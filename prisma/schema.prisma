@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// 1. User & Customer Management
+model Admin {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+}
+
+model Customer {
+  id           Int      @id @default(autoincrement())
+  type         String   // 'individual', 'business'
+  rank         Int      @default(1) // 1 to 5
+  name         String
+  kana         String?
+  companyName  String?
+  zipCode      String?
+  address      String?
+  phone        String?
+  email        String?
+  lineId       String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  
+  watches      Watch[]
+  repairs      Repair[]
+}
+
+// 2. Watch Metadata (Smart Input)
+model Brand {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  kana        String?
+  initialChar String?
+  
+  models      Model[]
+  calibers    Caliber[]
+  watches     Watch[]
+}
+
+model Model {
+  id        Int     @id @default(autoincrement())
+  brandId   Int
+  name      String
+  refNumber String?
+  
+  brand     Brand   @relation(fields: [brandId], references: [id])
+  watches   Watch[]
+}
+
+model Caliber {
+  id                  Int     @id @default(autoincrement())
+  brandId             Int?
+  name                String
+  movementType        String? // 'quartz', 'mechanical_simple', 'mechanical_chrono'
+  standardWorkMinutes Int     @default(60)
+  
+  brand     Brand?  @relation(fields: [brandId], references: [id])
+  watches   Watch[]
+}
+
+// 3. Repair & Watch
+model Watch {
+  id           Int      @id @default(autoincrement())
+  brandId      Int
+  modelId      Int
+  caliberId    Int?
+  serialNumber String
+  customerId   Int
+  
+  brand    Brand    @relation(fields: [brandId], references: [id])
+  model    Model    @relation(fields: [modelId], references: [id])
+  caliber  Caliber? @relation(fields: [caliberId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  repairs  Repair[]
+
+  @@unique([brandId, serialNumber])
+}
+
+model Repair {
+  id                   Int       @id @default(autoincrement())
+  uuid                 String    @unique @default(uuid())
+  inquiryNumber        String    @unique // T-001
+  customerId           Int
+  watchId              Int
+  
+  receptionDate        DateTime  @default(now())
+  status               String    // 'reception', 'diagnosing', etc.
+  approvalStatus       String    @default("pending")
+  
+  // Scheduling & Priority Logic
+  priorityScore        Int       @default(0)
+  scheduledDate        DateTime?
+  estimatedWorkMinutes Int       @default(0)
+  
+  workSummary          String?
+  isPublic             Boolean   @default(false)
+  publicComment        String?
+  
+  deliveryDateExpected DateTime?
+  deliveryDateActual   DateTime?
+  
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  customer Customer          @relation(fields: [customerId], references: [id])
+  watch    Watch             @relation(fields: [watchId], references: [id])
+  logs     RepairStatusLog[]
+  photos   RepairPhoto[]
+  estimate Estimate?
+}
+
+model RepairStatusLog {
+  id        Int      @id @default(autoincrement())
+  repairId  Int
+  status    String
+  changedAt DateTime @default(now())
+  changedBy Int?     // Admin ID
+  
+  repair    Repair   @relation(fields: [repairId], references: [id])
+}
+
+// 4. Photos
+model RepairPhoto {
+  id         Int      @id @default(autoincrement())
+  repairId   Int
+  category   String
+  storageKey String
+  fileName   String?
+  mimeType   String?
+  createdAt  DateTime @default(now())
+  
+  repair     Repair   @relation(fields: [repairId], references: [id])
+}
+
+// 5. Accounting
+model PricingRule {
+  id                Int     @id @default(autoincrement())
+  brandId           Int?
+  modelId           Int?
+  caliberId         Int?
+  customerType      String?
+  minPrice          Int
+  maxPrice          Int
+  suggestedWorkName String
+}
+
+model Estimate {
+  id             Int      @id @default(autoincrement())
+  repairId       Int      @unique
+  version        Int      @default(1)
+  issuedDate     DateTime @default(now())
+  
+  technicalFee   Int      @default(0)
+  mechanicCost   Int      @default(0)
+  partsTotal     Int      @default(0)
+  discountAmount Int      @default(0)
+  taxAmount      Int      @default(0)
+  totalAmount    Int      @default(0)
+  isActive       Boolean  @default(true)
+  
+  repair         Repair         @relation(fields: [repairId], references: [id])
+  items          EstimateItem[]
+}
+
+model EstimateItem {
+  id         Int    @id @default(autoincrement())
+  estimateId Int
+  itemName   String
+  quantity   Int    @default(1)
+  unitPrice  Int
+  type       String // 'part', 'labor'
+  
+  estimate   Estimate @relation(fields: [estimateId], references: [id])
+}
+
+// 6. Parts
+model PartsMaster {
+  id            Int     @id @default(autoincrement())
+  name          String
+  partNumber    String?
+  category      String
+  stockQuantity Int     @default(0)
+  latestCostYen Int     @default(0)
+  location      String?
+}
