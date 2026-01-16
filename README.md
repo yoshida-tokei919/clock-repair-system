@@ -1,5 +1,17 @@
 # Clock Repair System (Web Migration)
 
+## 🟢 Latest Status (2026-01-16)
+**Progress Rate: 30%**
+
+### ✅ Verification Results (Phase 1.5)
+Lower level logic engines have been verified:
+- **Time Estimation Logic**: "Caliber 4130" correctly auto-estimated as **120 minutes**.
+- **Priority Scoring**:
+  - VIP Customers (Rank 5) verified to receive high baseline score (500+).
+  - Urgent Deadlines (<3 days) verified to override rank, scoring >1100 points.
+
+---
+
 FileMakerからWebアプリ（Next.js + XServer）への移行プロジェクト。
 
 ## 📊 Project Status
