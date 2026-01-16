@@ -84,7 +84,10 @@ model Watch {
   customer Customer @relation(fields: [customerId], references: [id])
   repairs  Repair[]
 
-  @@unique([brandId, serialNumber])
+  // Fast Search Indexes
+  @@unique([brandId, serialNumber]) // Existing: Logic uniqueness
+  @@index([serialNumber])           // NEW: For "Serial-only" partial search
+  @@index([brandId, modelId])       // NEW: Filtering by specific model
 }
 
 model Repair {
