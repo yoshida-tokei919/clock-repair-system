@@ -10,6 +10,12 @@ Lower level logic engines have been verified:
   - VIP Customers (Rank 5) verified to receive high baseline score (500+).
   - Urgent Deadlines (<3 days) verified to override rank, scoring >1100 points.
 
+### 📘 Phase 2 Design (Completed)
+Detailed design for scaling to 50,000 records has been documented:
+- **Search**: Designed "Prefix Indexes" for instant serial number search.
+- **Image Optimization**: Defined auto-compression logic (WebP, <500KB) to minimize R2 costs.
+- **Storage**: Adopted `YYYY/MM/UUID` structure for efficient file management.
+
 ---
 
 FileMakerからWebアプリ（Next.js + XServer）への移行プロジェクト。
