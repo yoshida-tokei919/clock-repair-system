@@ -27,3 +27,7 @@ pnpm-debug.log*
 
 # vercel
 .vercel
+
+# deployment artifacts
+*.zip
+deploy.zip*

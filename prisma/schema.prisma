@@ -32,29 +32,59 @@ model Customer {
   passwordHash String?
   createdAt    DateTime @default(now())
   
-  watches      Watch[]
-  repairs      Repair[]
+  // Partner Extensions
+  isPartner    Boolean  @default(false)
+  prefix       String?  // e.g. "T", "JK"
+  currentSeq   Int      @default(0) // Last issued sequence (e.g. 100)
+  
+  // Document Sequences
+  seqEstimate  Int      @default(0)
+  seqDelivery  Int      @default(0)
+  seqInvoice   Int      @default(0)
+  
+  watches       Watch[]
+  repairs       Repair[]
+  deliveryNotes DeliveryNote[]
+  invoices      Invoice[]
+  estimateDocuments EstimateDocument[]
 }
 
 // 2. Watch Metadata (Smart Input)
 model Brand {
   id          Int       @id @default(autoincrement())
-  name        String    @unique
+  name        String    @unique // Legacy support (Internal ID or English)
+  nameEn      String?   @map("name_en") // English (e.g. ROLEX)
+  nameJp      String    @map("name_jp") // Japanese (e.g. ロレックス)
   kana        String?
   initialChar String?
   
   models      Model[]
   calibers    Caliber[]
   watches     Watch[]
+  parts       PartsMaster[]
 }
 
 model Model {
   id        Int     @id @default(autoincrement())
   brandId   Int
-  name      String
-  refNumber String?
+  name      String  // Legacy
+  nameEn    String? @map("name_en")
+  nameJp    String  @map("name_jp")
   
   brand     Brand   @relation(fields: [brandId], references: [id])
+  references WatchReference[]
+  watches   Watch[]
+  parts     PartsMaster[]
+}
+
+model WatchReference {
+  id        Int      @id @default(autoincrement())
+  modelId   Int
+  name      String   // e.g. 16233
+  caliberId Int?
+  
+  model     Model    @relation(fields: [modelId], references: [id])
+  caliber   Caliber? @relation(fields: [caliberId], references: [id])
   watches   Watch[]
 }
 
@@ -62,11 +92,15 @@ model Caliber {
   id                  Int     @id @default(autoincrement())
   brandId             Int?
   name                String
+  nameEn              String? @map("name_en")
+  nameJp              String? @map("name_jp")
   movementType        String? // 'quartz', 'mechanical_simple', 'mechanical_chrono'
   standardWorkMinutes Int     @default(60)
   
-  brand     Brand?  @relation(fields: [brandId], references: [id])
-  watches   Watch[]
+  brand      Brand?  @relation(fields: [brandId], references: [id])
+  references WatchReference[]
+  watches    Watch[]
+  parts      PartsMaster[]
 }
 
 // 3. Repair & Watch
@@ -74,20 +108,24 @@ model Watch {
   id           Int      @id @default(autoincrement())
   brandId      Int
   modelId      Int
+  referenceId  Int?
   caliberId    Int?
-  serialNumber String
+  serialNumber String? // Optional for vintage/unknown
   customerId   Int
   
-  brand    Brand    @relation(fields: [brandId], references: [id])
-  model    Model    @relation(fields: [modelId], references: [id])
-  caliber  Caliber? @relation(fields: [caliberId], references: [id])
-  customer Customer @relation(fields: [customerId], references: [id])
-  repairs  Repair[]
+  brand       Brand    @relation(fields: [brandId], references: [id])
+  model       Model    @relation(fields: [modelId], references: [id])
+  reference   WatchReference? @relation(fields: [referenceId], references: [id])
+  caliber     Caliber? @relation(fields: [caliberId], references: [id])
+  customer    Customer @relation(fields: [customerId], references: [id])
+  repairs     Repair[]
 
+  accessories  String?  // JSON or comma-separated list of accessories (Box, Warranty, etc.)
+  
   // Fast Search Indexes
-  @@unique([brandId, serialNumber]) // Existing: Logic uniqueness
-  @@index([serialNumber])           // NEW: For "Serial-only" partial search
-  @@index([brandId, modelId])       // NEW: Filtering by specific model
+  @@index([brandId, serialNumber]) // Replaced unique constraint with index
+  @@index([serialNumber])
+  @@index([brandId, modelId])
 }
 
 model Repair {
@@ -96,10 +134,13 @@ model Repair {
   inquiryNumber        String    @unique // T-001
   customerId           Int
   watchId              Int
+  partnerRef           String?   // Manual Partner Mgmt No
+  accessories          String?   // JSON or CSV of checked items
   
   receptionDate        DateTime  @default(now())
   status               String    // 'reception', 'diagnosing', etc.
   approvalStatus       String    @default("pending")
+  approvalDate         DateTime?
   
   // Scheduling & Priority Logic
   priorityScore        Int       @default(0)
@@ -107,8 +148,13 @@ model Repair {
   estimatedWorkMinutes Int       @default(0)
   
   workSummary          String?
-  isPublic             Boolean   @default(false)
-  publicComment        String?
+  // SEO Flags
+  isPublicB2C          Boolean   @default(false)
+  isPublicB2B          Boolean   @default(false)
+  publicTitle          String?
+  publicDescription    String?
+  endUserName          String?   // B2B End User Name
+  
   
   deliveryDateExpected DateTime?
   deliveryDateActual   DateTime?
@@ -121,6 +167,15 @@ model Repair {
   logs     RepairStatusLog[]
   photos   RepairPhoto[]
   estimate Estimate?
+  
+  deliveryNoteId Int?
+  deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
+  
+  invoiceId      Int?
+  invoice        Invoice?      @relation(fields: [invoiceId], references: [id])
+
+  estimateDocumentId Int?
+  estimateDocument   EstimateDocument? @relation(fields: [estimateDocumentId], references: [id])
 }
 
 model RepairStatusLog {
@@ -156,6 +211,7 @@ model PricingRule {
   minPrice          Int
   maxPrice          Int
   suggestedWorkName String
+  notes             String?
 }
 
 model Estimate {
@@ -168,6 +224,7 @@ model Estimate {
   mechanicCost   Int      @default(0)
   partsTotal     Int      @default(0)
   discountAmount Int      @default(0)
+  shipping       Int      @default(0)
   taxAmount      Int      @default(0)
   totalAmount    Int      @default(0)
   isActive       Boolean  @default(true)
@@ -188,12 +245,75 @@ model EstimateItem {
 }
 
 // 6. Parts
+// 6. Parts
 model PartsMaster {
   id            Int     @id @default(autoincrement())
-  name          String
-  partNumber    String?
-  category      String
+  brandId       Int?
+  caliberId     Int?
+  
+  name          String  // Legacy
+  nameEn        String? @map("name_en")
+  nameJp        String  @map("name_jp")
+  
+  partNumber    String? // Manufacturer Ref
+  category      String  // 'internal', 'external', 'generic'
+  
   stockQuantity Int     @default(0)
   latestCostYen Int     @default(0)
+  retailPrice   Int     @default(0) // Override or cached calc
   location      String?
+  supplier      String? // e.g. "eBay", "C24"
+  notes         String?
+  
+  brand         Brand?   @relation(fields: [brandId], references: [id])
+  caliber       Caliber? @relation(fields: [caliberId], references: [id])
+  modelId       Int?
+  model         Model?   @relation(fields: [modelId], references: [id])
+}
+
+// 7. Documents (Bulk Generation)
+model DeliveryNote {
+  id           Int      @id @default(autoincrement())
+  slipNumber   String   @unique // e.g. TD-001
+  issuedDate   DateTime @default(now())
+  
+  customerId   Int
+  customer     Customer @relation(fields: [customerId], references: [id])
+  
+  repairs      Repair[]
+  
+  totalAmount  Int      @default(0) // Cache for speed
+  taxAmount    Int      @default(0)
+}
+
+model Invoice {
+  id            Int      @id @default(autoincrement())
+  invoiceNumber String   @unique // e.g. TI-001
+  issuedDate    DateTime @default(now())
+  
+  customerId    Int
+  customer      Customer @relation(fields: [customerId], references: [id])
+  
+  repairs       Repair[]
+  
+  totalAmount   Int      @default(0)
+  taxAmount     Int      @default(0)
+  status        String   @default("issued") // issued, paid
+  paymentDueDate DateTime?
+}
+
+
+
+model EstimateDocument {
+  id              Int      @id @default(autoincrement())
+  estimateNumber  String   @unique // e.g. TE-001
+  issuedDate      DateTime @default(now())
+  
+  customerId      Int
+  customer        Customer @relation(fields: [customerId], references: [id])
+  
+  repairs         Repair[]
+  
+  totalAmount     Int      @default(0)
+  taxAmount       Int      @default(0)
 }

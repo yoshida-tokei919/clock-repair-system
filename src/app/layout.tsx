@@ -10,6 +10,9 @@ export const metadata: Metadata = {
     description: "Advanced Clock Repair Management",
 };
 
+import { Toaster } from "@/components/ui/toaster"
+import { Providers } from "@/components/Providers"
+
 export default function RootLayout({
     children,
 }: Readonly<{
@@ -18,7 +21,10 @@ export default function RootLayout({
     return (
         <html lang="ja">
             <body className={cn(inter.className, "antialiased min-h-screen bg-neutral-50")}>
-                {children}
+                <Providers>
+                    {children}
+                </Providers>
+                <Toaster />
             </body>
         </html>
     );

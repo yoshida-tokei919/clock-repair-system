@@ -1,0 +1,6 @@
+# Project Rules
+
+- **schema.sql Integrity**: 
+  - The `schema.sql` file in the project root is a **READ-ONLY** reference for the database structure. 
+  - **DO NOT** edit this file.
+  - When generating or modifying code, **ALWAYS** verify consistency with the definitions in `schema.sql`.

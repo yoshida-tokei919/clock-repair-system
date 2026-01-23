@@ -1,53 +1,73 @@
+// prisma/seed.ts
 import { PrismaClient } from '@prisma/client'
+
 const prisma = new PrismaClient()
 
 async function main() {
-    // 1. Create Brands
-    const rolex = await prisma.brand.upsert({
-        where: { name: 'ROLEX' },
+    console.log('Seeding data...')
+
+    // 1. Create Admin
+    const admin = await prisma.admin.upsert({
+        where: { email: 'admin@yoshida-watch.com' },
         update: {},
-        create: { name: 'ROLEX', kana: 'ロレックス', initialChar: 'R' },
+        create: {
+            name: 'Admin User',
+            email: 'admin@yoshida-watch.com',
+            passwordHash: 'hashed_password_here', // In future use bcrypt
+            role: 'admin',
+        },
     })
+    console.log({ admin })
 
-    // 2. Create Models
-    const daytona = await prisma.model.create({
-        data: {
-            brandId: rolex.id,
-            name: 'Daytona',
-            refNumber: '116500LN',
+    // 2. Create Partners (F-01/F-10 Enhancement)
+    const partners = [
+        { name: 'TRUST', prefix: 'T', currentSeq: 20260091 },
+        { name: 'J KAMER', prefix: 'JK', currentSeq: 50 },
+        { name: 'EVANCE', prefix: 'E', currentSeq: 10 },
+        { name: 'COMMIT', prefix: 'C', currentSeq: 0 },
+        { name: 'QUAKE', prefix: 'Q', currentSeq: 0 },
+        { name: 'A-WATCH', prefix: 'A', currentSeq: 0 },
+    ]
+
+    for (const p of partners) {
+        // Only create if not exists
+        const existing = await prisma.customer.findFirst({
+            where: { name: p.name, isPartner: true }
+        });
+
+        if (!existing) {
+            const partner = await prisma.customer.create({
+                data: {
+                    type: 'business',
+                    isPartner: true,
+                    rank: 5,
+                    name: p.name,
+                    companyName: p.name,
+                    prefix: p.prefix,
+                    currentSeq: p.currentSeq,
+                },
+            })
+            console.log(`Created partner: ${partner.name} (Prefix: ${partner.prefix})`)
         }
-    })
+    }
 
-    // 3. Create Calibers (with Work Time)
-    const c4130 = await prisma.caliber.create({
-        data: {
-            brandId: rolex.id,
-            name: '4130',
-            movementType: 'mechanical_chrono',
-            standardWorkMinutes: 120, // 2 hours
-        }
-    })
+    // 3. Create Brands (Master Data)
+    const brands = [
+        { name: 'ROLEX', nameEn: 'ROLEX', nameJp: 'ロレックス' },
+        { name: 'OMEGA', nameEn: 'OMEGA', nameJp: 'オメガ' },
+        { name: 'SEIKO', nameEn: 'SEIKO', nameJp: 'セイコー' },
+        { name: 'CARTIER', nameEn: 'CARTIER', nameJp: 'カルティエ' },
+    ]
 
-    // 4. Create Customers with Ranks
-    const vipCustomer = await prisma.customer.create({
-        data: {
-            type: 'individual',
-            name: 'VIP Tanaka',
-            email: 'tanaka@vip.com',
-            rank: 5, // High rank
-        }
-    })
+    for (const b of brands) {
+        await prisma.brand.upsert({
+            where: { name: b.name },
+            update: {},
+            create: b,
+        })
+    }
 
-    const normalCustomer = await prisma.customer.create({
-        data: {
-            type: 'individual',
-            name: 'Normal Suzuki',
-            email: 'suzuki@normal.com',
-            rank: 1, // Normal rank
-        }
-    })
-
-    console.log({ rolex, daytona, c4130, vipCustomer, normalCustomer })
+    console.log('Seeding finished.')
 }
 
 main()

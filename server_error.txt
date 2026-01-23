@@ -1,0 +1,14 @@
+2026-01-17T10:37:12.337Z - 
+Invalid `prisma.watch.create()` invocation:
+
+
+Foreign key constraint failed on the field: `foreign key`
+{
+  "name": "PrismaClientKnownRequestError",
+  "code": "P2003",
+  "clientVersion": "5.7.0",
+  "meta": {
+    "modelName": "Watch",
+    "field_name": "foreign key"
+  }
+}

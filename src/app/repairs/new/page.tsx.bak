@@ -1,0 +1,903 @@
+"use client";
+
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import dynamic from "next/dynamic";
+import { ArrowLeft, Camera, Printer, Save, Search, Check, ChevronDown, User, Watch, Settings, Trash2, Plus, Image as ImageIcon, MapPin, Phone, Mail, MessageCircle, Clock, CheckCircle, Smartphone, FileText } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { MasterService } from "@/lib/masterData";
+import { MasterValidators, ValidationMessages } from "@/lib/validators";
+
+// Dynamically import PDF component to avoid SSR issues with @react-pdf/renderer
+const PDFPreviewDialog = dynamic(() => import("@/components/repairs/PDFPreviewDialog"), {
+    ssr: false,
+    loading: () => <Button variant="outline" size="sm" disabled><FileText className="w-4 h-4 mr-1" /> Loading PDF...</Button>
+});
+const TagPreviewDialog = dynamic(() => import("@/components/repairs/TagPreviewDialog"), {
+    ssr: false
+});
+import { LinePreviewModal } from "@/components/line/LinePreviewModal";
+import { QuickRegisterDialog, RegisterData } from "@/components/repairs/QuickRegisterDialog";
+
+// --- Types ---
+interface WorkItem { id: string; name: string; price: number; }
+interface PartItem { id: string; name: string; retailPrice: number; supplier?: string; notes?: string; }
+type RepairStatus = "estimate" | "parts_wait" | "working" | "completed" | "delivered";
+
+const formatPartOption = (p: any) => `${p.name} [${p.supplier || "-"}] - ¥${p.retailPrice.toLocaleString()}`;
+
+// --- Status Timeline Data ---
+const STATUS_STEPS: { id: RepairStatus; label: string }[] = [
+    { id: "estimate", label: "見積・受付" },
+    { id: "parts_wait", label: "部品待ち" },
+    { id: "working", label: "作業中" },
+    { id: "completed", label: "完了" },
+    { id: "delivered", label: "納品済" },
+];
+
+// --- Combobox Component ---
+interface AdvancedComboboxProps {
+    value: string;
+    onChange: (value: string) => void;
+    onUpsert?: (value: string) => void;
+    placeholder?: string;
+    options: { label: string, value: string }[];
+    disabled?: boolean;
+    validator?: (value: string) => boolean;
+    validationMessage?: string;
+}
+
+const AdvancedCombobox: React.FC<AdvancedComboboxProps> = ({ value, onChange, onUpsert, placeholder, options, disabled, validator, validationMessage }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [highlightedIndex, setHighlightedIndex] = useState(0);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const safeOptions = Array.isArray(options) ? options : [];
+    const filtered = safeOptions.filter(opt => opt.label && opt.label.toLowerCase().includes(search.toLowerCase()));
+    const exactMatch = safeOptions.some(opt => opt.value === search || opt.label === search);
+    const selectedLabel = safeOptions.find(o => o.value === value)?.label || value;
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) setIsOpen(false);
+        }
+        // Use mousedown to capture before click
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (isOpen) {
+            setSearch("");
+            setError(null);
+            setHighlightedIndex(0);
+            // Slight delay to ensure render
+            setTimeout(() => inputRef.current?.focus(), 50);
+        }
+    }, [isOpen]);
+
+    const handleSelect = (val: string) => {
+        onChange(val);
+        setIsOpen(false);
+    };
+
+    const handleCreateNew = () => {
+        if (validator && !validator(search)) { if (!confirm(`警告: ${validationMessage}\n登録しますか？`)) return; }
+        if (onUpsert) { onUpsert(search); setIsOpen(false); setSearch(""); }
+        else { onChange(search); setIsOpen(false); }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (!isOpen) {
+            if (e.key === "Enter" || e.key === "ArrowDown") { setIsOpen(true); e.preventDefault(); }
+            return;
+        }
+
+        switch (e.key) {
+            case "ArrowDown":
+                e.preventDefault();
+                setHighlightedIndex(prev => (prev + 1) % filtered.length);
+                break;
+            case "ArrowUp":
+                e.preventDefault();
+                setHighlightedIndex(prev => (prev - 1 + filtered.length) % filtered.length);
+                break;
+            case "Enter":
+                e.preventDefault();
+                if (filtered.length > 0) {
+                    handleSelect(filtered[highlightedIndex].value);
+                } else if (search && onUpsert) {
+                    handleCreateNew();
+                }
+                break;
+            case "Escape":
+                setIsOpen(false);
+                break;
+        }
+    };
+
+    return (
+        <div className="relative" ref={wrapperRef}>
+            <div
+                className={cn("flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm cursor-pointer hover:bg-zinc-50 transition-colors", disabled ? "opacity-50 pointer-events-none bg-zinc-100" : "", value ? "font-bold text-zinc-900" : "text-muted-foreground")}
+                onClick={(e) => {
+                    if (disabled) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsOpen(prev => !prev);
+                }}
+            >
+                <div className="truncate pr-4">{selectedLabel ? selectedLabel : (placeholder || "Select...")}</div>
+                <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+            </div>
+            {isOpen && (
+                <div className="absolute z-[999] mt-1 w-full rounded-md border bg-popover shadow-md bg-white dark:bg-zinc-800 p-1 min-w-[300px]">
+                    <Input
+                        ref={inputRef}
+                        autoFocus
+                        className="h-8 mb-1"
+                        placeholder="Search..."
+                        value={search}
+                        onChange={(e) => { setSearch(e.target.value); setHighlightedIndex(0); }}
+                        onKeyDown={handleKeyDown}
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                    {error && <p className="text-xs text-red-500 pl-1 font-bold">{error}</p>}
+                    <div className="max-h-[300px] overflow-auto">
+                        {!exactMatch && search && onUpsert && (
+                            <div className="p-2 text-sm text-blue-600 cursor-pointer hover:bg-blue-50 font-bold" onClick={handleCreateNew}>+ "{search}" を新規登録</div>
+                        )}
+                        {filtered.map((opt, idx) => (
+                            <div
+                                key={opt.value}
+                                className={cn("p-1.5 text-sm cursor-pointer rounded-sm border-b border-zinc-50 last:border-0", highlightedIndex === idx ? "bg-blue-100 text-blue-900 font-bold" : "hover:bg-accent")}
+                                onClick={() => handleSelect(opt.value)}
+                                onMouseEnter={() => setHighlightedIndex(idx)}
+                            >
+                                {opt.label}
+                            </div>
+                        ))}
+                        {filtered.length === 0 && !search && <div className="p-2 text-xs text-muted-foreground">Type to search...</div>}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default function RepairEntryPage() {
+    // --- Core State ---
+    const [status, setStatus] = useState<RepairStatus>("estimate");
+    const [statusLog, setStatusLog] = useState<Record<string, string>>({ "estimate": new Date().toLocaleDateString() });
+
+    // --- Partner & Customer Info (F-01) ---
+    interface Partner { id: string; name: string; prefix: string; currentSeq: number; }
+    const [partners, setPartners] = useState<Partner[]>([]);
+
+    // Fetch Partners from API
+    useEffect(() => {
+        fetch('/api/partners')
+            .then(res => res.json())
+            .then(data => {
+                if (data.partners) setPartners(data.partners);
+            })
+            .catch(err => console.error("Failed to fetch partners", err));
+    }, []);
+
+    // Derived options for Combobox
+    const partnerOptions = useMemo(() => partners.map(p => ({ label: p.name, value: p.name })), [partners]);
+
+    const [customerCategory, setCustomerCategory] = useState<"B2B" | "B2C">("B2B");
+    const [customerName, setCustomerName] = useState("");
+    const [contactPerson, setContactPerson] = useState("");
+    const [endUserName, setEndUserName] = useState("");
+    const [lineId, setLineId] = useState("");
+    const [address, setAddress] = useState("");
+    const [email, setEmail] = useState("");
+
+    // --- Watch Specs (F-02) ---
+    const [brand, setBrand] = useState("");
+    const [model, setModel] = useState("");
+    const [refName, setRefName] = useState("");
+    const [caliber, setCaliber] = useState("");
+    const [serial, setSerial] = useState("");
+    const [accessories, setAccessories] = useState("");
+
+    // --- Quote & Parts (F-12) ---
+    const [repairType, setRepairType] = useState<"internal" | "external">("internal");
+    const [selectedWorks, setSelectedWorks] = useState<WorkItem[]>([]);
+    const [selectedParts, setSelectedParts] = useState<PartItem[]>([]);
+
+    // --- Request & Notes ---
+    const [requestContent, setRequestContent] = useState("");
+    const [internalNotes, setInternalNotes] = useState("");
+    const [customerComm, setCustomerComm] = useState("");
+
+    // IDs (F-01 refined)
+    const [inquiryId, setInquiryId] = useState(""); // Our Management No (Auto: Prefix-Seq)
+    const [partnerRef, setPartnerRef] = useState(""); // Their Ref (Manual)
+
+    const router = useRouter(); // Need import from next/navigation
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSave = async () => {
+        if (!brand) {
+            alert("必須項目（ブランド）が入力されていません。");
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            // Find Partner ID if B2B
+            const partner = customerCategory === "B2B" ? partners.find(p => p.name === customerName) : null;
+
+            // If ID is a timestamp (local only), send null to backend so it looks up by Name
+            const isValidId = partner && partner.id.length < 10;
+
+            const payload = {
+                customer: {
+                    id: isValidId ? partner?.id : null,
+                    name: customerName,
+                    type: customerCategory === "B2B" ? "business" : "individual",
+                    phone: lineId, // Using lineId field as phone/contact for now for B2C matching
+                    address: address,
+                    email: email,
+                },
+                watch: {
+                    brand,
+                    model,
+                    ref: refName, // Might need to pass if we want to save it
+                    serial,
+                    caliber
+                },
+                request: {
+                    partnerRef,
+                    accessories: accessories.split(",").map(s => s.trim()), // Simple CSV split
+                    diagnosis: requestContent,
+                    internalNotes
+                }
+            };
+
+            const res = await fetch("/api/repairs", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Save failed on server");
+            }
+
+            const result = await res.json();
+            // Redirect to Detail Page
+            router.push(`/repairs/${result.repair.id}`);
+
+        } catch (error: any) {
+            console.error(error);
+            alert(`保存に失敗しました。\nエラー: ${error.message}`);
+            setIsSaving(false);
+        }
+    };
+
+
+
+    // --- F-06 / F-13 State ---
+    const [isPdfOpen, setIsPdfOpen] = useState(false);
+    const [pdfReady, setPdfReady] = useState(false);
+
+    // F-13 Mock State
+    const [linePreview, setLinePreview] = useState<{
+        isOpen: boolean;
+        recipient: string;
+        message: string;
+        attachType?: "pdf" | null;
+    }>({ isOpen: false, recipient: "", message: "", attachType: null });
+
+    // --- Options ---
+    const [brandOptions, setBrandOptions] = useState<any[]>([]);
+    const [modelOptions, setModelOptions] = useState<any[]>([]);
+    const [refOptions, setRefOptions] = useState<any[]>([]);
+    const [workOptions, setWorkOptions] = useState<any[]>([]);
+    const [partsOptions, setPartsOptions] = useState<any[]>([]);
+
+    // --- Effects ---
+    useEffect(() => { setBrandOptions(MasterService.getBrands().map(s => ({ label: s, value: s }))); }, [brand]);
+    useEffect(() => { setModelOptions(MasterService.getModelsForBrand(brand).map(s => ({ label: s, value: s }))); }, [brand, model]);
+    useEffect(() => { setRefOptions(MasterService.getRefsForModel(model).map(s => ({ label: s, value: s }))); }, [model, refName]);
+
+    useEffect(() => {
+        if (refName) {
+            const linkedCaliber = MasterService.getCaliberForRef(refName);
+            if (linkedCaliber) setCaliber(linkedCaliber);
+        }
+    }, [refName]);
+
+    // Force refresh parts/works when context changes
+    useEffect(() => {
+        let wCS: any[] = [];
+        let pCS: any[] = [];
+        const isInternal = repairType === "internal";
+        const target = isInternal ? caliber : refName;
+
+        if (isInternal && caliber) {
+            wCS = MasterService.getInternalWorkOptions(caliber);
+            pCS = MasterService.getPartsForCaliber(caliber);
+        } else if (!isInternal && refName) {
+            wCS = MasterService.getExternalWorkOptions(refName);
+            pCS = MasterService.getPartsForRef(refName);
+        }
+        setWorkOptions(wCS);
+        setPartsOptions(pCS);
+    }, [repairType, caliber, refName]);
+
+    const handlePartUpsert = (val: string) => {
+        const newPart = MasterService.upsertPart({
+            type: repairType,
+            brandId: "b1",
+            targetId: repairType === "internal" ? (caliber || "c2") : (refName ? "r1" : "unknown"),
+            name: val,
+            ref: `${val}-NEW`,
+            costPrice: 0,
+            retailPrice: 0,
+            stock: 0,
+            supplier: "Manual",
+            notes: "Quick Add"
+        });
+
+        // Refresh options immediately
+        let updatedOptions = [...partsOptions];
+        if (repairType === "internal" && caliber) updatedOptions = MasterService.getPartsForCaliber(caliber);
+        else if (repairType === "external" && refName) updatedOptions = MasterService.getPartsForRef(refName);
+        setPartsOptions(updatedOptions);
+
+        // Auto Select the new part
+        if (newPart) {
+            setSelectedParts(prev => [...prev, { id: newPart.id, name: newPart.name, retailPrice: newPart.retailPrice, supplier: newPart.supplier, notes: newPart.notes }]);
+        }
+    };
+
+    const handleStatusToggle = (stepId: RepairStatus) => {
+        const isAlreadyDone = !!statusLog[stepId];
+
+        if (isAlreadyDone) {
+            if (confirm(`ステータス「${STATUS_STEPS.find(s => s.id === stepId)?.label}」の日付リセットしますか？\n（履歴から削除されます）`)) {
+                const newLog = { ...statusLog };
+                delete newLog[stepId];
+                setStatusLog(newLog);
+                // Also revert current status if it was this one? 
+                // Logic: find previous available status or stay? 
+                // For now just clearing date.
+            }
+        } else {
+            setStatus(stepId);
+            setStatusLog({ ...statusLog, [stepId]: new Date().toLocaleDateString() });
+        }
+    };
+
+    const handleLineNotify = () => {
+        if (!lineId && !email && !customerName) {
+            alert("LINE送信先（LINE ID, TEL, または顧客名）が見つかりません。");
+            return;
+        }
+
+        const recipient = lineId || customerName || "お客様";
+        const currentStatusLabel = STATUS_STEPS.find(s => s.id === status)?.label;
+        const msg = `お世話になっております。\n\nお預かりしている時計のステータスが「${currentStatusLabel}」に更新されました。\n\nご確認のほどよろしくお願いいたします。`;
+
+        setLinePreview({
+            isOpen: true,
+            recipient: recipient,
+            message: msg,
+            attachType: null
+        });
+    };
+
+    const handlePdfLineSend = () => {
+        const recipient = lineId || customerName || "お客様";
+        const msg = `お世話になっております。\n\n修理のお見積書を作成いたしました。\nPDFファイルを送付いたしますので、内容をご確認ください。\n\nご不明な点がございましたらお気軽にご連絡ください。`;
+
+        setLinePreview({
+            isOpen: true,
+            recipient: recipient,
+            message: msg,
+            attachType: "pdf"
+        });
+    };
+
+    // --- Register Dialog State (F-12) ---
+    const [registerDialog, setRegisterDialog] = useState<{
+        isOpen: boolean;
+        mode: "work" | "part";
+        initialName: string;
+    }>({ isOpen: false, mode: "work", initialName: "" });
+
+    const openRegisterDialog = (mode: "work" | "part", name: string) => {
+        setRegisterDialog({ isOpen: true, mode, initialName: name });
+    };
+
+    const handleRegisterSubmit = (data: RegisterData) => {
+        if (registerDialog.mode === "work") {
+            const newWork = MasterService.upsertWork({
+                name: data.name,
+                price: data.price,
+                category: repairType,
+                targetId: repairType === "internal" ? (caliber || "c2") : (refName || "r1")
+            });
+
+            // Refresh Options
+            let wCS = [];
+            if (repairType === "internal" && caliber) wCS = MasterService.getInternalWorkOptions(caliber);
+            else if (repairType === "external" && refName) wCS = MasterService.getExternalWorkOptions(refName);
+            setWorkOptions(wCS);
+
+            // Select it
+            if (newWork) {
+                setSelectedWorks(prev => [...prev, { id: newWork.id, name: newWork.name, price: newWork.price }]);
+            }
+
+        } else {
+            const newPart = MasterService.upsertPart({
+                type: repairType,
+                brandId: "b1",
+                targetId: repairType === "internal" ? (caliber || "c2") : (refName ? "r1" : "unknown"),
+                name: data.name,
+                ref: `${data.name}-NEW`,
+                costPrice: data.cost || 0,
+                retailPrice: data.price,
+                stock: 0,
+                supplier: data.supplier,
+                notes: "Manual Entry"
+            });
+
+            // Refresh options
+            let updatedOptions = [...partsOptions];
+            if (repairType === "internal" && caliber) updatedOptions = MasterService.getPartsForCaliber(caliber);
+            else if (repairType === "external" && refName) updatedOptions = MasterService.getPartsForRef(refName);
+            setPartsOptions(updatedOptions);
+
+            // Select it
+            if (newPart) {
+                setSelectedParts(prev => [...prev, { id: newPart.id, name: newPart.name, retailPrice: newPart.retailPrice, supplier: newPart.supplier, notes: newPart.notes }]);
+            }
+        }
+    };
+
+    // --- PDF Data Prep (F-06 Integration) ---
+    // Simplified for debugging
+    const pdfData = {
+        id: `Est-${Date.now()}`,
+        date: new Date().toLocaleDateString("ja-JP"),
+        customer: {
+            name: customerName || "お客様",
+            type: "individual" as const,
+            address: address
+        },
+        jobs: [{
+            inquiryId: inquiryId || "TEMP",
+            partnerRef: partnerRef,
+            endUser: endUserName,
+            watch: { brand, model, ref: refName, serial },
+            items: [],
+            photos: []
+        }],
+        deliveries: undefined
+    };
+
+    // Totals
+    const techTotal = selectedWorks.reduce((s, w) => s + w.price, 0);
+    const partsTotal = selectedParts.reduce((s, p) => s + p.retailPrice, 0);
+    const grandTotal = techTotal + partsTotal;
+
+    return (
+        <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 p-2 font-sans text-zinc-900 dark:text-zinc-100">
+            {/* Top Bar */}
+            <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" className="h-8 gap-1"><ArrowLeft className="w-4 h-4" /> Back</Button>
+                        <h1 className="text-lg font-bold tracking-tight text-zinc-700 dark:text-zinc-200">新規修理受付</h1>
+                    </div>
+                    {/* F-06 & F-13 Actions */}
+                    <div className="flex items-center gap-2">
+                        {/* F-13: LINE Notify */}
+                        <Button variant="outline" size="sm" className="h-8 gap-1 border-green-500 text-green-600 hover:bg-green-50" onClick={handleLineNotify}>
+                            <MessageCircle className="w-4 h-4" /> LINE通知
+                        </Button>
+
+                        {/* F-06: PDF Estimate (Isolated Component) */}
+                        <PDFPreviewDialog
+                            data={pdfData}
+                            className="h-8 gap-1 border-zinc-400 text-zinc-600"
+                            onLineSend={handlePdfLineSend}
+                        />
+
+                        {/* F-08: Tag Print */}
+                        <TagPreviewDialog
+                            data={{
+                                id: pdfData.id, // Use same ID or specific Repair ID
+                                customerName: customerName || "Customer",
+                                model: model || brand || "-",
+                                ref: refName || "-",
+                                date: new Date().toLocaleDateString("ja-JP")
+                            }}
+                            className="h-8 gap-1 border-zinc-400 text-zinc-600"
+                        />
+
+                        {/* Request: Invoice Generation (Corrected) */}
+                        <PDFPreviewDialog
+                            data={pdfData}
+                            mode="invoice"
+                            className="h-8 gap-1 border-zinc-400 text-zinc-600"
+                            onLineSend={handlePdfLineSend}
+                        />
+
+                        {/* F-07: Warranty */}
+                        <PDFPreviewDialog
+                            data={{
+                                id: `WAR-${Date.now()}`,
+                                repairId: pdfData.jobs[0].inquiryId || "",
+                                customerName: endUserName || customerName || "お客様",
+                                watch: { brand, model, ref: refName, serial },
+                                repairDate: new Date().toLocaleDateString("ja-JP"),
+                                expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toLocaleDateString("ja-JP"),
+                                guaranteeContent: "オーバーホール"
+                            }}
+                            mode="warranty"
+                            className="h-8 gap-1 border-amber-400 text-amber-700 hover:bg-amber-50"
+                        />
+
+
+                        <Button size="sm" className="h-8 gap-1 bg-blue-600 hover:bg-blue-700" onClick={handleSave} disabled={isSaving}>
+                            <Save className="w-4 h-4" /> {isSaving ? "Saving..." : "保存"}
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Line Preview Modal */}
+                <LinePreviewModal
+                    isOpen={linePreview.isOpen}
+                    onClose={() => setLinePreview(prev => ({ ...prev, isOpen: false }))}
+                    recipientName={linePreview.recipient}
+                    messageText={linePreview.message}
+                    attachmentType={linePreview.attachType}
+                    attachmentTitle="御見積書.pdf"
+                    onSend={() => {
+                        alert("✅ LINE送信完了 (Mock)\n\n実際に連携するにはMessaging APIの設定が必要です。");
+                        setLinePreview(prev => ({ ...prev, isOpen: false }));
+                    }}
+                />
+
+                {/* Visual Status Timeline (F-04) */}
+                <Card className="p-3 bg-white border-zinc-300 rounded-sm">
+                    <div className="flex items-center justify-between relative px-4">
+                        <div className="absolute top-1/2 left-0 w-full h-1 bg-zinc-100 -z-10" />
+                        {STATUS_STEPS.map((step, idx) => {
+                            const isDone = Object.keys(statusLog).includes(step.id);
+                            const isCurrent = status === step.id;
+                            const logDate = statusLog[step.id];
+
+                            return (
+                                <div key={step.id}
+                                    className={cn("flex flex-col items-center gap-1 cursor-pointer transition-all hover:scale-105 group")}
+                                >
+                                    {/* Icon: Toggles Status */}
+                                    <div
+                                        onClick={() => handleStatusToggle(step.id)}
+                                        className={cn(
+                                            "w-8 h-8 rounded-full flex items-center justify-center border-2 z-10 transition-colors shadow-sm",
+                                            isCurrent ? "bg-blue-600 border-blue-600 text-white" :
+                                                isDone ? "bg-green-500 border-green-500 text-white" : "bg-white border-zinc-300 text-zinc-400"
+                                        )}
+                                    >
+                                        {isDone || isCurrent ? <CheckCircle className="w-5 h-5" /> : <Clock className="w-4 h-4" />}
+                                    </div>
+
+                                    {/* Label & Date */}
+                                    <div className="text-center relative">
+                                        <div className={cn("text-xs font-bold", isCurrent ? "text-blue-700" : "text-zinc-600")}>{step.label}</div>
+
+                                        {/* Date Text / Picker */}
+                                        <div className="relative h-4 min-w-[60px] flex items-center justify-center">
+                                            {logDate ? (
+                                                <>
+                                                    <span className="text-[10px] text-zinc-500 font-mono">{logDate}</span>
+                                                    {/* Hidden Date Input for Editing */}
+                                                    <input
+                                                        type="date"
+                                                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                        onChange={(e) => {
+                                                            if (e.target.value) {
+                                                                const d = new Date(e.target.value);
+                                                                setStatusLog({ ...statusLog, [step.id]: d.toLocaleDateString() });
+                                                            }
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()} // Prevent toggle
+                                                    />
+                                                </>
+                                            ) : (
+                                                <div className="h-full w-full" onClick={() => handleStatusToggle(step.id)}>
+                                                    <span className="text-[10px] text-zinc-300">-</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Card>
+            </div>
+
+
+            <div className="grid grid-cols-12 gap-2 h-full">
+
+                {/* 1. Header Info (F-01) */}
+                <Card className="col-span-12 p-3 bg-white shadow-sm border-zinc-300 rounded-sm">
+                    <div className="grid grid-cols-12 gap-4 items-start">
+                        <div className="col-span-2">
+                            <Label className="label-dense">顧客区分</Label>
+                            <div className="flex bg-zinc-100 rounded p-1">
+                                <button onClick={() => setCustomerCategory("B2B")} className={cn("flex-1 text-xs py-1 rounded font-bold transition-all", customerCategory === "B2B" ? "bg-white shadow text-blue-700" : "text-zinc-500")}>業者 (B2B)</button>
+                                <button onClick={() => setCustomerCategory("B2C")} className={cn("flex-1 text-xs py-1 rounded font-bold transition-all", customerCategory === "B2C" ? "bg-white shadow text-green-700" : "text-zinc-500")}>個人 (B2C)</button>
+                            </div>
+                        </div>
+
+                        {customerCategory === "B2B" ? (
+                            <>
+                                <div className="col-span-3">
+                                    <Label className="label-dense">取引先名 (Partner)</Label>
+                                    <AdvancedCombobox
+                                        options={partnerOptions}
+                                        value={customerName}
+                                        onChange={(val) => {
+                                            setCustomerName(val);
+                                            // Auto-generate Our Management ID (Prefix-Seq)
+                                            const partner = partners.find(p => p.name === val);
+                                            if (partner) {
+                                                const nextSeq = partner.currentSeq + 1;
+                                                const newId = `${partner.prefix}-${String(nextSeq).padStart(3, '0')}`;
+                                                setInquiryId(newId);
+                                            } else {
+                                                setInquiryId("");
+                                            }
+                                        }}
+                                        placeholder="取引先を選択..."
+                                        onUpsert={(val) => {
+                                            // Registration prompt
+                                            const prefix = window.prompt(`新規取引先「${val}」の登録\n管理番号用プレフィックスを入力してください (例: T, JK)`) || val.slice(0, 2).toUpperCase();
+                                            const newPartner: Partner = {
+                                                id: Date.now().toString(),
+                                                name: val,
+                                                prefix: prefix,
+                                                currentSeq: 0
+                                            };
+                                            setPartners(prev => [...prev, newPartner]);
+                                            setCustomerName(val);
+                                            setInquiryId(`${prefix}-001`);
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="col-span-3 grid grid-cols-2 gap-2">
+                                    <div>
+                                        <Label className="label-dense text-blue-700">管理番号 (Auto)</Label>
+                                        <Input
+                                            className="bg-blue-50/50 border-blue-200 h-8 font-mono font-bold text-blue-800"
+                                            value={inquiryId}
+                                            readOnly
+                                            placeholder="自動採番"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="label-dense">貴社管理番号 (Partner Ref)</Label>
+                                        <Input
+                                            className="bg-zinc-50 border-zinc-300 h-8 font-mono"
+                                            value={partnerRef}
+                                            onChange={(e) => setPartnerRef(e.target.value)}
+                                            placeholder="任意手入力..."
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="col-span-2">
+                                    <Label className="label-dense">担当者</Label>
+                                    <Input className="bg-zinc-50 border-zinc-300 h-8" placeholder="担当者名" value={contactPerson} onChange={e => setContactPerson(e.target.value)} />
+                                </div>
+                                <div className="col-span-2">
+                                    <Label className="label-dense">LINE ID / Memo</Label>
+                                    <Input className="bg-zinc-50 border-zinc-300 h-8 font-mono" placeholder="LINE..." value={lineId} onChange={e => setLineId(e.target.value)} />
+                                </div>
+                                <div className="col-span-2">
+                                    <Label className="label-dense text-blue-600">エンドユーザー名</Label>
+                                    <Input className="bg-blue-50 border-blue-200 h-8" placeholder="お客様名（任意）" value={endUserName} onChange={e => setEndUserName(e.target.value)} />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="col-span-3">
+                                    <Label className="label-dense">お客様名</Label>
+                                    <Input className="bg-zinc-50 border-zinc-300 h-8" placeholder="氏名" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+                                </div>
+                                <div className="col-span-3">
+                                    <Label className="label-dense">住所</Label>
+                                    <Input className="bg-zinc-50 border-zinc-300 h-8" placeholder="〒住所..." value={address} onChange={e => setAddress(e.target.value)} />
+                                </div>
+                                <div className="col-span-2">
+                                    <Label className="label-dense">LINE / TEL</Label>
+                                    <Input className="bg-zinc-50 border-zinc-300 h-8 font-mono" placeholder="090-..." value={lineId} onChange={e => setLineId(e.target.value)} />
+                                </div>
+                                <div className="col-span-2">
+                                    <Label className="label-dense">Email</Label>
+                                    <Input className="bg-zinc-50 border-zinc-300 h-8 font-mono" placeholder="@" value={email} onChange={e => setEmail(e.target.value)} />
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </Card>
+
+                {/* Left Column: Watch Specs */}
+                <div className="col-span-3 flex flex-col gap-2">
+                    <Card className="flex-1 p-3 bg-white border-zinc-300 rounded-sm space-y-3">
+                        <div className="flex items-center gap-2 border-b pb-2 mb-2">
+                            <Watch className="w-5 h-5 text-zinc-500" />
+                            <h2 className="font-bold text-zinc-700">お預かり時計</h2>
+                        </div>
+                        <div className="space-y-0.5">
+                            <Label className="label-dense text-blue-800 font-bold">ブランド (Brand)</Label>
+                            <AdvancedCombobox value={brand} onChange={(v) => { setBrand(v); setModel(""); setRefName(""); setCaliber(""); }} onUpsert={(v) => { MasterService.upsertBrand(v); setBrand(v); }} options={brandOptions} placeholder="ROLEX..." validator={MasterValidators.brand} />
+                        </div>
+                        <div className="space-y-0.5">
+                            <Label className="label-dense text-zinc-600">モデル名 (Model)</Label>
+                            <AdvancedCombobox value={model} onChange={(v) => { setModel(v); setRefName(""); }} onUpsert={(v) => { MasterService.upsertModel(brand, v); setModel(v); }} options={modelOptions} placeholder="Model..." disabled={!brand} validator={MasterValidators.model} />
+                        </div>
+                        <div className="space-y-0.5">
+                            <Label className="label-dense text-zinc-600">Ref No.</Label>
+                            <AdvancedCombobox value={refName} onChange={(v) => { setRefName(v); }} onUpsert={(v) => { MasterService.upsertRef(model, v); setRefName(v); }} options={refOptions} placeholder="Ref..." disabled={!model} validator={MasterValidators.ref} />
+                        </div>
+                        <div className="space-y-0.5">
+                            <Label className="label-dense text-blue-600 font-bold">Caliber</Label>
+                            <Input value={caliber} onChange={(e) => setCaliber(e.target.value)} placeholder="Caliber..." className="font-mono bg-blue-50/50 border-blue-200" />
+                        </div>
+                        <div className="space-y-0.5 pt-2">
+                            <Label className="label-dense text-zinc-600">Serial No.</Label>
+                            <Input className="input-dense bg-zinc-50" placeholder="Serial..." value={serial} onChange={e => setSerial(e.target.value)} />
+                        </div>
+                        <div className="space-y-0.5">
+                            <Label className="label-dense text-zinc-600">付属品</Label>
+                            <Input className="input-dense bg-zinc-50" placeholder="箱, 保証書..." value={accessories} onChange={e => setAccessories(e.target.value)} />
+                        </div>
+                    </Card>
+                </div>
+
+                {/* Center Column: Quote & Request (F-03/F-12) */}
+                <div className="col-span-5 flex flex-col gap-2">
+                    <Card className="flex-1 p-0 bg-white border-zinc-300 rounded-sm flex flex-col overflow-hidden">
+                        <div className="p-2 bg-zinc-50 border-b flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Settings className="w-4 h-4 text-zinc-500" />
+                                <h2 className="font-bold text-sm text-zinc-700">数理見積 / Quote</h2>
+                            </div>
+                            <div className="flex bg-white border rounded p-0.5 scale-90">
+                                <button onClick={() => setRepairType("internal")} className={cn("px-2 py-0.5 text-xs font-bold rounded transition-all", repairType === "internal" ? "bg-blue-100 text-blue-700" : "text-zinc-500")}>内装</button>
+                                <button onClick={() => setRepairType("external")} className={cn("px-2 py-0.5 text-xs font-bold rounded transition-all", repairType === "external" ? "bg-green-100 text-green-700" : "text-zinc-500")}>外装</button>
+                            </div>
+                        </div>
+
+                        <div className="p-2 flex-1 overflow-y-auto space-y-4">
+                            {/* Tech Fee */}
+                            <div>
+                                <h3 className="text-xs font-bold text-zinc-500 mb-1 border-b border-zinc-100 pb-1">1. 技術料</h3>
+                                <div className="mb-2">
+                                    <AdvancedCombobox
+                                        value=""
+                                        options={workOptions.map(w => ({ label: `${w.name} (¥${w.price.toLocaleString()})`, value: w.id }))}
+                                        onChange={(id) => { const w = workOptions.find(o => o.id === id); if (w && !selectedWorks.some(sw => sw.id === w.id)) setSelectedWorks([...selectedWorks, w]); }}
+                                        onUpsert={(val) => openRegisterDialog("work", val)}
+                                        placeholder="作業項目を選択..."
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    {selectedWorks.map((work, idx) => (
+                                        <div key={idx} className="flex gap-1 items-center bg-zinc-50 p-1 rounded">
+                                            <span className="text-xs flex-1">{work.name}</span>
+                                            <span className="text-xs font-mono">¥{work.price.toLocaleString()}</span>
+                                            <button onClick={() => { const n = [...selectedWorks]; n.splice(idx, 1); setSelectedWorks(n); }} className="text-zinc-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Parts */}
+                            <div>
+                                <h3 className="text-xs font-bold text-zinc-500 mb-1 border-b border-zinc-100 pb-1 flex justify-between">
+                                    <span>2. 部品</span>
+                                    <span>Tgt: {repairType === "internal" ? caliber : refName}</span>
+                                </h3>
+                                <div className="mb-2">
+                                    <AdvancedCombobox
+                                        value=""
+                                        options={partsOptions.map(p => ({ label: formatPartOption(p), value: p.id }))}
+                                        onChange={(id) => { const p = partsOptions.find(o => o.id === id); if (p && !selectedParts.some(sp => sp.id === p.id)) setSelectedParts([...selectedParts, p]); }}
+                                        onUpsert={(val) => openRegisterDialog("part", val)}
+                                        placeholder={partsOptions.length > 0 ? "部品を選択..." : "該当なし(新規登録可)"}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    {selectedParts.map((part, idx) => (
+                                        <div key={idx} className="flex gap-1 items-center bg-blue-50/30 p-1 rounded border border-blue-100">
+                                            <div className="flex-1">
+                                                <div className="text-xs font-bold flex items-center gap-1">
+                                                    {part.name}
+                                                    {part.supplier && <span className="bg-white border rounded px-1 text-[10px] text-zinc-500">{part.supplier}</span>}
+                                                </div>
+                                                {part.notes && <div className="text-[10px] text-zinc-400">{part.notes}</div>}
+                                            </div>
+                                            <div className="text-xs font-mono font-bold">¥{part.retailPrice.toLocaleString()}</div>
+                                            <button onClick={() => { const n = [...selectedParts]; n.splice(idx, 1); setSelectedParts(n); }} className="text-zinc-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <QuickRegisterDialog
+                                isOpen={registerDialog.isOpen}
+                                mode={registerDialog.mode}
+                                initialName={registerDialog.initialName}
+                                onClose={() => setRegisterDialog(prev => ({ ...prev, isOpen: false }))}
+                                onRegister={handleRegisterSubmit}
+                            />
+                        </div>
+                </div>
+            </div>
+
+            <div className="p-2 bg-zinc-50 border-t flex justify-between items-center text-sm font-bold text-zinc-700">
+                <span>合計</span>
+                <span className="text-lg">¥{grandTotal.toLocaleString()}</span>
+            </div>
+        </Card>
+
+                    {/* Notes & Request Split */ }
+    <Card className="p-2 bg-white border-zinc-300 rounded-sm space-y-2">
+        <div>
+            <Label className="label-dense mb-1">依頼内容 (Request)</Label>
+            <textarea value={requestContent} onChange={e => setRequestContent(e.target.value)} className="w-full p-2 text-xs border rounded-md resize-none h-16 bg-zinc-50" placeholder="修理依頼内容..."></textarea>
+        </div>
+        <div>
+            <Label className="label-dense mb-1">備考 (Notes)</Label>
+            <textarea value={internalNotes} onChange={e => setInternalNotes(e.target.value)} className="w-full p-2 text-xs border rounded-md resize-none h-12 bg-zinc-50" placeholder="社内備考..."></textarea>
+        </div>
+        <div>
+            <Label className="label-dense mb-1 text-blue-600">お客様連絡事項 (Customer Comm)</Label>
+            <textarea value={customerComm} onChange={e => setCustomerComm(e.target.value)} className="w-full p-2 text-xs border border-blue-100 rounded-md resize-none h-12 bg-blue-50/50" placeholder="見積時の連絡事項など..."></textarea>
+        </div>
+    </Card>
+                </div >
+
+        {/* Right Column: Photos */ }
+        < div className = "col-span-4 flex flex-col gap-2" >
+            <Card className="flex-1 bg-zinc-200 border-zinc-300 rounded-sm overflow-hidden flex flex-col">
+                <div className="flex-1 flex items-center justify-center p-4">
+                    <div className="text-center">
+                        <Camera className="w-10 h-10 text-zinc-400 mx-auto mb-2" />
+                        <p className="text-xs text-zinc-500">Drag & Drop</p>
+                    </div>
+                </div>
+                <div className="bg-white p-2 border-t grid grid-cols-3 gap-2 h-32 overflow-y-auto">
+                    {[1, 2, 3].map(i => <div key={i} className="aspect-square bg-zinc-100 rounded-sm border border-zinc-200"></div>)}
+                    <button className="aspect-square bg-zinc-50 border border-dashed border-zinc-300 rounded-sm flex items-center justify-center"><Plus className="w-5 h-5 text-zinc-400" /></button>
+                </div>
+            </Card>
+                </div >
+
+            </div >
+        </div >
+    );
+}
