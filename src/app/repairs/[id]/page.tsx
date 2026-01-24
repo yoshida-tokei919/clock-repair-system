@@ -50,8 +50,9 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
             address: repair.customer?.address || "-",
         },
         watch: {
-            brand: repair.watch?.brand?.nameEn || repair.watch?.brand?.name || "Unknown",
-            brandJp: repair.watch?.brand?.nameJp || "",
+            brand: (repair.watch?.brand?.nameEn && repair.watch?.brand?.nameJp && repair.watch.brand.nameEn !== repair.watch.brand.nameJp)
+                ? `${repair.watch.brand.nameEn} ${repair.watch.brand.nameJp}`
+                : (repair.watch?.brand?.nameJp || repair.watch?.brand?.nameEn || repair.watch?.brand?.name || "Unknown"),
             model: repair.watch?.model?.name || "Unknown",
             ref: repair.watch?.reference?.name || "-",
             serial: repair.watch?.serialNumber || "-",
@@ -81,7 +82,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                     <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
                         <div className="font-mono text-xs text-slate-500">{mockRepair.inquiryNumber}</div>
                         <h1 className="text-lg font-bold text-slate-900">
-                            {mockRepair.watch.brand} {mockRepair.watch.brandJp} {mockRepair.watch.model} {mockRepair.watch.ref}
+                            {mockRepair.watch.brand} {mockRepair.watch.model} {mockRepair.watch.ref}
                         </h1>
                         <div>{getStatusBadge(mockRepair.status)}</div>
                     </div>
@@ -103,7 +104,6 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                             inquiryNumber: mockRepair.inquiryNumber,
                             watch: {
                                 brand: mockRepair.watch.brand,
-                                brandJp: mockRepair.watch.brandJp,
                                 model: mockRepair.watch.model,
                                 ref: mockRepair.watch.ref,
                             },
