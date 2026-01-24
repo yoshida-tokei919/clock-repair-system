@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { EstimatePDFClient } from "@/components/pdf/EstimatePDFClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function EstimateDocumentPage({ params }: { params: { id: string } }) {
     const id = parseInt(params.id);
     if (isNaN(id)) return notFound();

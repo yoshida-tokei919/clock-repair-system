@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 /* eslint-disable @next/next/no-img-element */
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 // --- 1. CSS (Original) ---
 const GLOBAL_CSS = `

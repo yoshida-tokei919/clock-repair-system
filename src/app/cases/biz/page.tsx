@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowRight } from "lucide-react";
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function BizCasePage() {
     const repairs = await prisma.repair.findMany({

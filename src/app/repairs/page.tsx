@@ -7,6 +7,7 @@ import { RepairListStatusSelect } from "@/components/repairs/RepairListStatusSel
 import { RepairsTableClient } from "@/components/repairs/RepairsTableClient";
 import { PlusCircle, Search, Filter, LayoutDashboard } from "lucide-react";
 import { redirect } from "next/navigation";
+export const dynamic = "force-dynamic";
 
 export default async function RepairsPage({
     searchParams,

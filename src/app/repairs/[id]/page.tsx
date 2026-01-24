@@ -13,6 +13,8 @@ import { getStatusBadge } from "@/components/status-badge";
 import { StatusUpdateForm } from "@/components/repairs/StatusUpdateForm";
 import { TagPrintButton } from "@/components/repairs/TagPrintButton";
 import { LineButton } from "@/components/line/LineButton";
+
+export const dynamic = "force-dynamic";
 import { PublishCaseButton } from "@/components/repairs/PublishCaseButton";
 
 export default async function RepairDetailPage({ params }: { params: { id: string } }) {

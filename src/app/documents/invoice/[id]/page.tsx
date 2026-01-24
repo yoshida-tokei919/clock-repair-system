@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { InvoicePDFClient } from "@/components/pdf/InvoicePDFClient"; // Will create this
 
+export const dynamic = "force-dynamic";
+
 export default async function InvoiceDocumentPage({ params }: { params: { id: string } }) {
     const id = parseInt(params.id);
     if (isNaN(id)) return notFound();

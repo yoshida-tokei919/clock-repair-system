@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { DeliveryPDFClient } from "@/components/pdf/DeliveryPDFClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function DeliveryDocumentPage({ params }: { params: { id: string } }) {
     const id = parseInt(params.id);
     if (isNaN(id)) return notFound();

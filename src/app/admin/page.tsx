@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: "Dashboard - Clock Repair System",
   description: "Management Dashboard",
 };
+export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
   return (

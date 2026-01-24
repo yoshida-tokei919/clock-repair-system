@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Hammer } from "lucide-react";
 
-export const revalidate = 60; // ISR: Revalidate every 60 seconds
+export const dynamic = 'force-dynamic';
 
 export default async function GalleryPage() {
     const repairs = await prisma.repair.findMany({
