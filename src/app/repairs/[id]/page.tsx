@@ -37,29 +37,29 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
     const mockRepair = {
         id: String(repair.id),
         inquiryNumber: repair.inquiryNumber,
-        partnerRef: repair.partnerRef || "-", // ADDED
+        partnerRef: repair.partnerRef || "-",
         status: repair.status,
-        receptionDate: repair.receptionDate.toLocaleDateString("ja-JP"),
+        receptionDate: repair.receptionDate ? repair.receptionDate.toLocaleDateString("ja-JP") : "-",
         customer: {
-            name: repair.customer.name,
-            type: repair.customer.rank > 3 ? "VIP" : (repair.customer.type === 'business' ? "Owner/B2B" : "General"),
-            phone: repair.customer.phone || repair.customer.lineId || "-",
-            address: repair.customer.address || "-",
+            name: repair.customer?.name || "Unknown",
+            type: repair.customer ? (repair.customer.rank > 3 ? "VIP" : (repair.customer.type === 'business' ? "Owner/B2B" : "General")) : "-",
+            phone: repair.customer?.phone || repair.customer?.lineId || "-",
+            address: repair.customer?.address || "-",
         },
         watch: {
-            brand: repair.watch.brand.name || "Unknown",
-            model: repair.watch.model.name || "Unknown",
-            ref: repair.watch.reference?.name || "-",
-            serial: repair.watch.serialNumber || "-",
-            caliber: repair.watch.caliber?.name || "-",
+            brand: repair.watch?.brand?.name || "Unknown",
+            model: repair.watch?.model?.name || "Unknown",
+            ref: repair.watch?.reference?.name || "-",
+            serial: repair.watch?.serialNumber || "-",
+            caliber: repair.watch?.caliber?.name || "-",
         },
         timeline: repair.logs.map(log => ({
             id: log.id,
             status: log.status,
-            date: log.changedAt.toLocaleDateString("ja-JP") + " " + log.changedAt.toLocaleTimeString("ja-JP", { hour: '2-digit', minute: '2-digit' }),
+            date: log.changedAt ? (log.changedAt.toLocaleDateString("ja-JP") + " " + log.changedAt.toLocaleTimeString("ja-JP", { hour: '2-digit', minute: '2-digit' })) : "-",
             isCompleted: true
         })),
-        photos: repair.photos.map(p => p.storageKey),
+        photos: repair.photos?.map(p => p.storageKey) || [],
         estimateItems: repair.estimate?.items || []
     };
 

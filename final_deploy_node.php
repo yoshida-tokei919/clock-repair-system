@@ -22,6 +22,9 @@ if (!file_exists("$home/.nodebrew")) {
 run("$node_bin/nodebrew install-binary v20.10.0");
 run("$node_bin/nodebrew use v20.10.0");
 
+// 2.5 Git Pull
+run("cd $app_path && git pull origin main");
+
 // 3. NPM Install & Prisma
 run("cd $app_path && export PATH=$node_bin:\$PATH && npm install --production");
 run("cd $app_path && export PATH=$node_bin:\$PATH && npx prisma db push");
