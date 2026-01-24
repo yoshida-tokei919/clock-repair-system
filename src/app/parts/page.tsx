@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Search, Package, Save } from "lucide-react";
+import { Plus, Search, Package, Save, ArrowLeft, LayoutDashboard, FileText, X } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -97,7 +98,13 @@ const AdvancedCombobox: React.FC<AdvancedComboboxProps> = ({
                     />
                     {error && <p className="text-xs text-red-500 pl-1 font-bold">{error}</p>}
 
-                    <div className="max-h-[200px] overflow-auto">
+                    <div className="max-h-[200px] overflow-auto border-t">
+                        {value && (
+                            <div className="p-1.5 text-xs text-red-500 cursor-pointer hover:bg-red-50 flex items-center gap-1 font-bold"
+                                onClick={() => { onChange(""); setIsOpen(false); }}>
+                                <X className="w-3 h-3" /> 選択をクリアする（空にする）
+                            </div>
+                        )}
                         {filtered.length === 0 && search && !exactMatch ? (
                             <div className="p-2 text-sm text-blue-600 cursor-pointer hover:bg-blue-50 font-bold" onClick={handleCreateNew}>
                                 + "{search}" を使用/登録
@@ -387,9 +394,21 @@ export default function PartsManagerPage() {
 
             {/* LEFT: Inventory List */}
             <div className="flex-1 flex flex-col gap-4">
+                <div className="flex items-center gap-4 mb-2">
+                    <Link href="/admin">
+                        <Button variant="ghost" size="sm">
+                            <LayoutDashboard className="w-4 h-4 mr-2" /> ダッシュボード
+                        </Button>
+                    </Link>
+                    <Link href="/repairs">
+                        <Button variant="ghost" size="sm">
+                            <FileText className="w-4 h-4 mr-2" /> 修理一覧
+                        </Button>
+                    </Link>
+                </div>
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <Package className="w-6 h-6" /> 部品在庫管理 (Parts Manager)
+                        <Package className="w-6 h-6" /> 部品マスタ管理
                     </h1>
                     <div className="flex bg-zinc-200 rounded-lg p-1">
                         <button

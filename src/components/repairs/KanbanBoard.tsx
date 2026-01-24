@@ -78,10 +78,10 @@ export function KanbanBoard({ initialRepairs }: KanbanBoardProps) {
         const result = await updateRepairStatus(repairId, newStatus);
         if (!result.success) {
             // Revert
-            setRepairs(initialRepairs); // Or better revert logic
+            setRepairs(initialRepairs);
             toast({
                 title: "ステータス更新失敗",
-                description: "サーバーエラーが発生しました。",
+                description: result.error || "サーバーエラーが発生しました。",
                 variant: "destructive"
             });
         }

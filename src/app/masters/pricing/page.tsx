@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Search, Settings, Save, AlertCircle } from "lucide-react";
+import { Plus, Search, Settings, Save, AlertCircle, LayoutDashboard, FileText, X } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -93,7 +94,13 @@ const AdvancedCombobox: React.FC<AdvancedComboboxProps> = ({
                     />
                     {error && <p className="text-[10px] text-red-500 pl-1 font-bold">{error}</p>}
 
-                    <div className="max-h-[200px] overflow-auto">
+                    <div className="max-h-[200px] overflow-auto border-t">
+                        {value && (
+                            <div className="p-1.5 text-xs text-red-500 cursor-pointer hover:bg-red-50 flex items-center gap-1 font-bold"
+                                onClick={() => { onChange(""); setIsOpen(false); }}>
+                                <X className="w-3 h-3" /> 選択をクリアする（空にする）
+                            </div>
+                        )}
                         {filtered.length === 0 && search && !exactMatch ? (
                             <div className="p-2 text-sm text-blue-600 cursor-pointer hover:bg-blue-50 font-bold" onClick={handleCreateNew}>
                                 + "{search}" を使用/登録
@@ -279,9 +286,21 @@ export default function PricingManagerPage() {
         <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 p-6 flex gap-6 font-sans">
             {/* List */}
             <div className="flex-1 space-y-4">
+                <div className="flex items-center gap-4 mb-2">
+                    <Link href="/admin">
+                        <Button variant="ghost" size="sm">
+                            <LayoutDashboard className="w-4 h-4 mr-2" /> ダッシュボード
+                        </Button>
+                    </Link>
+                    <Link href="/repairs">
+                        <Button variant="ghost" size="sm">
+                            <FileText className="w-4 h-4 mr-2" /> 修理一覧
+                        </Button>
+                    </Link>
+                </div>
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold flex items-center gap-2 text-slate-800">
-                        <Settings className="w-6 h-6 text-blue-600" /> 作業内容・料金マスタ (Pricing Master)
+                        <Settings className="w-6 h-6 text-blue-600" /> 作業内容・料金マスタ
                     </h1>
                 </div>
 

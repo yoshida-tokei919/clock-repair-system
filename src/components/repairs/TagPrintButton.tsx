@@ -14,7 +14,9 @@ interface Props {
         inquiryNumber: string;
         watch: {
             brand: string;
+            brandJp?: string;
             model: string;
+            ref: string;
         };
         customer: {
             name: string;
@@ -49,7 +51,7 @@ export function TagPrintButton({ repair }: Props) {
             const doc = (
                 <TagDocument
                     repairId={repair.inquiryNumber}
-                    modelName={`${repair.watch.brand} ${repair.watch.model}`}
+                    modelName={`${repair.watch.brand} ${repair.watch.brandJp || ""} ${repair.watch.model} ${repair.watch.ref}`}
                     customerName={repair.customer.name}
                     qrCodeDataUrl={qrUrl}
                 />
@@ -61,9 +63,9 @@ export function TagPrintButton({ repair }: Props) {
             // 3. Open in new window (User prints using OS dialog)
             window.open(url, '_blank');
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Print failed", error);
-            alert("印刷データの生成に失敗しました");
+            alert(`印刷データの生成に失敗しました: ${error.message || "Unknown error"}`);
         } finally {
             setIsGenerating(false);
         }
@@ -92,7 +94,7 @@ export function TagPrintButton({ repair }: Props) {
                         )}
                         <div className="text-center">
                             <p className="text-sm font-bold text-zinc-700">{repair.inquiryNumber}</p>
-                            <p className="text-xs text-zinc-500">{repair.watch.brand} {repair.watch.model}</p>
+                            <p className="text-xs text-zinc-500">{repair.watch.brand} {repair.watch.brandJp} {repair.watch.model} {repair.watch.ref}</p>
                         </div>
                         <Button className="w-full" onClick={() => { setShowPreview(false); handlePrint(); }}>
                             <Printer className="w-4 h-4 mr-2" /> この内容で印刷

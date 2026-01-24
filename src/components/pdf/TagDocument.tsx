@@ -4,7 +4,7 @@ import { Page, Text, View, Document, StyleSheet, Image, Font } from '@react-pdf/
 // Register Japanese Font
 Font.register({
     family: "NotoSansJP",
-    src: "https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8_1v4f5lT8EzlC9FvruPM.ttf",
+    src: "/fonts/NotoSansJP-Regular.otf",
 });
 
 // Dimensions for Brother DK-1209 (Small Address Label): 29mm x 62mm

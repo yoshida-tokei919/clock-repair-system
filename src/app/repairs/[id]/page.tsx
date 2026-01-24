@@ -40,6 +40,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
         id: String(repair.id),
         inquiryNumber: repair.inquiryNumber,
         partnerRef: repair.partnerRef || "-",
+        endUserName: repair.endUserName || null,
         status: repair.status,
         receptionDate: repair.receptionDate ? repair.receptionDate.toLocaleDateString("ja-JP") : "-",
         customer: {
@@ -49,7 +50,8 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
             address: repair.customer?.address || "-",
         },
         watch: {
-            brand: repair.watch?.brand?.name || "Unknown",
+            brand: repair.watch?.brand?.nameEn || repair.watch?.brand?.name || "Unknown",
+            brandJp: repair.watch?.brand?.nameJp || "",
             model: repair.watch?.model?.name || "Unknown",
             ref: repair.watch?.reference?.name || "-",
             serial: repair.watch?.serialNumber || "-",
@@ -70,15 +72,17 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
             {/* Header / Nav */}
             <div className="bg-white border-b sticky top-0 z-30 px-4 py-3 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-4">
-                    <Link href="/admin">
+                    <Link href="/repairs">
                         <Button variant="ghost" size="sm">
-                            <ArrowLeft className="w-4 h-4 mr-2" /> ダッシュボード
+                            <ArrowLeft className="w-4 h-4 mr-2" /> 修理一覧
                         </Button>
                     </Link>
                     <div className="h-6 w-px bg-slate-200 mx-2 hidden md:block"></div>
                     <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
                         <div className="font-mono text-xs text-slate-500">{mockRepair.inquiryNumber}</div>
-                        <h1 className="text-lg font-bold text-slate-900">{mockRepair.watch.brand} {mockRepair.watch.model}</h1>
+                        <h1 className="text-lg font-bold text-slate-900">
+                            {mockRepair.watch.brand} {mockRepair.watch.brandJp} {mockRepair.watch.model} {mockRepair.watch.ref}
+                        </h1>
                         <div>{getStatusBadge(mockRepair.status)}</div>
                     </div>
                 </div>
@@ -99,7 +103,9 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                             inquiryNumber: mockRepair.inquiryNumber,
                             watch: {
                                 brand: mockRepair.watch.brand,
+                                brandJp: mockRepair.watch.brandJp,
                                 model: mockRepair.watch.model,
+                                ref: mockRepair.watch.ref,
                             },
                             customer: {
                                 name: mockRepair.customer.name
@@ -126,9 +132,11 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                             <ShieldCheck className="w-4 h-4 mr-2" /> 保証書
                         </Button>
                     </Link>
-                    <Button size="sm">
-                        <Edit className="w-4 h-4 mr-2" /> 編集
-                    </Button>
+                    <Link href={`/repairs/${params.id}/edit`}>
+                        <Button size="sm">
+                            <Edit className="w-4 h-4 mr-2" /> 編集
+                        </Button>
+                    </Link>
                 </div>
             </div>
 
@@ -147,7 +155,14 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                         <CardContent className="text-sm space-y-3">
                             <div>
                                 <div className="text-slate-500 text-xs">お名前</div>
-                                <div className="font-bold text-slate-900 text-lg">{mockRepair.customer.name}</div>
+                                <div className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                                    {mockRepair.customer.name}
+                                    {mockRepair.endUserName && (
+                                        <span className="text-sm font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                                            (エンドユーザー: {mockRepair.endUserName} 様)
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex gap-4">
                                 <div>
