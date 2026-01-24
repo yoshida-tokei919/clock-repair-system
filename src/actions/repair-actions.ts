@@ -20,10 +20,12 @@ export async function updateRepairStatus(repairId: number, newStatus: string, no
         await prisma.$transaction(async (tx) => {
             // 1. Fetch current to check approvalDate
             const current = await tx.repair.findUnique({ where: { id: repairId } });
-            if (!current) throw new Error("Repair not found");
+            if (!current) throw new Error(`Repair ID ${repairId} not found`);
 
             const isApprovalStatus = ['in_progress', 'parts_wait', 'completed', 'delivered'].includes(newStatus);
             const shouldSetApprovalDate = isApprovalStatus && !current.approvalDate;
+
+            console.log(`Updating Repair ${repairId} to status ${newStatus}. Should set approval date: ${shouldSetApprovalDate}`);
 
             // 2. Update Repair Status
             await tx.repair.update({
@@ -35,22 +37,31 @@ export async function updateRepairStatus(repairId: number, newStatus: string, no
             });
 
             // 3. Add Log
+            // Check if admin 1 exists (fallback to null if not)
+            const admin = await tx.admin.findUnique({ where: { id: 1 } });
+
             await tx.repairStatusLog.create({
                 data: {
                     repairId: repairId,
                     status: statusLabel,
-                    changedBy: 1
+                    changedBy: admin ? 1 : null
                 }
             });
         });
 
         revalidatePath(`/repairs/${repairId}`);
         revalidatePath('/repairs');
+        revalidatePath('/repairs/board');
 
         return { success: true };
-    } catch (error) {
-        console.error("Status Update Error:", error);
-        return { success: false, error: "Failed to update status" };
+    } catch (error: any) {
+        console.error("Status Update Error Detailed:", {
+            message: error.message,
+            stack: error.stack,
+            repairId,
+            newStatus
+        });
+        return { success: false, error: error.message || "Failed to update status" };
     }
 }
 
