@@ -23,6 +23,7 @@ yarn-debug.log*
 pnpm-debug.log*
 
 # local env files
+.env
 .env*.local
 
 # vercel
@@ -30,4 +31,22 @@ pnpm-debug.log*
 
 # deployment artifacts
 *.zip
+*.tgz
 deploy.zip*
+deploy_package.zip
+deploy_package.tgz
+
+# secrets
+*.key
+deploy_key
+deploy_key.pub
+
+# recovery tools
+*.php
+migrate_to_supabase*.js
+check_pw.js
+test_db_conn.js
+local_build*.bat
+gen_key.bat
+deploy_to_server.bat
+MANUAL_UPLOAD_KEY.txt
