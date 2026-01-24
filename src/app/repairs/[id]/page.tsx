@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RepairTimeline } from "@/components/repair-timeline";
 import { PhotoGallery } from "@/components/photo-gallery";
-import { ArrowLeft, Printer, FileText, Edit, Clock, Calendar, ShieldCheck, MapPin, Package } from "lucide-react";
+import { ArrowLeft, Printer, FileText, Edit, Clock, Calendar, ShieldCheck, MapPin, Package, Settings, ChevronRight } from "lucide-react";
 
 import { getStatusBadge } from "@/components/status-badge";
 import { StatusUpdateForm } from "@/components/repairs/StatusUpdateForm";
@@ -112,40 +112,33 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                             }
                         }}
                     />
-                    <Link href={`/repairs/${params.id}/estimate/pdf`}>
-                        <Button variant="outline" size="sm">
-                            <Printer className="w-4 h-4 mr-2" /> 見積書
-                        </Button>
-                    </Link>
-                    <Link href={`/repairs/${params.id}/invoice/pdf`}>
-                        <Button variant="outline" size="sm">
-                            <FileText className="w-4 h-4 mr-2" /> 請求書
-                        </Button>
-                    </Link>
-                    <Link href={`/repairs/${params.id}/delivery/pdf`}>
-                        <Button variant="outline" size="sm">
-                            <Package className="w-4 h-4 mr-2" /> 納品書
-                        </Button>
-                    </Link>
-                    <Link href={`/repairs/${params.id}/warranty/pdf`}>
-                        <Button variant="outline" size="sm">
-                            <ShieldCheck className="w-4 h-4 mr-2" /> 保証書
-                        </Button>
-                    </Link>
+                    <div className="h-6 w-px bg-slate-200 mx-1"></div>
                     <Link href={`/repairs/${params.id}/edit`}>
-                        <Button size="sm">
+                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 shadow-sm">
                             <Edit className="w-4 h-4 mr-2" /> 編集
                         </Button>
                     </Link>
                 </div>
             </div>
 
-            <main className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+            <main className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-                {/* Left Column: Basic Info */}
-                <div className="md:col-span-4 space-y-6">
+                {/* Left Column: Basic Info (Sticky on Large Screens) */}
+                <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
+                    {/* Status Update Card (Moved to top of sidebar for quick access) */}
+                    <Card className="border-blue-100 bg-blue-50/30">
+                        <CardHeader className="pb-3 text-blue-900">
+                            <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                <Settings className="w-4 h-4" /> ステータス更新
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <StatusUpdateForm repairId={parseInt(mockRepair.id)} currentStatus={mockRepair.status} />
+                        </CardContent>
+                    </Card>
+
                     {/* Customer Card */}
-                    <Card>
+                    <Card className="shadow-sm">
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center">
                                 <ShieldCheck className="w-4 h-4 mr-2 text-blue-600" />
@@ -154,11 +147,11 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                         </CardHeader>
                         <CardContent className="text-sm space-y-3">
                             <div>
-                                <div className="text-slate-500 text-xs">お名前</div>
-                                <div className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                                <div className="text-slate-500 text-xs text-zinc-400">お名前</div>
+                                <div className="font-bold text-slate-900 text-lg flex flex-wrap items-center gap-2 text-zinc-800">
                                     {mockRepair.customer.name}
                                     {mockRepair.endUserName && (
-                                        <span className="text-sm font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                                        <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                                             (エンドユーザー: {mockRepair.endUserName} 様)
                                         </span>
                                     )}
@@ -166,17 +159,17 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                             </div>
                             <div className="flex gap-4">
                                 <div>
-                                    <div className="text-slate-500 text-xs">ランク</div>
+                                    <div className="text-slate-500 text-xs text-zinc-400">ランク</div>
                                     <Badge variant="secondary" className="mt-1">{mockRepair.customer.type}</Badge>
                                 </div>
                                 <div>
-                                    <div className="text-slate-500 text-xs">連絡先</div>
-                                    <div className="mt-1 font-mono">{mockRepair.customer.phone}</div>
+                                    <div className="text-slate-500 text-xs text-zinc-400">連絡先</div>
+                                    <div className="mt-1 font-mono text-zinc-700">{mockRepair.customer.phone}</div>
                                 </div>
                             </div>
                             <div>
-                                <div className="text-slate-500 text-xs">住所</div>
-                                <div className="mt-1 flex items-start gap-1">
+                                <div className="text-slate-500 text-xs text-zinc-400">住所</div>
+                                <div className="mt-1 flex items-start gap-1 text-zinc-600">
                                     <MapPin className="w-3 h-3 mt-1 text-slate-400" />
                                     {mockRepair.customer.address}
                                 </div>
@@ -184,15 +177,15 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                             {/* Partner Ref */}
                             {mockRepair.partnerRef && mockRepair.partnerRef !== "-" && (
                                 <div className="pt-2 border-t mt-2">
-                                    <div className="text-slate-500 text-xs text-blue-600 font-bold">貴社管理番号 (Their Ref)</div>
-                                    <div className="font-mono font-bold">{mockRepair.partnerRef}</div>
+                                    <div className="text-slate-500 text-xs text-blue-600 font-bold">貴社管理番号</div>
+                                    <div className="font-mono font-bold text-blue-700">{mockRepair.partnerRef}</div>
                                 </div>
                             )}
                         </CardContent>
                     </Card>
 
                     {/* Watch Card */}
-                    <Card>
+                    <Card className="shadow-sm">
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center">
                                 <Clock className="w-4 h-4 mr-2 text-slate-600" />
@@ -202,28 +195,28 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                         <CardContent className="text-sm space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <div className="text-slate-500 text-xs">ブランド</div>
-                                    <div className="font-medium">{mockRepair.watch.brand}</div>
+                                    <div className="text-slate-500 text-xs text-zinc-400">ブランド</div>
+                                    <div className="font-bold text-zinc-800">{mockRepair.watch.brand}</div>
                                 </div>
                                 <div>
-                                    <div className="text-slate-500 text-xs">モデル名</div>
-                                    <div className="font-medium">{mockRepair.watch.model}</div>
+                                    <div className="text-slate-500 text-xs text-zinc-400">モデル名</div>
+                                    <div className="font-medium text-zinc-800">{mockRepair.watch.model}</div>
                                 </div>
                                 <div>
-                                    <div className="text-slate-500 text-xs">型番 (Ref)</div>
-                                    <div className="font-mono font-medium">{mockRepair.watch.ref}</div>
+                                    <div className="text-slate-500 text-xs text-zinc-400">型番 (Ref)</div>
+                                    <div className="font-mono font-medium text-zinc-700">{mockRepair.watch.ref}</div>
                                 </div>
                                 <div>
-                                    <div className="text-slate-500 text-xs">製造番号 (Serial)</div>
-                                    <div className="font-mono font-medium">{mockRepair.watch.serial}</div>
+                                    <div className="text-slate-500 text-xs text-zinc-400">シリアル</div>
+                                    <div className="font-mono font-medium text-zinc-700">{mockRepair.watch.serial}</div>
                                 </div>
                                 <div>
-                                    <div className="text-slate-500 text-xs">キャリバー</div>
-                                    <div className="font-mono font-medium">{mockRepair.watch.caliber}</div>
+                                    <div className="text-slate-500 text-xs text-zinc-400">キャリバー</div>
+                                    <div className="font-mono font-medium text-zinc-700">{mockRepair.watch.caliber}</div>
                                 </div>
                                 <div>
-                                    <div className="text-slate-500 text-xs">受付日</div>
-                                    <div className="font-medium flex items-center gap-1">
+                                    <div className="text-slate-500 text-xs text-zinc-400">受付日</div>
+                                    <div className="font-medium flex items-center gap-1 text-zinc-800">
                                         <Calendar className="w-3 h-3 text-slate-400" />
                                         {mockRepair.receptionDate}
                                     </div>
@@ -232,112 +225,117 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                         </CardContent>
                     </Card>
 
-                    {/* Quick Documents */}
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base">関連書類 (Documents)</CardTitle>
+                    {/* Quick Documents - Consolidated List */}
+                    <Card className="shadow-sm overflow-hidden">
+                        <CardHeader className="pb-3 bg-zinc-50 border-b">
+                            <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                <FileText className="w-4 h-4" /> 帳票・書類一覧
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                            <Link href={`/repairs/${params.id}/estimate/pdf`} className="flex items-center justify-between p-3 border rounded-md hover:bg-slate-50 transition-colors group">
+                        <div className="divide-y text-sm">
+                            <Link href={`/repairs/${params.id}/estimate/pdf`} className="flex items-center justify-between p-3 hover:bg-zinc-50 transition-colors group">
                                 <div className="flex items-center gap-3">
-                                    <FileText className="w-8 h-8 text-red-500" />
-                                    <div>
-                                        <div className="font-bold text-slate-900 group-hover:text-blue-600 group-hover:underline">修理見積書.pdf</div>
-                                        <div className="text-xs text-slate-500">2026/01/12 発行</div>
-                                    </div>
+                                    <FileText className="w-4 h-4 text-zinc-400 group-hover:text-blue-600" />
+                                    <span>修理見積書.pdf</span>
                                 </div>
-                                <ArrowLeft className="w-4 h-4 rotate-180 text-slate-300" />
+                                <ArrowLeft className="w-3 h-3 rotate-180 text-zinc-300" />
                             </Link>
-                            <Link href={`/repairs/${params.id}/warranty/pdf`} className="flex items-center justify-between p-3 border rounded-md hover:bg-slate-50 transition-colors group">
+                            <Link href={`/repairs/${params.id}/invoice/pdf`} className="flex items-center justify-between p-3 hover:bg-zinc-50 transition-colors group">
                                 <div className="flex items-center gap-3">
-                                    <ShieldCheck className="w-8 h-8 text-green-600" />
-                                    <div>
-                                        <div className="font-bold text-slate-900 group-hover:text-blue-600 group-hover:underline">修理保証書.pdf</div>
-                                        <div className="text-xs text-slate-500">発行可能</div>
-                                    </div>
+                                    <FileText className="w-4 h-4 text-zinc-400 group-hover:text-blue-600" />
+                                    <span>修理請求書.pdf</span>
                                 </div>
-                                <ArrowLeft className="w-4 h-4 rotate-180 text-slate-300" />
+                                <ArrowLeft className="w-3 h-3 rotate-180 text-zinc-300" />
                             </Link>
-                        </CardContent>
+                            <Link href={`/repairs/${params.id}/delivery/pdf`} className="flex items-center justify-between p-3 hover:bg-zinc-50 transition-colors group">
+                                <div className="flex items-center gap-3">
+                                    <Package className="w-4 h-4 text-zinc-400 group-hover:text-blue-600" />
+                                    <span>修理納品書.pdf</span>
+                                </div>
+                                <ArrowLeft className="w-3 h-3 rotate-180 text-zinc-300" />
+                            </Link>
+                            <Link href={`/repairs/${params.id}/warranty/pdf`} className="flex items-center justify-between p-3 hover:bg-zinc-50 transition-colors group">
+                                <div className="flex items-center gap-3">
+                                    <ShieldCheck className="w-4 h-4 text-zinc-400 group-hover:text-blue-600" />
+                                    <span>修理保証書.pdf</span>
+                                </div>
+                                <ArrowLeft className="w-3 h-3 rotate-180 text-zinc-300" />
+                            </Link>
+                        </div>
                     </Card>
                 </div>
 
-                {/* Right Column: Timeline & Photos */}
-                <div className="md:col-span-8">
-                    <Tabs defaultValue="overview" className="w-full">
-                        <TabsList className="w-full justify-start mb-6 bg-transparent border-b rounded-none p-0 h-auto">
-                            <TabsTrigger value="overview" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-2 text-base">
-                                概要 & タイムライン
-                            </TabsTrigger>
-                            <TabsTrigger value="photos" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-2 text-base">
-                                写真ギャラリー ({mockRepair.photos.length})
-                            </TabsTrigger>
-                            <TabsTrigger value="parts" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-2 text-base">
-                                使用部品・工賃 ({mockRepair.estimateItems.length})
-                            </TabsTrigger>
-                        </TabsList>
+                {/* Right Column: All Content Segments */}
+                <div className="lg:col-span-8 space-y-12">
 
-                        <TabsContent value="overview" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <div className="space-y-1">
-                                        <CardTitle className="text-base">修理進行状況 (Status History)</CardTitle>
-                                        <CardDescription>
-                                            現在、技術者による分解掃除が進行中です。予定納期: 1月20日
-                                        </CardDescription>
-                                    </div>
-                                    <div className="w-[240px]">
-                                        <StatusUpdateForm repairId={parseInt(mockRepair.id)} currentStatus={mockRepair.status} />
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <RepairTimeline events={mockRepair.timeline} />
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
+                    {/* Section 1: Timeline */}
+                    <div id="timeline">
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="h-6 w-1 bg-blue-600 rounded-full"></div>
+                            <h2 className="text-xl font-bold text-zinc-800">修理進行状況 (Status History)</h2>
+                        </div>
+                        <Card className="shadow-sm border-0">
+                            <CardContent className="pt-6">
+                                <RepairTimeline events={mockRepair.timeline} />
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                        <TabsContent value="photos" className="animate-in fade-in-50 slide-in-from-bottom-2">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>登録写真 (Photo Gallery)</CardTitle>
-                                    <CardDescription>
-                                        クリックで拡大表示します。スマホから直接アップロードも可能です。
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <PhotoGallery photos={mockRepair.photos} repairId={mockRepair.id} />
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
+                    {/* Section 2: Photos */}
+                    <div id="photos">
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="h-6 w-1 bg-orange-500 rounded-full"></div>
+                            <h2 className="text-xl font-bold text-zinc-800">写真ギャラリー ({mockRepair.photos.length})</h2>
+                        </div>
+                        <Card className="shadow-sm border-0">
+                            <CardContent className="pt-6">
+                                <PhotoGallery photos={mockRepair.photos} repairId={mockRepair.id} />
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                        <TabsContent value="parts">
-                            <Card>
-                                <CardContent className="pt-6">
-                                    {mockRepair.estimateItems.length === 0 ? (
-                                        <p className="text-slate-500">部品リストはまだ登録されていません。</p>
-                                    ) : (
-                                        <div className="space-y-2">
+                    {/* Section 3: Parts & Labor */}
+                    <div id="parts">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="h-6 w-1 bg-green-600 rounded-full"></div>
+                                <h2 className="text-xl font-bold text-zinc-800">使用部品・工賃 ({mockRepair.estimateItems.length})</h2>
+                            </div>
+                        </div>
+                        <Card className="shadow-sm border-0 overflow-hidden">
+                            <CardContent className="p-0">
+                                {mockRepair.estimateItems.length === 0 ? (
+                                    <p className="text-slate-500 text-center py-12 bg-zinc-50/50">部品リストはまだ登録されていません。</p>
+                                ) : (
+                                    <div className="space-y-0">
+                                        <div className="grid grid-cols-12 text-[10px] font-bold text-zinc-400 px-6 py-3 bg-zinc-50 border-b uppercase tracking-wider">
+                                            <div className="col-span-8">項目名 / 区分</div>
+                                            <div className="col-span-4 text-right">価格</div>
+                                        </div>
+                                        <div className="divide-y">
                                             {mockRepair.estimateItems.map((item: any, idx: number) => (
-                                                <div key={idx} className="flex justify-between items-center p-2 border-b last:border-0 hover:bg-slate-50">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-bold text-sm">{item.itemName}</span>
-                                                        <span className="text-xs text-slate-500 uppercase">{item.type}</span>
+                                                <div key={idx} className="grid grid-cols-12 py-4 px-6 hover:bg-zinc-50 transition-colors">
+                                                    <div className="col-span-8 flex flex-col">
+                                                        <span className="font-bold text-zinc-800">{item.itemName}</span>
+                                                        <span className="text-[10px] text-zinc-400 font-mono uppercase italic leading-tight">{item.type}</span>
                                                     </div>
-                                                    <div className="font-mono">
+                                                    <div className="col-span-4 text-right font-mono font-bold text-zinc-900">
                                                         ¥{item.unitPrice.toLocaleString()}
                                                     </div>
                                                 </div>
                                             ))}
-                                            <div className="flex justify-between items-center p-2 pt-4 font-bold border-t">
-                                                <span>合計 (税抜)</span>
-                                                <span>¥{mockRepair.estimateItems.reduce((sum: number, i: any) => sum + i.unitPrice, 0).toLocaleString()}</span>
-                                            </div>
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    </Tabs>
+                                        <div className="flex justify-between items-center p-6 bg-zinc-900 text-white font-bold text-xl">
+                                            <span className="text-zinc-400 text-sm font-normal">合計金額 (税抜)</span>
+                                            <span className="font-mono">
+                                                ¥{mockRepair.estimateItems.reduce((sum: number, i: any) => sum + i.unitPrice, 0).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
 
             </main>
