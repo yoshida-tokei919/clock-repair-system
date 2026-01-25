@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 
 import { Toaster } from "@/components/ui/toaster"
 import { Providers } from "@/components/Providers"
+import { QRScannerListener } from "@/components/QRScannerListener"
 
 export default function RootLayout({
     children,
@@ -22,6 +23,7 @@ export default function RootLayout({
         <html lang="ja">
             <body className={cn(inter.className, "antialiased min-h-screen bg-neutral-50")}>
                 <Providers>
+                    <QRScannerListener />
                     {children}
                 </Providers>
                 <Toaster />
