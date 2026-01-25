@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { StatusOverview } from "@/components/dashboard/StatusOverview";
 import { SalesAnalytics } from "@/components/dashboard/SalesAnalytics";
 import { UrgentTaskList } from "@/components/dashboard/UrgentTaskList";
+import { PartsOrderStatusList } from "@/components/dashboard/PartsOrderStatusList";
 import { PlusCircle, FileText, Settings, User as UserIcon } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -55,13 +56,18 @@ export default function DashboardPage() {
       {/* 1. Status Cards */}
       <StatusOverview />
 
+      {/* 2. Parts Order Status (Always visible, very important for operations) */}
+      <div className="grid gap-4">
+        <PartsOrderStatusList />
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* 2. Charts (Revenue & Brands) - Takes 4/7 space */}
+        {/* 3. Charts (Bottom Left) */}
         <div className="col-span-4">
           <SalesAnalytics />
         </div>
 
-        {/* 3. Urgent List - Takes 3/7 space */}
+        {/* 4. Recent Repairs (Bottom Right) */}
         <div className="col-span-3">
           <UrgentTaskList />
         </div>

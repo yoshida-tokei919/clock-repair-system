@@ -40,7 +40,8 @@ export async function GET(request: Request) {
             retailPrice: p.retailPrice,
             stock: p.stockQuantity,
             supplier: p.supplier || "",
-            notes: p.notes || ""
+            notes: p.notes || "",
+            photoKey: p.photoKey || null
         }));
 
         return NextResponse.json(mapped);
@@ -67,7 +68,8 @@ export async function POST(request: Request) {
             retailPrice,
             stock,
             supplier,
-            notes
+            notes,
+            photoKey
         } = body;
 
         // Validation
@@ -143,6 +145,7 @@ export async function POST(request: Request) {
                 stockQuantity: stock || 0,
                 supplier: supplier || "",
                 notes: notes || "",
+                photoKey: photoKey || null,
             }
         });
 

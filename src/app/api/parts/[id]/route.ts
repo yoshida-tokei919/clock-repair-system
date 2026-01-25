@@ -25,7 +25,8 @@ export async function PUT(
             retailPrice,
             stock,
             supplier,
-            notes
+            notes,
+            photoKey
         } = body;
 
         // Validation
@@ -97,7 +98,8 @@ export async function PUT(
                 retailPrice: retailPrice || 0,
                 stockQuantity: stock || 0,
                 supplier: supplier || "",
-                notes: notes || ""
+                notes: notes || "",
+                photoKey: photoKey
             }
         });
 

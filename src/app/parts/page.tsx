@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Search, Package, Save, ArrowLeft, LayoutDashboard, FileText, X } from "lucide-react";
+import { Plus, Search, Package, Save, ArrowLeft, LayoutDashboard, FileText, X, Camera, Loader2, ImageIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,6 +149,9 @@ export default function PartsManagerPage() {
     const [stock, setStock] = useState("0");
     const [supplier, setSupplier] = useState("");
     const [notes, setNotes] = useState("");
+    const [photoKey, setPhotoKey] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     // Options
     const [brandOptions, setBrandOptions] = useState<string[]>([]);
@@ -238,19 +241,12 @@ export default function PartsManagerPage() {
         setEditingId(part.id);
         const p = part;
         setBrand(p.brand || "");
-        // TargetId logic is fuzzy in mapping, so we might not perfectly restore Model/Caliber unless API returns them explicitly.
-        // Current API `GET` returns `brand` name. `targetId`.
-        // If internal, targetId is caliber name.
+        // ... (rest same)
         if (p.type === 'internal') {
             setCaliber(p.targetId || "");
             setModel("");
             setRefName("");
         } else {
-            // If external, targetId might be Ref name or Model name? 
-            // In API GET, `targetId` is `p.nameEn`. 
-            // Wait, standard GET mapping (line 32) says: `targetId: p.category === 'internal' ? p.caliber?.name : p.nameEn`.
-            // For external, it doesn't give us Model/Ref clearly unless we fix GET. 
-            // But let's just populate what we have.
             setModel("");
             setRefName("");
         }
@@ -262,6 +258,7 @@ export default function PartsManagerPage() {
         setStock(String(p.stock));
         setSupplier(p.supplier || "");
         setNotes(p.notes || "");
+        setPhotoKey(p.photoKey || null);
     };
 
     const handleClearForm = () => {
@@ -273,8 +270,32 @@ export default function PartsManagerPage() {
         setStock("0");
         setSupplier("");
         setNotes("");
-        // Keep Brand/Caliber context? Maybe useful. 
-        // But reset is clearer.
+        setPhotoKey(null);
+    };
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append("file", file);
+        if (editingId) formData.append("partId", editingId);
+
+        try {
+            const res = await fetch("/api/upload", { method: "POST", body: formData });
+            const data = await res.json();
+            if (res.ok && data.storageKey) {
+                setPhotoKey(data.storageKey);
+            } else {
+                alert("アップロードに失敗しました");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("エラーが発生しました");
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
     };
 
     const handleSave = async () => {
@@ -291,7 +312,8 @@ export default function PartsManagerPage() {
                 retailPrice: parseInt(retailPrice) || 0,
                 stock: parseInt(stock) || 0,
                 supplier: supplier,
-                notes: notes
+                notes: notes,
+                photoKey: photoKey
             };
 
             // Check if a similar item exists (excluding ID) to warn user
@@ -446,10 +468,18 @@ export default function PartsManagerPage() {
                                         "grid grid-cols-12 border-b py-3 px-4 text-sm cursor-pointer transition-colors items-center",
                                         editingId === part.id ? "bg-blue-50 border-blue-200" : "hover:bg-zinc-50"
                                     )}>
-                                    <div className="col-span-1">
-                                        <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-bold border", part.type === "internal" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-green-50 text-green-700 border-green-200")}>
-                                            {part.type === "internal" ? "内" : "外"}
-                                        </span>
+                                    <div className="col-span-1 flex items-center justify-center">
+                                        <div className="relative w-8 h-8 rounded border overflow-hidden bg-zinc-100 flex items-center justify-center">
+                                            {part.photoKey ? (
+                                                <img src={part.photoKey} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <ImageIcon className="w-4 h-4 text-zinc-300" />
+                                            )}
+                                            <div className={cn(
+                                                "absolute bottom-0 right-0 w-2 h-2 rounded-full border border-white",
+                                                part.type === "internal" ? "bg-blue-500" : "bg-green-500"
+                                            )} />
+                                        </div>
                                     </div>
                                     <div className="col-span-3">
                                         <div className="font-bold text-zinc-800">{part.name}</div>
@@ -620,6 +650,49 @@ export default function PartsManagerPage() {
                             className="flex min-h-[60px] w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                             placeholder="状態やURLなど..."
                         />
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label className="text-xs">部品写真 (Photo)</Label>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept="image/*"
+                            onChange={handleFileSelect}
+                        />
+                        <div
+                            className={cn(
+                                "relative aspect-video rounded-md border-2 border-dashed flex flex-col items-center justify-center cursor-pointer overflow-hidden group transition-all",
+                                photoKey ? "border-zinc-300" : "border-zinc-200 hover:border-blue-400 hover:bg-blue-50/30"
+                            )}
+                            onClick={() => !isUploading && fileInputRef.current?.click()}
+                        >
+                            {isUploading ? (
+                                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                            ) : photoKey ? (
+                                <img src={photoKey} alt="Part" className="w-full h-full object-cover" />
+                            ) : (
+                                <>
+                                    <Camera className="w-6 h-6 text-zinc-400 mb-1 group-hover:text-blue-500" />
+                                    <span className="text-[10px] text-zinc-400 group-hover:text-blue-500">クリックして撮影・選択</span>
+                                </>
+                            )}
+
+                            {photoKey && !isUploading && (
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <div className="bg-white/90 p-1.5 rounded-full text-zinc-700 shadow-sm">
+                                        <Camera className="w-4 h-4" />
+                                    </div>
+                                    <div
+                                        className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 shadow-sm"
+                                        onClick={(e) => { e.stopPropagation(); setPhotoKey(null); }}
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="space-y-1 max-w-[100px] ml-auto">

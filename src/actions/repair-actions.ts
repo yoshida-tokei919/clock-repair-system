@@ -8,7 +8,8 @@ export async function updateRepairStatus(repairId: number, newStatus: string, no
         const statusMap: Record<string, string> = {
             'reception': '受付 (Reception)',
             'diagnosing': '見積中 (Estimating)',
-            'parts_wait': '部品待 (Waiting Parts)',
+            'parts_wait': '部品待 (未注文)',
+            'parts_wait_ordered': '部品待 (注文済)',
             'in_progress': '作業中 (In Progress)',
             'completed': '完了 (Completed)',
             'delivered': '納品済 (Delivered)',
@@ -22,7 +23,7 @@ export async function updateRepairStatus(repairId: number, newStatus: string, no
             const current = await tx.repair.findUnique({ where: { id: repairId } });
             if (!current) throw new Error(`Repair ID ${repairId} not found`);
 
-            const isApprovalStatus = ['in_progress', 'parts_wait', 'completed', 'delivered'].includes(newStatus);
+            const isApprovalStatus = ['in_progress', 'parts_wait', 'parts_wait_ordered', 'completed', 'delivered'].includes(newStatus);
             const shouldSetApprovalDate = isApprovalStatus && !current.approvalDate;
 
             console.log(`Updating Repair ${repairId} to status ${newStatus}. Should set approval date: ${shouldSetApprovalDate}`);
@@ -98,7 +99,8 @@ export async function getRepairStats() {
             in_progress: 0,
             completed: 0,
             delivered: 0,
-            parts_wait: 0
+            parts_wait: 0,
+            parts_wait_ordered: 0
         };
 
         counts.forEach(c => {
@@ -132,6 +134,41 @@ export async function getRecentRepairs(limit: number = 5) {
         return repairs;
     } catch (error) {
         console.error("Failed to get recent repairs:", error);
+        return [];
+    }
+}
+
+export async function getPendingParts() {
+    try {
+        const items = await prisma.estimateItem.findMany({
+            where: {
+                type: 'part',
+                orderStatus: { in: ['pending', 'ordered'] }
+            },
+            include: {
+                estimate: {
+                    include: {
+                        repair: {
+                            include: {
+                                watch: {
+                                    include: {
+                                        brand: true,
+                                        model: true,
+                                        caliber: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'asc'
+            }
+        });
+        return items;
+    } catch (error) {
+        console.error("Failed to get pending parts:", error);
         return [];
     }
 }

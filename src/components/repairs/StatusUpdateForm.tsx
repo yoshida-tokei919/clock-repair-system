@@ -37,7 +37,8 @@ export function StatusUpdateForm({ repairId, currentStatus }: { repairId: number
             >
                 <option value="reception">受付 (Reception)</option>
                 <option value="diagnosing">見積中 (Diagnosing)</option>
-                <option value="parts_wait">部品待 (Waiting Parts)</option>
+                <option value="parts_wait">部品待 (未注文)</option>
+                <option value="parts_wait_ordered">部品待 (注文済)</option>
                 <option value="in_progress">作業中 (In Progress)</option>
                 <option value="completed">完了 (Completed)</option>
                 <option value="delivered">納品済 (Delivered)</option>

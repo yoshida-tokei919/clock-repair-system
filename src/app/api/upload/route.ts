@@ -8,14 +8,12 @@ export async function POST(request: NextRequest) {
         const data = await request.formData();
         const file: File | null = data.get("file") as unknown as File;
         const repairId = data.get("repairId") as string;
+        const partId = data.get("partId") as string;
         const category = data.get("category") as string || "general";
 
         if (!file) {
             return NextResponse.json({ success: false, error: "No file uploaded" }, { status: 400 });
         }
-
-        // repairId is optional (e.g. valid for New Repair temp upload)
-        // if (!repairId) { ... } 
 
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
@@ -31,7 +29,8 @@ export async function POST(request: NextRequest) {
         // Generate Unique Filename
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.name) || ".jpg";
-        const filename = `${repairId || 'temp'}-${uniqueSuffix}${ext}`;
+        const prefix = repairId ? `rep-${repairId}` : (partId ? `part-${partId}` : "gen");
+        const filename = `${prefix}-${uniqueSuffix}${ext}`;
         const filepath = path.join(uploadDir, filename);
 
         // Write File
@@ -42,19 +41,24 @@ export async function POST(request: NextRequest) {
 
         let photo = null;
 
-        // Save to DB only if repairId is present
+        // Save to DB only if repairId is present (for repair photos specifically)
         if (repairId && repairId !== "null" && repairId !== "undefined") {
-            photo = await prisma.repairPhoto.create({
-                data: {
-                    repairId: parseInt(repairId),
-                    category: category,
-                    storageKey: storageKey,
-                    fileName: file.name,
-                    mimeType: file.type,
-                },
-            });
+            try {
+                photo = await prisma.repairPhoto.create({
+                    data: {
+                        repairId: parseInt(repairId),
+                        category: category,
+                        storageKey: storageKey,
+                        fileName: file.name,
+                        mimeType: file.type,
+                    },
+                });
+            } catch (e) {
+                console.error("DB Save failed for repairPhoto, but file was written", e);
+            }
         }
 
+        // Return storageKey for any caller to use
         return NextResponse.json({ success: true, photo, storageKey, fileName: file.name, mimeType: file.type });
     } catch (error) {
         console.error("Upload Error:", error);

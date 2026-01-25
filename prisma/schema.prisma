@@ -242,6 +242,12 @@ model EstimateItem {
   unitPrice  Int
   type       String // 'part', 'labor'
   
+  // For Parts Management (Phase 3)
+  orderStatus String?  @default("pending") // 'pending', 'ordered', 'received'
+  orderedAt   DateTime?
+  
+  createdAt   DateTime @default(now())
+  
   estimate   Estimate @relation(fields: [estimateId], references: [id])
 }
 
@@ -265,6 +271,7 @@ model PartsMaster {
   location      String?
   supplier      String? // e.g. "eBay", "C24"
   notes         String?
+  photoKey      String? // URL or storage key for part photo
   
   brand         Brand?   @relation(fields: [brandId], references: [id])
   caliber       Caliber? @relation(fields: [caliberId], references: [id])

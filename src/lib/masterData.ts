@@ -34,6 +34,7 @@ export interface PartItem {
     stock: number;
     supplier?: string;   // 購入店
     notes?: string;      // 備考
+    photoKey?: string | null;
 }
 
 // ---------------------------------------------------------
