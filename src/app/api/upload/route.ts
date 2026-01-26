@@ -18,26 +18,12 @@ export async function POST(request: NextRequest) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // Create Directory Structure: public/uploads/YYYY/MM
-        const date = new Date();
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const uploadDir = path.join(process.cwd(), "public", "uploads", String(year), month);
+        // Convert to Base64 Data URL
+        const base64Docs = `data:${file.type};base64,${buffer.toString('base64')}`;
 
-        await mkdir(uploadDir, { recursive: true });
-
-        // Generate Unique Filename
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.name) || ".jpg";
-        const prefix = repairId ? `rep-${repairId}` : (partId ? `part-${partId}` : "gen");
-        const filename = `${prefix}-${uniqueSuffix}${ext}`;
-        const filepath = path.join(uploadDir, filename);
-
-        // Write File
-        await writeFile(filepath, buffer);
-
-        // Public URL (relative to root)
-        const storageKey = `/uploads/${year}/${month}/${filename}`;
+        // In this "Base64 Mode", we store the actual image data in storageKey.
+        // This is a temporary solution to bypass file system issues on serverless.
+        const storageKey = base64Docs;
 
         let photo = null;
 
@@ -48,17 +34,18 @@ export async function POST(request: NextRequest) {
                     data: {
                         repairId: parseInt(repairId),
                         category: category,
-                        storageKey: storageKey,
+                        storageKey: storageKey, // Saving Base64 directly
                         fileName: file.name,
                         mimeType: file.type,
                     },
                 });
             } catch (e) {
-                console.error("DB Save failed for repairPhoto, but file was written", e);
+                console.error("DB Save failed for repairPhoto", e);
+                return NextResponse.json({ success: false, error: "Database save failed" }, { status: 500 });
             }
         }
 
-        // Return storageKey for any caller to use
+        // Return storageKey (Base64) for caller to display immediately
         return NextResponse.json({ success: true, photo, storageKey, fileName: file.name, mimeType: file.type });
     } catch (error) {
         console.error("Upload Error:", error);
