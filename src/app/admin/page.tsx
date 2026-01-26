@@ -44,10 +44,16 @@ export default function DashboardPage() {
               新規修理登録
             </Button>
           </Link>
-          <Link href="/customers/new">
+          <Link href="/customers">
             <Button variant="outline">
               <UserIcon className="mr-2 h-4 w-4" />
-              新規顧客登録
+              顧客管理
+            </Button>
+          </Link>
+          <Link href="/customers/new">
+            <Button variant="outline">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              新規顧客
             </Button>
           </Link>
         </div>
