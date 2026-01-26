@@ -212,7 +212,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
         if (!brand) return;
         getBrands().then(list => {
             const b = list.find(x => x.name === brand);
-            if (b) getModels(b.id).then(m => setModelOptions(m.map(x => ({ label: x.nameJp, value: x.nameJp }))));
+            if (b) getModels(b.id).then(m => setModelOptions(m.map((x: any) => ({ label: x.nameJp, value: x.nameJp }))));
         });
     }, [brand]);
 
@@ -223,8 +223,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
         const payload = {
             customer: { name: customerName, type: customerCategory === "B2B" ? "business" : "individual", address, endUserName, phone: lineId },
             watch: { brand, model, ref: refName, serial, caliber },
-            request: { partnerRef, accessories: accessories.split(",").map(s => s.trim()).filter(Boolean), diagnosis: requestContent, internalNotes },
-            estimate: { items: [...selectedWorks.map(w => ({ type: "labor", name: w.name, price: w.price })), ...selectedParts.map(p => ({ type: "part", name: p.name, price: p.retailPrice }))] },
+            request: { partnerRef, accessories: accessories.split(",").map((s: string) => s.trim()).filter(Boolean), diagnosis: requestContent, internalNotes },
+            estimate: { items: [...selectedWorks.map((w: WorkItem) => ({ type: "labor", name: w.name, price: w.price })), ...selectedParts.map((p: PartItem) => ({ type: "part", name: p.name, price: p.retailPrice }))] },
             status, statusLog, photos: uploadedPhotos
         };
 
