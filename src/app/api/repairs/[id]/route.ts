@@ -2,9 +2,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function PATCH(req: Request, { params }: { params: { repairId: string } }) {
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     try {
-        const id = parseInt(params.repairId);
+        const id = parseInt(params.id);
         const body = await req.json();
         console.log("Updating Repair:", id, body);
 
