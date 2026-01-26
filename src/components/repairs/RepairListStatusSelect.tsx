@@ -20,23 +20,27 @@ interface Props {
 const getStatusBadgeVariant = (status: string) => {
     switch (status) {
         case 'reception': return "bg-blue-500 hover:bg-blue-600";
-        case 'diagnosing': return "bg-orange-500 hover:bg-orange-600";
-        case 'parts_wait': return "bg-yellow-500 hover:bg-yellow-600";
-        case 'in_progress': return "bg-purple-500 hover:bg-purple-600";
-        case 'completed': return "bg-green-500 hover:bg-green-600";
-        case 'delivered': return "bg-slate-500 hover:bg-slate-600";
+        case 'diagnosing': return "bg-amber-500 hover:bg-amber-600";
+        case 'parts_wait': return "bg-orange-400 hover:bg-orange-500";
+        case 'parts_wait_ordered': return "bg-orange-600 hover:bg-orange-700";
+        case 'in_progress': return "bg-indigo-500 hover:bg-indigo-600";
+        case 'completed': return "bg-emerald-500 hover:bg-emerald-600";
+        case 'delivered': return "bg-zinc-500 hover:bg-zinc-600";
+        case 'canceled': return "bg-red-500 hover:bg-red-600";
         default: return "";
     }
 };
 
 const getStatusLabel = (status: string) => {
     switch (status) {
-        case 'reception': return "受付 (Reception)";
-        case 'diagnosing': return "見積中 (Estimating)";
-        case 'parts_wait': return "部品待 (Waiting Parts)";
-        case 'in_progress': return "作業中 (In Progress)";
-        case 'completed': return "完了 (Completed)";
-        case 'delivered': return "納品済 (Delivered)";
+        case 'reception': return "受付";
+        case 'diagnosing': return "見積中";
+        case 'parts_wait': return "部品待 (未注文)";
+        case 'parts_wait_ordered': return "部品待 (注文済)";
+        case 'in_progress': return "作業中";
+        case 'completed': return "完了";
+        case 'delivered': return "納品済";
+        case 'canceled': return "キャンセル";
         default: return status;
     }
 };
@@ -75,12 +79,14 @@ export function RepairListStatusSelect({ id, currentStatus }: Props) {
                 </Badge>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => handleSelect('reception')}>受付 (Reception)</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSelect('diagnosing')}>見積中 (Estimating)</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSelect('parts_wait')}>部品待 (Waiting Parts)</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSelect('in_progress')}>作業中 (In Progress)</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSelect('completed')}>完了 (Completed)</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleSelect('delivered')}>納品済 (Delivered)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSelect('reception')}>受付</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSelect('diagnosing')}>見積中</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSelect('parts_wait')}>部品待 (未注文)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSelect('parts_wait_ordered')}>部品待 (注文済)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSelect('in_progress')}>作業中</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSelect('completed')}>完了</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSelect('delivered')}>納品済</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSelect('canceled')}>キャンセル</DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     );

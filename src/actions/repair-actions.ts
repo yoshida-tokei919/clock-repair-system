@@ -172,3 +172,46 @@ export async function getPendingParts() {
         return [];
     }
 }
+export async function updatePartOrderStatus(itemId: number, status: string) {
+    try {
+        const item = await prisma.estimateItem.update({
+            where: { id: itemId },
+            data: {
+                orderStatus: status,
+                orderedAt: status === 'ordered' ? new Date() : undefined
+            },
+            include: {
+                estimate: {
+                    include: {
+                        repair: true,
+                        items: true
+                    }
+                }
+            }
+        });
+
+        const repairId = item.estimate.repairId;
+        const allItems = item.estimate.items.filter(i => i.type === 'part');
+
+        // Logical check: If all parts are at least 'ordered' or 'received', suggest 'parts_wait_ordered'
+        // If any part is 'pending', the repair is effectively 'parts_wait' (Unordered)
+        const hasPending = allItems.some(i => !i.orderStatus || i.orderStatus === 'pending');
+
+        let targetStatus = null;
+        if (hasPending) {
+            targetStatus = 'parts_wait';
+        } else if (allItems.length > 0) {
+            targetStatus = 'parts_wait_ordered';
+        }
+
+        if (targetStatus && item.estimate.repair.status.startsWith('parts_wait')) {
+            await updateRepairStatus(repairId, targetStatus);
+        }
+
+        revalidatePath(`/repairs/${repairId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to update part order status:", error);
+        return { success: false };
+    }
+}

@@ -9,9 +9,10 @@ import { RepairTimeline } from "@/components/repair-timeline";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { ArrowLeft, Printer, FileText, Edit, Clock, Calendar, ShieldCheck, MapPin, Package, Settings, ChevronRight } from "lucide-react";
 
-import { getStatusBadge } from "@/components/status-badge";
 import { StatusUpdateForm } from "@/components/repairs/StatusUpdateForm";
+import { getStatusBadge } from "@/components/status-badge";
 import { TagPrintButton } from "@/components/repairs/TagPrintButton";
+import { PartOrderStatusSelect } from "@/components/repairs/PartOrderStatusSelect";
 import { LineButton } from "@/components/line/LineButton";
 
 export const dynamic = "force-dynamic";
@@ -84,7 +85,10 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                         <h1 className="text-lg font-bold text-slate-900">
                             {mockRepair.watch.brand} {mockRepair.watch.model} {mockRepair.watch.ref}
                         </h1>
-                        <div>{getStatusBadge(mockRepair.status)}</div>
+                        <div className="flex items-center gap-2">
+                            {getStatusBadge(mockRepair.status)}
+                            <StatusUpdateForm repairId={parseInt(mockRepair.id)} currentStatus={mockRepair.status} />
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -314,10 +318,15 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                                         </div>
                                         <div className="divide-y">
                                             {mockRepair.estimateItems.map((item: any, idx: number) => (
-                                                <div key={idx} className="grid grid-cols-12 py-4 px-6 hover:bg-zinc-50 transition-colors">
-                                                    <div className="col-span-8 flex flex-col">
+                                                <div key={idx} className="grid grid-cols-12 py-4 px-6 hover:bg-zinc-50 transition-colors items-center">
+                                                    <div className="col-span-8 flex flex-col gap-1">
                                                         <span className="font-bold text-zinc-800">{item.itemName}</span>
-                                                        <span className="text-[10px] text-zinc-400 font-mono uppercase italic leading-tight">{item.type}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] text-zinc-400 font-mono uppercase italic leading-tight">{item.type}</span>
+                                                            {item.type === 'part' && (
+                                                                <PartOrderStatusSelect itemId={item.id} currentStatus={item.orderStatus} />
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <div className="col-span-4 text-right font-mono font-bold text-zinc-900">
                                                         ¥{item.unitPrice.toLocaleString()}

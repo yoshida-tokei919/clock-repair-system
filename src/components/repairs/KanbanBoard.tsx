@@ -14,15 +14,13 @@ interface KanbanBoardProps {
 }
 
 const COLUMNS = [
-    { id: 'reception', title: '受付 (Reception)', color: 'bg-slate-100' },
-    { id: 'diagnosing', title: '見積中 (Estimate)', color: 'bg-yellow-50 text-yellow-800' },
-    { id: 'parts_wait', title: '部品待 (Part Wait)', color: 'bg-orange-50 text-orange-800' },
-    { id: 'in_progress', title: '作業中 (Working)', color: 'bg-blue-50 text-blue-800' },
-    { id: 'completed', title: '完了 (Completed)', color: 'bg-green-50 text-green-800' },
-    { id: 'delivered', title: '納品済 (Delivered)', color: 'bg-zinc-100 text-zinc-600' },
-    // Delivered/Canceled hidden or separate? Usually specific board for Active.
-    // Let's keep Delivered/Canceled out for this "Active" board to keep it clean, or put them at end.
-    // User asked for "Progress Management", so active is key.
+    { id: 'reception', title: '受付', color: 'bg-slate-100' },
+    { id: 'diagnosing', title: '見積中', color: 'bg-yellow-50 text-yellow-800 border-yellow-100' },
+    { id: 'parts_wait', title: '部品待 (未注文)', color: 'bg-orange-50 text-orange-800 border-orange-100' },
+    { id: 'parts_wait_ordered', title: '部品待 (注文済)', color: 'bg-orange-100 text-orange-900 border-orange-200' },
+    { id: 'in_progress', title: '作業中', color: 'bg-blue-50 text-blue-800 border-blue-100' },
+    { id: 'completed', title: '完了', color: 'bg-green-50 text-green-800 border-green-100' },
+    { id: 'delivered', title: '納品済', color: 'bg-zinc-100 text-zinc-600' },
 ];
 
 export function KanbanBoard({ initialRepairs }: KanbanBoardProps) {
