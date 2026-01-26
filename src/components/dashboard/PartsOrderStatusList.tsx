@@ -2,7 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { getPendingParts } from "@/actions/repair-actions";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { ExternalLink, Truck, Clock } from "lucide-react";
+import { ExternalLink, Truck, Clock, BookOpen } from "lucide-react";
+import { PartOrderStatusSelect } from "@/components/repairs/PartOrderStatusSelect";
 
 export async function PartsOrderStatusList() {
     const parts = await getPendingParts();
@@ -28,7 +29,7 @@ export async function PartsOrderStatusList() {
                     <table className="w-full text-sm">
                         <thead className="bg-zinc-50 border-y py-2">
                             <tr className="text-left text-zinc-500 font-medium">
-                                <th className="p-2">ステータス</th>
+                                <th className="p-2">ステータス / 自社管理番号</th>
                                 <th className="p-2">ブランド・モデル</th>
                                 <th className="p-2">Ref / Cal</th>
                                 <th className="p-2">部品名</th>
@@ -42,14 +43,19 @@ export async function PartsOrderStatusList() {
                             {parts.map((item: any) => {
                                 const watch = item.estimate?.repair?.watch;
                                 const repair = item.estimate?.repair;
-                                const status = orderStatusMap[item.orderStatus || 'pending'];
 
                                 return (
                                     <tr key={item.id} className="hover:bg-zinc-50/50 transition-colors">
                                         <td className="p-2">
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${status.color}`}>
-                                                {status.label}
-                                            </span>
+                                            <div className="flex flex-col gap-1 items-start">
+                                                <PartOrderStatusSelect itemId={item.id} currentStatus={item.orderStatus} minimal />
+                                                {repair?.partnerRef && repair?.partnerRef !== "-" && (
+                                                    <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-1.5 py-0.5 rounded border border-blue-100 italic">
+                                                        <BookOpen className="w-2.5 h-2.5" />
+                                                        {repair.partnerRef}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-2 font-medium">
                                             <div>{watch?.brand?.nameEn || watch?.brand?.name || '-'}</div>
