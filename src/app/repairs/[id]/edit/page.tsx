@@ -53,7 +53,7 @@ export default async function EditRepairPage({ params }: { params: { id: string 
 
     return (
         <div className="bg-zinc-100 min-h-screen">
-            <RepairEntryForm mode="edit" initialData={{ ...repair, statusLog }} />
+            <RepairEntryForm mode="edit" initialData={JSON.parse(JSON.stringify({ ...repair, statusLog }))} />
         </div>
     );
 }

@@ -1,8 +1,6 @@
 
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 export async function PATCH(req: Request, { params }: { params: { repairId: string } }) {
     try {
@@ -13,17 +11,19 @@ export async function PATCH(req: Request, { params }: { params: { repairId: stri
         const result = await prisma.$transaction(async (tx) => {
             // 1. Update Watch Details
             if (body.watch) {
-                const brand = await tx.brand.findUnique({ where: { name: body.watch.brand } });
-                if (!brand) throw new Error("Brand not found");
-
-                await tx.watch.update({
-                    where: { id: (await tx.repair.findUnique({ where: { id } }))?.watchId },
-                    data: {
-                        brandId: brand.id,
-                        serialNumber: body.watch.serial,
-                        // Could update more if needed
+                const repairRecord = await tx.repair.findUnique({ where: { id } });
+                if (repairRecord) {
+                    const brand = await tx.brand.findUnique({ where: { name: body.watch.brand } });
+                    if (brand) {
+                        await tx.watch.update({
+                            where: { id: repairRecord.watchId },
+                            data: {
+                                brandId: brand.id,
+                                serialNumber: body.watch.serial,
+                            }
+                        });
                     }
-                });
+                }
             }
 
             // 2. Update Repair Fields

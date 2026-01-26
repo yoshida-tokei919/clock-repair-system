@@ -1,8 +1,6 @@
 
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
     try {
@@ -257,6 +255,7 @@ export async function POST(req: Request) {
                     status: dbStatus,
                     accessories: JSON.stringify(body.request.accessories || []),
                     workSummary: body.request.diagnosis, // Using diagnosis field as summary request
+                    internalNotes: body.request.internalNotes,
                     estimatedWorkMinutes: 0,
                     endUserName: body.customer.endUserName || null,
                 }

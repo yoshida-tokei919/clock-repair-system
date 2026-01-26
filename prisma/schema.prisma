@@ -149,6 +149,7 @@ model Repair {
   estimatedWorkMinutes Int       @default(0)
   
   workSummary          String?
+  internalNotes        String?
   // SEO Flags
   isPublicB2C          Boolean   @default(false)
   isPublicB2B          Boolean   @default(false)
