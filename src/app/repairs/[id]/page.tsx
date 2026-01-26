@@ -13,6 +13,7 @@ import { StatusUpdateForm } from "@/components/repairs/StatusUpdateForm";
 import { getStatusBadge } from "@/components/status-badge";
 import { TagPrintButton } from "@/components/repairs/TagPrintButton";
 import { PartOrderStatusSelect } from "@/components/repairs/PartOrderStatusSelect";
+import { ClickToCopy } from "@/components/ui/click-to-copy";
 import { LineButton } from "@/components/line/LineButton";
 
 export const dynamic = "force-dynamic";
@@ -81,7 +82,11 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                     </Link>
                     <div className="h-6 w-px bg-slate-200 mx-2 hidden md:block"></div>
                     <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
-                        <div className="font-mono text-xs text-slate-500">{mockRepair.inquiryNumber}</div>
+                        <ClickToCopy text={mockRepair.inquiryNumber}>
+                            <div className="font-mono text-xs text-slate-500 cursor-copy hover:bg-zinc-100 px-1 rounded transition-colors">
+                                {mockRepair.inquiryNumber}
+                            </div>
+                        </ClickToCopy>
                         <h1 className="text-lg font-bold text-slate-900">
                             {mockRepair.watch.brand} {mockRepair.watch.model} {mockRepair.watch.ref}
                         </h1>
@@ -182,7 +187,9 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                             {mockRepair.partnerRef && mockRepair.partnerRef !== "-" && (
                                 <div className="pt-2 border-t mt-2">
                                     <div className="text-slate-500 text-xs text-blue-600 font-bold">貴社管理番号</div>
-                                    <div className="font-mono font-bold text-blue-700">{mockRepair.partnerRef}</div>
+                                    <ClickToCopy text={mockRepair.partnerRef}>
+                                        <div className="font-mono font-bold text-blue-700 cursor-copy hover:bg-blue-50 px-1 rounded transition-colors inline-block">{mockRepair.partnerRef}</div>
+                                    </ClickToCopy>
                                 </div>
                             )}
                         </CardContent>

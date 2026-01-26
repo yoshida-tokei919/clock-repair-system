@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { ExternalLink, Truck, Clock, BookOpen } from "lucide-react";
 import { PartOrderStatusSelect } from "@/components/repairs/PartOrderStatusSelect";
+import { ClickToCopy } from "@/components/ui/click-to-copy";
 
 export async function PartsOrderStatusList() {
     const parts = await getPendingParts();
@@ -51,15 +52,19 @@ export async function PartsOrderStatusList() {
                                                 <PartOrderStatusSelect itemId={item.id} currentStatus={item.orderStatus} minimal />
                                                 <div className="flex flex-col gap-0.5 mt-0.5">
                                                     {repair?.inquiryNumber && (
-                                                        <div className="text-[10px] font-mono font-bold text-zinc-500 bg-zinc-100 px-1 rounded border border-zinc-200">
-                                                            ID: {repair.inquiryNumber}
-                                                        </div>
+                                                        <ClickToCopy text={repair.inquiryNumber}>
+                                                            <div className="text-[10px] font-mono font-bold text-zinc-500 bg-zinc-100 px-1 rounded border border-zinc-200 cursor-copy">
+                                                                ID: {repair.inquiryNumber}
+                                                            </div>
+                                                        </ClickToCopy>
                                                     )}
                                                     {repair?.partnerRef && repair?.partnerRef !== "-" && (
-                                                        <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-1 rounded border border-blue-100 italic">
-                                                            <BookOpen className="w-2.5 h-2.5" />
-                                                            {repair.partnerRef}
-                                                        </div>
+                                                        <ClickToCopy text={repair.partnerRef}>
+                                                            <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-1 rounded border border-blue-100 italic cursor-copy">
+                                                                <BookOpen className="w-2.5 h-2.5" />
+                                                                {repair.partnerRef}
+                                                            </div>
+                                                        </ClickToCopy>
                                                     )}
                                                 </div>
                                             </div>

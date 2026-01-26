@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FileText, Truck, Receipt } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import { ClickToCopy } from "@/components/ui/click-to-copy";
 import { generateBulkDocument } from "@/actions/document-actions"; // We will create this
 
 type RepairWithRelations = Repair & {
@@ -136,8 +137,18 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                         />
                                     </td>
                                     <td className="px-4 py-3 font-mono font-bold text-slate-700">
-                                        {repair.inquiryNumber}
-                                        {repair.partnerRef && <div className="text-xs text-slate-400 font-normal">{repair.partnerRef}</div>}
+                                        <div className="flex flex-col gap-1">
+                                            <ClickToCopy text={repair.inquiryNumber}>
+                                                <span>{repair.inquiryNumber}</span>
+                                            </ClickToCopy>
+                                            {repair.partnerRef && repair.partnerRef !== "-" && (
+                                                <ClickToCopy text={repair.partnerRef}>
+                                                    <div className="text-[10px] text-blue-600 font-bold bg-blue-50 px-1 rounded border border-blue-100 w-fit italic cursor-copy">
+                                                        {repair.partnerRef}
+                                                    </div>
+                                                </ClickToCopy>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-3">
                                         <RepairListStatusSelect id={repair.id} currentStatus={repair.status} />

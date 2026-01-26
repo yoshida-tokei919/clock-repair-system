@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getRecentRepairs } from "@/actions/repair-actions";
 import Link from "next/link";
 import { Watch, User, ArrowRight } from "lucide-react";
+import { ClickToCopy } from "@/components/ui/click-to-copy";
 
 export async function UrgentTaskList() {
     const recentRepairs = await getRecentRepairs(5);
@@ -38,7 +39,10 @@ export async function UrgentTaskList() {
                                         {repair.watch?.brand?.nameEn || repair.watch?.brand?.name || "ブランド不明"} {repair.watch?.model?.nameJp || ""}
                                     </p>
                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                        <User className="h-3 w-3" /> {repair.customer?.name || "顧客不明"} • {repair.inquiryNumber}
+                                        <User className="h-3 w-3" /> {repair.customer?.name || "顧客不明"} •
+                                        <ClickToCopy text={repair.inquiryNumber} className="inline-flex">
+                                            <span className="cursor-copy hover:underline">{repair.inquiryNumber}</span>
+                                        </ClickToCopy>
                                     </p>
                                 </div>
                                 <div className="font-medium text-right">
