@@ -24,6 +24,7 @@ import { LinePreviewModal } from "@/components/line/LinePreviewModal";
 import { QuickRegisterDialog, RegisterData } from "@/components/repairs/QuickRegisterDialog";
 import { RecentRegistrations } from "@/components/repairs/RecentRegistrations";
 import { CameraCaptureDialog } from "@/components/repairs/CameraCaptureDialog";
+import { MobileConnectDialog } from "@/components/repairs/MobileConnectDialog";
 
 // Dynamically import PDF components to avoid SSR issues
 const PDFPreviewDialog = dynamic(() => import("@/components/repairs/PDFPreviewDialog"), {
@@ -206,12 +207,54 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     const [workOptions, setWorkOptions] = useState<any[]>([]);
     const [partsOptions, setPartsOptions] = useState<any[]>([]);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [isMobileConnectOpen, setIsMobileConnectOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Refresh photos from server (for mobile upload sync)
+    const refreshPhotos = async () => {
+        if (!initialData?.id) return;
+        try {
+            // Fetch the latest repair data to get updated photos
+            // Since we don't have a dedicated photo API, we might need to assume 
+            // the edit page logic or creating a lightweight endpoint is better.
+            // For now, let's assume we can fetch the repair details again.
+            // If direct API isn't available, we rely on page refresh or implementing a specific route.
+            // Let's implement a direct fetch to the upload API if it supported GET, but it likely doesn't.
+            // fallback: reload the page or use a server action if this was a server component (it's client).
+
+            // Actually, simplest way in Next.js app dir without reloading is using router.refresh() 
+            // BUT that refreshes server data passed to props.
+            router.refresh();
+            // However, router.refresh() might not update the state 'uploadedPhotos' if it's initialized from initialData prop only once.
+            // We need to fetch. Let's try to fetch the repair object.
+
+            // For this specific requirement, let's assume we simply want to notify the user to refresh or 
+            // we can implement a specific photo fetching logic if the backend supports it.
+            // Given the context, I will assume a router.refresh() is the "Next.js way" to re-fetch server data,
+            // but we need to update the local state.
+
+            // Workaround: We will fetch the same page data client-side if an API exists, 
+            // OR we can create a simple server action to get photos.
+            // Let's add a simple fetch to a new endpoint we will create quickly: /api/repairs/[id]/photos
+
+            const res = await fetch(`/api/repairs/${initialData.id}/photos`);
+            if (res.ok) {
+                const photos = await res.json();
+                setUploadedPhotos(photos.map((p: any) => ({
+                    storageKey: p.storageKey,
+                    fileName: p.fileName,
+                    mimeType: p.mimeType
+                })));
+            }
+        } catch (e) {
+            console.error("Failed to refresh photos", e);
+        }
+    };
+
     const handlePhotoUpload = async (file: File | Blob) => {
         setIsUploading(true);
-        
+
         try {
             // 1. Image Compression & WebP Conversion
             const options = {
@@ -223,7 +266,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
 
             const imageFile = file instanceof File ? file : new File([file], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
             const compressedBlob = await imageCompression(imageFile, options);
-            
+
             // 2. Prepare Form Data
             const formData = new FormData();
             const fileName = (imageFile.name || `img-${Date.now()}`).replace(/\.[^/.]+$/, "") + ".webp";
@@ -481,7 +524,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                                             <Plus className="w-6 h-6" />
                                         </div>
                                     </div>
-                                    <p className="text-[10px] text-zinc-500 font-bold">LUMIX 高画質連携</p>
+                                    <div className="flex gap-2">
+                                        <Button variant="outline" size="sm" className="h-7 text-[10px] bg-white border-blue-200 text-blue-600 hover:bg-blue-50" onClick={() => setIsMobileConnectOpen(true)}>
+                                            <Smartphone className="w-3 h-3 mr-1.5" /> スマホ連携
+                                        </Button>
+                                    </div>
+                                    <p className="text-[10px] text-zinc-500 font-bold mt-2">LUMIX 高画質連携</p>
                                     <p className="text-[8px] text-zinc-300 italic">またはファイルをドラッグ＆ドロップ</p>
                                 </>
                             )}
@@ -519,6 +567,15 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                     // setIsCameraOpen(false); 
                 }}
             />
+
+            {initialData?.id && (
+                <MobileConnectDialog
+                    isOpen={isMobileConnectOpen}
+                    onClose={() => setIsMobileConnectOpen(false)}
+                    repairId={initialData.id.toString()}
+                    onPhotosUploaded={refreshPhotos}
+                />
+            )}
         </div>
     );
 }
