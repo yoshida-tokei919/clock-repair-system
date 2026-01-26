@@ -10,6 +10,7 @@ export async function getCustomers(query?: string) {
                 { name: { contains: query, mode: 'insensitive' } },
                 { phone: { contains: query, mode: 'insensitive' } },
                 { email: { contains: query, mode: 'insensitive' } },
+                { lineId: { contains: query, mode: 'insensitive' } },
             ]
         } : {},
         orderBy: { createdAt: 'desc' }
@@ -37,6 +38,7 @@ export async function updateCustomer(id: number, data: any) {
                 type: data.type,
                 phone: data.phone,
                 email: data.email,
+                lineId: data.lineId,
                 address: data.address,
                 isPartner: data.isPartner,
                 prefix: data.prefix,

@@ -5,7 +5,7 @@ import { getCustomers, deleteCustomer } from "@/actions/customer-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Search, UserPlus, Edit, Trash2, Phone, Mail, MapPin, Building2, User } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, Phone, Mail, MapPin, Building2, User, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
@@ -99,6 +99,9 @@ export default function CustomerListPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Mail className="w-3 h-3" /> {c.email || "-"}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <MessageCircle className="w-3 h-3 text-emerald-500" /> {c.lineId || "-"}
                                 </div>
                                 <div className="flex items-center gap-2 truncate">
                                     <MapPin className="w-3 h-3" /> {c.address || "-"}

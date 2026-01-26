@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Save, Building2, User, Star, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Building2, User, Star, Trash2, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +115,23 @@ export default function CustomerEditPage({ params }: { params: { id: string } })
                                 onChange={e => setData({ ...data, email: e.target.value })}
                                 className="border-zinc-200"
                             />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-bold text-zinc-500 flex items-center gap-1">
+                                <MessageCircle className="w-3 h-3 text-emerald-500" /> LINE ID
+                            </Label>
+                            <Input
+                                value={data.lineId || ""}
+                                onChange={e => setData({ ...data, lineId: e.target.value })}
+                                className="border-zinc-200"
+                                placeholder="line_id"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            {/* Empty space or other info */}
                         </div>
                     </div>
 
