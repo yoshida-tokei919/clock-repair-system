@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import {
     ArrowLeft, Camera, Printer, Save, Search, Check, ChevronDown, User, Watch,
     Settings, Trash2, Plus, Image as ImageIcon, MapPin, Phone, Mail, MessageCircle,
-    Clock, CheckCircle, Smartphone, FileText
+    Clock, CheckCircle, Smartphone, FileText, RefreshCw
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
 import { LinePreviewModal } from "@/components/line/LinePreviewModal";
 import { QuickRegisterDialog, RegisterData } from "@/components/repairs/QuickRegisterDialog";
 import { RecentRegistrations } from "@/components/repairs/RecentRegistrations";
+import { CameraCaptureDialog } from "@/components/repairs/CameraCaptureDialog";
 
 // Dynamically import PDF components to avoid SSR issues
 const PDFPreviewDialog = dynamic(() => import("@/components/repairs/PDFPreviewDialog"), {
@@ -203,6 +204,32 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     const [modelOptions, setModelOptions] = useState<any[]>([]);
     const [workOptions, setWorkOptions] = useState<any[]>([]);
     const [partsOptions, setPartsOptions] = useState<any[]>([]);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handlePhotoUpload = async (file: File | Blob) => {
+        setIsUploading(true);
+        const formData = new FormData();
+        const fileName = (file as File).name || `capture-${Date.now()}.jpg`;
+        formData.append("file", file, fileName);
+        if (initialData?.id) formData.append("repairId", initialData.id.toString());
+
+        try {
+            const res = await fetch("/api/upload", { method: "POST", body: formData });
+            const data = await res.json();
+            if (data.success) {
+                setUploadedPhotos(prev => [...prev, { storageKey: data.storageKey, fileName: data.fileName, mimeType: data.mimeType }]);
+            } else {
+                alert("アップロードに失敗しました");
+            }
+        } catch (e) {
+            console.error("Photo upload failed:", e);
+            alert("通信エラーが発生しました");
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     useEffect(() => {
         getBrands().then(data => setBrandOptions(data.map(b => ({ label: b.nameJp || b.name, value: b.name }))));
@@ -398,13 +425,51 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                 {/* Right Column: Photos & Quick Actions */}
                 <div className="col-span-3 flex flex-col gap-2">
                     <Card className="flex-1 bg-white border border-zinc-200 border-dashed rounded-lg flex flex-col relative overflow-hidden group shadow-sm">
-                        <div className="p-2 border-b bg-zinc-50 flex items-center justify-between"><div className="flex items-center gap-2"><ImageIcon className="w-3.5 h-3.5 text-zinc-400" /><h3 className="text-[10px] font-bold text-zinc-500 uppercase">修理写真 (0)</h3></div> <button className="text-[10px] text-blue-600 hover:underline">全件表示</button></div>
-                        <div className="flex-1 flex flex-col items-center justify-center p-4">
-                            <div className="w-10 h-10 rounded-full bg-zinc-50 flex items-center justify-center mb-2 group-hover:bg-blue-50 transition-colors cursor-pointer border border-zinc-100">
-                                <Plus className="w-5 h-5 text-zinc-300 group-hover:text-blue-500" />
+                        <div className="p-2 border-b bg-zinc-50 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <ImageIcon className="w-3.5 h-3.5 text-zinc-400" />
+                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase">修理写真 ({uploadedPhotos.length})</h3>
                             </div>
-                            <p className="text-[10px] text-zinc-400 font-medium">クリックしてアップロード</p>
-                            <p className="text-[8px] text-zinc-300 italic">Drag & Drop supported</p>
+                            <div className="flex gap-1">
+                                <input
+                                    type="file"
+                                    className="hidden"
+                                    ref={fileInputRef}
+                                    accept="image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                        const files = Array.from(e.target.files || []);
+                                        files.forEach(f => handlePhotoUpload(f));
+                                    }}
+                                />
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-600 hover:bg-blue-50" onClick={() => setIsCameraOpen(true)}>
+                                    <Camera className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-500 hover:bg-zinc-100" onClick={() => fileInputRef.current?.click()}>
+                                    <Plus className="w-3.5 h-3.5" />
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-[120px]">
+                            {isUploading ? (
+                                <div className="flex flex-col items-center gap-2">
+                                    <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
+                                    <p className="text-[10px] text-zinc-400 font-medium">アップロード中...</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex gap-4 mb-3">
+                                        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center border border-blue-100 text-blue-500 hover:bg-blue-100 transition-colors cursor-pointer shadow-sm" onClick={() => setIsCameraOpen(true)}>
+                                            <Camera className="w-6 h-6" />
+                                        </div>
+                                        <div className="w-12 h-12 rounded-full bg-zinc-50 flex items-center justify-center border border-zinc-100 text-zinc-400 hover:bg-zinc-100 transition-colors cursor-pointer shadow-sm" onClick={() => fileInputRef.current?.click()}>
+                                            <Plus className="w-6 h-6" />
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-zinc-500 font-bold">LUMIX 高画質連携</p>
+                                    <p className="text-[8px] text-zinc-300 italic">またはファイルをドラッグ＆ドロップ</p>
+                                </>
+                            )}
                         </div>
                         <div className="bg-zinc-50/50 p-2 h-44 overflow-y-auto grid grid-cols-2 gap-2 border-t">
                             {uploadedPhotos.map((p, i) => (
@@ -429,6 +494,16 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                     </Card>
                 </div>
             </div>
+
+            <CameraCaptureDialog
+                isOpen={isCameraOpen}
+                onClose={() => setIsCameraOpen(false)}
+                onCapture={(blob) => {
+                    handlePhotoUpload(blob);
+                    // Keep open for continuous shooting if desired, or close
+                    // setIsCameraOpen(false); 
+                }}
+            />
         </div>
     );
 }
