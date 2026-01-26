@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
+import imageCompression from 'browser-image-compression';
 import {
     ArrowLeft, Camera, Printer, Save, Search, Check, ChevronDown, User, Watch,
     Settings, Trash2, Plus, Image as ImageIcon, MapPin, Phone, Mail, MessageCircle,
@@ -210,12 +211,26 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
 
     const handlePhotoUpload = async (file: File | Blob) => {
         setIsUploading(true);
-        const formData = new FormData();
-        const fileName = (file as File).name || `capture-${Date.now()}.jpg`;
-        formData.append("file", file, fileName);
-        if (initialData?.id) formData.append("repairId", initialData.id.toString());
-
+        
         try {
+            // 1. Image Compression & WebP Conversion
+            const options = {
+                maxSizeMB: 1,            // Target 1MB
+                maxWidthOrHeight: 3000, // Limit resolution but keep it high
+                useWebWorker: true,
+                fileType: 'image/webp' as any
+            };
+
+            const imageFile = file instanceof File ? file : new File([file], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            const compressedBlob = await imageCompression(imageFile, options);
+            
+            // 2. Prepare Form Data
+            const formData = new FormData();
+            const fileName = (imageFile.name || `img-${Date.now()}`).replace(/\.[^/.]+$/, "") + ".webp";
+            formData.append("file", compressedBlob, fileName);
+            if (initialData?.id) formData.append("repairId", initialData.id.toString());
+
+            // 3. Upload
             const res = await fetch("/api/upload", { method: "POST", body: formData });
             const data = await res.json();
             if (data.success) {
@@ -224,8 +239,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                 alert("アップロードに失敗しました");
             }
         } catch (e) {
-            console.error("Photo upload failed:", e);
-            alert("通信エラーが発生しました");
+            console.error("Photo process/upload failed:", e);
+            alert("画像の処理またはアップロードに失敗しました");
         } finally {
             setIsUploading(false);
         }
