@@ -49,12 +49,19 @@ export async function PartsOrderStatusList() {
                                         <td className="p-2">
                                             <div className="flex flex-col gap-1 items-start">
                                                 <PartOrderStatusSelect itemId={item.id} currentStatus={item.orderStatus} minimal />
-                                                {repair?.partnerRef && repair?.partnerRef !== "-" && (
-                                                    <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-1.5 py-0.5 rounded border border-blue-100 italic">
-                                                        <BookOpen className="w-2.5 h-2.5" />
-                                                        {repair.partnerRef}
-                                                    </div>
-                                                )}
+                                                <div className="flex flex-col gap-0.5 mt-0.5">
+                                                    {repair?.inquiryNumber && (
+                                                        <div className="text-[10px] font-mono font-bold text-zinc-500 bg-zinc-100 px-1 rounded border border-zinc-200">
+                                                            ID: {repair.inquiryNumber}
+                                                        </div>
+                                                    )}
+                                                    {repair?.partnerRef && repair?.partnerRef !== "-" && (
+                                                        <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-1 rounded border border-blue-100 italic">
+                                                            <BookOpen className="w-2.5 h-2.5" />
+                                                            {repair.partnerRef}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="p-2 font-medium">
