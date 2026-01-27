@@ -209,35 +209,32 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isMobileConnectOpen, setIsMobileConnectOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isQuickRegisterOpen, setIsQuickRegisterOpen] = useState(false);
+    const [customerOptions, setCustomerOptions] = useState<any[]>([]);
+
+    useEffect(() => {
+        // Ideally we should have a getCustomers action, but for now we'll simulate or fetch if available.
+        // Or we can rely on the user typing to search. 
+        // Let's implement a simple fetch or re-use existing if available, or just keep it simple for now.
+        // We will pass an empty list initially and let the user type.
+        // Actually, let's fetch customers for the combobox if possible.
+        // For this step, I'll restore the state and dialog logic first.
+    }, []);
+
+    const handleCustomerRegister = (data: any) => {
+        setCustomerCategory(data.type === 'business' ? 'B2B' : 'B2C');
+        setCustomerName(data.name);
+        if (data.phone) setLineId(data.phone);
+        if (data.address) setAddress(data.address);
+        setIsQuickRegisterOpen(false);
+    };
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Refresh photos from server (for mobile upload sync)
     const refreshPhotos = async () => {
         if (!initialData?.id) return;
         try {
-            // Fetch the latest repair data to get updated photos
-            // Since we don't have a dedicated photo API, we might need to assume 
-            // the edit page logic or creating a lightweight endpoint is better.
-            // For now, let's assume we can fetch the repair details again.
-            // If direct API isn't available, we rely on page refresh or implementing a specific route.
-            // Let's implement a direct fetch to the upload API if it supported GET, but it likely doesn't.
-            // fallback: reload the page or use a server action if this was a server component (it's client).
-
-            // Actually, simplest way in Next.js app dir without reloading is using router.refresh() 
-            // BUT that refreshes server data passed to props.
-            router.refresh();
-            // However, router.refresh() might not update the state 'uploadedPhotos' if it's initialized from initialData prop only once.
-            // We need to fetch. Let's try to fetch the repair object.
-
-            // For this specific requirement, let's assume we simply want to notify the user to refresh or 
-            // we can implement a specific photo fetching logic if the backend supports it.
-            // Given the context, I will assume a router.refresh() is the "Next.js way" to re-fetch server data,
-            // but we need to update the local state.
-
-            // Workaround: We will fetch the same page data client-side if an API exists, 
-            // OR we can create a simple server action to get photos.
-            // Let's add a simple fetch to a new endpoint we will create quickly: /api/repairs/[id]/photos
-
             const res = await fetch(`/api/repairs/${initialData.id}/photos`);
             if (res.ok) {
                 const photos = await res.json();
@@ -358,7 +355,23 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                             <button onClick={() => setCustomerCategory("B2C")} className={cn("flex-1 text-xs font-bold py-1.5 rounded-sm transition-all", customerCategory === "B2C" ? "bg-white shadow-sm text-green-600" : "text-zinc-400 hover:text-zinc-600")}>一般 (B2C)</button>
                         </div>
                         <div className="space-y-3">
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">顧客名 / 業者名</Label><Input value={customerName} onChange={e => setCustomerName(e.target.value)} className="h-8 text-sm font-bold border-zinc-200 focus:border-blue-400" /></div>
+                            <div className="flex items-end gap-2">
+                                <div className="flex-1">
+                                    <Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">顧客名 / 業者名</Label>
+                                    <div className="flex gap-1">
+                                        <Input
+                                            value={customerName}
+                                            onChange={e => setCustomerName(e.target.value)}
+                                            className="h-8 text-sm font-bold border-zinc-200 focus:border-blue-400"
+                                            placeholder="名前を入力..."
+                                        />
+                                    </div>
+                                </div>
+                                <Button size="sm" className="h-8 bg-zinc-100 text-zinc-600 hover:bg-zinc-200 border border-zinc-200" onClick={() => setIsQuickRegisterOpen(true)}>
+                                    <Plus className="w-3.5 h-3.5" /> 新規
+                                </Button>
+                            </div>
+
                             {customerCategory === "B2B" ? (
                                 <div className="grid grid-cols-2 gap-2">
                                     <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">貴社伝票番号</Label><Input value={partnerRef} onChange={e => setPartnerRef(e.target.value)} className="h-8 text-sm font-mono border-zinc-200" /></div>
@@ -592,6 +605,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                     onPhotosUploaded={refreshPhotos}
                 />
             )}
+
+            <QuickRegisterDialog
+                isOpen={isQuickRegisterOpen}
+                onClose={() => setIsQuickRegisterOpen(false)}
+                onRegister={handleCustomerRegister}
+            />
         </div>
     );
 }
