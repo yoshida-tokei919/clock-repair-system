@@ -610,6 +610,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                 isOpen={isQuickRegisterOpen}
                 onClose={() => setIsQuickRegisterOpen(false)}
                 onRegister={handleCustomerRegister}
+                mode="create"
+                initialName={customerName}
             />
         </div>
     );
