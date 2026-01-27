@@ -344,15 +344,14 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
             <StatusTimeline currentStatus={status} statusLog={statusLog} onStatusClick={s => setStatus(s)} onDateChange={(s, d) => setStatusLog({ ...statusLog, [s]: d })} />
 
             <div className="flex-1 p-2 grid grid-cols-12 gap-2 overflow-hidden items-stretch">
-                {/* Registration History Sidebar */}
-                {mode === 'create' && (
-                    <div className="col-span-2 overflow-y-auto bg-white border border-zinc-200 rounded-lg shadow-sm">
-                        <RecentRegistrations />
-                    </div>
-                )}
+                {/* Left Column: History, Basic Info & Actions (3/12) */}
+                <div className="col-span-3 flex flex-col gap-2 overflow-y-auto pr-1">
+                    {mode === 'create' && (
+                        <div className="bg-white border border-zinc-200 rounded-lg shadow-sm max-h-48 overflow-y-auto mb-2">
+                            <RecentRegistrations />
+                        </div>
+                    )}
 
-                {/* Left Column: Basic Info */}
-                <div className={cn("flex flex-col gap-2 overflow-y-auto", mode === 'create' ? "col-span-3" : "col-span-4")}>
                     <Card className="p-3 bg-white space-y-4 shadow-sm">
                         <div className="flex bg-zinc-100 p-1 rounded-md">
                             <button onClick={() => setCustomerCategory("B2B")} className={cn("flex-1 text-xs font-bold py-1.5 rounded-sm transition-all", customerCategory === "B2B" ? "bg-white shadow-sm text-blue-600" : "text-zinc-400 hover:text-zinc-600")}>業者 (B2B)</button>
@@ -385,10 +384,20 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                         <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">製造番号 (Serial)</Label><Input value={serial} onChange={e => setSerial(e.target.value)} className="h-8 text-sm font-mono border-zinc-200" /></div>
                         <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">付属品</Label><Input value={accessories} onChange={e => setAccessories(e.target.value)} className="h-8 text-xs border-zinc-200 placeholder:italic" placeholder="箱, 保証書, 外したコマ..." /></div>
                     </Card>
+
+                    <Card className="p-3 bg-zinc-900 text-white shadow-xl mt-auto">
+                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 border-b border-zinc-800 pb-1 flex items-center gap-2"><Settings className="w-3 h-3" /> Quick Documents / LINE</h3>
+                        <div className="space-y-2">
+                            <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start" disabled={mode === 'create'}><FileText className="w-3.5 h-3.5 mr-2 text-blue-400" /> 見積書作成 (PDF)</Button>
+                            <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start" disabled={mode === 'create'}><CheckCircle className="w-3.5 h-3.5 mr-2 text-green-400" /> 納品書発行 (PDF)</Button>
+                            <div className="h-px bg-zinc-800 my-1"></div>
+                            <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start text-emerald-400 border-emerald-900/50"><MessageCircle className="w-3.5 h-3.5 mr-2" /> LINEでステータス送信</Button>
+                        </div>
+                    </Card>
                 </div>
 
-                {/* Center Column: Estimates & Requests */}
-                <div className={cn("flex flex-col gap-2", mode === 'create' ? "col-span-4" : "col-span-5")}>
+                {/* Center Column: Estimates & Requests (5/12) */}
+                <div className="col-span-5 flex flex-col gap-2">
                     <Card className="flex-1 p-0 bg-white flex flex-col overflow-hidden shadow-sm border-t-2 border-t-blue-500">
                         <div className="p-2.5 border-b bg-zinc-50 flex justify-between items-center">
                             <div className="flex items-center gap-2"><Settings className="w-4 h-4 text-blue-500" /><span className="text-xs font-bold text-zinc-700">見積項目明細</span></div>
@@ -473,88 +482,95 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                         </div>
                     </Card>
 
-                    <Card className="p-3 bg-white space-y-3 shadow-sm">
+                    <Card className="p-3 bg-white space-y-3 shadow-sm h-1/4">
                         <div className="flex items-center gap-2 mb-1"><FileText className="w-4 h-4 text-zinc-400" /><h3 className="text-xs font-bold font-bold">依頼・備考メモ</h3></div>
                         <div><Label className="text-[10px] text-zinc-400 font-bold ml-1">依頼内容 (Customer Request)</Label><textarea value={requestContent} onChange={e => setRequestContent(e.target.value)} className="w-full h-16 p-2 text-xs border border-zinc-200 rounded-md bg-zinc-50 focus:bg-white transition-colors resize-none" /></div>
                         <div><Label className="text-[10px] text-zinc-400 font-bold ml-1">社内備考 (Internal Notes)</Label><textarea value={internalNotes} onChange={e => setInternalNotes(e.target.value)} className="w-full h-12 p-2 text-xs border border-zinc-200 rounded-md bg-zinc-50 focus:bg-white transition-colors resize-none" /></div>
                     </Card>
                 </div>
 
-                {/* Right Column: Photos & Quick Actions */}
-                <div className="col-span-3 flex flex-col gap-2">
-                    <Card className="flex-1 bg-white border border-zinc-200 border-dashed rounded-lg flex flex-col relative overflow-hidden group shadow-sm">
-                        <div className="p-2 border-b bg-zinc-50 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <ImageIcon className="w-3.5 h-3.5 text-zinc-400" />
-                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase">修理写真 ({uploadedPhotos.length})</h3>
-                            </div>
-                            <div className="flex gap-1">
-                                <input
-                                    type="file"
-                                    className="hidden"
-                                    ref={fileInputRef}
-                                    accept="image/*"
-                                    multiple
-                                    onChange={(e) => {
-                                        const files = Array.from(e.target.files || []);
-                                        files.forEach(f => handlePhotoUpload(f));
-                                    }}
-                                />
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-600 hover:bg-blue-50" onClick={() => setIsCameraOpen(true)}>
-                                    <Camera className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-500 hover:bg-zinc-100" onClick={() => fileInputRef.current?.click()}>
-                                    <Plus className="w-3.5 h-3.5" />
-                                </Button>
-                            </div>
+                {/* Right Column: Photos (4/12) - Dedicated & Large */}
+                <div className="col-span-4 flex flex-col h-full bg-zinc-50 border border-zinc-200 rounded-lg overflow-hidden relative">
+                    {/* Header / Upload Controls - Compact */}
+                    <div className="p-2 border-b bg-white flex items-center justify-between shrink-0 z-10 shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <ImageIcon className="w-4 h-4 text-zinc-500" />
+                            <h3 className="text-xs font-bold text-zinc-600">修理写真 ({uploadedPhotos.length})</h3>
                         </div>
-                        <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-[120px]">
-                            {isUploading ? (
-                                <div className="flex flex-col items-center gap-2">
-                                    <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
-                                    <p className="text-[10px] text-zinc-400 font-medium">アップロード中...</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="flex gap-4 mb-3">
-                                        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center border border-blue-100 text-blue-500 hover:bg-blue-100 transition-colors cursor-pointer shadow-sm" onClick={() => setIsCameraOpen(true)}>
-                                            <Camera className="w-6 h-6" />
-                                        </div>
-                                        <div className="w-12 h-12 rounded-full bg-zinc-50 flex items-center justify-center border border-zinc-100 text-zinc-400 hover:bg-zinc-100 transition-colors cursor-pointer shadow-sm" onClick={() => fileInputRef.current?.click()}>
-                                            <Plus className="w-6 h-6" />
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" size="sm" className="h-7 text-[10px] bg-white border-blue-200 text-blue-600 hover:bg-blue-50" onClick={() => setIsMobileConnectOpen(true)}>
-                                            <Smartphone className="w-3 h-3 mr-1.5" /> スマホ連携
-                                        </Button>
-                                    </div>
-                                    <p className="text-[10px] text-zinc-500 font-bold mt-2">LUMIX 高画質連携</p>
-                                    <p className="text-[8px] text-zinc-300 italic">またはファイルをドラッグ＆ドロップ</p>
-                                </>
-                            )}
+                        <div className="flex gap-2">
+                            <input
+                                type="file"
+                                className="hidden"
+                                ref={fileInputRef}
+                                accept="image/*"
+                                multiple
+                                onChange={(e) => {
+                                    const files = Array.from(e.target.files || []);
+                                    files.forEach(f => handlePhotoUpload(f));
+                                }}
+                            />
+                            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={() => setIsMobileConnectOpen(true)}>
+                                <Smartphone className="w-3 h-3 text-blue-500" />
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={() => setIsCameraOpen(true)}>
+                                <Camera className="w-3 h-3 text-zinc-600" />
+                            </Button>
+                            <Button size="sm" className="h-7 text-[10px] gap-1 bg-zinc-800 hover:bg-zinc-700" onClick={() => fileInputRef.current?.click()}>
+                                <Plus className="w-3 h-3" /> 追加
+                            </Button>
                         </div>
-                        <div className="bg-zinc-50/50 p-2 h-44 overflow-y-auto grid grid-cols-2 gap-2 border-t">
+                    </div>
+
+                    {/* Photo Grid - Large Area */}
+                    <div className="flex-1 overflow-y-auto p-4 bg-zinc-100/50">
+                        {isUploading && (
+                            <div className="w-full p-4 mb-4 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center gap-2 animate-pulse">
+                                <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+                                <span className="text-xs font-bold text-blue-600">アップロード中...</span>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 gap-4">
                             {uploadedPhotos.map((p, i) => (
-                                <div key={i} className="aspect-video bg-white border border-zinc-200 rounded relative group overflow-hidden shadow-sm">
-                                    <img src={p.storageKey} alt="Repair" className="w-full h-full object-cover" />
-                                    <button onClick={() => setUploadedPhotos(uploadedPhotos.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 bg-black/50 text-white w-4 h-4 flex items-center justify-center rounded-full text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                <div key={i} className="group relative bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden hover:shadow-md transition-all">
+                                    <div className="aspect-[4/3] w-full bg-zinc-50 relative cursor-pointer">
+                                        <img src={p.storageKey} alt="Repair" className="w-full h-full object-contain" />
+                                        {/* Overlay Metadata */}
+                                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm p-2 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <p className="text-[10px] truncate font-mono">{p.fileName}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Delete Button - Clearly Visible */}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm("この写真を削除しますか？")) {
+                                                setUploadedPhotos(uploadedPhotos.filter((_, idx) => idx !== i));
+                                            }
+                                        }}
+                                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transform scale-90 hover:scale-105 transition-all z-10"
+                                        title="削除"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </div>
                             ))}
-                            {uploadedPhotos.length === 0 && <div className="col-span-2 flex flex-col items-center justify-center h-full opacity-30 select-none"><ImageIcon className="w-6 h-6 mb-1" /><span className="text-[10px]">No photos</span></div>}
-                        </div>
-                    </Card>
 
-                    {/* Quick Document Links - Restored */}
-                    <Card className="p-3 bg-zinc-900 text-white shadow-xl">
-                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 border-b border-zinc-800 pb-1 flex items-center gap-2"><Settings className="w-3 h-3" /> Quick Documents / LINE</h3>
-                        <div className="space-y-2">
-                            <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start" disabled={mode === 'create'}><FileText className="w-3.5 h-3.5 mr-2 text-blue-400" /> 見積書作成 (PDF)</Button>
-                            <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start" disabled={mode === 'create'}><CheckCircle className="w-3.5 h-3.5 mr-2 text-green-400" /> 納品書発行 (PDF)</Button>
-                            <div className="h-px bg-zinc-800 my-1"></div>
-                            <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start text-emerald-400 border-emerald-900/50"><MessageCircle className="w-3.5 h-3.5 mr-2" /> LINEでステータス送信</Button>
+                            {uploadedPhotos.length === 0 && !isUploading && (
+                                <div className="flex flex-col items-center justify-center py-20 text-zinc-300 border-2 border-dashed border-zinc-200 rounded-xl">
+                                    <Camera className="w-12 h-12 mb-2 opacity-50" />
+                                    <p className="text-sm font-bold">No Photos</p>
+                                    <p className="text-[10px]">写真を追加してください</p>
+                                </div>
+                            )}
                         </div>
-                    </Card>
+                    </div>
+
+                    {/* Footer Info */}
+                    <div className="p-2 bg-zinc-50 border-t text-[10px] text-zinc-400 text-center">
+                        Drag & Drop supported
+                    </div>
                 </div>
             </div>
 
