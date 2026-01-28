@@ -330,13 +330,12 @@ const HTML_ABOUT_PRICE = `
         </div>
 
         <div class="strength-item">
-            <div class="strength-img">
-                <img src="/img/watch5.jpg" alt="絶版パーツの復元・作成" style="width:100%;height:100%;object-fit:cover;" />
+            <div className="strength-img">
+                <img src="/img/parts-creation.jpg" alt="絶版パーツの復元・作成" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
             </div>
             <div className="strength-text">
                 <h3>絶版パーツの復元・作成</h3>
                 <p>どうしても部品の調達が難しい場合は、旋盤などを用いて部品をゼロから製作することも可能です。他社で「修理不可」とされた時計も、諦めずにご相談ください。</p>
-                <img src="/img/dial-hands.jpg" alt="分解パーツ" style={{width: '100%', marginTop: '15px', borderRadius: '4px'}} />
             </div>
         </div>
 
@@ -557,8 +556,8 @@ export default async function TopPage() {
             {/* Hero / Slider */}
             <section className="hero">
                 <div className="slideshow-container">
-                    <div className="mySlides active" style={{ backgroundImage: "url('/img/watch-sea-dweller.jpg')" }}></div>
-                    <div className="mySlides" style={{ backgroundImage: "url('/img/parts-tray.jpg')" }}></div>
+                    <div className="mySlides active" style={{ backgroundImage: "url('/img/watch-submariner.jpg')" }}></div>
+                    <div className="mySlides" style={{ backgroundImage: "url('/img/watch-sea-dweller.jpg')" }}></div>
                 </div>
 
                 <div className="hero-content">
