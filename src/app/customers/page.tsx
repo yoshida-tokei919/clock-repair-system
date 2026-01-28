@@ -5,7 +5,7 @@ import { getCustomers, deleteCustomer } from "@/actions/customer-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Search, UserPlus, Edit, Trash2, Phone, Mail, MapPin, Building2, User, MessageCircle } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, Phone, Mail, MapPin, Building2, User, MessageCircle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
@@ -42,6 +42,11 @@ export default function CustomerListPage() {
         <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
+                    <Link href="/">
+                        <Button variant="ghost" size="sm" className="gap-1 mb-2 -ml-2 text-zinc-500">
+                            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+                        </Button>
+                    </Link>
                     <h1 className="text-2xl font-bold text-zinc-900">顧客管理</h1>
                     <p className="text-zinc-500 text-sm">登録されている顧客および取引先の一覧です。</p>
                 </div>
