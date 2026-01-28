@@ -283,7 +283,7 @@ const HTML_HEADER = `
 <header>
     <div class="nav-container">
         <a href="#" class="logo-wrapper">
-            <!-- <img src="logo.png" alt="ヨシダ時計修理工房 ロゴ" class="logo-img"> -->
+            <img src="/img/logo.png" alt="ヨシダ時計修理工房 ロゴ" class="logo-img">
             <span class="site-name">ヨシダ時計修理工房</span>
         </a>
         <nav>
@@ -307,7 +307,7 @@ const HTML_ABOUT_PRICE = `
         
         <div class="strength-item">
             <div class="strength-img">
-                <img src="/img/watch3.jpg" alt="1級時計修理技能士の技術" style="width:100%;height:100%;object-fit:cover;" />
+                <img src="/img/work1.jpg" alt="1級時計修理技能士の技術" style="width:100%;height:100%;object-fit:cover;" />
             </div>
             <div class="strength-text">
                 <h3>1級時計修理技能士の確かな技術</h3>
@@ -317,7 +317,7 @@ const HTML_ABOUT_PRICE = `
 
         <div class="strength-item">
             <div class="strength-img">
-                <img src="/img/watch4.jpg" alt="独自の部品調達ネットワーク" style="width:100%;height:100%;object-fit:cover;" />
+                <img src="/img/work2.jpg" alt="独自の部品調達ネットワーク" style="width:100%;height:100%;object-fit:cover;" />
             </div>
             <div class="strength-text">
                 <h3>独自の部品調達ネットワーク</h3>
@@ -337,7 +337,7 @@ const HTML_ABOUT_PRICE = `
 
         <div class="strength-item">
             <div class="strength-img">
-                <img src="/img/watch1.jpg" alt="防水性能を可能な限り復活" style="width:100%;height:100%;object-fit:cover;" />
+                <img src="/img/waterproof.jpg" alt="防水性能を可能な限り復活" style="width:100%;height:100%;object-fit:cover;" />
             </div>
             <div class="strength-text">
                 <h3>防水性能を可能な限り復活</h3>
@@ -514,7 +514,7 @@ const HTML_FLOW_FOOTER = `
         <h2>お問い合わせ</h2>
         <p>時計の不調、メンテナンス、お気軽にご相談ください。</p>
         <div class="line-wrapper">
-            <!-- <img src="line.qrcode.png" alt="公式LINE QRコード" class="qr-code-img"> -->
+            <img src="/img/line-qr.png" alt="公式LINE QRコード" class="qr-code-img">
             <h3>公式LINEで相談する</h3>
             <p>写真を送るだけで、簡単お見積もり</p>
             <a href="https://lin.ee/3C0XfJW" class="btn line-btn">LINE 友だち追加</a>
@@ -524,7 +524,7 @@ const HTML_FLOW_FOOTER = `
 
 <footer>
     <div class="container">
-        <!-- <img src="logo.png" alt="ヨシダ時計修理工房 ロゴ" class="footer-logo-img"> -->
+        <img src="/img/logo.png" alt="ヨシダ時計修理工房 ロゴ" class="footer-logo-img">
         <div class="footer-name">ヨシダ時計修理工房</div>
         <p class="copyright">&copy; 2026 Yoshida Watch Repair Studio. All Rights Reserved.</p>
     </div>
