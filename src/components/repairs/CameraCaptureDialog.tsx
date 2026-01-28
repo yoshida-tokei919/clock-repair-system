@@ -55,8 +55,9 @@ export function CameraCaptureDialog({ isOpen, onClose, onCapture }: CameraCaptur
                 const newStream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
-                        width: { ideal: 3840 }, // Ask for 4K for S5IIX
-                        height: { ideal: 2160 }
+                        // Remove strict 4K requirement, let browser negotiate best available
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
                     }
                 });
 
@@ -68,7 +69,7 @@ export function CameraCaptureDialog({ isOpen, onClose, onCapture }: CameraCaptur
                 setError(null);
             } catch (err) {
                 console.error("Error starting camera:", err);
-                setError("カメラの起動に失敗しました。接続と設定を確認してください。");
+                setError(`カメラの起動に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
             }
         };
 

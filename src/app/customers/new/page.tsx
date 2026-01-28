@@ -16,7 +16,7 @@ export default function NewCustomerPage() {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Link href="/">
+                        <Link href="/admin">
                             <Button variant="ghost" size="sm" className="gap-1">
                                 <ArrowLeft className="w-4 h-4" /> Back to Dashboard
                             </Button>
