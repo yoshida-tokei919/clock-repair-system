@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-/* eslint-disable @next/next/no-img-element */
+
 
 export const dynamic = 'force-dynamic';
 
@@ -307,7 +307,7 @@ const HTML_ABOUT_PRICE = `
         
         <div class="strength-item">
             <div class="strength-img">
-                <!-- Placeholder -->
+                <img src="/img/watch3.jpg" alt="1級時計修理技能士の技術" style="width:100%;height:100%;object-fit:cover;" />
             </div>
             <div class="strength-text">
                 <h3>1級時計修理技能士の確かな技術</h3>
@@ -317,7 +317,7 @@ const HTML_ABOUT_PRICE = `
 
         <div class="strength-item">
             <div class="strength-img">
-                <!-- Placeholder -->
+                <img src="/img/watch4.jpg" alt="独自の部品調達ネットワーク" style="width:100%;height:100%;object-fit:cover;" />
             </div>
             <div class="strength-text">
                 <h3>独自の部品調達ネットワーク</h3>
@@ -327,7 +327,7 @@ const HTML_ABOUT_PRICE = `
 
         <div class="strength-item">
             <div class="strength-img">
-                <!-- Placeholder -->
+                <img src="/img/watch5.jpg" alt="絶版パーツの復元・作成" style="width:100%;height:100%;object-fit:cover;" />
             </div>
             <div class="strength-text">
                 <h3>絶版パーツの復元・作成</h3>
@@ -337,7 +337,7 @@ const HTML_ABOUT_PRICE = `
 
         <div class="strength-item">
             <div class="strength-img">
-                <!-- Placeholder -->
+                <img src="/img/watch1.jpg" alt="防水性能を可能な限り復活" style="width:100%;height:100%;object-fit:cover;" />
             </div>
             <div class="strength-text">
                 <h3>防水性能を可能な限り復活</h3>
@@ -552,8 +552,8 @@ export default async function TopPage() {
             {/* Hero / Slider */}
             <section className="hero">
                 <div className="slideshow-container">
-                    <div className="mySlides active" style={{ backgroundImage: "url('https://placehold.co/1920x1080/1a2b4b/fff?text=Slide+1')" }}></div>
-                    <div className="mySlides" style={{ backgroundImage: "url('https://placehold.co/1920x1080/0f172a/fff?text=Slide+2')" }}></div>
+                    <div className="mySlides active" style={{ backgroundImage: "url('/img/watch1.jpg')" }}></div>
+                    <div className="mySlides" style={{ backgroundImage: "url('/img/watch2.jpg')" }}></div>
                 </div>
 
                 <div className="hero-content">
