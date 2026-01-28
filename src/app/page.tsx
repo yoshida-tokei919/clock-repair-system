@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-
+/* eslint-disable @next/next/no-img-element */
 
 export const dynamic = 'force-dynamic';
 
@@ -307,21 +307,21 @@ const HTML_ABOUT_PRICE = `
         
         <div class="strength-item">
             <div class="strength-img">
-                <img src="/img/work1.jpg" alt="1級時計修理技能士の技術" style="width:100%;height:100%;object-fit:cover;" />
+                <img src="/img/work1.jpg" alt="1級時計修理技能士の技術">
             </div>
-            <div className="strength-text">
+            <div class="strength-text">
                 <h3>1級時計修理技能士の確かな技術</h3>
                 <p>時計修理歴20年、メーカー下請け会社での豊富な経験を持つ1級時計修理技能士が、一点一点丁寧に診断・修理いたします。複雑な機械式時計も安心してお任せください。</p>
-                <div style={{display: 'flex', gap: '10px', marginTop: '15px'}}>
-                    <img src="/img/work3.jpg" alt="修理風景1" style={{width: '48%', borderRadius: '4px'}} />
-                    <img src="/img/work4.jpg" alt="修理風景2" style={{width: '48%', borderRadius: '4px'}} />
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <img src="/img/work3.jpg" alt="修理風景1" style="width: 48%; border-radius: 4px;">
+                    <img src="/img/work4.jpg" alt="修理風景2" style="width: 48%; border-radius: 4px;">
                 </div>
             </div>
         </div>
 
         <div class="strength-item">
             <div class="strength-img">
-                <img src="/img/work2.jpg" alt="独自の部品調達ネットワーク" style="width:100%;height:100%;object-fit:cover;" />
+                <img src="/img/work2.jpg" alt="独自の部品調達ネットワーク">
             </div>
             <div class="strength-text">
                 <h3>独自の部品調達ネットワーク</h3>
@@ -330,18 +330,19 @@ const HTML_ABOUT_PRICE = `
         </div>
 
         <div class="strength-item">
-            <div className="strength-img">
-                <img src="/img/parts-creation.jpg" alt="絶版パーツの復元・作成" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+            <div class="strength-img">
+                <img src="/img/parts-creation.jpg" alt="絶版パーツの復元・作成">
             </div>
-            <div className="strength-text">
+            <div class="strength-text">
                 <h3>絶版パーツの復元・作成</h3>
                 <p>どうしても部品の調達が難しい場合は、旋盤などを用いて部品をゼロから製作することも可能です。他社で「修理不可」とされた時計も、諦めずにご相談ください。</p>
+                <img src="/img/dial-hands.jpg" alt="分解パーツ" style="width: 100%; margin-top: 15px; border-radius: 4px;">
             </div>
         </div>
 
         <div class="strength-item">
             <div class="strength-img">
-                <img src="/img/waterproof.jpg" alt="防水性能を可能な限り復活" style="width:100%;height:100%;object-fit:cover;" />
+                <img src="/img/waterproof.jpg" alt="防水性能を可能な限り復活">
             </div>
             <div class="strength-text">
                 <h3>防水性能を可能な限り復活</h3>
