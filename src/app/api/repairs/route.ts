@@ -9,30 +9,26 @@ export async function POST(req: Request) {
 
         const result = await prisma.$transaction(async (tx) => {
             // 1. Customer Handling
-            // 1. Customer Handling
             let customerId = body.customer.id ? parseInt(body.customer.id) : null;
             let customer;
 
             if (customerId) {
-                // Try to find by ID
                 customer = await tx.customer.findUnique({ where: { id: customerId } });
             }
 
-            // Fallback: If ID provided but not found, or ID not provided
             if (!customer) {
                 const type = body.customer.type || 'individual';
-                const name = body.customer.name;
+                const name = (body.customer.name || "").trim();
 
                 if (type === 'business') {
-                    // B2B: Match by Name + isPartner
+                    // B2B: Match by Name (be more aggressive to avoid duplicates)
                     customer = await tx.customer.findFirst({
-                        where: { name: name, isPartner: true }
+                        where: { name: name, type: 'business' }
                     });
 
                     if (!customer) {
-                        // Create New Partner
-                        // Auto-gen prefix? First 2 chars upper for now.
-                        const prefix = name.slice(0, 2).toUpperCase();
+                        // Create New B2B
+                        const prefix = body.customer.prefix || name.slice(0, 2).toUpperCase();
                         customer = await tx.customer.create({
                             data: {
                                 type: 'business',
@@ -47,22 +43,29 @@ export async function POST(req: Request) {
                         });
                     }
                 } else {
-                    // B2C: Match by Phone + type=individual
-                    // If no phone, match by Name? Phone is safer.
-                    const phone = body.customer.phone;
+                    // B2C: Match by Phone OR Name
+                    const phone = (body.customer.phone || "").trim();
+
                     if (phone) {
                         customer = await tx.customer.findFirst({
                             where: { phone: phone, type: 'individual' }
                         });
                     }
 
+                    if (!customer && name) {
+                        // Match by Name if phone didn't work or wasn't provided
+                        customer = await tx.customer.findFirst({
+                            where: { name: name, type: 'individual' }
+                        });
+                    }
+
                     if (customer) {
-                        // Update existing B2C info
+                        // Update existing B2C info (address/email if provided)
                         customer = await tx.customer.update({
                             where: { id: customer.id },
                             data: {
-                                name: name,
-                                address: body.customer.address,
+                                address: body.customer.address || customer.address,
+                                email: body.customer.email || customer.email,
                             }
                         });
                     } else {
@@ -71,6 +74,8 @@ export async function POST(req: Request) {
                             data: {
                                 type: 'individual',
                                 name: name,
+                                prefix: 'C',
+                                isPartner: true, // Personal is also "partner" for C-001 logic
                                 rank: 1,
                                 phone: phone || null,
                                 address: body.customer.address,

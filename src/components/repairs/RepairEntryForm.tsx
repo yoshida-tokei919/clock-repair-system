@@ -6,14 +6,23 @@ import imageCompression from 'browser-image-compression';
 import {
     ArrowLeft, Camera, Printer, Save, Search, Check, ChevronDown, User, Watch,
     Settings, Trash2, Plus, Image as ImageIcon, MapPin, Phone, Mail, MessageCircle,
-    Clock, CheckCircle, Smartphone, FileText, RefreshCw
+    Clock, CheckCircle, Smartphone, FileText, RefreshCw, AlertTriangle
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogDescription
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/use-toast";
 import { MasterService } from "@/lib/masterData";
 import {
     getBrands, getModels, getCalibers, getCalibersForModel, getCalibersForRef,
@@ -235,11 +244,13 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     const [statusLog, setStatusLog] = useState<Record<string, string>>(initialData?.statusLog || { "reception": new Date().toLocaleDateString("ja-JP") });
 
     // Customer
+    const [customerId, setCustomerId] = useState<number | null>(initialData?.customer?.id || null);
     const [customerCategory, setCustomerCategory] = useState<"B2B" | "B2C">(initialData?.customer?.type === 'business' ? "B2B" : "B2C");
     const [customerName, setCustomerName] = useState(initialData?.customer?.name || "");
     const [endUserName, setEndUserName] = useState(initialData?.endUserName || "");
     const [lineId, setLineId] = useState(initialData?.customer?.phone || initialData?.customer?.lineId || "");
     const [address, setAddress] = useState(initialData?.customer?.address || "");
+    const [customerPrefix, setCustomerPrefix] = useState(initialData?.customer?.prefix || "");
 
     // Watch
     const [brand, setBrand] = useState(initialData?.watch?.brand?.name || initialData?.watch?.brand?.nameEn || "");
@@ -278,6 +289,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     const [isUploading, setIsUploading] = useState(false);
     const [isQuickRegisterOpen, setIsQuickRegisterOpen] = useState(false);
     const [customerOptions, setCustomerOptions] = useState<any[]>([]);
+    const [showDupDialog, setShowDupDialog] = useState(false);
+    const [dupResults, setDupResults] = useState<any[]>([]);
 
     // Incremental Customer Search
     useEffect(() => {
@@ -299,8 +312,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     }, [customerName]);
 
     const handleCustomerRegister = (data: any) => {
+        setCustomerId(null); // New register means ID not yet existing
         setCustomerCategory(data.type === 'business' ? 'B2B' : 'B2C');
         setCustomerName(data.name);
+        setCustomerPrefix(data.prefix || "");
         if (data.phone) setLineId(data.phone);
         if (data.address) setAddress(data.address);
         setIsQuickRegisterOpen(false);
@@ -410,11 +425,33 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     }, [refName, refOptions]);
 
     // Handle Save
-    const handleSave = async () => {
+    const handleSave = async (force: boolean = false) => {
         if (!brand || !customerName) { alert("ブランドと顧客名は必須です"); return; }
+
+        // --- Duplicate Check logic ---
+        if (!force && mode === 'create' && !customerId) {
+            // Check if name already exists
+            const matches = await getCustomers(customerName);
+            // Filter by exact name
+            const exactMatches = matches.filter(m => m.name === customerName);
+            if (exactMatches.length > 0) {
+                setDupResults(exactMatches);
+                setShowDupDialog(true);
+                return;
+            }
+        }
+
         setIsSaving(true);
         const payload = {
-            customer: { name: customerName, type: customerCategory === "B2B" ? "business" : "individual", address, endUserName, phone: lineId },
+            customer: {
+                id: customerId,
+                name: customerName,
+                type: customerCategory === "B2B" ? "business" : "individual",
+                address,
+                endUserName,
+                phone: lineId,
+                prefix: customerCategory === "B2B" ? customerPrefix : "C"
+            },
             watch: { brand, model, ref: refName, serial, caliber },
             request: { partnerRef, accessories: accessories.split(",").map((s: string) => s.trim()).filter(Boolean), diagnosis: requestContent, internalNotes },
             estimate: { items: [...selectedWorks.map((w: WorkItem) => ({ type: "labor", name: w.name, price: w.price })), ...selectedParts.map((p: PartItem) => ({ type: "part", name: p.name, price: p.retailPrice }))] },
@@ -442,7 +479,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="h-8 gap-1 border-zinc-300" onClick={() => window.print()}><Printer className="w-4 h-4" /> 印刷</Button>
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 shadow-sm" onClick={handleSave} disabled={isSaving}>
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 shadow-sm" onClick={() => handleSave()} disabled={isSaving}>
                         <Save className="w-4 h-4 mr-1" /> {isSaving ? "保存中..." : "保存する"}
                     </Button>
                 </div>
@@ -478,9 +515,14 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                                                 const found = customerOptions.find(o => o.value === val);
                                                 if (found?.fullData) {
                                                     const d = found.fullData;
+                                                    setCustomerId(d.id);
                                                     setCustomerCategory(d.type === 'business' ? 'B2B' : 'B2C');
+                                                    setCustomerPrefix(d.prefix || "");
                                                     if (d.phone || d.lineId) setLineId(d.phone || d.lineId);
                                                     if (d.address) setAddress(d.address);
+                                                } else {
+                                                    // If user manually types and it doesn't match an option, clear ID
+                                                    setCustomerId(null);
                                                 }
                                             }}
                                             placeholder="顧客名または業者名を入力..."
@@ -744,6 +786,49 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                 mode="customer"
                 initialName={customerName}
             />
+
+            {/* 重複警告ダイアログ (Repair Entry screen version) */}
+            <Dialog open={showDupDialog} onOpenChange={setShowDupDialog}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-amber-600">
+                            <AlertTriangle className="w-5 h-5" /> 重複の可能性があります
+                        </DialogTitle>
+                        <DialogDescription className="pt-2 text-zinc-600 text-xs">
+                            同じ名称の顧客が既に見つかりました。既存の顧客を選択するか（候補から選ぶ）、被っていても新しく作成するか選んでください。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 py-4">
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">一致する既存顧客:</p>
+                        {dupResults.map(c => (
+                            <div key={c.id} className="p-2.5 bg-zinc-50 border rounded-md text-xs flex justify-between items-center group hover:border-blue-300 cursor-pointer transition-all"
+                                onClick={() => {
+                                    setCustomerId(c.id);
+                                    setCustomerName(c.name);
+                                    setCustomerCategory(c.type === 'business' ? 'B2B' : 'B2C');
+                                    setCustomerPrefix(c.prefix || "");
+                                    if (c.phone || c.lineId) setLineId(c.phone || c.lineId);
+                                    if (c.address) setAddress(c.address);
+                                    setShowDupDialog(false);
+                                    toast({ title: "既存顧客を選択しました", description: `${c.name} を修理に紐付けます。` });
+                                }}
+                            >
+                                <div>
+                                    <div className="font-bold text-zinc-900">{c.name}</div>
+                                    <div className="text-[10px] text-zinc-500">電話: {c.phone || "不明"} / Prefix: <span className="font-mono font-bold">{c.prefix}</span></div>
+                                </div>
+                                <div className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold opacity-0 group-hover:opacity-100">これを選択</div>
+                            </div>
+                        ))}
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setShowDupDialog(false)} className="text-xs">キャンセル・修正</Button>
+                        <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-xs" onClick={() => { setShowDupDialog(false); handleSave(true); }}>
+                            被っていても新規で保存
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
