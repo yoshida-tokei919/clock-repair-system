@@ -42,7 +42,7 @@ export default function CustomerListPage() {
         <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <Link href="/">
+                    <Link href="/admin">
                         <Button variant="ghost" size="sm" className="gap-1 mb-2 -ml-2 text-zinc-500">
                             <ArrowLeft className="w-4 h-4" /> Back to Dashboard
                         </Button>
