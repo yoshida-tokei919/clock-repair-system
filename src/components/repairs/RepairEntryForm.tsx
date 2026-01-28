@@ -145,8 +145,15 @@ const AdvancedCombobox: React.FC<{
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     // Use either the selected value's label or the manual search text
-    const filtered = (options || []).filter(opt => (opt.label || "").toLowerCase().includes(search.toLowerCase()));
-    const selectedLabel = options?.find(o => o.value === value)?.label || value;
+    // Fixed: Always filter based on current search or show all if search is empty
+    const filtered = (options || []).filter(opt =>
+        (opt.label || "").toLowerCase().includes(search.toLowerCase()) ||
+        (opt.value || "").toLowerCase().includes(search.toLowerCase())
+    );
+
+    // After selection, we usually want the clean 'value' (e.g. "TRUST") in the input,
+    // not the 'label' (e.g. "TRUST (No Contact)")
+    const inputDisplayValue = isOpen ? search : value;
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -156,36 +163,46 @@ const AdvancedCombobox: React.FC<{
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Sync external search change
+    // Important: Reflect parent-side 'value' changes in local search if needed, 
+    // but usually 'search' should only exist while typing.
     useEffect(() => {
-        if (onSearchChange) onSearchChange(search);
-    }, [search]);
+        if (!isOpen) setSearch("");
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && onSearchChange) {
+            onSearchChange(search);
+        }
+    }, [search, isOpen, onSearchChange]);
 
     return (
         <div className="relative" ref={wrapperRef}>
             <div
                 className={cn(
-                    "flex h-8 w-full items-center justify-between rounded border border-input bg-white px-2 py-1 text-xs cursor-text focus-within:ring-1 focus-within:ring-blue-400",
+                    "flex h-8 w-full items-center justify-between rounded border border-input bg-white px-2 py-1 text-xs cursor-text focus-within:ring-1 focus-within:ring-blue-400 font-medium",
                     disabled ? "opacity-50" : ""
                 )}
                 onClick={() => {
                     if (!disabled) {
                         setIsOpen(true);
-                        // If we already have a value, initialize search with it to show relevant results
-                        if (!search && value) setSearch(value);
+                        inputRef.current?.focus();
                     }
                 }}
             >
                 <input
                     ref={inputRef}
-                    className="bg-transparent border-0 p-0 text-xs w-full focus:outline-none"
+                    className="bg-transparent border-0 p-0 text-xs w-full focus:outline-none placeholder:text-zinc-300"
                     placeholder={placeholder}
-                    value={isOpen ? search : selectedLabel}
+                    value={inputDisplayValue}
                     onChange={(e) => {
                         setSearch(e.target.value);
                         if (!isOpen) setIsOpen(true);
                     }}
-                    onFocus={() => setIsOpen(true)}
+                    onFocus={() => {
+                        setIsOpen(true);
+                        // Trigger search with empty string to show all on focus
+                        if (onSearchChange) onSearchChange("");
+                    }}
                     disabled={disabled}
                 />
                 <ChevronDown className="h-3 w-3 opacity-50 cursor-pointer" onClick={(e) => {
@@ -292,24 +309,22 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     const [showDupDialog, setShowDupDialog] = useState(false);
     const [dupResults, setDupResults] = useState<any[]>([]);
 
+    const [customerSearch, setCustomerSearch] = useState("");
+
     // Incremental Customer Search
     useEffect(() => {
-        if (!customerName) {
-            setCustomerOptions([]);
-            return;
-        }
-
         const timer = setTimeout(async () => {
-            const results = await getCustomers(customerName);
+            // Fetch even if search is empty to show initial list
+            const results = await getCustomers(customerSearch);
             setCustomerOptions(results.map(c => ({
-                label: `${c.name} (${c.phone || c.lineId || "No Contact"})`,
-                value: c.name, // We primarily want the name
+                label: `${c.name} (${c.phone || c.email || "No Contact"})`,
+                value: c.name,
                 fullData: c
             })));
-        }, 300); // Debounce
+        }, 150); // Shorter debounce for better feel
 
         return () => clearTimeout(timer);
-    }, [customerName]);
+    }, [customerSearch]);
 
     const handleCustomerRegister = (data: any) => {
         setCustomerId(null); // New register means ID not yet existing
@@ -415,14 +430,14 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
         }
     }, [model, modelOptions, brand, brandOptions]);
 
-    // Ref Change -> Auto-fill Caliber
+    // Ref Change -> Auto-fill Caliber (Safely)
     useEffect(() => {
         if (!refName) return;
         const r = refOptions.find(o => o.value === refName);
         if (r?.caliber) {
             setCaliber(r.caliber);
         }
-    }, [refName, refOptions]);
+    }, [refName]); // Trigger specifically on refName change
 
     // Handle Save
     const handleSave = async (force: boolean = false) => {
@@ -509,9 +524,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                                     <div className="flex gap-1">
                                         <AdvancedCombobox
                                             value={customerName}
+                                            onSearchChange={setCustomerSearch}
                                             onChange={(val) => {
                                                 setCustomerName(val);
-                                                // Auto-fill other fields if it's a known customer
+                                                // Find details
                                                 const found = customerOptions.find(o => o.value === val);
                                                 if (found?.fullData) {
                                                     const d = found.fullData;
@@ -521,11 +537,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                                                     if (d.phone || d.lineId) setLineId(d.phone || d.lineId);
                                                     if (d.address) setAddress(d.address);
                                                 } else {
-                                                    // If user manually types and it doesn't match an option, clear ID
                                                     setCustomerId(null);
                                                 }
                                             }}
-                                            placeholder="顧客名または業者名を入力..."
+                                            placeholder="顧客名を入力..."
                                             options={customerOptions}
                                         />
                                     </div>
@@ -557,15 +572,15 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                             })} /></div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">リファレンス</Label><AdvancedCombobox value={refName} onChange={setRefName} options={refOptions} onUpsert={v => model && upsertRef(model, brand, v).then(() => {
+                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">リファレンス (Ref)</Label><AdvancedCombobox value={refName} onChange={setRefName} options={refOptions} onUpsert={v => model && upsertRef(model, brand, v).then(() => {
                                 const m = modelOptions.find(x => x.value === model);
                                 if (m) getRefsByModel(m.id).then(r => setRefOptions(r.map(x => ({ label: x.name, value: x.name, id: x.id, caliber: x.caliber?.name }))));
-                            })} /></div>
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">キャリバー</Label><AdvancedCombobox value={caliber} onChange={setCaliber} options={caliberOptions} onUpsert={v => brand && upsertCaliber(v, brandOptions.find(b => b.value === brand)?.id).then(() => {
+                            })} placeholder="型番を選択..." /></div>
+                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">キャリバー (Cal)</Label><AdvancedCombobox value={caliber} onChange={setCaliber} options={caliberOptions} onUpsert={v => brand && upsertCaliber(v, brandOptions.find(b => b.value === brand)?.id).then(() => {
                                 const b = brandOptions.find(x => x.value === brand);
                                 const m = modelOptions.find(x => x.value === model);
                                 if (b) getCalibersForModel(b.id, m?.id).then(cals => setCaliberOptions(cals.map(c => ({ label: c.name, value: c.name }))));
-                            })} /></div>
+                            })} placeholder="機械番号..." /></div>
                         </div>
                         <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">製造番号 (Serial)</Label><Input value={serial} onChange={e => setSerial(e.target.value)} className="h-8 text-sm font-mono border-zinc-200" /></div>
                         <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">付属品</Label><Input value={accessories} onChange={e => setAccessories(e.target.value)} className="h-8 text-xs border-zinc-200 placeholder:italic" placeholder="箱, 保証書, 外したコマ..." /></div>
