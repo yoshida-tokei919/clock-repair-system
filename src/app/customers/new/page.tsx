@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArrowLeft, Save, Building2, User, Star } from "lucide-react";
+import { ArrowLeft, Save, Building2, User, Star, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createCustomer } from "@/actions/customer-actions";
+import { createCustomer, checkDuplicateCustomer } from "@/actions/customer-actions";
 import { toast } from "@/components/ui/use-toast";
 
 export default function NewCustomerPage() {
@@ -18,214 +19,196 @@ export default function NewCustomerPage() {
     // フォームの状態
     const [type, setType] = useState<"business" | "individual">("business");
     const [name, setName] = useState(""); // 個人名、または担当者名
-    const [kana, setKana] = useState("");
     const [companyName, setCompanyName] = useState(""); // 屋号・会社名
+    const [kana, setKana] = useState("");
     const [rank, setRank] = useState(1);
     const [zipCode, setZipCode] = useState("");
     const [address, setAddress] = useState("");
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
     const [lineId, setLineId] = useState("");
-
-    // 取引先設定 (B2Bのみ)
-    const [isPartner, setIsPartner] = useState(false);
     const [prefix, setPrefix] = useState("");
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    // 重複チェック用
+    const [showDupDialog, setShowDupDialog] = useState(false);
+    const [dupResults, setDupResults] = useState<any[]>([]);
 
-        // バリデーション: 業者の場合は屋号を必須に、個人の場合はお名前を必須にする
-        if (type === "business" && !companyName) {
-            toast({ title: "入力エラー", description: "業者登録の場合は『屋号・会社名』が必須です", variant: "destructive" });
+    // バリデーション関数 (漢字、ひらがな、カタカナ、半角英数のみ)
+    const isValidText = (str: string) => /^[ぁ-んァ-ヶ\u4E00-\u9FFF a-zA-Z0-9ー\s\d．・（）\(\)]+$/.test(str);
+    const isAlphaNum = (str: string) => /^[a-zA-Z0-9]+$/.test(str);
+
+    const validateForm = () => {
+        const targetName = type === "business" ? companyName : name;
+        if (!targetName) return "名前を入力してください";
+        if (!isValidText(targetName)) return "特殊な記号は使用できません。";
+
+        if (type === "business") {
+            if (!prefix) return "プレフィックスを入力してください";
+            if (!isAlphaNum(prefix)) return "プレフィックスは半角英数字のみ使用可能です";
+        }
+        return null;
+    };
+
+    const handleSaveRequest = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const error = validateForm();
+        if (error) {
+            toast({ title: "入力エラー", description: error, variant: "destructive" });
             return;
         }
-        if (type === "individual" && !name) {
-            toast({ title: "入力エラー", description: "個人登録の場合は『お名前』が必須です", variant: "destructive" });
-            return;
-        }
+
+        // 重複チェック
+        const targetName = type === "business" ? companyName : name;
+        const targetPrefix = type === "business" ? prefix : "C";
 
         setIsSaving(true);
+        const matches = await checkDuplicateCustomer(targetName, targetPrefix);
+
+        if (matches.length > 0) {
+            setDupResults(matches);
+            setShowDupDialog(true);
+            setIsSaving(false);
+            return;
+        }
+
+        await performSave();
+    };
+
+    const performSave = async () => {
+        setIsSaving(true);
         const res = await createCustomer({
-            type, name, kana, companyName, rank, zipCode, address, phone, email, lineId, isPartner, prefix
+            type, name, companyName, rank, zipCode, address, phone, email, lineId,
+            prefix: type === "business" ? prefix : "C"
         });
 
         if (res.success) {
             toast({ title: "登録完了", description: "新規顧客を登録しました。" });
             router.push("/admin");
         } else {
-            alert("エラーが発生しました: " + res.error);
+            alert("エラー: " + res.error);
             setIsSaving(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-6 font-sans text-zinc-900 dark:text-zinc-100">
+        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-6 font-sans">
             <div className="max-w-4xl mx-auto space-y-6">
 
-                {/* ヘッダー */}
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Link href="/admin">
-                            <Button variant="ghost" size="sm" className="gap-1">
-                                <ArrowLeft className="w-4 h-4" /> 戻る
-                            </Button>
-                        </Link>
-                    </div>
-                    <h1 className="text-2xl font-bold tracking-tight text-zinc-800 dark:text-zinc-200">
-                        新規顧客登録
-                    </h1>
+                    <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-1">
+                        <ArrowLeft className="w-4 h-4" /> 戻る
+                    </Button>
+                    <h1 className="text-2xl font-bold text-zinc-800">新規顧客登録</h1>
                 </div>
 
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSaveRequest}>
                     <Card className="border-t-4 border-t-blue-600 shadow-md">
                         <CardHeader>
                             <div className="flex items-center gap-4 border-b border-zinc-100 pb-4">
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="radio"
-                                        name="ctype"
-                                        id="type-business"
-                                        className="w-4 h-4 text-blue-600"
-                                        checked={type === "business"}
-                                        onChange={() => setType("business")}
-                                    />
-                                    <Label htmlFor="type-business" className="text-base cursor-pointer flex items-center gap-2 font-bold">
-                                        <Building2 className="w-4 h-4" /> 業者 (B2B)
-                                    </Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="radio"
-                                        name="ctype"
-                                        id="type-individual"
-                                        className="w-4 h-4 text-blue-600"
-                                        checked={type === "individual"}
-                                        onChange={() => setType("individual")}
-                                    />
-                                    <Label htmlFor="type-individual" className="text-base cursor-pointer flex items-center gap-2 font-bold">
-                                        <User className="w-4 h-4" /> 一般個人 (B2C)
-                                    </Label>
-                                </div>
+                                <button type="button" onClick={() => setType("business")} className={`flex items-center gap-2 px-4 py-2 rounded-md font-bold transition-all ${type === 'business' ? 'bg-blue-600 text-white' : 'bg-zinc-100 text-zinc-400'}`}>
+                                    <Building2 className="w-4 h-4" /> 業者 (B2B)
+                                </button>
+                                <button type="button" onClick={() => setType("individual")} className={`flex items-center gap-2 px-4 py-2 rounded-md font-bold transition-all ${type === 'individual' ? 'bg-green-600 text-white' : 'bg-zinc-100 text-zinc-400'}`}>
+                                    <User className="w-4 h-4" /> 一般個人 (B2C)
+                                </button>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-6 pt-6">
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* 左側: 基本情報 */}
                                 <div className="space-y-4">
                                     {type === "business" ? (
-                                        <>
+                                        <div className="space-y-4">
                                             <div className="space-y-2">
-                                                <Label className="font-bold flex items-center gap-1">屋号・会社名 <span className="text-red-500">*</span></Label>
-                                                <Input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="例：株式会社ヨシダ時計" className="bg-white border-zinc-200" required />
+                                                <Label className="font-bold">屋号・会社名 <span className="text-red-500">*</span></Label>
+                                                <Input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="例：吉田時計店" className="bg-white" required />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label className="text-zinc-500 text-xs">担当者名 (任意)</Label>
-                                                <Input value={name} onChange={e => setName(e.target.value)} placeholder="例：山田 太郎" className="bg-white border-zinc-200" />
+                                                <Label className="font-bold">プレフィックス <span className="text-red-500">*</span></Label>
+                                                <Input value={prefix} onChange={e => setPrefix(e.target.value.toUpperCase())} placeholder="例：JK" className="font-mono uppercase bg-white" maxLength={3} />
+                                                <p className="text-[10px] text-zinc-400 italic">※半角英数字のみ可（修理番号 {prefix || "JK"}-001 となります）</p>
                                             </div>
-                                        </>
-                                    ) : (
-                                        <>
                                             <div className="space-y-2">
-                                                <Label className="font-bold flex items-center gap-1">お名前 <span className="text-red-500">*</span></Label>
-                                                <Input value={name} onChange={e => setName(e.target.value)} placeholder="例：山田 太郎" className="bg-white border-zinc-200" required />
+                                                <Label className="text-zinc-500 text-xs text-xs">担当者名 (任意)</Label>
+                                                <Input value={name} onChange={e => setName(e.target.value)} placeholder="やまだ たろう" className="bg-white border-zinc-200" />
                                             </div>
-                                        </>
-                                    )}
-                                    <div className="space-y-2">
-                                        <Label className="text-zinc-500 text-xs">フリガナ</Label>
-                                        <Input value={kana} onChange={e => setKana(e.target.value)} placeholder="ヤマダ タロウ" className="bg-white border-zinc-200" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-zinc-500 text-xs">重要度 (ランク)</Label>
-                                        <div className="flex items-center gap-2">
-                                            {[1, 2, 3, 4, 5].map(v => (
-                                                <Star
-                                                    key={v}
-                                                    className={`w-6 h-6 cursor-pointer ${v <= rank ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-200'}`}
-                                                    onClick={() => setRank(v)}
-                                                />
-                                            ))}
-                                            <span className="ml-2 text-sm font-bold text-zinc-600">Rank {rank}</span>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div className="space-y-2">
+                                                <Label className="font-bold">お名前 <span className="text-red-500">*</span></Label>
+                                                <Input value={name} onChange={e => setName(e.target.value)} placeholder="やまだ 太郎" className="bg-white" required />
+                                            </div>
+                                            <div className="p-3 bg-green-50 rounded-md border border-green-100">
+                                                <Label className="text-xs font-bold text-green-700">自動割り当てプレフィックス:</Label>
+                                                <div className="text-xl font-mono font-bold text-green-800">C</div>
+                                                <p className="text-[10px] text-green-600/70 mt-1 italic">※一般のお客様は一律「C-001」形式の番号となります</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* 右側: 連絡先情報 */}
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-zinc-500 text-xs">郵便番号</Label>
-                                            <Input value={zipCode} onChange={e => setZipCode(e.target.value)} placeholder="123-4567" className="bg-white border-zinc-200" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-zinc-500 text-xs font-bold text-zinc-700">住所</Label>
-                                            <Input value={address} onChange={e => setAddress(e.target.value)} placeholder="東京都..." className="bg-white border-zinc-200" />
+                                <div className="space-y-4 text-xs">
+                                    <div className="space-y-2">
+                                        <Label className="font-bold text-zinc-700">顧客重要度</Label>
+                                        <div className="flex items-center gap-2">
+                                            {[1, 2, 3, 4, 5].map(v => (
+                                                <Star key={v} className={`w-6 h-6 cursor-pointer ${v <= rank ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-200'}`} onClick={() => setRank(v)} />
+                                            ))}
                                         </div>
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="font-bold">電話番号</Label>
-                                        <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="090-0000-0000" className="bg-white border-zinc-200" />
+                                        <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="09000000000" className="bg-white" />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-zinc-500 text-xs">Email / LINE ID</Label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <Input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="メール" className="bg-white border-zinc-200" />
-                                            <Input value={lineId} onChange={e => setLineId(e.target.value)} placeholder="LINE ID" className="bg-white border-zinc-200" />
-                                        </div>
+                                        <Label className="font-bold">住所</Label>
+                                        <Input value={address} onChange={e => setAddress(e.target.value)} placeholder="とうきょうと..." className="bg-white" />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 取引先＆プレフィックス設定 (業者のみ表示) */}
-                            {type === "business" && (
-                                <Card className="p-4 bg-blue-50/50 border-blue-100 space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                id="isPartner"
-                                                checked={isPartner}
-                                                onChange={e => setIsPartner(e.target.checked)}
-                                                className="w-4 h-4 accent-blue-600"
-                                            />
-                                            <Label htmlFor="isPartner" className="font-bold text-blue-800 cursor-pointer">
-                                                公式パートナー（取引先）として管理する
-                                            </Label>
-                                        </div>
-                                        {isPartner && (
-                                            <div className="flex items-center gap-3">
-                                                <Label className="text-xs font-bold text-blue-700">管理番号接頭辞 (Prefix):</Label>
-                                                <Input
-                                                    value={prefix}
-                                                    onChange={e => setPrefix(e.target.value.toUpperCase())}
-                                                    placeholder="例：JK"
-                                                    className="w-20 h-9 font-mono text-center font-bold uppercase border-blue-200 focus:ring-blue-400"
-                                                    maxLength={3}
-                                                    required
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <p className="text-[10px] text-blue-600/70 italic">
-                                        ※パートナー設定を有効にすると、この顧客からの依頼に対して、独自の番号（例: {prefix || 'JK'}-001）を自動で振ることができます。
-                                    </p>
-                                </Card>
-                            )}
-
                             <div className="flex justify-end pt-4 border-t border-zinc-100">
-                                <Button
-                                    type="submit"
-                                    disabled={isSaving}
-                                    className="w-full md:w-auto gap-2 bg-blue-600 hover:bg-blue-700 font-bold px-10 h-11"
-                                >
-                                    <Save className="w-4 h-4" /> {isSaving ? "登録中..." : "この内容で登録する"}
+                                <Button type="submit" disabled={isSaving} className="w-full md:w-auto gap-2 bg-blue-600 hover:bg-blue-700 font-bold px-10 h-11">
+                                    <Save className="w-4 h-4" /> {isSaving ? "チェック中..." : "保存して登録"}
                                 </Button>
                             </div>
-
                         </CardContent>
                     </Card>
                 </form>
+
+                {/* 重複警告ダイアログ */}
+                <Dialog open={showDupDialog} onOpenChange={setShowDupDialog}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-amber-600">
+                                <AlertTriangle className="w-5 h-5" /> 重複の可能性があります
+                            </DialogTitle>
+                            <DialogDescription className="pt-2 text-zinc-600">
+                                入力された内容（屋号・名前、またはプレフィックス）が既に登録されています。
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3 py-4">
+                            <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">一致した既存の顧客:</p>
+                            {dupResults.map(c => (
+                                <div key={c.id} className="p-3 bg-zinc-50 border rounded-md text-sm flex justify-between items-center">
+                                    <div>
+                                        <div className="font-bold text-zinc-900">{c.name}</div>
+                                        <div className="text-xs text-zinc-500">Prefix: <span className="font-mono font-bold">{c.prefix}</span></div>
+                                    </div>
+                                    <div className="text-[10px] bg-zinc-200 px-2 py-0.5 rounded text-zinc-600 font-bold">登録済</div>
+                                </div>
+                            ))}
+                        </div>
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button variant="ghost" onClick={() => setShowDupDialog(false)}>修正する</Button>
+                            <Button className="bg-amber-600 hover:bg-amber-700" onClick={() => { setShowDupDialog(false); performSave(); }}>
+                                被っていても登録する
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
             </div>
         </div>
     );
