@@ -269,6 +269,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     // --- Masters ---
     const [brandOptions, setBrandOptions] = useState<any[]>([]);
     const [modelOptions, setModelOptions] = useState<any[]>([]);
+    const [refOptions, setRefOptions] = useState<any[]>([]);
+    const [caliberOptions, setCaliberOptions] = useState<any[]>([]);
     const [workOptions, setWorkOptions] = useState<any[]>([]);
     const [partsOptions, setPartsOptions] = useState<any[]>([]);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -362,16 +364,50 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     };
 
     useEffect(() => {
-        getBrands().then(data => setBrandOptions(data.map(b => ({ label: b.nameJp || b.name, value: b.name }))));
+        getBrands().then(data => setBrandOptions(data.map(b => ({ label: b.nameJp || b.name, value: b.name, id: b.id }))));
     }, []);
 
+    // Brand Change -> Load Models
     useEffect(() => {
-        if (!brand) return;
-        getBrands().then(list => {
-            const b = list.find(x => x.name === brand);
-            if (b) getModels(b.id).then(m => setModelOptions(m.map((x: any) => ({ label: x.nameJp, value: x.nameJp }))));
-        });
-    }, [brand]);
+        if (!brand) {
+            setModelOptions([]);
+            return;
+        }
+        const b = brandOptions.find(x => x.value === brand);
+        if (b) {
+            getModels(b.id).then(m => setModelOptions(m.map((x: any) => ({ label: x.nameJp || x.name, value: x.nameJp || x.name, id: x.id }))));
+        }
+    }, [brand, brandOptions]);
+
+    // Model Change -> Load Refs & Calibers
+    useEffect(() => {
+        if (!model) {
+            setRefOptions([]);
+            setCaliberOptions([]);
+            return;
+        }
+        const m = modelOptions.find(x => x.value === model);
+        if (m) {
+            getRefsByModel(m.id).then(refs => {
+                setRefOptions(refs.map(r => ({ label: r.name, value: r.name, id: r.id, caliber: r.caliber?.name })));
+            });
+            const b = brandOptions.find(x => x.value === brand);
+            if (b) {
+                getCalibersForModel(b.id, m.id).then(cals => {
+                    setCaliberOptions(cals.map(c => ({ label: c.name, value: c.name })));
+                });
+            }
+        }
+    }, [model, modelOptions, brand, brandOptions]);
+
+    // Ref Change -> Auto-fill Caliber
+    useEffect(() => {
+        if (!refName) return;
+        const r = refOptions.find(o => o.value === refName);
+        if (r?.caliber) {
+            setCaliber(r.caliber);
+        }
+    }, [refName, refOptions]);
 
     // Handle Save
     const handleSave = async () => {
@@ -472,12 +508,22 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                     <Card className="p-3 bg-white space-y-4 shadow-sm border-t-2 border-t-zinc-400">
                         <div className="flex items-center gap-2 mb-1"><Watch className="w-4 h-4 text-zinc-400" /><h3 className="text-xs font-bold">時計情報</h3></div>
                         <div className="grid grid-cols-2 gap-2">
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">ブランド</Label><AdvancedCombobox value={brand} onChange={setBrand} options={brandOptions} onUpsert={v => upsertBrand(v).then(() => getBrands().then(d => setBrandOptions(d.map(b => ({ label: b.name, value: b.name })))))} /></div>
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">モデル</Label><AdvancedCombobox value={model} onChange={setModel} options={modelOptions} onUpsert={v => brand && upsertModel(brand, v).then(() => getModels(brandOptions.find(b => b.value === brand)?.id).then(m => setModelOptions(m.map(x => ({ label: x.nameJp, value: x.nameJp })))))} /></div>
+                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">ブランド</Label><AdvancedCombobox value={brand} onChange={setBrand} options={brandOptions} onUpsert={v => upsertBrand(v).then(() => getBrands().then(d => setBrandOptions(d.map(b => ({ label: b.nameJp || b.name, value: b.name, id: b.id })))))} /></div>
+                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">モデル</Label><AdvancedCombobox value={model} onChange={setModel} options={modelOptions} onUpsert={v => brand && upsertModel(brand, v).then(() => {
+                                const b = brandOptions.find(x => x.value === brand);
+                                if (b) getModels(b.id).then(m => setModelOptions(m.map(x => ({ label: x.nameJp || x.name, value: x.nameJp || x.name, id: x.id }))));
+                            })} /></div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">リファレンス</Label><Input value={refName} onChange={e => setRefName(e.target.value)} className="h-8 text-sm border-zinc-200" /></div>
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">キャリバー</Label><Input value={caliber} onChange={e => setCaliber(e.target.value)} className="h-8 text-sm font-mono border-zinc-200" /></div>
+                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">リファレンス</Label><AdvancedCombobox value={refName} onChange={setRefName} options={refOptions} onUpsert={v => model && upsertRef(model, brand, v).then(() => {
+                                const m = modelOptions.find(x => x.value === model);
+                                if (m) getRefsByModel(m.id).then(r => setRefOptions(r.map(x => ({ label: x.name, value: x.name, id: x.id, caliber: x.caliber?.name }))));
+                            })} /></div>
+                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">キャリバー</Label><AdvancedCombobox value={caliber} onChange={setCaliber} options={caliberOptions} onUpsert={v => brand && upsertCaliber(v, brandOptions.find(b => b.value === brand)?.id).then(() => {
+                                const b = brandOptions.find(x => x.value === brand);
+                                const m = modelOptions.find(x => x.value === model);
+                                if (b) getCalibersForModel(b.id, m?.id).then(cals => setCaliberOptions(cals.map(c => ({ label: c.name, value: c.name }))));
+                            })} /></div>
                         </div>
                         <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">製造番号 (Serial)</Label><Input value={serial} onChange={e => setSerial(e.target.value)} className="h-8 text-sm font-mono border-zinc-200" /></div>
                         <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">付属品</Label><Input value={accessories} onChange={e => setAccessories(e.target.value)} className="h-8 text-xs border-zinc-200 placeholder:italic" placeholder="箱, 保証書, 外したコマ..." /></div>
