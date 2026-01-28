@@ -20,6 +20,7 @@ import {
     getPricingRules, getPartsMatched, upsertBrand, upsertModel, upsertCaliber,
     getRefsByModel, upsertRef
 } from "@/actions/master-actions";
+import { getCustomers } from "@/actions/customer-actions";
 import { LinePreviewModal } from "@/components/line/LinePreviewModal";
 import { QuickRegisterDialog, RegisterData } from "@/components/repairs/QuickRegisterDialog";
 import { RecentRegistrations } from "@/components/repairs/RecentRegistrations";
@@ -121,35 +122,99 @@ const StatusTimeline: React.FC<{
 };
 
 const AdvancedCombobox: React.FC<{
-    value: string; onChange: (v: string) => void; onUpsert?: (v: string) => void; placeholder?: string;
-    options: { label: string, value: string }[]; disabled?: boolean;
-}> = ({ value, onChange, onUpsert, placeholder, options, disabled }) => {
+    value: string;
+    onChange: (v: string) => void;
+    onSearchChange?: (s: string) => void;
+    onUpsert?: (v: string) => void;
+    placeholder?: string;
+    options: { label: string, value: string }[];
+    disabled?: boolean;
+}> = ({ value, onChange, onSearchChange, onUpsert, placeholder, options, disabled }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
-    const filtered = (options || []).filter(opt => opt.label?.toLowerCase().includes(search.toLowerCase()));
+
+    // Use either the selected value's label or the manual search text
+    const filtered = (options || []).filter(opt => (opt.label || "").toLowerCase().includes(search.toLowerCase()));
     const selectedLabel = options?.find(o => o.value === value)?.label || value;
+
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => { if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false); };
+        const handleClickOutside = (e: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false);
+        };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    // Sync external search change
+    useEffect(() => {
+        if (onSearchChange) onSearchChange(search);
+    }, [search]);
+
     return (
         <div className="relative" ref={wrapperRef}>
-            <div className={cn("flex h-8 w-full items-center justify-between rounded border border-input bg-white px-2 py-1 text-xs cursor-pointer", disabled ? "opacity-50" : "")} onClick={() => !disabled && setIsOpen(!isOpen)}>
-                <span className="truncate">{selectedLabel || placeholder}</span>
-                <ChevronDown className="h-3 w-3 opacity-50" />
+            <div
+                className={cn(
+                    "flex h-8 w-full items-center justify-between rounded border border-input bg-white px-2 py-1 text-xs cursor-text focus-within:ring-1 focus-within:ring-blue-400",
+                    disabled ? "opacity-50" : ""
+                )}
+                onClick={() => {
+                    if (!disabled) {
+                        setIsOpen(true);
+                        // If we already have a value, initialize search with it to show relevant results
+                        if (!search && value) setSearch(value);
+                    }
+                }}
+            >
+                <input
+                    ref={inputRef}
+                    className="bg-transparent border-0 p-0 text-xs w-full focus:outline-none"
+                    placeholder={placeholder}
+                    value={isOpen ? search : selectedLabel}
+                    onChange={(e) => {
+                        setSearch(e.target.value);
+                        if (!isOpen) setIsOpen(true);
+                    }}
+                    onFocus={() => setIsOpen(true)}
+                    disabled={disabled}
+                />
+                <ChevronDown className="h-3 w-3 opacity-50 cursor-pointer" onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(!isOpen);
+                }} />
             </div>
             {isOpen && (
-                <div className="absolute z-50 mt-1 w-full bg-white border rounded shadow-lg p-1 min-w-[200px]">
-                    <Input ref={inputRef} autoFocus className="h-7 mb-1 text-xs" placeholder="検索..." value={search} onChange={e => setSearch(e.target.value)} onClick={e => e.stopPropagation()} />
-                    <div className="max-h-60 overflow-auto">
+                <div className="absolute z-50 mt-1 w-full bg-white border rounded shadow-lg p-1 min-w-[240px] max-h-60 overflow-hidden flex flex-col">
+                    <div className="overflow-auto flex-1">
                         {onUpsert && search && !options.some(o => o.label === search) && (
-                            <div className="p-1 px-2 text-xs text-blue-600 font-bold hover:bg-blue-50 cursor-pointer" onClick={() => { onUpsert(search); setIsOpen(false); }}>+ "{search}" を登録</div>
+                            <div className="p-1 px-2 text-xs text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-b mb-1" onClick={() => {
+                                onUpsert(search);
+                                onChange(search);
+                                setIsOpen(false);
+                            }}>
+                                + "{search}" を新規登録/使用
+                            </div>
+                        )}
+                        {filtered.length === 0 && !onUpsert && (
+                            <div className="p-2 text-xs text-zinc-400 italic">候補が見つかりません</div>
                         )}
                         {filtered.map(opt => (
-                            <div key={opt.value} className="p-1.5 text-xs hover:bg-zinc-100 cursor-pointer rounded" onClick={() => { onChange(opt.value); setIsOpen(false); }}>{opt.label}</div>
+                            <div
+                                key={opt.value}
+                                className={cn(
+                                    "p-1.5 text-xs hover:bg-zinc-100 cursor-pointer rounded flex justify-between items-center",
+                                    value === opt.value ? "bg-blue-50 text-blue-700 font-bold" : ""
+                                )}
+                                onClick={() => {
+                                    onChange(opt.value);
+                                    setSearch(opt.label);
+                                    setIsOpen(false);
+                                }}
+                            >
+                                <span>{opt.label}</span>
+                                {value === opt.value && <Check className="w-3 h-3" />}
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -212,14 +277,24 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     const [isQuickRegisterOpen, setIsQuickRegisterOpen] = useState(false);
     const [customerOptions, setCustomerOptions] = useState<any[]>([]);
 
+    // Incremental Customer Search
     useEffect(() => {
-        // Ideally we should have a getCustomers action, but for now we'll simulate or fetch if available.
-        // Or we can rely on the user typing to search. 
-        // Let's implement a simple fetch or re-use existing if available, or just keep it simple for now.
-        // We will pass an empty list initially and let the user type.
-        // Actually, let's fetch customers for the combobox if possible.
-        // For this step, I'll restore the state and dialog logic first.
-    }, []);
+        if (!customerName) {
+            setCustomerOptions([]);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            const results = await getCustomers(customerName);
+            setCustomerOptions(results.map(c => ({
+                label: `${c.name} (${c.phone || c.lineId || "No Contact"})`,
+                value: c.name, // We primarily want the name
+                fullData: c
+            })));
+        }, 300); // Debounce
+
+        return () => clearTimeout(timer);
+    }, [customerName]);
 
     const handleCustomerRegister = (data: any) => {
         setCustomerCategory(data.type === 'business' ? 'B2B' : 'B2C');
@@ -359,11 +434,21 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                                 <div className="flex-1">
                                     <Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">顧客名 / 業者名</Label>
                                     <div className="flex gap-1">
-                                        <Input
+                                        <AdvancedCombobox
                                             value={customerName}
-                                            onChange={e => setCustomerName(e.target.value)}
-                                            className="h-8 text-sm font-bold border-zinc-200 focus:border-blue-400"
-                                            placeholder="名前を入力..."
+                                            onChange={(val) => {
+                                                setCustomerName(val);
+                                                // Auto-fill other fields if it's a known customer
+                                                const found = customerOptions.find(o => o.value === val);
+                                                if (found?.fullData) {
+                                                    const d = found.fullData;
+                                                    setCustomerCategory(d.type === 'business' ? 'B2B' : 'B2C');
+                                                    if (d.phone || d.lineId) setLineId(d.phone || d.lineId);
+                                                    if (d.address) setAddress(d.address);
+                                                }
+                                            }}
+                                            placeholder="顧客名または業者名を入力..."
+                                            options={customerOptions}
                                         />
                                     </div>
                                 </div>

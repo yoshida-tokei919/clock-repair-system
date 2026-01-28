@@ -10,7 +10,8 @@ import { FileText, Truck, Receipt } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ClickToCopy } from "@/components/ui/click-to-copy";
-import { generateBulkDocument } from "@/actions/document-actions"; // We will create this
+import { generateBulkDocument } from "@/actions/document-actions";
+import { cn } from "@/lib/utils";
 
 type RepairWithRelations = Repair & {
     customer: Customer;
@@ -129,15 +130,22 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                             </tr>
                         ) : (
                             repairs.map(repair => (
-                                <tr key={repair.id} className={`transition-colors ${selectedIds.includes(repair.id) ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                                    <td className="px-4 py-3">
+                                <tr
+                                    key={repair.id}
+                                    className={cn(
+                                        "transition-colors cursor-pointer",
+                                        selectedIds.includes(repair.id) ? 'bg-blue-50/50' : 'hover:bg-slate-50'
+                                    )}
+                                    onClick={() => router.push(`/repairs/${repair.id}`)}
+                                >
+                                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                         <Checkbox
                                             checked={selectedIds.includes(repair.id)}
                                             onCheckedChange={() => toggleSelect(repair.id)}
                                         />
                                     </td>
                                     <td className="px-4 py-3 font-mono font-bold text-slate-700">
-                                        <div className="flex flex-col gap-1">
+                                        <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
                                             <ClickToCopy text={repair.inquiryNumber}>
                                                 <span>{repair.inquiryNumber}</span>
                                             </ClickToCopy>
@@ -150,7 +158,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3">
+                                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                         <RepairListStatusSelect id={repair.id} currentStatus={repair.status} />
                                     </td>
                                     <td className="px-4 py-3">
@@ -173,7 +181,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                         {repair.approvalDate && (
                                             <div className="text-sm font-bold text-blue-600">承: {repair.approvalDate.toLocaleDateString("ja-JP")}</div>
                                         )}
-                                        <div className="flex gap-1 mt-1 flex-wrap">
+                                        <div className="flex gap-1 mt-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
                                             {(repair as any).estimateDocument && (
                                                 <Link href={`/documents/estimate/${(repair as any).estimateDocument.id}`} className="text-[10px] bg-green-100 text-green-700 px-1 rounded border border-green-200 hover:underline">
                                                     {(repair as any).estimateDocument.estimateNumber}
@@ -191,7 +199,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                                         <Link href={`/repairs/${repair.id}`}>
                                             <Button size="sm" variant="outline">詳細</Button>
                                         </Link>
