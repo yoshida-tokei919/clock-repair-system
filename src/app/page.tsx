@@ -283,7 +283,7 @@ const HTML_HEADER = `
 <header>
     <div class="nav-container">
         <a href="#" class="logo-wrapper">
-            <!-- <img src="logo.png" alt="ヨシダ時計修理工房 ロゴ" class="logo-img"> -->
+            <img src="/img/logo.png" alt="ヨシダ時計修理工房 ロゴ" class="logo-img">
             <span class="site-name">ヨシダ時計修理工房</span>
         </a>
         <nav>
@@ -307,17 +307,21 @@ const HTML_ABOUT_PRICE = `
         
         <div class="strength-item">
             <div class="strength-img">
-                <!-- Placeholder -->
+                <img src="/img/work1.jpg" alt="1級時計修理技能士の技術">
             </div>
             <div class="strength-text">
                 <h3>1級時計修理技能士の確かな技術</h3>
                 <p>時計修理歴20年、メーカー下請け会社での豊富な経験を持つ1級時計修理技能士が、一点一点丁寧に診断・修理いたします。複雑な機械式時計も安心してお任せください。</p>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <img src="/img/work3.jpg" alt="修理風景1" style="width: 48%; border-radius: 4px;">
+                    <img src="/img/work4.jpg" alt="修理風景2" style="width: 48%; border-radius: 4px;">
+                </div>
             </div>
         </div>
 
         <div class="strength-item">
             <div class="strength-img">
-                <!-- Placeholder -->
+                <img src="/img/work2.jpg" alt="独自の部品調達ネットワーク">
             </div>
             <div class="strength-text">
                 <h3>独自の部品調達ネットワーク</h3>
@@ -327,17 +331,18 @@ const HTML_ABOUT_PRICE = `
 
         <div class="strength-item">
             <div class="strength-img">
-                <!-- Placeholder -->
+                <img src="/img/parts-creation.jpg" alt="絶版パーツの復元・作成">
             </div>
             <div class="strength-text">
                 <h3>絶版パーツの復元・作成</h3>
                 <p>どうしても部品の調達が難しい場合は、旋盤などを用いて部品をゼロから製作することも可能です。他社で「修理不可」とされた時計も、諦めずにご相談ください。</p>
+                <img src="/img/dial-hands.jpg" alt="分解パーツ" style="width: 100%; margin-top: 15px; border-radius: 4px;">
             </div>
         </div>
 
         <div class="strength-item">
             <div class="strength-img">
-                <!-- Placeholder -->
+                <img src="/img/waterproof.jpg" alt="防水性能を可能な限り復活">
             </div>
             <div class="strength-text">
                 <h3>防水性能を可能な限り復活</h3>
@@ -514,7 +519,7 @@ const HTML_FLOW_FOOTER = `
         <h2>お問い合わせ</h2>
         <p>時計の不調、メンテナンス、お気軽にご相談ください。</p>
         <div class="line-wrapper">
-            <!-- <img src="line.qrcode.png" alt="公式LINE QRコード" class="qr-code-img"> -->
+            <img src="/img/line-qr.png" alt="公式LINE QRコード" class="qr-code-img">
             <h3>公式LINEで相談する</h3>
             <p>写真を送るだけで、簡単お見積もり</p>
             <a href="https://lin.ee/3C0XfJW" class="btn line-btn">LINE 友だち追加</a>
@@ -524,7 +529,7 @@ const HTML_FLOW_FOOTER = `
 
 <footer>
     <div class="container">
-        <!-- <img src="logo.png" alt="ヨシダ時計修理工房 ロゴ" class="footer-logo-img"> -->
+        <img src="/img/logo.png" alt="ヨシダ時計修理工房 ロゴ" class="footer-logo-img">
         <div class="footer-name">ヨシダ時計修理工房</div>
         <p class="copyright">&copy; 2026 Yoshida Watch Repair Studio. All Rights Reserved.</p>
     </div>
@@ -552,8 +557,8 @@ export default async function TopPage() {
             {/* Hero / Slider */}
             <section className="hero">
                 <div className="slideshow-container">
-                    <div className="mySlides active" style={{ backgroundImage: "url('https://placehold.co/1920x1080/1a2b4b/fff?text=Slide+1')" }}></div>
-                    <div className="mySlides" style={{ backgroundImage: "url('https://placehold.co/1920x1080/0f172a/fff?text=Slide+2')" }}></div>
+                    <div className="mySlides active" style={{ backgroundImage: "url('/img/watch-submariner.jpg')" }}></div>
+                    <div className="mySlides" style={{ backgroundImage: "url('/img/watch-sea-dweller.jpg')" }}></div>
                 </div>
 
                 <div className="hero-content">
