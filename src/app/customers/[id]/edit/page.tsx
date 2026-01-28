@@ -75,26 +75,70 @@ export default function CustomerEditPage({ params }: { params: { id: string } })
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-zinc-500">お名前 / 会社名</Label>
-                            <Input
-                                value={data.name || ""}
-                                onChange={e => setData({ ...data, name: e.target.value })}
-                                className="font-bold border-zinc-200"
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-zinc-500">顧客ランク (1-5)</Label>
-                            <div className="flex items-center gap-1">
-                                {[1, 2, 3, 4, 5].map(star => (
-                                    <Star
-                                        key={star}
-                                        className={cn("w-5 h-5 cursor-pointer", star <= data.rank ? "text-yellow-400 fill-yellow-400" : "text-zinc-200")}
-                                        onClick={() => setData({ ...data, rank: star })}
+                    <div className="space-y-4">
+                        {data.type === "business" ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-zinc-500">屋号・会社名 <span className="text-red-500">*</span></Label>
+                                    <Input
+                                        value={data.companyName || ""}
+                                        onChange={e => setData({ ...data, companyName: e.target.value })}
+                                        className="font-bold border-zinc-200"
+                                        required
                                     />
-                                ))}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-zinc-500">担当者名 (任意)</Label>
+                                    <Input
+                                        value={data.name || ""}
+                                        onChange={e => setData({ ...data, name: e.target.value })}
+                                        className="border-zinc-200"
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-zinc-500">お名前 <span className="text-red-500">*</span></Label>
+                                    <Input
+                                        value={data.name || ""}
+                                        onChange={e => setData({ ...data, name: e.target.value })}
+                                        className="font-bold border-zinc-200"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-zinc-500">フリガナ (任意)</Label>
+                                    <Input
+                                        value={data.kana || ""}
+                                        onChange={e => setData({ ...data, kana: e.target.value })}
+                                        className="border-zinc-200"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-zinc-500">顧客ランク (1-5)</Label>
+                                <div className="flex items-center gap-1">
+                                    {[1, 2, 3, 4, 5].map(star => (
+                                        <Star
+                                            key={star}
+                                            className={cn("w-5 h-5 cursor-pointer", star <= data.rank ? "text-yellow-400 fill-yellow-400" : "text-zinc-200")}
+                                            onClick={() => setData({ ...data, rank: star })}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-zinc-500">フリガナ (業者モード時用)</Label>
+                                <Input
+                                    value={data.kana || ""}
+                                    onChange={e => setData({ ...data, kana: e.target.value })}
+                                    className="border-zinc-200"
+                                    disabled={data.type === 'individual'}
+                                />
                             </div>
                         </div>
                     </div>
@@ -131,7 +175,12 @@ export default function CustomerEditPage({ params }: { params: { id: string } })
                             />
                         </div>
                         <div className="space-y-2">
-                            {/* Empty space or other info */}
+                            <Label className="text-xs font-bold text-zinc-500">郵便番号</Label>
+                            <Input
+                                value={data.zipCode || ""}
+                                onChange={e => setData({ ...data, zipCode: e.target.value })}
+                                className="border-zinc-200"
+                            />
                         </div>
                     </div>
 
