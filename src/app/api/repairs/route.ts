@@ -346,9 +346,9 @@ export async function POST(req: Request) {
             // 6. Create Estimate (if items exist)
             const estimateItems = body.estimate?.items || [];
             if (estimateItems.length > 0) {
-                const total = estimateItems.reduce((sum: number, item: any) => sum + item.price, 0);
-                const techFee = estimateItems.filter((i: any) => i.type === 'labor').reduce((sum: number, i: any) => sum + i.price, 0);
-                const partsFee = estimateItems.filter((i: any) => i.type === 'part').reduce((sum: number, i: any) => sum + i.price, 0);
+                const total = estimateItems.reduce((sum: number, item: any) => sum + (Number(item.price) || 0), 0);
+                const techFee = estimateItems.filter((i: any) => i.type === 'labor').reduce((sum: number, i: any) => sum + (Number(i.price) || 0), 0);
+                const partsFee = estimateItems.filter((i: any) => i.type === 'part').reduce((sum: number, i: any) => sum + (Number(i.price) || 0), 0);
 
                 await tx.estimate.create({
                     data: {
@@ -361,7 +361,7 @@ export async function POST(req: Request) {
                             create: estimateItems.map((item: any) => ({
                                 itemName: item.name,
                                 type: item.type,
-                                unitPrice: item.price,
+                                unitPrice: Math.floor(Number(item.price) || 0),
                                 quantity: 1
                             }))
                         }
@@ -390,7 +390,7 @@ export async function POST(req: Request) {
                                     name: item.name,
                                     nameJp: item.name,
                                     nameEn: item.name,
-                                    retailPrice: item.price,
+                                    retailPrice: Math.floor(Number(item.price) || 0),
                                     stockQuantity: 0,
                                 }
                             });
@@ -408,8 +408,8 @@ export async function POST(req: Request) {
                             await tx.pricingRule.create({
                                 data: {
                                     suggestedWorkName: item.name,
-                                    minPrice: item.price,
-                                    maxPrice: item.price,
+                                    minPrice: Math.floor(Number(item.price) || 0),
+                                    maxPrice: Math.floor(Number(item.price) || 0),
                                     brandId: brand.id,
                                     modelId: modelId,
                                     caliberId: caliberId
@@ -422,6 +422,8 @@ export async function POST(req: Request) {
 
             // 6. Return Data
             return repair;
+        }, {
+            timeout: 20000 // Handle sequential master syncs gracefully
         });
 
         return NextResponse.json({ success: true, repair: result });
