@@ -8,6 +8,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         const body = await req.json();
         console.log("Updating Repair:", id, body);
 
+        // Increased timeout to 20 seconds to prevent "Transaction already closed" due to timeouts
         const result = await prisma.$transaction(async (tx) => {
             const repairRecord = await tx.repair.findUnique({
                 where: { id },
@@ -119,7 +120,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     }
                 }
 
-                // Sync Watch Record
+                // Sync Watch Record (Always refresh to avoid "-" display)
                 await tx.watch.update({
                     where: { id: repairRecord.watchId },
                     data: {
@@ -141,6 +142,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                         phone: body.customer.phone || null,
                         lineId: body.customer.lineId || null,
                         address: body.customer.address || null,
+                        companyName: body.customer.type === 'business' ? body.customer.name : undefined
                     }
                 });
             }
@@ -172,9 +174,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
             // 4. Update Estimates
             if (body.estimate?.items) {
-                const total = body.estimate.items.reduce((sum: number, item: any) => sum + item.price, 0);
+                const total = body.estimate.items.reduce((sum: number, item: any) => sum + (Number(item.price) || 0), 0);
 
-                await tx.estimate.upsert({
+                // Use the returned estimate from upsert directly
+                const estimate = await tx.estimate.upsert({
                     where: { repairId: id },
                     create: {
                         repairId: id,
@@ -187,51 +190,50 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     }
                 });
 
-                const estimate = await tx.estimate.findUnique({ where: { repairId: id } });
                 if (estimate) {
+                    // Transaction-safe deletion and creation
                     await tx.estimateItem.deleteMany({ where: { estimateId: estimate.id } });
-                    await tx.estimateItem.createMany({
-                        data: body.estimate.items.map((item: any) => ({
-                            estimateId: estimate.id,
-                            itemName: item.name,
-                            type: item.type,
-                            unitPrice: item.price,
-                            quantity: 1
-                        }))
-                    });
 
-                    // 4.1 Master Sync
+                    if (body.estimate.items.length > 0) {
+                        await tx.estimateItem.createMany({
+                            data: body.estimate.items.map((item: any) => ({
+                                estimateId: estimate.id,
+                                itemName: item.name,
+                                type: item.type,
+                                unitPrice: Math.floor(Number(item.price) || 0),
+                                quantity: 1
+                            }))
+                        });
+                    }
+
+                    // 4.1 Master Sync (Optimized lookup where possible)
                     for (const item of body.estimate.items) {
                         if (item.type === 'part') {
                             const existingPart = await tx.partsMaster.findFirst({
-                                where: { nameJp: item.name, brandId: brandId, modelId: modelId, caliberId: caliberId }
+                                where: { nameJp: item.name, brandId, modelId, caliberId }
                             });
                             if (!existingPart) {
                                 await tx.partsMaster.create({
                                     data: {
                                         category: 'generic',
-                                        brandId: brandId,
-                                        modelId: modelId,
-                                        caliberId: caliberId,
+                                        brandId, modelId, caliberId,
                                         name: item.name,
                                         nameJp: item.name,
-                                        retailPrice: item.price,
+                                        retailPrice: Math.floor(Number(item.price) || 0),
                                     }
                                 });
                             }
                         } else if (item.type === 'labor') {
                             const existingRule = await tx.pricingRule.findFirst({
-                                where: { suggestedWorkName: item.name, brandId: brandId, modelId: modelId, caliberId: caliberId }
+                                where: { suggestedWorkName: item.name, brandId, modelId, caliberId }
                             });
                             if (!existingRule) {
                                 await tx.pricingRule.create({
                                     data: {
                                         suggestedWorkName: item.name,
-                                        minPrice: item.price,
-                                        maxPrice: item.price,
-                                        brandId: brandId,
-                                        modelId: modelId,
-                                        caliberId: caliberId
+                                        minPrice: Math.floor(Number(item.price) || 0),
+                                        maxPrice: Math.floor(Number(item.price) || 0),
+                                        brandId, modelId, caliberId
                                     }
                                 });
                             }
@@ -241,6 +243,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             }
 
             return updatedRepair;
+        }, {
+            timeout: 20000 // Increase timeout to 20s to handle sequential master syncs
         });
 
         return NextResponse.json({ success: true, repair: result });
