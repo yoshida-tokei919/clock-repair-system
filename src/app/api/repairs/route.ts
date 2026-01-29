@@ -137,7 +137,14 @@ export async function POST(req: Request) {
             const modelNameInput = body.watch.model || "Unknown Model";
 
             const model = await tx.model.findFirst({
-                where: { brandId: brand.id, name: modelNameInput }
+                where: {
+                    brandId: brand.id,
+                    OR: [
+                        { name: modelNameInput },
+                        { nameEn: modelNameInput },
+                        { nameJp: modelNameInput }
+                    ]
+                }
             });
 
             if (model) {
@@ -159,7 +166,13 @@ export async function POST(req: Request) {
             const caliberInput = body.watch.caliber;
             if (caliberInput) {
                 const cal = await tx.caliber.findFirst({
-                    where: { name: caliberInput }
+                    where: {
+                        OR: [
+                            { name: caliberInput },
+                            { nameEn: caliberInput },
+                            { nameJp: caliberInput }
+                        ]
+                    }
                 });
                 if (cal) {
                     caliberId = cal.id;

@@ -39,7 +39,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     let modelId = repairRecord.watch.modelId;
                     if (body.watch.model) {
                         const model = await tx.model.findFirst({
-                            where: { name: body.watch.model, brandId: brand.id }
+                            where: {
+                                brandId: brand.id,
+                                OR: [
+                                    { name: body.watch.model },
+                                    { nameEn: body.watch.model },
+                                    { nameJp: body.watch.model }
+                                ]
+                            }
                         });
 
                         if (model) {
@@ -56,7 +63,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     let caliberId = repairRecord.watch.caliberId;
                     if (body.watch.caliber) {
                         const cal = await tx.caliber.findFirst({
-                            where: { name: body.watch.caliber }
+                            where: {
+                                OR: [
+                                    { name: body.watch.caliber },
+                                    { nameEn: body.watch.caliber },
+                                    { nameJp: body.watch.caliber }
+                                ]
+                            }
                         });
                         if (cal) {
                             caliberId = cal.id;
@@ -239,6 +252,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         return NextResponse.json({ success: true, repair: result });
     } catch (error: any) {
         console.error("Update Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json(
+            { error: error.message || "予期せぬエラーが発生しました" },
+            { status: 500 }
+        );
     }
 }

@@ -203,7 +203,9 @@ const AdvancedCombobox: React.FC<{
                     placeholder={placeholder}
                     value={inputDisplayValue}
                     onChange={(e) => {
-                        setSearch(e.target.value);
+                        const val = e.target.value;
+                        setSearch(val);
+                        onChange(val); // Push current text to parent state immediately
                         if (!isOpen) setIsOpen(true);
                     }}
                     onFocus={() => {
@@ -519,7 +521,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
             if (!res.ok) throw new Error("保存に失敗しました");
             const result = await res.json();
             router.push(`/repairs/${result.repair.id}`);
-        } catch (e: any) { alert(e.message); setIsSaving(false); }
+        } catch (e: any) {
+            console.error("Save Error:", e);
+            alert(`保存に失敗しました: ${e.message}`);
+            setIsSaving(false);
+        }
     };
 
     const grandTotal = selectedWorks.reduce((s, w) => s + w.price, 0) + selectedParts.reduce((s, p) => s + p.retailPrice, 0);
