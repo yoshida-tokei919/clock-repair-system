@@ -541,8 +541,16 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
 
         try {
             const url = mode === 'edit' ? `/api/repairs/${initialData.id}` : "/api/repairs";
-            const res = await fetch(url, { method: mode === 'edit' ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-            if (!res.ok) throw new Error("保存に失敗しました");
+            const res = await fetch(url, {
+                method: mode === 'edit' ? "PATCH" : "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || "保存に失敗しました");
+            }
             const result = await res.json();
             router.push(`/repairs/${result.repair.id}`);
         } catch (e: any) {

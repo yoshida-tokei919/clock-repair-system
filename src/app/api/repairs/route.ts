@@ -96,30 +96,36 @@ export async function POST(req: Request) {
             let brand = await tx.brand.findUnique({ where: { name: brandNameInput } });
 
             if (!brand) {
-                // Try fuzzy match or English/Japanese match
                 brand = await tx.brand.findFirst({
                     where: {
                         OR: [
+                            { name: brandNameInput },
                             { nameEn: brandNameInput },
                             { nameJp: brandNameInput },
-                            // Handle "ROLEX ロレックス" composite case if common?
-                            // Or just lenient check
                         ]
                     }
                 });
             }
 
-            // Extreme fallback: Create Brand if missing? (Maybe too dangerous for master data)
-            // For now just error if truly invalid.
-            if (!brand) {
-                // Try one last check: Split by space? "ROLEX ロレックス" -> "ROLEX"
-                const parts = brandNameInput.split(" ");
-                if (parts.length > 1) {
-                    brand = await tx.brand.findUnique({ where: { name: parts[0] } });
+            // Extreme fallback: Handle composite names like "ROLEX ロレックス"
+            if (!brand && brandNameInput) {
+                const parts = brandNameInput.split(/[\s/／]+/); // Split by space or slash
+                if (parts.length > 0) {
+                    brand = await tx.brand.findFirst({
+                        where: {
+                            OR: [
+                                { name: { in: parts } },
+                                { nameEn: { in: parts } },
+                                { nameJp: { in: parts } }
+                            ]
+                        }
+                    });
                 }
             }
 
-            if (!brand) throw new Error(`Invalid Brand Name: ${brandNameInput}`);
+            if (!brand) {
+                throw new Error(`ブランドが見つかりません: ${brandNameInput}`);
+            }
 
             let watch;
             const serialInput = body.watch.serial || null;
