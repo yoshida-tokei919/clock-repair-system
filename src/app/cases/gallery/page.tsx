@@ -35,7 +35,7 @@ export default async function GalleryPage() {
                 {repairs.map((repair) => {
                     const heroImage = repair.photos.length > 0
                         ? `/uploads/${repair.photos[0].storageKey}`
-                        : "https://placehold.co/600x400/e2e8f0/64748b?text=No+Image";
+                        : "https://placehold.co/600x400/e2e8f0/64748b?text=画像なし";
 
                     const title = repair.publicTitle || `${repair.watch.brand.name} ${repair.watch.model.name} 修理`;
 

@@ -40,7 +40,7 @@ export default async function BizCasePage() {
                             <TableHead className="w-[120px]">ブランド</TableHead>
                             <TableHead className="w-[180px]">モデル / Ref</TableHead>
                             <TableHead>作業内容</TableHead>
-                            <TableHead className="text-right w-[120px]">修理総額(抜)</TableHead>
+                            <TableHead className="text-right w-[120px]">修理総額(税別)</TableHead>
                             <TableHead className="text-right w-[100px]">納期目安</TableHead>
                             <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
