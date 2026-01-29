@@ -60,12 +60,14 @@ export async function POST(req: Request) {
                     }
 
                     if (customer) {
-                        // Update existing B2C info (address/email if provided)
+                        // Update existing customer info (address/email/phone/lineId if provided)
                         customer = await tx.customer.update({
                             where: { id: customer.id },
                             data: {
                                 address: body.customer.address || customer.address,
                                 email: body.customer.email || customer.email,
+                                phone: body.customer.phone || customer.phone,
+                                lineId: body.customer.lineId || customer.lineId,
                             }
                         });
                     } else {
@@ -78,6 +80,7 @@ export async function POST(req: Request) {
                                 isPartner: true, // Personal is also "partner" for C-001 logic
                                 rank: 1,
                                 phone: phone || null,
+                                lineId: body.customer.lineId || null,
                                 address: body.customer.address,
                                 email: body.customer.email,
                             },
@@ -170,7 +173,7 @@ export async function POST(req: Request) {
 
             // Handle WatchReference
             let referenceId: number | null = null;
-            const refNameInput = body.watch.refName;
+            const refNameInput = body.watch.ref;
             if (refNameInput) {
                 const wr = await tx.watchReference.findFirst({
                     where: { modelId: modelId, name: refNameInput }
@@ -243,11 +246,14 @@ export async function POST(req: Request) {
 
             // 4. Create Repair
             const statusMapping: Record<string, string> = {
-                "estimate": "reception",
+                "reception": "reception",
+                "diagnosing": "diagnosing",
                 "parts_wait": "parts_wait",
-                "working": "in_progress",
+                "parts_wait_ordered": "parts_wait_ordered",
+                "in_progress": "in_progress",
                 "completed": "completed",
-                "delivered": "delivered"
+                "delivered": "delivered",
+                "canceled": "canceled"
             };
             const dbStatus = statusMapping[body.status] || body.status || "reception";
 
@@ -268,11 +274,14 @@ export async function POST(req: Request) {
 
             // 5. initial Log & History logs
             const statusLabels: Record<string, string> = {
-                "estimate": "受付 (Reception)",
-                "parts_wait": "部品待 (Waiting Parts)",
-                "working": "作業中 (In Progress)",
-                "completed": "完了 (Completed)",
-                "delivered": "納品済 (Delivered)"
+                "reception": "受付",
+                "diagnosing": "見積中",
+                "parts_wait": "部品待 (未注文)",
+                "parts_wait_ordered": "部品待 (注文済)",
+                "in_progress": "作業中",
+                "completed": "完了",
+                "delivered": "納品済",
+                "canceled": "キャンセル"
             };
 
             const logEntries = Object.entries(body.statusLog || {});
@@ -292,7 +301,7 @@ export async function POST(req: Request) {
                 await tx.repairStatusLog.create({
                     data: {
                         repairId: repair.id,
-                        status: statusLabels[dbStatus] || "受付 (Reception)",
+                        status: statusLabels[dbStatus] || "受付",
                         changedBy: 1 // Admin
                     }
                 });
@@ -338,6 +347,57 @@ export async function POST(req: Request) {
                         }
                     }
                 });
+
+                // 6.5 Master Data Sync (New)
+                // Automatically register items to PartsMaster/PricingRule if they don't exist
+                for (const item of estimateItems) {
+                    if (item.type === 'part') {
+                        const existingPart = await tx.partsMaster.findFirst({
+                            where: {
+                                nameJp: item.name,
+                                brandId: brand.id,
+                                modelId: modelId,
+                                caliberId: caliberId
+                            }
+                        });
+                        if (!existingPart) {
+                            await tx.partsMaster.create({
+                                data: {
+                                    category: 'generic', // Default from repair entry
+                                    brandId: brand.id,
+                                    modelId: modelId,
+                                    caliberId: caliberId,
+                                    name: item.name,
+                                    nameJp: item.name,
+                                    nameEn: item.name,
+                                    retailPrice: item.price,
+                                    stockQuantity: 0,
+                                }
+                            });
+                        }
+                    } else if (item.type === 'labor') {
+                        const existingRule = await tx.pricingRule.findFirst({
+                            where: {
+                                suggestedWorkName: item.name,
+                                brandId: brand.id,
+                                modelId: modelId,
+                                caliberId: caliberId
+                            }
+                        });
+                        if (!existingRule) {
+                            await tx.pricingRule.create({
+                                data: {
+                                    suggestedWorkName: item.name,
+                                    minPrice: item.price,
+                                    maxPrice: item.price,
+                                    brandId: brand.id,
+                                    modelId: modelId,
+                                    caliberId: caliberId
+                                }
+                            });
+                        }
+                    }
+                }
             }
 
             // 6. Return Data

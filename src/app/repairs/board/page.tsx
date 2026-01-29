@@ -43,8 +43,8 @@ export default async function KanbanPage() {
             type: r.customer.type
         },
         watch: {
-            brand: r.watch.brand.name || "Unknown",
-            model: r.watch.model.name || "Unknown",
+            brand: r.watch.brand.nameJp || r.watch.brand.name || "不明",
+            model: r.watch.model.nameJp || r.watch.model.name || "不明",
         },
         endUserName: r.endUserName, // Added
         status: r.status,
@@ -63,7 +63,7 @@ export default async function KanbanPage() {
                     </Link>
                     <h1 className="text-xl font-bold flex items-center gap-2">
                         <LayoutDashboard className="w-5 h-5 text-blue-600" />
-                        進捗ボード (Kanban)
+                        進捗ボード
                     </h1>
                 </div>
                 <div className="flex gap-2">

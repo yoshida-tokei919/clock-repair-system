@@ -24,6 +24,7 @@ export interface RegisterData {
     type?: "individual" | "business";
     prefix?: string;
     phone?: string;
+    lineId?: string;
     address?: string;
 }
 
@@ -39,6 +40,7 @@ export const QuickRegisterDialog: React.FC<QuickRegisterDialogProps> = ({ isOpen
     const [type, setType] = useState<"individual" | "business">("individual");
     const [prefix, setPrefix] = useState("C");
     const [phone, setPhone] = useState("");
+    const [lineId, setLineId] = useState("");
     const [address, setAddress] = useState("");
 
     useEffect(() => {
@@ -52,6 +54,7 @@ export const QuickRegisterDialog: React.FC<QuickRegisterDialogProps> = ({ isOpen
             setType("individual");
             setPrefix("C");
             setPhone("");
+            setLineId("");
             setAddress("");
         }
     }, [isOpen, initialName]);
@@ -80,7 +83,7 @@ export const QuickRegisterDialog: React.FC<QuickRegisterDialogProps> = ({ isOpen
                 alert("業者の場合、管理用プレフィックス（2-3文字）は必須です");
                 return;
             }
-            onRegister({ name, type, prefix, phone, address });
+            onRegister({ name, type, prefix, phone, lineId, address });
         } else {
             // Work/Part
             if (price < 0) {
@@ -106,18 +109,18 @@ export const QuickRegisterDialog: React.FC<QuickRegisterDialogProps> = ({ isOpen
                     </button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4 text-zinc-800">
                     {/* CUSTOMER MODE */}
                     {mode === 'customer' && (
                         <>
                             <div className="flex gap-4 mb-2">
                                 <div className="flex items-center space-x-2">
                                     <input type="radio" id="type-c" checked={type === 'individual'} onChange={() => setType('individual')} className="w-4 h-4 text-blue-600" />
-                                    <Label htmlFor="type-c" className="cursor-pointer">個人 (Individual)</Label>
+                                    <Label htmlFor="type-c" className="cursor-pointer">個人</Label>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <input type="radio" id="type-b" checked={type === 'business'} onChange={() => setType('business')} className="w-4 h-4 text-blue-600" />
-                                    <Label htmlFor="type-b" className="cursor-pointer">業者 (Business)</Label>
+                                    <Label htmlFor="type-b" className="cursor-pointer">業者</Label>
                                 </div>
                             </div>
 
@@ -128,7 +131,7 @@ export const QuickRegisterDialog: React.FC<QuickRegisterDialogProps> = ({ isOpen
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
-                                    <Label className="text-xs font-bold text-zinc-500">管理ID (Prefix)</Label>
+                                    <Label className="text-xs font-bold text-zinc-500">管理ID</Label>
                                     <Input
                                         value={prefix}
                                         onChange={e => setPrefix(e.target.value.toUpperCase())}
@@ -139,12 +142,16 @@ export const QuickRegisterDialog: React.FC<QuickRegisterDialogProps> = ({ isOpen
                                     />
                                     {type === 'individual' && <p className="text-[10px] text-zinc-400">※個人客は "C" 固定</p>}
                                 </div>
-                                {type === 'individual' && (
-                                    <div className="space-y-1">
-                                        <Label className="text-xs font-bold text-zinc-500">電話番号</Label>
-                                        <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="090-..." />
-                                    </div>
-                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold text-zinc-500">電話番号</Label>
+                                    <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="090-..." />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold text-zinc-500">LINE ID</Label>
+                                    <Input value={lineId} onChange={e => setLineId(e.target.value)} placeholder="@..." />
+                                </div>
                             </div>
 
                             <div className="space-y-1">
@@ -158,14 +165,14 @@ export const QuickRegisterDialog: React.FC<QuickRegisterDialogProps> = ({ isOpen
                     {mode !== 'customer' && (
                         <>
                             <div className="space-y-1">
-                                <Label className="text-xs font-bold text-zinc-500">名称 / Name</Label>
+                                <Label className="text-xs font-bold text-zinc-500">名称</Label>
                                 <Input value={name} onChange={e => setName(e.target.value)} placeholder="名称を入力..." className="font-bold" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                     <Label className="text-xs font-bold text-zinc-500">
-                                        {mode === "work" ? "技術料 (Tax Inc)" : "販売価格 (Retail)"}
+                                        {mode === "work" ? "技術料 (税込)" : "販売価格 (上代)"}
                                     </Label>
                                     <Input
                                         type="number"
@@ -177,7 +184,7 @@ export const QuickRegisterDialog: React.FC<QuickRegisterDialogProps> = ({ isOpen
 
                                 {mode === "part" && (
                                     <div className="space-y-1">
-                                        <Label className="text-xs font-bold text-zinc-500">仕入価格 (Cost)</Label>
+                                        <Label className="text-xs font-bold text-zinc-500">仕入価格</Label>
                                         <Input
                                             type="number"
                                             value={cost}
@@ -190,7 +197,7 @@ export const QuickRegisterDialog: React.FC<QuickRegisterDialogProps> = ({ isOpen
 
                             {mode === "part" && (
                                 <div className="space-y-1">
-                                    <Label className="text-xs font-bold text-zinc-500">仕入先 / Supplier</Label>
+                                    <Label className="text-xs font-bold text-zinc-500">仕入先</Label>
                                     <Input value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="仕入先..." className="text-sm" />
                                 </div>
                             )}
@@ -198,7 +205,7 @@ export const QuickRegisterDialog: React.FC<QuickRegisterDialogProps> = ({ isOpen
                     )}
                 </div>
 
-                <div className="mt-6 flex justify-end gap-2">
+                <div className="mt-6 flex justify-end gap-2 text-zinc-800">
                     <Button variant="ghost" onClick={onClose}>キャンセル</Button>
                     <Button className="bg-blue-600 hover:bg-blue-700 gap-1" onClick={handleSave}>
                         <Check className="w-4 h-4" /> 登録して追加

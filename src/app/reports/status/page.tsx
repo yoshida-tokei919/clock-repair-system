@@ -14,7 +14,7 @@ const MOCK_STATUS_DATA: StatusDocumentProps['data'] = {
     generatedAt: new Date().toLocaleString(),
     groups: [
         {
-            status: "見積・診断中 (Diagnosing)",
+            status: "見積・診断中",
             count: 2,
             items: [
                 { id: "S-00050", customerName: "田中 様", watchInfo: "ROLEX Datejust", startDate: "2026-01-20", dueDate: "2026-01-25" },
@@ -22,14 +22,14 @@ const MOCK_STATUS_DATA: StatusDocumentProps['data'] = {
             ]
         },
         {
-            status: "部品発注中 (Waiting Parts)",
+            status: "部品発注中",
             count: 1,
             items: [
                 { id: "S-00048", customerName: "佐藤 様", watchInfo: "OMEGA Seamaster", startDate: "2026-01-15", dueDate: "Pending" },
             ]
         },
         {
-            status: "修理進行中 (In Progress)",
+            status: "修理進行中",
             count: 2,
             items: [
                 { id: "S-00045", customerName: "株式会社 時計商事", watchInfo: "CARTIER Pasha", startDate: "2026-01-10", dueDate: "2026-02-01" },
@@ -37,7 +37,7 @@ const MOCK_STATUS_DATA: StatusDocumentProps['data'] = {
             ]
         },
         {
-            status: "最終検査・QC (Quality Control)",
+            status: "最終検査・QC",
             count: 1,
             items: [
                 { id: "S-00042", customerName: "山田 様", watchInfo: "PANERAI Luminor", startDate: "2026-01-05", dueDate: "2026-01-23" },
@@ -77,7 +77,6 @@ export default function StatusReportPage() {
                         <h1 className="text-2xl font-bold text-zinc-800 flex items-center gap-2">
                             <ListTodo className="w-6 h-6" /> 修理進行状況レポート
                         </h1>
-                        <p className="text-sm text-zinc-500">WIP (Work In Progress) Status Report</p>
                     </div>
                     <div className="flex items-center gap-4">
                         <Button onClick={handleRefresh} variant="outline" className="gap-2">
@@ -92,7 +91,7 @@ export default function StatusReportPage() {
                     {/* Left: Summary Cards */}
                     <div className="lg:col-span-1 space-y-4">
                         <Card className="p-4 bg-white shadow-sm border-l-4 border-yellow-500">
-                            <p className="text-xs text-zinc-500 font-bold uppercase">進行中案件数 (Active Jobs)</p>
+                            <p className="text-xs text-zinc-500 font-bold uppercase">進行中案件数</p>
                             <p className="text-3xl font-bold text-zinc-900">6 <span className="text-sm font-normal text-zinc-400">件</span></p>
                         </Card>
                         <div className="p-4 bg-white rounded shadow-sm">

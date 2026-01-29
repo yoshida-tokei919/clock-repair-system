@@ -39,7 +39,7 @@ import { MobileConnectDialog } from "@/components/repairs/MobileConnectDialog";
 // Dynamically import PDF components to avoid SSR issues
 const PDFPreviewDialog = dynamic(() => import("@/components/repairs/PDFPreviewDialog"), {
     ssr: false,
-    loading: () => <Button variant="outline" size="sm" disabled><FileText className="w-4 h-4 mr-1" /> Loading PDF...</Button>
+    loading: () => <Button variant="outline" size="sm" disabled><FileText className="w-4 h-4 mr-1" /> PDFを準備中...</Button>
 });
 const TagPreviewDialog = dynamic(() => import("@/components/repairs/TagPreviewDialog"), {
     ssr: false
@@ -94,7 +94,15 @@ const StatusTimeline: React.FC<{
                     if (logDate) {
                         try {
                             const d = new Date(logDate);
-                            if (!isNaN(d.getTime())) dateValue = d.toISOString().split("T")[0];
+                            if (!isNaN(d.getTime())) {
+                                // For input[type="date"], we need YYYY-MM-DD in local time
+                                const offset = 9 * 60; // Tokyo
+                                const localDate = new Date(d.getTime() + offset * 60 * 1000);
+                                dateValue = d.toLocaleString("ja-JP", { timeZone: 'Asia/Tokyo' }).split(" ")[0].replace(/\//g, "-");
+                                // Simpler: just use what's in the string if it's already YYYY/MM/DD
+                                if (logDate.includes("/")) dateValue = logDate.replace(/\//g, "-");
+                                else dateValue = d.toISOString().split("T")[0];
+                            }
                         } catch (e) { }
                     }
 
@@ -265,7 +273,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     const [customerCategory, setCustomerCategory] = useState<"B2B" | "B2C">(initialData?.customer?.type === 'business' ? "B2B" : "B2C");
     const [customerName, setCustomerName] = useState(initialData?.customer?.name || "");
     const [endUserName, setEndUserName] = useState(initialData?.endUserName || "");
-    const [lineId, setLineId] = useState(initialData?.customer?.phone || initialData?.customer?.lineId || "");
+    const [lineId, setLineId] = useState(initialData?.customer?.lineId || "");
+    const [customerPhone, setCustomerPhone] = useState(initialData?.customer?.phone || "");
     const [address, setAddress] = useState(initialData?.customer?.address || "");
     const [customerPrefix, setCustomerPrefix] = useState(initialData?.customer?.prefix || "");
 
@@ -310,6 +319,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     const [dupResults, setDupResults] = useState<any[]>([]);
 
     const [customerSearch, setCustomerSearch] = useState("");
+    const [newWorkName, setNewWorkName] = useState("");
+    const [newWorkPrice, setNewWorkPrice] = useState("");
+    const [newPartName, setNewPartName] = useState("");
+    const [newPartPrice, setNewPartPrice] = useState("");
 
     // Incremental Customer Search
     useEffect(() => {
@@ -317,7 +330,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
             // Fetch even if search is empty to show initial list
             const results = await getCustomers(customerSearch);
             setCustomerOptions(results.map(c => ({
-                label: `${c.name} (${c.phone || c.email || "No Contact"})`,
+                label: `${c.name} (${c.phone || c.email || "連絡先なし"})`,
                 value: c.name,
                 fullData: c
             })));
@@ -327,11 +340,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
     }, [customerSearch]);
 
     const handleCustomerRegister = (data: any) => {
-        setCustomerId(null); // New register means ID not yet existing
+        setCustomerId(null);
         setCustomerCategory(data.type === 'business' ? 'B2B' : 'B2C');
         setCustomerName(data.name);
         setCustomerPrefix(data.prefix || "");
-        if (data.phone) setLineId(data.phone);
+        if (data.phone) setCustomerPhone(data.phone);
+        if (data.lineId) setLineId(data.lineId);
         if (data.address) setAddress(data.address);
         setIsQuickRegisterOpen(false);
     };
@@ -437,7 +451,32 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
         if (r?.caliber) {
             setCaliber(r.caliber);
         }
-    }, [refName]); // Trigger specifically on refName change
+    }, [refName, refOptions]); // Include refOptions in deps
+
+    // Fetch Work & Parts Master automatically based on context
+    useEffect(() => {
+        const b = brandOptions.find(x => x.value === brand);
+        const m = modelOptions.find(x => x.value === model);
+        const c = caliberOptions.find(x => x.value === caliber);
+
+        if (b) {
+            getPricingRules(b.id, m?.id).then(rules => {
+                setWorkOptions(rules.map(r => ({
+                    label: r.suggestedWorkName,
+                    value: r.suggestedWorkName,
+                    price: r.minPrice
+                })));
+            });
+            getPartsMatched(b.id, m?.id).then(parts => {
+                setPartsOptions(parts.map(p => ({
+                    label: p.nameJp || p.name,
+                    value: p.nameJp || p.name,
+                    price: p.retailPrice,
+                    supplier: p.supplier
+                })));
+            });
+        }
+    }, [brand, model, caliber, brandOptions, modelOptions, caliberOptions]);
 
     // Handle Save
     const handleSave = async (force: boolean = false) => {
@@ -464,7 +503,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                 type: customerCategory === "B2B" ? "business" : "individual",
                 address,
                 endUserName,
-                phone: lineId,
+                phone: customerPhone,
+                lineId: lineId,
                 prefix: customerCategory === "B2B" ? customerPrefix : "C"
             },
             watch: { brand, model, ref: refName, serial, caliber },
@@ -514,8 +554,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
 
                     <Card className="p-3 bg-white space-y-4 shadow-sm">
                         <div className="flex bg-zinc-100 p-1 rounded-md">
-                            <button onClick={() => setCustomerCategory("B2B")} className={cn("flex-1 text-xs font-bold py-1.5 rounded-sm transition-all", customerCategory === "B2B" ? "bg-white shadow-sm text-blue-600" : "text-zinc-400 hover:text-zinc-600")}>業者 (B2B)</button>
-                            <button onClick={() => setCustomerCategory("B2C")} className={cn("flex-1 text-xs font-bold py-1.5 rounded-sm transition-all", customerCategory === "B2C" ? "bg-white shadow-sm text-green-600" : "text-zinc-400 hover:text-zinc-600")}>一般 (B2C)</button>
+                            <button onClick={() => setCustomerCategory("B2B")} className={cn("flex-1 text-xs font-bold py-1.5 rounded-sm transition-all", customerCategory === "B2B" ? "bg-white shadow-sm text-blue-600" : "text-zinc-400 hover:text-zinc-600")}>業者</button>
+                            <button onClick={() => setCustomerCategory("B2C")} className={cn("flex-1 text-xs font-bold py-1.5 rounded-sm transition-all", customerCategory === "B2C" ? "bg-white shadow-sm text-green-600" : "text-zinc-400 hover:text-zinc-600")}>一般</button>
                         </div>
                         <div className="space-y-3">
                             <div className="flex items-end gap-2">
@@ -534,7 +574,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                                                     setCustomerId(d.id);
                                                     setCustomerCategory(d.type === 'business' ? 'B2B' : 'B2C');
                                                     setCustomerPrefix(d.prefix || "");
-                                                    if (d.phone || d.lineId) setLineId(d.phone || d.lineId);
+                                                    if (d.phone) setCustomerPhone(d.phone);
+                                                    if (d.lineId) setLineId(d.lineId);
                                                     if (d.address) setAddress(d.address);
                                                 } else {
                                                     setCustomerId(null);
@@ -550,15 +591,17 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                                 </Button>
                             </div>
 
-                            {customerCategory === "B2B" ? (
+                            <div className="grid grid-cols-2 gap-2">
+                                <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">電話番号</Label><Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-8 text-sm border-zinc-200" placeholder="090-..." /></div>
+                                <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">LINE ID</Label><Input value={lineId} onChange={e => setLineId(e.target.value)} className="h-8 text-sm border-zinc-200" placeholder="@..." /></div>
+                            </div>
+                            {customerCategory === "B2B" && (
                                 <div className="grid grid-cols-2 gap-2">
                                     <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">貴社伝票番号</Label><Input value={partnerRef} onChange={e => setPartnerRef(e.target.value)} className="h-8 text-sm font-mono border-zinc-200" /></div>
                                     <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">エンドユーザー</Label><Input value={endUserName} onChange={e => setEndUserName(e.target.value)} className="h-8 text-sm border-zinc-200" /></div>
                                 </div>
-                            ) : (
-                                <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">連絡先 (Tel/LINE)</Label><Input value={lineId} onChange={e => setLineId(e.target.value)} className="h-8 text-sm border-zinc-200" /></div>
                             )}
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">住所</Label><Input value={address} onChange={e => setAddress(e.target.value)} className="h-8 text-sm border-zinc-200" /></div>
+                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">住所</Label><Input value={address} onChange={e => setAddress(e.target.value)} className="h-8 text-sm border-zinc-200" placeholder="都道府県 市区町村..." /></div>
                         </div>
                     </Card>
 
@@ -587,7 +630,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                     </Card>
 
                     <Card className="p-3 bg-zinc-900 text-white shadow-xl mt-auto">
-                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 border-b border-zinc-800 pb-1 flex items-center gap-2"><Settings className="w-3 h-3" /> Quick Documents / LINE</h3>
+                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 border-b border-zinc-800 pb-1 flex items-center gap-2"><Settings className="w-3 h-3" /> 各種書類 / LINE出力</h3>
                         <div className="space-y-2">
                             <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start" disabled={mode === 'create'}><FileText className="w-3.5 h-3.5 mr-2 text-blue-400" /> 見積書作成 (PDF)</Button>
                             <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start" disabled={mode === 'create'}><CheckCircle className="w-3.5 h-3.5 mr-2 text-green-400" /> 納品書発行 (PDF)</Button>
@@ -610,21 +653,35 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                         <div className="p-3 overflow-y-auto space-y-5 flex-1">
                             {/* Labor Section */}
                             <div className="space-y-2">
-                                <p className="text-[9px] font-bold text-zinc-400 border-b border-zinc-100 pb-1 uppercase tracking-wider flex justify-between items-center"><span>1. 技術料・工賃</span> <span className="text-blue-500">Labor Fee</span></p>
+                                <p className="text-[9px] font-bold text-zinc-400 border-b border-zinc-100 pb-1 uppercase tracking-wider flex justify-between items-center"><span>1. 技術料・工賃</span></p>
                                 <div className="flex gap-1">
-                                    <Input placeholder="作業項目を入力..." id="newWorkName" className="h-8 text-xs flex-1 border-zinc-200" />
+                                    <div className="flex-1">
+                                        <AdvancedCombobox
+                                            value={newWorkName}
+                                            onChange={(val) => {
+                                                setNewWorkName(val);
+                                                const match = workOptions.find(o => o.value === val);
+                                                if (match) setNewWorkPrice(String(match.price));
+                                            }}
+                                            options={workOptions}
+                                            placeholder="作業項目を選択または入力..."
+                                        />
+                                    </div>
                                     <div className="relative">
                                         <span className="absolute left-2 top-2 text-zinc-400 text-[10px]">¥</span>
-                                        <Input placeholder="価格" id="newWorkPrice" className="h-8 text-xs w-20 pl-5 border-zinc-200" />
+                                        <Input
+                                            placeholder="価格"
+                                            value={newWorkPrice}
+                                            onChange={e => setNewWorkPrice(e.target.value)}
+                                            className="h-8 text-xs w-20 pl-5 border-zinc-200"
+                                        />
                                     </div>
                                     <Button size="sm" className="h-8 w-8 p-0 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-600 hover:text-white" onClick={() => {
-                                        const n = (document.getElementById('newWorkName') as HTMLInputElement).value;
-                                        const pStr = (document.getElementById('newWorkPrice') as HTMLInputElement).value;
-                                        const p = parseInt(pStr);
-                                        if (n && !isNaN(p)) {
-                                            setSelectedWorks([...selectedWorks, { id: "new-" + Date.now(), name: n, price: p }]);
-                                            (document.getElementById('newWorkName') as HTMLInputElement).value = "";
-                                            (document.getElementById('newWorkPrice') as HTMLInputElement).value = "";
+                                        const p = parseInt(newWorkPrice);
+                                        if (newWorkName && !isNaN(p)) {
+                                            setSelectedWorks([...selectedWorks, { id: "new-" + Date.now(), name: newWorkName, price: p }]);
+                                            setNewWorkName("");
+                                            setNewWorkPrice("");
                                         }
                                     }}><Plus className="w-3.5 h-3.5" /></Button>
                                 </div>
@@ -643,21 +700,35 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
 
                             {/* Parts Section */}
                             <div className="space-y-2">
-                                <p className="text-[9px] font-bold text-zinc-400 border-b border-zinc-100 pb-1 uppercase tracking-wider flex justify-between items-center"><span>2. 交換部品代</span> <span className="text-emerald-500">Parts Fee</span></p>
+                                <p className="text-[9px] font-bold text-zinc-400 border-b border-zinc-100 pb-1 uppercase tracking-wider flex justify-between items-center"><span>2. 交換部品代</span></p>
                                 <div className="flex gap-1">
-                                    <Input placeholder="部品名..." id="newPartName" className="h-8 text-xs flex-1 border-emerald-100" />
+                                    <div className="flex-1">
+                                        <AdvancedCombobox
+                                            value={newPartName}
+                                            onChange={(val) => {
+                                                setNewPartName(val);
+                                                const match = partsOptions.find(o => o.value === val);
+                                                if (match) setNewPartPrice(String(match.price));
+                                            }}
+                                            options={partsOptions}
+                                            placeholder="部品を選択または入力..."
+                                        />
+                                    </div>
                                     <div className="relative">
                                         <span className="absolute left-2 top-2 text-zinc-400 text-[10px]">¥</span>
-                                        <Input placeholder="価格" id="newPartPrice" className="h-8 text-xs w-20 pl-5 border-emerald-100" />
+                                        <Input
+                                            placeholder="価格"
+                                            value={newPartPrice}
+                                            onChange={e => setNewPartPrice(e.target.value)}
+                                            className="h-8 text-xs w-20 pl-5 border-emerald-100"
+                                        />
                                     </div>
                                     <Button size="sm" className="h-8 w-8 p-0 bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-600 hover:text-white" onClick={() => {
-                                        const n = (document.getElementById('newPartName') as HTMLInputElement).value;
-                                        const pStr = (document.getElementById('newPartPrice') as HTMLInputElement).value;
-                                        const p = parseInt(pStr);
-                                        if (n && !isNaN(p)) {
-                                            setSelectedParts([...selectedParts, { id: "new-p-" + Date.now(), name: n, retailPrice: p }]);
-                                            (document.getElementById('newPartName') as HTMLInputElement).value = "";
-                                            (document.getElementById('newPartPrice') as HTMLInputElement).value = "";
+                                        const p = parseInt(newPartPrice);
+                                        if (newPartName && !isNaN(p)) {
+                                            setSelectedParts([...selectedParts, { id: "new-p-" + Date.now(), name: newPartName, retailPrice: p }]);
+                                            setNewPartName("");
+                                            setNewPartPrice("");
                                         }
                                     }}><Plus className="w-3.5 h-3.5" /></Button>
                                 </div>
@@ -676,8 +747,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                         </div>
                         <div className="p-3 border-t bg-zinc-900 text-white flex justify-between items-center font-bold">
                             <div className="flex flex-col">
-                                <span className="text-[9px] text-zinc-500 font-normal uppercase">Total Estimate (Tax excl.)</span>
-                                <span className="text-zinc-200 text-xs font-normal">合計金額 (税抜)</span>
+                                <span className="text-zinc-200 text-xs font-normal">合計見積額 (税別)</span>
                             </div>
                             <span className="text-2xl font-mono tracking-tight">¥{grandTotal.toLocaleString()}</span>
                         </div>
@@ -685,8 +755,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
 
                     <Card className="p-3 bg-white space-y-3 shadow-sm h-1/4">
                         <div className="flex items-center gap-2 mb-1"><FileText className="w-4 h-4 text-zinc-400" /><h3 className="text-xs font-bold font-bold">依頼・備考メモ</h3></div>
-                        <div><Label className="text-[10px] text-zinc-400 font-bold ml-1">依頼内容 (Customer Request)</Label><textarea value={requestContent} onChange={e => setRequestContent(e.target.value)} className="w-full h-16 p-2 text-xs border border-zinc-200 rounded-md bg-zinc-50 focus:bg-white transition-colors resize-none" /></div>
-                        <div><Label className="text-[10px] text-zinc-400 font-bold ml-1">社内備考 (Internal Notes)</Label><textarea value={internalNotes} onChange={e => setInternalNotes(e.target.value)} className="w-full h-12 p-2 text-xs border border-zinc-200 rounded-md bg-zinc-50 focus:bg-white transition-colors resize-none" /></div>
+                        <div><Label className="text-[10px] text-zinc-400 font-bold ml-1">依頼内容 (お客様要望)</Label><textarea value={requestContent} onChange={e => setRequestContent(e.target.value)} className="w-full h-16 p-2 text-xs border border-zinc-200 rounded-md bg-zinc-50 focus:bg-white transition-colors resize-none" /></div>
+                        <div><Label className="text-[10px] text-zinc-400 font-bold ml-1">社内備考 (技術メモ)</Label><textarea value={internalNotes} onChange={e => setInternalNotes(e.target.value)} className="w-full h-12 p-2 text-xs border border-zinc-200 rounded-md bg-zinc-50 focus:bg-white transition-colors resize-none" /></div>
                     </Card>
                 </div>
 
@@ -727,7 +797,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                         {isUploading && (
                             <div className="w-full p-4 mb-4 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center gap-2 animate-pulse">
                                 <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
-                                <span className="text-xs font-bold text-blue-600">アップロード中...</span>
+                                <span className="text-xs font-bold text-blue-600">処理中...</span>
                             </div>
                         )}
 
@@ -761,8 +831,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                             {uploadedPhotos.length === 0 && !isUploading && (
                                 <div className="flex flex-col items-center justify-center py-20 text-zinc-300 border-2 border-dashed border-zinc-200 rounded-xl">
                                     <Camera className="w-12 h-12 mb-2 opacity-50" />
-                                    <p className="text-sm font-bold">No Photos</p>
-                                    <p className="text-[10px]">写真を追加してください</p>
+                                    <p className="text-sm font-bold">写真がありません</p>
+                                    <p className="text-[10px]">修理品の状態を撮影して追加してください</p>
                                 </div>
                             )}
                         </div>

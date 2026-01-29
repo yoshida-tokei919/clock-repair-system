@@ -25,7 +25,7 @@ export function SalesAnalytics() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
             <Card className="col-span-4 shadow-sm">
                 <CardHeader>
-                    <CardTitle className="text-sm font-medium">売上推移 (Monthly Revenue)</CardTitle>
+                    <CardTitle className="text-sm font-medium">売上推移</CardTitle>
                 </CardHeader>
                 <CardContent className="pl-2">
                     <ResponsiveContainer width="100%" height={280}>
@@ -40,7 +40,7 @@ export function SalesAnalytics() {
             </Card>
             <Card className="col-span-3 shadow-sm">
                 <CardHeader>
-                    <CardTitle className="text-sm font-medium">ブランド別シェア (Brand Share)</CardTitle>
+                    <CardTitle className="text-sm font-medium">ブランド別シェア</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <ResponsiveContainer width="100%" height={280}>

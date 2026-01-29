@@ -166,14 +166,14 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                         {(repair as any).endUserName && (
                                             <div className="text-xs text-slate-500 font-bold">{(repair as any).endUserName} 様</div>
                                         )}
-                                        <div className="text-xs text-slate-400">{repair.customer.type === 'business' ? 'B2B' : 'B2C'}</div>
+                                        <div className="text-xs text-slate-400">{repair.customer.type === 'business' ? '業者' : '一般'}</div>
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="font-bold text-slate-800">
-                                            {repair.watch.brand?.name || "Unknown"}
+                                            {repair.watch.brand?.name || "不明"}
                                         </div>
                                         <div className="text-xs text-slate-500">
-                                            {repair.watch.model?.name} / {repair.watch.serialNumber || "-"}
+                                            {repair.watch.model?.name || "不明"} / {repair.watch.serialNumber || "-"}
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">

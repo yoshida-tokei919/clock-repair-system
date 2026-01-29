@@ -54,7 +54,6 @@ export default function MonthlyReportPage() {
                         <h1 className="text-2xl font-bold text-zinc-800 flex items-center gap-2">
                             <FileText className="w-6 h-6" /> 月次売上レポート
                         </h1>
-                        <p className="text-sm text-zinc-500">Monthly Sales Report</p>
                     </div>
                     <div className="flex items-center gap-4">
                         <input
@@ -75,16 +74,16 @@ export default function MonthlyReportPage() {
                     {/* Left: Summary Cards (Dashboard Lite) */}
                     <div className="lg:col-span-1 space-y-4">
                         <Card className="p-4 bg-white shadow-sm border-l-4 border-blue-500">
-                            <p className="text-xs text-zinc-500 font-bold uppercase">売上合計 (Total Sales)</p>
+                            <p className="text-xs text-zinc-500 font-bold uppercase">売上合計</p>
                             <p className="text-2xl font-bold text-zinc-900">¥297,000</p>
                             <p className="text-xs text-zinc-400">税込合計</p>
                         </Card>
                         <Card className="p-4 bg-white shadow-sm border-l-4 border-green-500">
-                            <p className="text-xs text-zinc-500 font-bold uppercase">完了件数 (Details)</p>
+                            <p className="text-xs text-zinc-500 font-bold uppercase">完了件数</p>
                             <p className="text-2xl font-bold text-zinc-900">5 <span className="text-sm font-normal text-zinc-400">件</span></p>
                         </Card>
                         <Card className="p-4 bg-white shadow-sm border-l-4 border-orange-500">
-                            <p className="text-xs text-zinc-500 font-bold uppercase">技術料計 (Tech Fees)</p>
+                            <p className="text-xs text-zinc-500 font-bold uppercase">技術料計</p>
                             <p className="text-xl font-bold text-zinc-900">¥245,000</p>
                         </Card>
                     </div>

@@ -46,26 +46,36 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
         status: repair.status,
         receptionDate: repair.receptionDate ? repair.receptionDate.toLocaleDateString("ja-JP") : "-",
         customer: {
-            name: repair.customer?.name || "Unknown",
-            type: repair.customer ? (repair.customer.rank > 3 ? "VIP" : (repair.customer.type === 'business' ? "Owner/B2B" : "General")) : "-",
+            name: repair.customer?.name || "名前不明",
+            type: repair.customer ? (repair.customer.rank > 3 ? "重要客" : (repair.customer.type === 'business' ? "業者" : "一般客")) : "-",
             phone: repair.customer?.phone || repair.customer?.lineId || "-",
             address: repair.customer?.address || "-",
         },
         watch: {
-            brand: (repair.watch?.brand?.nameEn && repair.watch?.brand?.nameJp && repair.watch.brand.nameEn !== repair.watch.brand.nameJp)
-                ? `${repair.watch.brand.nameEn} ${repair.watch.brand.nameJp}`
-                : (repair.watch?.brand?.nameJp || repair.watch?.brand?.nameEn || repair.watch?.brand?.name || "Unknown"),
-            model: repair.watch?.model?.name || "Unknown",
+            brand: repair.watch?.brand?.nameJp || repair.watch?.brand?.nameEn || repair.watch?.brand?.name || "不明",
+            model: repair.watch?.model?.nameJp || repair.watch?.model?.name || "不明",
             ref: repair.watch?.reference?.name || "-",
             serial: repair.watch?.serialNumber || "-",
             caliber: repair.watch?.caliber?.name || "-",
         },
-        timeline: repair.logs.map(log => ({
-            id: log.id,
-            status: log.status,
-            date: log.changedAt ? (log.changedAt.toLocaleDateString("ja-JP") + " " + log.changedAt.toLocaleTimeString("ja-JP", { hour: '2-digit', minute: '2-digit' })) : "-",
-            isCompleted: true
-        })),
+        timeline: [...repair.logs].reverse().map(log => {
+            const statusLabels: Record<string, string> = {
+                'reception': '受付',
+                'diagnosing': '見積中',
+                'parts_wait': '部品待 (未注文)',
+                'parts_wait_ordered': '部品待 (注文済)',
+                'in_progress': '作業中',
+                'completed': '完了',
+                'delivered': '納品済',
+                'canceled': 'キャンセル'
+            };
+            return {
+                id: log.id,
+                status: statusLabels[log.status] || log.status,
+                date: log.changedAt ? log.changedAt.toLocaleString("ja-JP", { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : "-",
+                isCompleted: true
+            };
+        }),
         photos: repair.photos?.map(p => p.storageKey) || [],
         estimateItems: repair.estimate?.items || []
     };
@@ -151,14 +161,14 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center">
                                 <ShieldCheck className="w-4 h-4 mr-2 text-blue-600" />
-                                顧客情報 (Client)
+                                顧客情報
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="text-sm space-y-3">
                             <div>
                                 <div className="text-slate-500 text-xs text-zinc-400">お名前</div>
                                 <div className="font-bold text-slate-900 text-lg flex flex-wrap items-center gap-2 text-zinc-800">
-                                    {mockRepair.customer.name}
+                                    {mockRepair.customer.name} 様
                                     {mockRepair.endUserName && (
                                         <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                                             (エンドユーザー: {mockRepair.endUserName} 様)
@@ -168,7 +178,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                             </div>
                             <div className="flex gap-4">
                                 <div>
-                                    <div className="text-slate-500 text-xs text-zinc-400">ランク</div>
+                                    <div className="text-slate-500 text-xs text-zinc-400">客層</div>
                                     <Badge variant="secondary" className="mt-1">{mockRepair.customer.type}</Badge>
                                 </div>
                                 <div>
@@ -200,7 +210,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center">
                                 <Clock className="w-4 h-4 mr-2 text-slate-600" />
-                                時計詳細 (Watch)
+                                時計詳細
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="text-sm space-y-4">
@@ -283,7 +293,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                     <div id="timeline">
                         <div className="flex items-center gap-2 mb-4">
                             <div className="h-6 w-1 bg-blue-600 rounded-full"></div>
-                            <h2 className="text-xl font-bold text-zinc-800">修理進行状況 (Status History)</h2>
+                            <h2 className="text-xl font-bold text-zinc-800">進行状況</h2>
                         </div>
                         <Card className="shadow-sm border-0">
                             <CardContent className="pt-6">
@@ -329,7 +339,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                                                     <div className="col-span-8 flex flex-col gap-1">
                                                         <span className="font-bold text-zinc-800">{item.itemName}</span>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] text-zinc-400 font-mono uppercase italic leading-tight">{item.type}</span>
+                                                            <span className="text-[10px] text-zinc-400 font-mono uppercase italic leading-tight">{item.type === 'labor' ? '技術料' : '交換部品'}</span>
                                                             {item.type === 'part' && (
                                                                 <PartOrderStatusSelect itemId={item.id} currentStatus={item.orderStatus} />
                                                             )}
@@ -342,7 +352,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                                             ))}
                                         </div>
                                         <div className="flex justify-between items-center p-6 bg-zinc-900 text-white font-bold text-xl">
-                                            <span className="text-zinc-400 text-sm font-normal">合計金額 (税抜)</span>
+                                            <span className="text-zinc-400 text-sm font-normal">合計金額 (税別)</span>
                                             <span className="font-mono">
                                                 ¥{mockRepair.estimateItems.reduce((sum: number, i: any) => sum + i.unitPrice, 0).toLocaleString()}
                                             </span>

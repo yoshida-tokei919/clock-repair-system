@@ -6,14 +6,14 @@ import { revalidatePath } from "next/cache";
 export async function updateRepairStatus(repairId: number, newStatus: string, note?: string) {
     try {
         const statusMap: Record<string, string> = {
-            'reception': '受付 (Reception)',
-            'diagnosing': '見積中 (Estimating)',
+            'reception': '受付',
+            'diagnosing': '見積中',
             'parts_wait': '部品待 (未注文)',
             'parts_wait_ordered': '部品待 (注文済)',
-            'in_progress': '作業中 (In Progress)',
-            'completed': '完了 (Completed)',
-            'delivered': '納品済 (Delivered)',
-            'canceled': 'キャンセル (Canceled)'
+            'in_progress': '作業中',
+            'completed': '完了',
+            'delivered': '納品済',
+            'canceled': 'キャンセル'
         };
 
         const statusLabel = statusMap[newStatus] || newStatus;

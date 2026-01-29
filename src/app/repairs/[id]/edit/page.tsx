@@ -39,13 +39,14 @@ export default async function EditRepairPage({ params }: { params: { id: string 
     repair.logs.forEach(log => {
         // Map log labels back to UI keys if possible
         const labelToKey: Record<string, string> = {
-            '受付 (Reception)': 'reception',
-            '見積中 (Estimating)': 'diagnosing',
+            '受付': 'reception',
+            '見積中': 'diagnosing',
             '部品待 (未注文)': 'parts_wait',
             '部品待 (注文済)': 'parts_wait_ordered',
-            '作業中 (In Progress)': 'in_progress',
-            '完了 (Completed)': 'completed',
-            '納品済 (Delivered)': 'delivered'
+            '作業中': 'in_progress',
+            '完了': 'completed',
+            '納品済': 'delivered',
+            'キャンセル': 'canceled'
         };
         const key = labelToKey[log.status] || log.status;
         statusLog[key] = log.changedAt.toLocaleDateString("ja-JP");

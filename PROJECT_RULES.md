@@ -20,15 +20,28 @@ The AI assistant MUST read and follow these rules before making any changes.
   - Example: "C-001", "C-002", "C-003"...
 - **UI:** The prefix input should be hidden or disabled (fixed to "C") for individual customers.
 
-## 2. UI/UX PRESERVATION
+## 2. UI/UX PRESERVATION & LOCALIZATION
+- **完全日本語化の徹底**: UI上のあらゆる表記から英語を排除し、日本語のみとする。
+  - `顧客情報 (Client)` → `顧客情報`
+  - `見積中 (Diagnosing)` → `見積中`
+  - 理由の如何を問わず、括弧書きの英語併記も禁止する。プログラム内部の識別子（reception等）が画面に漏れ出さないよう、必ず変換処理を通すこと。
+- **パフォーマンスとシンプルさの追求**:
+  - 不要な装飾や重い処理を避け、FileMakerのような軽快な動作を目指す。
+  - データベースからの取得データは必要最小限に絞り、不要な通信（Includeの多用）を抑制する。
+- **日本時間（Asia/Tokyo）の徹底**: 日時・タイムスタンプは常に日本時間で表示する。
 - **Critical Features:** Do NOT remove existing buttons, dialogs, or input fields unless explicitly instructed.
 - **Registration Flow:** The "New Registration" button next to the customer name input is critical. It must always trigger the detailed registration dialog (`QuickRegisterDialog`).
 - **Layout Changes:** When refactoring layouts (e.g., to 3 columns), ensure all original functional elements are preserved and relocated, not deleted.
 
-## 3. COMMANDS
+## 3. MASTER DATA PERSISTENCE
+- **Automatic Registration:** When a new repair is created or updated, any "Work Items" (Labor) or "Parts" entered in the estimate section MUST be automatically registered/updated in the `PricingRule` (Work Master) and `PartsMaster` tables respectively if they don't already exist for that specific watch (Brand/Model/Caliber).
+- **Naming Priority:** Always display Japanese names (`nameJp`) for Brands and Models if available. Fall back to `name` or English only if `nameJp` is empty.
+- **Ref/Model Management:** Model and Reference (Ref) fields are mandatory for accurate part matching.
+
+## 4. COMMANDS
 - **"ルール追加" (Add Rule):** When the user prompts "ルール追加", add the new rule to this file immediately.
 
-## 4. DATABASE SCHEMA (IMMUTABLE REFERENCE)
+## 5. DATABASE SCHEMA (IMMUTABLE REFERENCE)
 The following schema defines the core data structure. Any changes to this schema must be explicitly requested.
 
 ```prisma
