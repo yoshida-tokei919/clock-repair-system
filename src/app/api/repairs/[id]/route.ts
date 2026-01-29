@@ -101,6 +101,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                         }
                     }
 
+                    // ALWAYS update watch details to ensure current form state is persisted
                     await tx.watch.update({
                         where: { id: repairRecord.watchId },
                         data: {

@@ -205,13 +205,21 @@ const AdvancedCombobox: React.FC<{
                     onChange={(e) => {
                         const val = e.target.value;
                         setSearch(val);
-                        onChange(val); // Push current text to parent state immediately
+                        onChange(val); // Continuous sync with parent
                         if (!isOpen) setIsOpen(true);
                     }}
                     onFocus={() => {
                         setIsOpen(true);
-                        // Trigger search with empty string to show all on focus
-                        if (onSearchChange) onSearchChange("");
+                        // Do NOT clear search here, let user see what's there
+                        if (onSearchChange) onSearchChange(search || value);
+                    }}
+                    onBlur={() => {
+                        // Small delay to allow click on options
+                        setTimeout(() => {
+                            if (wrapperRef.current && !wrapperRef.current.contains(document.activeElement)) {
+                                setIsOpen(false);
+                            }
+                        }, 200);
                     }}
                     disabled={disabled}
                 />
@@ -223,7 +231,7 @@ const AdvancedCombobox: React.FC<{
             {isOpen && (
                 <div className="absolute z-50 mt-1 w-full bg-white border rounded shadow-lg p-1 min-w-[240px] max-h-60 overflow-hidden flex flex-col">
                     <div className="overflow-auto flex-1">
-                        {onUpsert && search && !options.some(o => o.label === search) && (
+                        {onUpsert && search && !options.some(o => o.value === search) && (
                             <div className="p-1 px-2 text-xs text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-b mb-1" onClick={() => {
                                 onUpsert(search);
                                 onChange(search);
@@ -498,6 +506,17 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
         }
 
         setIsSaving(true);
+        // Auto-append unsaved work items/parts
+        let finalWorks = [...selectedWorks];
+        if (newWorkName && newWorkPrice && !isNaN(parseInt(newWorkPrice))) {
+            finalWorks.push({ id: "auto-" + Date.now(), name: newWorkName, price: parseInt(newWorkPrice) });
+        }
+
+        let finalParts = [...selectedParts];
+        if (newPartName && newPartPrice && !isNaN(parseInt(newPartPrice))) {
+            finalParts.push({ id: "auto-p-" + Date.now(), name: newPartName, retailPrice: parseInt(newPartPrice) });
+        }
+
         const payload = {
             customer: {
                 id: customerId,
@@ -511,7 +530,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
             },
             watch: { brand, model, ref: refName, serial, caliber },
             request: { partnerRef, accessories: accessories.split(",").map((s: string) => s.trim()).filter(Boolean), diagnosis: requestContent, internalNotes },
-            estimate: { items: [...selectedWorks.map((w: WorkItem) => ({ type: "labor", name: w.name, price: w.price })), ...selectedParts.map((p: PartItem) => ({ type: "part", name: p.name, price: p.retailPrice }))] },
+            estimate: {
+                items: [
+                    ...finalWorks.map((w: WorkItem) => ({ type: "labor", name: w.name, price: w.price })),
+                    ...finalParts.map((p: PartItem) => ({ type: "part", name: p.name, price: p.retailPrice }))
+                ]
+            },
             status, statusLog, photos: uploadedPhotos
         };
 

@@ -223,17 +223,18 @@ export async function POST(req: Request) {
                     }
                 });
             } else {
-                // Update watch if caliber or reference was missing
-                const updateData: any = {};
-                if (!watch.caliberId && caliberId) updateData.caliberId = caliberId;
-                if (!watch.referenceId && referenceId) updateData.referenceId = referenceId;
-
-                if (Object.keys(updateData).length > 0) {
-                    watch = await tx.watch.update({
-                        where: { id: watch.id },
-                        data: updateData
-                    });
-                }
+                // FORCE update watch metadata to ensure data persistence
+                // (Previously it was skipping if already set, causing "-" issues)
+                await tx.watch.update({
+                    where: { id: watch.id },
+                    data: {
+                        brandId: brand.id,
+                        modelId: modelId,
+                        referenceId: referenceId,
+                        caliberId: caliberId,
+                        serialNumber: serialInput
+                    }
+                });
             }
 
             // 3. Inquiry Number Generation (The Core Logic)
