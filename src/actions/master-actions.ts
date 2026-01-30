@@ -31,7 +31,14 @@ export async function getModels(brandId?: number) {
 export async function upsertModel(brandName: string, modelName: string) {
     const brand = await upsertBrand(brandName);
     const model = await prisma.model.findFirst({
-        where: { nameJp: modelName, brandId: brand.id }
+        where: {
+            brandId: brand.id,
+            OR: [
+                { name: modelName },
+                { nameEn: modelName },
+                { nameJp: modelName }
+            ]
+        }
     });
 
     if (model) return model;
@@ -241,15 +248,25 @@ export async function upsertWorkMaster(data: {
 
 export async function getPricingRules(brandId?: number, modelId?: number, caliberId?: number) {
     try {
+        if (!brandId) return [];
+
+        // Inclusive search: find rules for this brand, 
+        // that either match exact model/caliber OR are generalized (null)
         const rules = await prisma.pricingRule.findMany({
             where: {
-                brandId: brandId || null,
-                modelId: modelId || null,
-                caliberId: caliberId || null
-            },
-            orderBy: { suggestedWorkName: 'asc' }
+                brandId: brandId,
+                modelId: (modelId ? { in: [modelId, null] } : null) as any,
+                caliberId: (caliberId ? { in: [caliberId, null] } : null) as any
+            }
         });
-        return rules;
+
+        // Sort by specificity: Caliber match > Model match > Brand only
+        // This ensures the most specific price is picked by .find() in UI
+        return rules.sort((a, b) => {
+            const scoreA = (a.caliberId ? 10 : 0) + (a.modelId ? 5 : 0);
+            const scoreB = (b.caliberId ? 10 : 0) + (b.modelId ? 5 : 0);
+            return scoreB - scoreA;
+        });
     } catch (error) {
         console.error("Failed to fetch pricing rules:", error);
         return [];
@@ -258,17 +275,23 @@ export async function getPricingRules(brandId?: number, modelId?: number, calibe
 
 export async function getPartsMatched(brandId?: number, modelId?: number, caliberId?: number, category?: string) {
     try {
+        if (!brandId) return [];
+
         const parts = await prisma.partsMaster.findMany({
             where: {
-                brandId: brandId || undefined,
-                modelId: modelId || undefined,
-                caliberId: caliberId || undefined,
+                brandId: brandId,
+                modelId: (modelId ? { in: [modelId, null] } : null) as any,
+                caliberId: (caliberId ? { in: [caliberId, null] } : null) as any,
                 category: category || undefined
             },
-            orderBy: { name: 'asc' },
             include: { brand: true, model: true, caliber: true }
         });
-        return parts;
+
+        return parts.sort((a, b) => {
+            const scoreA = (a.caliberId ? 10 : 0) + (a.modelId ? 5 : 0);
+            const scoreB = (b.caliberId ? 10 : 0) + (b.modelId ? 5 : 0);
+            return scoreB - scoreA;
+        });
     } catch (error) {
         console.error("Failed to fetch parts:", error);
         return [];

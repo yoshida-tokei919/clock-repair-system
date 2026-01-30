@@ -470,14 +470,14 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
         const c = caliberOptions.find(x => x.value === caliber);
 
         if (b) {
-            getPricingRules(b.id, m?.id).then(rules => {
+            getPricingRules(b.id, m?.id, c?.id).then(rules => {
                 setWorkOptions(rules.map(r => ({
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
                     price: r.minPrice
                 })));
             });
-            getPartsMatched(b.id, m?.id).then(parts => {
+            getPartsMatched(b.id, m?.id, c?.id).then(parts => {
                 setPartsOptions(parts.map(p => ({
                     label: p.nameJp || p.name,
                     value: p.nameJp || p.name,
