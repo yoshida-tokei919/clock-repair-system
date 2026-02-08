@@ -58,16 +58,21 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
     });
 
     const pdfData = {
-        id: String(invoice.id),
         invoiceNumber: invoice.invoiceNumber,
         date: invoice.issuedDate.toLocaleDateString("ja-JP"),
+        dueDate: invoice.paymentDueDate?.toLocaleDateString("ja-JP") || "",
         customer: {
             name: invoice.customer.name,
-            type: invoice.customer.type as 'individual' | 'business',
             address: invoice.customer.address || undefined
         },
-        jobs: jobs,
-        deliveries: deliveries
+        items: invoice.repairs.map(r => ({
+            date: r.deliveryDateActual?.toLocaleDateString("ja-JP") || invoice.issuedDate.toLocaleDateString("ja-JP"),
+            slipNumber: r.deliveryNote?.slipNumber || r.inquiryNumber,
+            description: `${r.watch.brand?.name} ${r.watch.model?.name} 修理代`,
+            amount: (r.estimate?.items || []).reduce((s, i) => s + i.unitPrice * i.quantity, 0)
+        })),
+        taxRate: 0.1,
+        bankInfo: "三菱UFJ銀行 銀座支店\n普通 1234567\nヨシダトケイシュウリコウボウ"
     };
 
     return <InvoicePDFClient data={pdfData} />;

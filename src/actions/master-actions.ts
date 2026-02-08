@@ -36,7 +36,8 @@ export async function upsertModel(brandName: string, modelName: string) {
             OR: [
                 { name: modelName },
                 { nameEn: modelName },
-                { nameJp: modelName }
+                { nameJp: modelName },
+                { name: { contains: modelName } }
             ]
         }
     });
@@ -250,21 +251,25 @@ export async function getPricingRules(brandId?: number, modelId?: number, calibe
     try {
         if (!brandId) return [];
 
-        // Inclusive search: find rules for this brand, 
-        // that either match exact model/caliber OR are generalized (null)
-        const rules = await prisma.pricingRule.findMany({
-            where: {
-                brandId: brandId,
-                modelId: (modelId ? { in: [modelId, null] } : null) as any,
-                caliberId: (caliberId ? { in: [caliberId, null] } : null) as any
-            }
-        });
+        const where: any = { brandId: brandId };
 
-        // Sort by specificity: Caliber match > Model match > Brand only
-        // This ensures the most specific price is picked by .find() in UI
+        if (modelId) {
+            where.OR = [{ modelId: modelId }, { modelId: null }];
+        }
+        if (caliberId) {
+            // If we already have OR from modelId, we need to handle nested OR or separate AND
+            // Simplified: let's just use AND with multiple ORs if possible, or build a clean object
+            if (!where.AND) where.AND = [];
+            where.AND.push({ OR: [{ caliberId: caliberId }, { caliberId: null }] });
+        }
+
+        const rules = await prisma.pricingRule.findMany({ where });
+
         return rules.sort((a, b) => {
-            const scoreA = (a.caliberId ? 10 : 0) + (a.modelId ? 5 : 0);
-            const scoreB = (b.caliberId ? 10 : 0) + (b.modelId ? 5 : 0);
+            const scoreA = (a.caliberId === caliberId && caliberId ? 100 : (a.caliberId ? -1 : 0)) +
+                (a.modelId === modelId && modelId ? 50 : (a.modelId ? -1 : 0));
+            const scoreB = (b.caliberId === caliberId && caliberId ? 100 : (b.caliberId ? -1 : 0)) +
+                (b.modelId === modelId && modelId ? 50 : (b.modelId ? -1 : 0));
             return scoreB - scoreA;
         });
     } catch (error) {
@@ -277,13 +282,19 @@ export async function getPartsMatched(brandId?: number, modelId?: number, calibe
     try {
         if (!brandId) return [];
 
+        const where: any = { brandId: brandId };
+        if (category) where.category = category;
+
+        const conditions: any[] = [];
+        if (modelId) conditions.push({ OR: [{ modelId: modelId }, { modelId: null }] });
+        if (caliberId) conditions.push({ OR: [{ caliberId: caliberId }, { caliberId: null }] });
+
+        if (conditions.length > 0) {
+            where.AND = conditions;
+        }
+
         const parts = await prisma.partsMaster.findMany({
-            where: {
-                brandId: brandId,
-                modelId: (modelId ? { in: [modelId, null] } : null) as any,
-                caliberId: (caliberId ? { in: [caliberId, null] } : null) as any,
-                category: category || undefined
-            },
+            where,
             include: { brand: true, model: true, caliber: true }
         });
 

@@ -1,124 +1,180 @@
+
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font, Image } from '@react-pdf/renderer';
 
-// Font Registration
 Font.register({
     family: 'Noto Sans JP',
     src: '/fonts/NotoSansJP-Regular.otf',
-
 });
 
+// A5 Landscape or Postcard size feel
 const styles = StyleSheet.create({
-    page: { padding: 25, fontFamily: 'Noto Sans JP', fontSize: 10, color: '#333', backgroundColor: '#fff' },
-
-    // Decorative Border
-    borderFrame: {
-        border: '4px double #444',
-        padding: 15,
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
+    page: {
+        padding: 40,
+        fontFamily: 'Noto Sans JP',
+        fontSize: 10,
+        color: '#333',
+        flexDirection: 'column'
     },
-
-    header: { alignItems: 'center', marginBottom: 10, marginTop: 5, borderBottomWidth: 1, borderBottomColor: '#ddd', paddingBottom: 5 },
-    title: { fontSize: 20, fontWeight: 'bold', marginBottom: 2 },
-    subtitle: { fontSize: 8, color: '#666', letterSpacing: 2 },
-
-    contentContainer: { marginBottom: 10 },
-
-    section: { marginBottom: 10 },
-    row: { flexDirection: 'row', marginBottom: 4, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', paddingBottom: 2, alignItems: 'center' },
-    label: { width: '25%', color: '#666', fontSize: 9 },
-    value: { width: '75%', fontSize: 9, fontWeight: 'bold' },
-
-    termsContainer: { marginTop: 'auto', borderTopWidth: 1, borderTopColor: '#333', paddingTop: 8 },
-    termsTitle: { fontSize: 9, fontWeight: 'bold', marginBottom: 3 },
-    termText: { fontSize: 7, lineHeight: 1.5, color: '#555', marginBottom: 1 },
-
-    footer: { alignItems: 'center', marginTop: 10 },
-    shopName: { fontSize: 10, fontWeight: 'bold', marginBottom: 2 },
-    shopAddress: { fontSize: 7, color: '#666', textAlign: 'center' }
+    borderFrame: {
+        borderWidth: 4,
+        borderColor: '#0f172a', // Dark Navy
+        height: '100%',
+        padding: 20,
+        display: 'flex',
+        flexDirection: 'column'
+    },
+    header: {
+        textAlign: 'center',
+        marginBottom: 20,
+        borderBottomWidth: 1,
+        borderColor: '#ccc',
+        paddingBottom: 10
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#0f172a',
+        marginBottom: 4
+    },
+    subTitle: {
+        fontSize: 10,
+        color: '#666',
+        letterSpacing: 2
+    },
+    content: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    row: {
+        flexDirection: 'row',
+        marginBottom: 12,
+        alignItems: 'baseline'
+    },
+    label: {
+        width: '30%',
+        fontSize: 10,
+        color: '#666',
+        textAlign: 'right',
+        paddingRight: 15
+    },
+    value: {
+        width: '70%',
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#000'
+    },
+    guaranteePeriod: {
+        marginTop: 15,
+        marginBottom: 15,
+        padding: 10,
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        alignItems: 'center'
+    },
+    periodText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#0f172a'
+    },
+    footer: {
+        marginTop: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end'
+    },
+    terms: {
+        width: '70%',
+        fontSize: 7,
+        color: '#666',
+        lineHeight: 1.4
+    },
+    qrArea: {
+        width: '25%',
+        alignItems: 'center'
+    },
+    qrPlaceholder: {
+        width: 60,
+        height: 60,
+        backgroundColor: '#eee',
+        marginBottom: 4
+    }
 });
+
+// --- V2 WARRANTY DOCUMENT ---
+// Rules: Luxury Design, A5 Landscape (simulated on A4 or actual if printer supports), QR Code.
+// This template creates a nice bordered certificate style.
 
 export interface WarrantyDocumentProps {
     data: {
-        id: string; // Warranty No
-        repairId: string;
-        customerName: string;
-        customerType?: 'individual' | 'business';
-        watch: { brand: string; model: string; ref: string; serial: string; };
-        repairDate: string;
-        expiryDate: string; // 1 Year later
-        guaranteeContent: string; // e.g., "Overhaul"
+        warrantyNumber: string;
+        issueDate: string;
+        guaranteeStart: string;
+        guaranteeEnd: string;
+        watch: { brand: string; model: string; ref?: string; serial: string; };
+        repairSummary: string; // "Overhaul, Gaskets"
+        qrCodeUrl?: string; // Data URL for QR Code image
     }
 }
 
-export const WarrantyDocument = ({ data }: WarrantyDocumentProps) => (
-    <Document>
-        <Page size="A5" orientation="landscape" style={styles.page}>
-            <View style={styles.borderFrame}>
+export function WarrantyDocument({ data }: WarrantyDocumentProps) {
+    return (
+        <Document>
+            {/* A5 Landscape is typical for warranties */}
+            <Page size="A5" orientation="landscape" style={styles.page}>
+                <View style={styles.borderFrame}>
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <Text style={styles.title}>修理保証書</Text>
+                        <Text style={styles.subTitle}>WATCH REPAIR GUARANTEE</Text>
+                    </View>
 
-                <View style={styles.header}>
-                    <Text style={styles.title}>修理保証書</Text>
-                    <Text style={styles.subtitle}>CERTIFICATE OF GUARANTEE</Text>
-                </View>
-
-                <View style={styles.contentContainer}>
-                    <View style={styles.section}>
+                    {/* Main Info */}
+                    <View style={styles.content}>
                         <View style={styles.row}>
-                            <Text style={styles.label}>お名前 (Customer)</Text>
-                            <Text style={styles.value}>
-                                {data.customerName} {data.customerType === 'business' ? '御中' : '様'}
-                            </Text>
+                            <Text style={styles.label}>BRAND / MODEL</Text>
+                            <Text style={styles.value}>{data.watch.brand} {data.watch.model}</Text>
                         </View>
                         <View style={styles.row}>
-                            <Text style={styles.label}>修理完了日 (Date)</Text>
-                            <Text style={styles.value}>{data.repairDate}</Text>
+                            <Text style={styles.label}>REF. / SERIAL</Text>
+                            <Text style={styles.value}>{data.watch.ref || '-'} / {data.watch.serial}</Text>
                         </View>
                         <View style={styles.row}>
-                            <Text style={styles.label}>保証期限 (Expiry)</Text>
-                            <Text style={styles.value}>{data.expiryDate}</Text>
+                            <Text style={styles.label}>REPAIR CONTENT</Text>
+                            <Text style={[styles.value, { fontSize: 11 }]}>{data.repairSummary}</Text>
+                        </View>
+
+                        {/* Period Box */}
+                        <View style={styles.guaranteePeriod}>
+                            <Text style={{ fontSize: 9, color: '#666', marginBottom: 4 }}>保証期間 (Guarantee Period)</Text>
+                            <Text style={styles.periodText}>{data.guaranteeStart} 〜 {data.guaranteeEnd}</Text>
                         </View>
                     </View>
 
-                    <View style={styles.section}>
-                        <View style={styles.row}>
-                            <Text style={styles.label}>ブランド (Brand)</Text>
-                            <Text style={styles.value}>{data.watch.brand}</Text>
-                        </View>
-                        <View style={styles.row}>
-                            <Text style={styles.label}>モデル (Model)</Text>
-                            <Text style={styles.value}>{data.watch.model}</Text>
-                        </View>
-                        <View style={styles.row}>
-                            <Text style={styles.label}>リファレンス (Reference)</Text>
-                            <Text style={styles.value}>{data.watch.ref}</Text>
-                        </View>
-                        <View style={styles.row}>
-                            <Text style={styles.label}>シリアル (Serial)</Text>
-                            <Text style={styles.value}>{data.watch.serial}</Text>
-                        </View>
-                    </View>
-                </View>
-
-                <View style={styles.termsContainer}>
-                    <Text style={styles.termsTitle}>保証規定</Text>
-                    <View>
-                        <Text style={styles.termText}>1. 本証は、当店にて修理を行った時計が、通常の使用状態で故障した場合に限り、規定の期間内無償で再修理を保証するものです。</Text>
-                        <Text style={styles.termText}>2. 次の場合は保証期間内であっても有償修理となります。</Text>
-                        <Text style={{ ...styles.termText, paddingLeft: 8 }}>・誤ったご使用による故障、または不当な修理や改造による故障。</Text>
-                        <Text style={{ ...styles.termText, paddingLeft: 8 }}>・落下、衝撃、水入り（防水保証のない場合）による故障。</Text>
-                        <Text style={{ ...styles.termText, paddingLeft: 8 }}>・外装部品（ケース、ガラス、ベルト等）の損傷、変化。</Text>
-                        <Text style={styles.termText}>3. 本証の再発行は致しませんので大切に保管してください。</Text>
-                    </View>
-
+                    {/* Footer / Terms / QR */}
                     <View style={styles.footer}>
-                        <Text style={styles.shopName}>ヨシダ時計修理工房</Text>
-                        <Text style={styles.shopAddress}>〒104-0061 東京都中央区銀座 1-2-3  TEL: 03-1234-5678</Text>
+                        <View style={styles.terms}>
+                            <Text>【保証規定】</Text>
+                            <Text>1. 通常使用において生じた自然故障に限り、期間内は無償で再修理いたします。</Text>
+                            <Text>2. 以下の場合は保証対象外となります。</Text>
+                            <Text>   ・誤ったご使用による故障（落下、衝撃、磁気帯び等）</Text>
+                            <Text>   ・水入り、サビ、ケース・ガラス等の外装部品の損傷。</Text>
+                            <Text>3. 本証の再発行は致しかねますので大切に保管してください。</Text>
+                            <Text style={{ marginTop: 4, fontWeight: 'bold' }}>ヨシダ時計修理工房 TEL: 03-1234-5678</Text>
+                        </View>
+
+                        <View style={styles.qrArea}>
+                            {data.qrCodeUrl ? (
+                                <Image src={data.qrCodeUrl} style={{ width: 60, height: 60 }} />
+                            ) : (
+                                <View style={styles.qrPlaceholder} />
+                            )}
+                            <Text style={{ fontSize: 7, marginTop: 2 }}>Scan for Detail</Text>
+                        </View>
                     </View>
                 </View>
-
-            </View>
-        </Page>
-    </Document>
-);
+            </Page>
+        </Document>
+    );
+}

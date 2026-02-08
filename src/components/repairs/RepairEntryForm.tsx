@@ -1,18 +1,22 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import imageCompression from 'browser-image-compression';
 import {
     ArrowLeft, Camera, Printer, Save, Search, Check, ChevronDown, User, Watch,
     Settings, Trash2, Plus, Image as ImageIcon, MapPin, Phone, Mail, MessageCircle,
-    Clock, CheckCircle, Smartphone, FileText, RefreshCw, AlertTriangle
+    Clock, CheckCircle, Smartphone, FileText, RefreshCw, AlertTriangle, ExternalLink, Calendar,
+    Eye, Truck
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { getShippingFeeByAddress } from "@/lib/shipping";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
     Dialog,
     DialogContent,
@@ -23,38 +27,24 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
-import { MasterService } from "@/lib/masterData";
+
+// --- ACTIONS (Server) ---
 import {
     getBrands, getModels, getCalibers, getCalibersForModel, getCalibersForRef,
     getPricingRules, getPartsMatched, upsertBrand, upsertModel, upsertCaliber,
     getRefsByModel, upsertRef
 } from "@/actions/master-actions";
 import { getCustomers } from "@/actions/customer-actions";
-import { LinePreviewModal } from "@/components/line/LinePreviewModal";
-import { QuickRegisterDialog, RegisterData } from "@/components/repairs/QuickRegisterDialog";
-import { RecentRegistrations } from "@/components/repairs/RecentRegistrations";
-import { CameraCaptureDialog } from "@/components/repairs/CameraCaptureDialog";
+
+// --- COMPONENTS ---
+import { QuickRegisterDialog } from "@/components/repairs/QuickRegisterDialog";
 import { MobileConnectDialog } from "@/components/repairs/MobileConnectDialog";
 
-// Dynamically import PDF components to avoid SSR issues
-const PDFPreviewDialog = dynamic(() => import("@/components/repairs/PDFPreviewDialog"), {
-    ssr: false,
-    loading: () => <Button variant="outline" size="sm" disabled><FileText className="w-4 h-4 mr-1" /> PDFを準備中...</Button>
-});
-const TagPreviewDialog = dynamic(() => import("@/components/repairs/TagPreviewDialog"), {
-    ssr: false
-});
+// Dynamically import PDF Dialog (Client only)
+const PDFPreviewDialog = dynamic(() => import("@/components/repairs/PDFPreviewDialog"), { ssr: false });
 
-// --- Types ---
-interface WorkItem { id: string; name: string; price: number; }
-interface PartItem { id: string; name: string; retailPrice: number; supplier?: string; notes?: string; }
-type RepairStatus = "reception" | "diagnosing" | "parts_wait" | "parts_wait_ordered" | "in_progress" | "completed" | "delivered" | "canceled";
-interface Partner { id: string; name: string; prefix: string; currentSeq: number; }
-
-const formatPartOption = (p: any) => `${p.name} [${p.supplier || "-"}] - ¥${p.retailPrice.toLocaleString()}`;
-
-// --- Status Timeline Data ---
-const STATUS_STEPS: { id: RepairStatus; label: string }[] = [
+// Define Status Steps (FMP Style Linear Flow)
+const STATUS_STEPS: { id: string; label: string }[] = [
     { id: "reception", label: "受付" },
     { id: "diagnosing", label: "見積中" },
     { id: "parts_wait", label: "部品待" },
@@ -63,106 +53,38 @@ const STATUS_STEPS: { id: RepairStatus; label: string }[] = [
     { id: "delivered", label: "納品済" },
 ];
 
-const RepairToUIStatus: Record<string, string> = {
-    'reception': 'reception',
-    'diagnosing': 'diagnosing',
-    'parts_wait': 'parts_wait',
-    'parts_wait_ordered': 'parts_wait',
-    'in_progress': 'in_progress',
-    'completed': 'completed',
-    'delivered': 'delivered'
-};
-
-// --- Sub-components ---
-const StatusTimeline: React.FC<{
-    currentStatus: RepairStatus;
-    statusLog: Record<string, string>;
-    onStatusClick: (status: RepairStatus) => void;
-    onDateChange: (status: RepairStatus, date: string) => void;
-}> = ({ currentStatus, statusLog, onStatusClick, onDateChange }) => {
-    const activeStatus = RepairToUIStatus[currentStatus] || currentStatus;
-    const currentIndex = STATUS_STEPS.findIndex(s => s.id === activeStatus);
-
-    return (
-        <div className="w-full bg-white border-b border-zinc-200 px-4 py-3 mb-2 overflow-x-auto">
-            <div className="flex items-center justify-between min-w-[600px]">
-                {STATUS_STEPS.map((step, idx) => {
-                    const isCompleted = idx <= currentIndex;
-                    const isCurrent = step.id === activeStatus;
-                    const logDate = statusLog[step.id];
-                    let dateValue = "";
-                    if (logDate) {
-                        try {
-                            const d = new Date(logDate);
-                            if (!isNaN(d.getTime())) {
-                                // For input[type="date"], we need YYYY-MM-DD in local time
-                                const offset = 9 * 60; // Tokyo
-                                const localDate = new Date(d.getTime() + offset * 60 * 1000);
-                                dateValue = d.toLocaleString("ja-JP", { timeZone: 'Asia/Tokyo' }).split(" ")[0].replace(/\//g, "-");
-                                // Simpler: just use what's in the string if it's already YYYY/MM/DD
-                                if (logDate.includes("/")) dateValue = logDate.replace(/\//g, "-");
-                                else dateValue = d.toISOString().split("T")[0];
-                            }
-                        } catch (e) { }
-                    }
-
-                    return (
-                        <div key={step.id} className="flex flex-col items-center relative flex-1 group" >
-                            {idx < STATUS_STEPS.length - 1 && (
-                                <div className={cn("absolute top-3 left-[50%] w-full h-0.5 z-0", idx < currentIndex ? "bg-blue-500" : "bg-zinc-200")} />
-                            )}
-                            <div
-                                className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center z-10 transition-all mb-1 cursor-pointer",
-                                    isCurrent ? "bg-blue-600 border-blue-600 shadow-md scale-110" :
-                                        isCompleted ? "bg-white border-blue-500" : "bg-white border-zinc-300"
-                                )}
-                                onClick={() => onStatusClick(step.id)}
-                            >
-                                {isCurrent && <Check className="w-3 h-3 text-white" />}
-                            </div>
-                            <span className={cn("text-xs font-bold transition-colors cursor-pointer", isCurrent ? "text-blue-700" : isCompleted ? "text-zinc-700" : "text-zinc-400")} onClick={() => onStatusClick(step.id)}>
-                                {step.label}
-                            </span>
-                            <div className="h-5 mt-1 text-center">
-                                {isCompleted ? (
-                                    <input type="date" className="text-[10px] bg-transparent border-0 text-zinc-500 font-mono w-[80px] text-center focus:outline-none focus:ring-0 cursor-pointer hover:bg-zinc-50 rounded" value={dateValue} onChange={(e) => onDateChange(step.id, e.target.value)} onClick={(e) => e.stopPropagation()} />
-                                ) : (
-                                    <span className="text-[10px] text-zinc-300">-</span>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-};
-
+/**
+ * INTELLIGENCE CACHE & COMBOBOX
+ * Independent, highly-optimized component for fast lookups.
+ */
 const AdvancedCombobox: React.FC<{
     value: string;
     onChange: (v: string) => void;
     onSearchChange?: (s: string) => void;
     onUpsert?: (v: string) => void;
     placeholder?: string;
-    options: { label: string, value: string }[];
+    options: { label: string, value: string, sub?: string, price?: number }[];
     disabled?: boolean;
-}> = ({ value, onChange, onSearchChange, onUpsert, placeholder, options, disabled }) => {
+    className?: string;
+}> = ({ value, onChange, onSearchChange, onUpsert, placeholder, options, disabled, className }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
-    // Use either the selected value's label or the manual search text
-    // Fixed: Always filter based on current search or show all if search is empty
-    const filtered = (options || []).filter(opt =>
-        (opt.label || "").toLowerCase().includes(search.toLowerCase()) ||
-        (opt.value || "").toLowerCase().includes(search.toLowerCase())
-    );
+    // Filter options client-side for speed
+    const filtered = useMemo(() => {
+        if (!search) return options;
+        const low = search.toLowerCase();
+        return options.filter(opt =>
+            (opt.label || "").toLowerCase().includes(low) ||
+            (opt.value || "").toLowerCase().includes(low)
+        );
+    }, [options, search]);
 
-    // After selection, we usually want the clean 'value' (e.g. "TRUST") in the input,
-    // not the 'label' (e.g. "TRUST (No Contact)")
-    const inputDisplayValue = isOpen ? search : value;
+    const displayValue = isOpen ? search : value;
 
+    // Handle outside click
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false);
@@ -171,92 +93,77 @@ const AdvancedCombobox: React.FC<{
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Important: Reflect parent-side 'value' changes in local search if needed, 
-    // but usually 'search' should only exist while typing.
-    useEffect(() => {
-        if (!isOpen) setSearch("");
-    }, [isOpen]);
-
-    useEffect(() => {
-        if (isOpen && onSearchChange) {
-            onSearchChange(search);
-        }
-    }, [search, isOpen, onSearchChange]);
+    // Sync input when closing
+    useEffect(() => { if (!isOpen) setSearch(""); }, [isOpen]);
 
     return (
-        <div className="relative" ref={wrapperRef}>
+        <div className={cn("relative w-full", className)} ref={wrapperRef}>
             <div
                 className={cn(
-                    "flex h-8 w-full items-center justify-between rounded border border-input bg-white px-2 py-1 text-xs cursor-text focus-within:ring-1 focus-within:ring-blue-400 font-medium",
-                    disabled ? "opacity-50" : ""
+                    "flex h-8 w-full items-center justify-between rounded-sm border border-zinc-300 bg-white px-2 py-1 text-xs cursor-text focus-within:ring-1 focus-within:ring-blue-500 font-medium transition-all shadow-sm",
+                    disabled ? "opacity-50 bg-zinc-50 cursor-not-allowed" : "hover:border-zinc-400"
                 )}
                 onClick={() => {
                     if (!disabled) {
                         setIsOpen(true);
-                        inputRef.current?.focus();
+                        setTimeout(() => inputRef.current?.focus(), 0);
                     }
                 }}
             >
                 <input
                     ref={inputRef}
-                    className="bg-transparent border-0 p-0 text-xs w-full focus:outline-none placeholder:text-zinc-300"
+                    className="bg-transparent border-0 p-0 text-xs w-full focus:outline-none placeholder:text-zinc-400 text-zinc-900"
                     placeholder={placeholder}
-                    value={inputDisplayValue}
+                    value={displayValue}
                     onChange={(e) => {
                         const val = e.target.value;
                         setSearch(val);
-                        onChange(val); // Continuous sync with parent
+                        onChange(val); // Real-time value update for free input
                         if (!isOpen) setIsOpen(true);
+                        if (onSearchChange) onSearchChange(val);
                     }}
-                    onFocus={() => {
-                        setIsOpen(true);
-                        // Do NOT clear search here, let user see what's there
-                        if (onSearchChange) onSearchChange(search || value);
-                    }}
-                    onBlur={() => {
-                        // Small delay to allow click on options
-                        setTimeout(() => {
-                            if (wrapperRef.current && !wrapperRef.current.contains(document.activeElement)) {
-                                setIsOpen(false);
-                            }
-                        }, 200);
-                    }}
+                    onFocus={() => setIsOpen(true)}
                     disabled={disabled}
                 />
-                <ChevronDown className="h-3 w-3 opacity-50 cursor-pointer" onClick={(e) => {
-                    e.stopPropagation();
-                    setIsOpen(!isOpen);
-                }} />
+                <ChevronDown className="h-3 w-3 opacity-50 cursor-pointer text-zinc-600" />
             </div>
             {isOpen && (
-                <div className="absolute z-50 mt-1 w-full bg-white border rounded shadow-lg p-1 min-w-[240px] max-h-60 overflow-hidden flex flex-col">
-                    <div className="overflow-auto flex-1">
+                <div className="absolute z-50 mt-1 w-full bg-white border border-zinc-200 rounded-sm shadow-xl min-w-[200px] max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100 origin-top-left">
+                    <div className="overflow-y-auto flex-1 p-1">
                         {onUpsert && search && !options.some(o => o.value === search) && (
-                            <div className="p-1 px-2 text-xs text-blue-600 font-bold hover:bg-blue-50 cursor-pointer border-b mb-1" onClick={() => {
+                            <div className="p-1.5 px-2 text-xs text-blue-600 font-bold hover:bg-blue-50 cursor-pointer rounded-sm mb-1 flex items-center" onClick={() => {
                                 onUpsert(search);
                                 onChange(search);
                                 setIsOpen(false);
                             }}>
-                                + "{search}" を新規登録/使用
+                                <Plus className="w-3 h-3 mr-1" />新規登録: "{search}"
                             </div>
                         )}
                         {filtered.length === 0 && !onUpsert && (
-                            <div className="p-2 text-xs text-zinc-400 italic">候補が見つかりません</div>
+                            <div className="p-2 text-xs text-zinc-400 italic text-center">候補なし</div>
                         )}
-                        {filtered.map(opt => (
+                        {filtered.map((opt, i) => (
                             <div
-                                key={opt.value}
+                                key={i}
                                 className={cn(
-                                    "p-1.5 text-xs hover:bg-zinc-100 cursor-pointer rounded flex justify-between items-center",
-                                    value === opt.value ? "bg-blue-50 text-blue-700 font-bold" : ""
+                                    "p-1.5 px-2 text-xs hover:bg-blue-50 hover:text-blue-700 cursor-pointer rounded-sm flex justify-between items-center transition-colors",
+                                    value === opt.value ? "bg-blue-100 text-blue-800 font-bold" : "text-zinc-700"
                                 )}
                                 onClick={() => {
                                     onChange(opt.value);
-                                    setSearch(opt.label);
+                                    setSearch(""); // Reset search on select
                                     setIsOpen(false);
                                 }}
                             >
-                                <span>{opt.label}</span>
+                                <div className="flex justify-between items-center w-full">
+                                    <div className="flex flex-col">
+                                        <span>{opt.label}</span>
+                                        {opt.sub && <span className="text-[9px] text-zinc-400 font-normal">{opt.sub}</span>}
+                                    </div>
+                                    {opt.price !== undefined && (
+                                        <span className="text-[10px] font-mono bg-zinc-100 px-1 rounded text-zinc-500 ml-2 truncate max-w-[80px]">¥{opt.price.toLocaleString()}</span>
+                                    )}
+                                </div>
                                 {value === opt.value && <Check className="w-3 h-3" />}
                             </div>
                         ))}
@@ -267,279 +174,221 @@ const AdvancedCombobox: React.FC<{
     );
 };
 
-// --- Main Form ---
-export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?: any, mode?: 'create' | 'edit' }) {
+// --- MAIN FORM ---
+interface Props {
+    initialData?: any;
+    mode?: 'create' | 'edit';
+}
+export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const router = useRouter();
     const [isSaving, setIsSaving] = useState(false);
 
-    // Dynamic import for Photo Gallery maybe later, currently inline
-
-    // --- Core State ---
-    const [status, setStatus] = useState<RepairStatus>(initialData?.status || "reception");
-    const [statusLog, setStatusLog] = useState<Record<string, string>>(initialData?.statusLog || { "reception": new Date().toLocaleDateString("ja-JP") });
-
-    // Customer
+    // --- 1. CORE DATA ---
+    const [status, setStatus] = useState<string>(initialData?.status || "reception");
+    const [statusLog, setStatusLog] = useState<Record<string, string>>(initialData?.statusLog || { "reception": new Date().toISOString() });
     const [customerId, setCustomerId] = useState<number | null>(initialData?.customer?.id || null);
-    const [customerCategory, setCustomerCategory] = useState<"B2B" | "B2C">(initialData?.customer?.type === 'business' ? "B2B" : "B2C");
+    const [isB2B, setIsB2B] = useState<boolean>(initialData?.customer?.type === 'business');
     const [customerName, setCustomerName] = useState(initialData?.customer?.name || "");
     const [endUserName, setEndUserName] = useState(initialData?.endUserName || "");
-    const [lineId, setLineId] = useState(initialData?.customer?.lineId || "");
+    const [partnerRef, setPartnerRef] = useState(initialData?.partnerRef || ""); // 貴社管理No
     const [customerPhone, setCustomerPhone] = useState(initialData?.customer?.phone || "");
+    const [lineId, setLineId] = useState(initialData?.customer?.lineId || "");
     const [address, setAddress] = useState(initialData?.customer?.address || "");
-    const [customerPrefix, setCustomerPrefix] = useState(initialData?.customer?.prefix || "");
+    const [email, setEmail] = useState(initialData?.customer?.email || "");
+    const [shippingFee, setShippingFee] = useState(0);
 
-    // Watch
-    const [brand, setBrand] = useState(initialData?.watch?.brand?.name || initialData?.watch?.brand?.nameEn || "");
-    const [model, setModel] = useState(initialData?.watch?.model?.nameJp || initialData?.watch?.model?.name || "");
+    // --- 2. WATCH DATA ---
+    const [brand, setBrand] = useState(initialData?.watch?.brand?.name || "");
+    const [model, setModel] = useState(initialData?.watch?.model?.name || "");
     const [refName, setRefName] = useState(initialData?.watch?.reference?.name || "");
     const [caliber, setCaliber] = useState(initialData?.watch?.caliber?.name || "");
     const [serial, setSerial] = useState(initialData?.watch?.serialNumber || "");
-    const [accessories, setAccessories] = useState(() => {
-        if (!initialData?.accessories) return "";
+    const [accessories, setAccessories] = useState<string>(() => {
         try {
-            const parsed = JSON.parse(initialData.accessories);
-            return Array.isArray(parsed) ? parsed.join(", ") : initialData.accessories;
-        } catch (e) { return initialData.accessories; }
+            return JSON.parse(initialData?.accessories || "[]").join(", ");
+        } catch { return initialData?.accessories || ""; }
     });
 
-    // Estimates
-    const [repairType, setRepairType] = useState<"internal" | "external">("internal");
-    const [selectedWorks, setSelectedWorks] = useState<WorkItem[]>(initialData?.estimate?.items?.filter((i: any) => i.type === 'labor').map((i: any) => ({ id: i.id.toString(), name: i.itemName, price: i.unitPrice })) || []);
-    const [selectedParts, setSelectedParts] = useState<PartItem[]>(initialData?.estimate?.items?.filter((i: any) => i.type === 'part').map((i: any) => ({ id: i.id.toString(), name: i.itemName, retailPrice: i.unitPrice })) || []);
+    // --- 3. REPAIR CONTENT (Internal/External) ---
+    // Unified list with 'category' flag
+    interface LineItem {
+        id: string;
+        category: 'internal' | 'external' | 'part_internal' | 'part_external' | 'part_generic';
+        name: string;
+        price: number;
+        cost?: number; // Cost price (hidden from customer)
+        partRef?: string; // Part number
+        spec?: string; // Note/Spec (e.g. "Genuine", "31.5mm")
+        status?: 'pending' | 'ordered' | 'arrived'; // For parts
+    }
+    const [lineItems, setLineItems] = useState<LineItem[]>(() => {
+        if (!initialData?.estimate?.items) return [];
+        return initialData.estimate.items.map((i: any) => ({
+            id: String(i.id),
+            category: i.type === 'labor' ? (i.category || 'internal') : 'part_external', // simplified mapping
+            name: i.itemName,
+            price: i.unitPrice,
+            spec: i.notes
+        }));
+    });
 
-    // Notes
-    const [requestContent, setRequestContent] = useState(initialData?.workSummary || "");
+    // Inputs for adding new items
+    const [addItemCategory, setAddItemCategory] = useState<'internal' | 'external'>('internal');
+    const [newItemName, setNewItemName] = useState("");
+    const [newItemPrice, setNewItemPrice] = useState("");
+    const [newItemSpec, setNewItemSpec] = useState("");
+
+    const [diagnosis, setDiagnosis] = useState(initialData?.workSummary || ""); // Diagnosis/Request details
     const [internalNotes, setInternalNotes] = useState(initialData?.internalNotes || "");
-    const [partnerRef, setPartnerRef] = useState(initialData?.partnerRef || "");
-    const [uploadedPhotos, setUploadedPhotos] = useState<any[]>(initialData?.photos?.map((p: any) => ({ storageKey: p.storageKey, fileName: p.fileName, mimeType: p.mimeType })) || []);
 
-    // --- Masters ---
-    const [brandOptions, setBrandOptions] = useState<any[]>([]);
-    const [modelOptions, setModelOptions] = useState<any[]>([]);
-    const [refOptions, setRefOptions] = useState<any[]>([]);
-    const [caliberOptions, setCaliberOptions] = useState<any[]>([]);
-    const [workOptions, setWorkOptions] = useState<any[]>([]);
-    const [partsOptions, setPartsOptions] = useState<any[]>([]);
-    const [isCameraOpen, setIsCameraOpen] = useState(false);
-    const [isMobileConnectOpen, setIsMobileConnectOpen] = useState(false);
+    // --- 4. PHOTOS ---
+    const [photos, setPhotos] = useState<any[]>(initialData?.photos || []);
     const [isUploading, setIsUploading] = useState(false);
-    const [isQuickRegisterOpen, setIsQuickRegisterOpen] = useState(false);
-    const [customerOptions, setCustomerOptions] = useState<any[]>([]);
-    const [showDupDialog, setShowDupDialog] = useState(false);
-    const [dupResults, setDupResults] = useState<any[]>([]);
 
-    const [customerSearch, setCustomerSearch] = useState("");
-    const [newWorkName, setNewWorkName] = useState("");
-    const [newWorkPrice, setNewWorkPrice] = useState("");
-    const [newPartName, setNewPartName] = useState("");
-    const [newPartPrice, setNewPartPrice] = useState("");
+    // --- 5. MASTERS & OPTIONS ---
+    const [brandOpts, setBrandOpts] = useState<any[]>([]);
+    const [modelOpts, setModelOpts] = useState<any[]>([]);
+    const [refOpts, setRefOpts] = useState<any[]>([]);
+    const [calOpts, setCalOpts] = useState<any[]>([]);
+    const [customerOpts, setCustomerOpts] = useState<any[]>([]);
+    const [workOpts, setWorkOpts] = useState<any[]>([]);
 
-    // Incremental Customer Search
+    // --- 6. DIALOGS ---
+    const [quickRegOpen, setQuickRegOpen] = useState(false);
+    const [mobileQR, setMobileQR] = useState(false);
+    const [showPdfDialog, setShowPdfDialog] = useState(false);
+
+    // Construct current data object for PDF
+    const currentDataForPdf = {
+        id: initialData?.id,
+        inquiryNumber: initialData?.inquiryNumber,
+        customer: { name: customerName, type: isB2B ? 'business' : 'individual', address, phone: customerPhone },
+        endUserName,
+        partnerRef,
+        watch: { brand, model, ref: refName, serial },
+        estimate: { items: lineItems.map(i => ({ name: i.name, price: i.price })) },
+        shippingFee,
+        status
+    };
+
+    // --- AUTOMATION: Shipping Fee ---
     useEffect(() => {
-        const timer = setTimeout(async () => {
-            // Fetch even if search is empty to show initial list
-            const results = await getCustomers(customerSearch);
-            setCustomerOptions(results.map(c => ({
-                label: `${c.name} (${c.phone || c.email || "連絡先なし"})`,
-                value: c.name,
-                fullData: c
-            })));
-        }, 150); // Shorter debounce for better feel
+        const fee = getShippingFeeByAddress(address);
+        setShippingFee(fee);
+    }, [address]);
 
-        return () => clearTimeout(timer);
-    }, [customerSearch]);
-
-    const handleCustomerRegister = (data: any) => {
-        setCustomerId(null);
-        setCustomerCategory(data.type === 'business' ? 'B2B' : 'B2C');
-        setCustomerName(data.name);
-        setCustomerPrefix(data.prefix || "");
-        if (data.phone) setCustomerPhone(data.phone);
-        if (data.lineId) setLineId(data.lineId);
-        if (data.address) setAddress(data.address);
-        setIsQuickRegisterOpen(false);
-    };
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Refresh photos from server (for mobile upload sync)
-    const refreshPhotos = async () => {
-        if (!initialData?.id) return;
-        try {
-            const res = await fetch(`/api/repairs/${initialData.id}/photos`);
-            if (res.ok) {
-                const photos = await res.json();
-                setUploadedPhotos(photos.map((p: any) => ({
-                    storageKey: p.storageKey,
-                    fileName: p.fileName,
-                    mimeType: p.mimeType
-                })));
-            }
-        } catch (e) {
-            console.error("Failed to refresh photos", e);
-        }
-    };
-
-    const handlePhotoUpload = async (file: File | Blob) => {
-        setIsUploading(true);
-
-        try {
-            // 1. Image Compression & WebP Conversion
-            const options = {
-                maxSizeMB: 1,            // Target 1MB
-                maxWidthOrHeight: 3000, // Limit resolution but keep it high
-                useWebWorker: true,
-                fileType: 'image/webp' as any
-            };
-
-            const imageFile = file instanceof File ? file : new File([file], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-            const compressedBlob = await imageCompression(imageFile, options);
-
-            // 2. Prepare Form Data
-            const formData = new FormData();
-            const fileName = (imageFile.name || `img-${Date.now()}`).replace(/\.[^/.]+$/, "") + ".webp";
-            formData.append("file", compressedBlob, fileName);
-            if (initialData?.id) formData.append("repairId", initialData.id.toString());
-
-            // 3. Upload
-            const res = await fetch("/api/upload", { method: "POST", body: formData });
-            const data = await res.json();
-            if (data.success) {
-                setUploadedPhotos(prev => [...prev, { storageKey: data.storageKey, fileName: data.fileName, mimeType: data.mimeType }]);
-            } else {
-                alert("アップロードに失敗しました");
-            }
-        } catch (e) {
-            console.error("Photo process/upload failed:", e);
-            alert("画像の処理またはアップロードに失敗しました");
-        } finally {
-            setIsUploading(false);
-        }
-    };
-
+    // --- INITIAL LOAD ---
     useEffect(() => {
-        getBrands().then(data => setBrandOptions(data.map(b => ({ label: b.nameJp || b.name, value: b.name, id: b.id }))));
+        getBrands().then(d => setBrandOpts(d.map(b => ({ label: b.name, value: b.name, id: b.id }))));
     }, []);
 
-    // Brand Change -> Load Models
+    // --- LOOKUP CHAINS ---
+    // 1. Brand -> Models
     useEffect(() => {
-        if (!brand) {
-            setModelOptions([]);
-            return;
-        }
-        const b = brandOptions.find(x => x.value === brand);
-        if (b) {
-            getModels(b.id).then(m => setModelOptions(m.map((x: any) => ({ label: x.nameJp || x.name, value: x.nameJp || x.name, id: x.id }))));
-        }
-    }, [brand, brandOptions]);
+        if (!brand) return;
+        const b = brandOpts.find(o => o.value === brand);
+        if (b) getModels(b.id).then(d => setModelOpts(d.map((m: any) => ({ label: m.nameJp || m.name, value: m.name, id: m.id }))));
+    }, [brand, brandOpts]);
 
-    // Model Change -> Load Refs & Calibers
+    // 2. Model -> Refs & Calibers
     useEffect(() => {
-        if (!model) {
-            setRefOptions([]);
-            setCaliberOptions([]);
-            return;
-        }
-        const m = modelOptions.find(x => x.value === model);
+        if (!model) return;
+        const m = modelOpts.find(o => o.value === model);
         if (m) {
-            getRefsByModel(m.id).then(refs => {
-                setRefOptions(refs.map(r => ({ label: r.name, value: r.name, id: r.id, caliber: r.caliber?.name })));
-            });
-            const b = brandOptions.find(x => x.value === brand);
-            if (b) {
-                getCalibersForModel(b.id, m.id).then(cals => {
-                    setCaliberOptions(cals.map(c => ({ label: c.name, value: c.name })));
-                });
+            getRefsByModel(m.id).then(d => setRefOpts(d.map((r: any) => ({ label: r.name, value: r.name, sub: r.caliber?.name, caliber: r.caliber?.name }))));
+            // Also fetch calibers linked to model
+            if (brand) {
+                const b = brandOpts.find(o => o.value === brand);
+                if (b) getCalibersForModel(b.id, m.id).then(d => setCalOpts(d.map((c: any) => ({ label: c.name, value: c.name }))));
             }
         }
-    }, [model, modelOptions, brand, brandOptions]);
+    }, [model, modelOpts, brand, brandOpts]);
 
-    // Ref Change -> Auto-fill Caliber (Safely)
+    // 3. Ref -> Caliber Auto-fill
     useEffect(() => {
-        if (!refName) return;
-        const r = refOptions.find(o => o.value === refName);
-        if (r?.caliber) {
-            setCaliber(r.caliber);
+        const r = refOpts.find(o => o.value === refName);
+        if (r && r.caliber) setCaliber(r.caliber);
+    }, [refName, refOpts]);
+
+    // 4. Intelligence Cache (Pricing Rules & Parts Master)
+    useEffect(() => {
+        const b = brandOpts.find(o => o.value === brand || o.label === brand);
+        if (!b) {
+            setWorkOpts([]);
+            return;
         }
-    }, [refName, refOptions]); // Include refOptions in deps
 
-    // Fetch Work & Parts Master automatically based on context
-    useEffect(() => {
-        const b = brandOptions.find(x => x.value === brand);
-        const m = modelOptions.find(x => x.value === model);
-        const c = caliberOptions.find(x => x.value === caliber);
+        const m = modelOpts.find(o => o.value === model || o.label === model);
+        const c = calOpts.find(o => o.value === caliber || o.label === caliber);
 
-        if (b) {
+        if (addItemCategory === 'internal') {
+            // Fetch labor/work rules
             getPricingRules(b.id, m?.id, c?.id).then(rules => {
-                setWorkOptions(rules.map(r => ({
+                setWorkOpts(rules.map(r => ({
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
                     price: r.minPrice
                 })));
             });
+        } else {
+            // Fetch parts master data
             getPartsMatched(b.id, m?.id, c?.id).then(parts => {
-                setPartsOptions(parts.map(p => ({
+                setWorkOpts(parts.map(p => ({
                     label: p.nameJp || p.name,
                     value: p.nameJp || p.name,
                     price: p.retailPrice,
-                    supplier: p.supplier
+                    sub: p.partNumber ? `Ref: ${p.partNumber} (${p.category})` : p.category
                 })));
+                console.log(`Fetched ${parts.length} matching parts for brand ${b.id}`);
             });
         }
-    }, [brand, model, caliber, brandOptions, modelOptions, caliberOptions]);
+    }, [brand, model, caliber, brandOpts, modelOpts, calOpts, addItemCategory]);
 
-    // Handle Save
-    const handleSave = async (force: boolean = false) => {
-        if (!brand || !customerName) { alert("ブランドと顧客名は必須です"); return; }
+    // --- CALCULATIONS ---
+    const totalAmount = lineItems.reduce((sum, i) => sum + i.price, 0);
+    const taxAmount = Math.floor(totalAmount * 0.1);
+    const grandTotal = totalAmount + taxAmount;
 
-        // --- Duplicate Check logic ---
-        if (!force && mode === 'create' && !customerId) {
-            // Check if name already exists
-            const matches = await getCustomers(customerName);
-            // Filter by exact name
-            const exactMatches = matches.filter(m => m.name === customerName);
-            if (exactMatches.length > 0) {
-                setDupResults(exactMatches);
-                setShowDupDialog(true);
-                return;
-            }
+    // --- ACTIONS ---
+    const handleSave = async () => {
+        if (!brand || !customerName) {
+            alert("「ブランド」と「顧客名」は必須です。");
+            return;
         }
-
         setIsSaving(true);
-        // Auto-append unsaved work items/parts
-        let finalWorks = [...selectedWorks];
-        if (newWorkName && newWorkPrice && !isNaN(parseInt(newWorkPrice))) {
-            finalWorks.push({ id: "auto-" + Date.now(), name: newWorkName, price: parseInt(newWorkPrice) });
-        }
-
-        let finalParts = [...selectedParts];
-        if (newPartName && newPartPrice && !isNaN(parseInt(newPartPrice))) {
-            finalParts.push({ id: "auto-p-" + Date.now(), name: newPartName, retailPrice: parseInt(newPartPrice) });
-        }
-
-        const payload = {
-            customer: {
-                id: customerId,
-                name: customerName,
-                type: customerCategory === "B2B" ? "business" : "individual",
-                address,
-                endUserName,
-                phone: customerPhone,
-                lineId: lineId,
-                prefix: customerCategory === "B2B" ? customerPrefix : "C"
-            },
-            watch: { brand, model, ref: refName, serial, caliber },
-            request: { partnerRef, accessories: accessories.split(",").map((s: string) => s.trim()).filter(Boolean), diagnosis: requestContent, internalNotes },
-            estimate: {
-                items: [
-                    ...finalWorks.map((w: WorkItem) => ({ type: "labor", name: w.name, price: w.price })),
-                    ...finalParts.map((p: PartItem) => ({ type: "part", name: p.name, price: p.retailPrice }))
-                ]
-            },
-            status, statusLog, photos: uploadedPhotos
-        };
-
         try {
+            const payload = {
+                customer: {
+                    id: customerId,
+                    name: customerName,
+                    type: isB2B ? 'business' : 'individual',
+                    phone: customerPhone,
+                    lineId: lineId,
+                    address: address,
+                    prefix: isB2B ? 'P' : 'C' // Simple logic
+                },
+                watch: { brand, model, ref: refName, serial, caliber },
+                request: {
+                    diagnosis,
+                    partnerRef,
+                    internalNotes,
+                    accessories: accessories.split(',').map(s => s.trim()).filter(Boolean),
+                    endUserName
+                },
+                estimate: {
+                    items: lineItems.map(i => ({
+                        type: i.category.includes('part') ? 'part' : 'labor',
+                        category: i.category,
+                        name: i.name,
+                        price: i.price,
+                        notes: i.spec
+                    }))
+                },
+                status,
+                statusLog,
+                photos
+            };
+
             const url = mode === 'edit' ? `/api/repairs/${initialData.id}` : "/api/repairs";
             const res = await fetch(url, {
                 method: mode === 'edit' ? "PATCH" : "POST",
@@ -547,411 +396,374 @@ export function RepairEntryForm({ initialData, mode = 'create' }: { initialData?
                 body: JSON.stringify(payload)
             });
 
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => ({}));
-                throw new Error(errorData.error || "保存に失敗しました");
-            }
-            const result = await res.json();
-            router.push(`/repairs/${result.repair.id}`);
-        } catch (e: any) {
-            console.error("Save Error:", e);
-            alert(`保存に失敗しました: ${e.message}`);
+            if (!res.ok) throw new Error("Save failed");
+            const json = await res.json();
+
+            // Redirect or Notify
+            if (mode === 'create') router.push(`/repairs/${json.repair.id}`);
+            else router.refresh();
+
+        } catch (e) {
+            console.error(e);
+            alert("保存に失敗しました。");
+        } finally {
             setIsSaving(false);
         }
     };
 
-    const grandTotal = selectedWorks.reduce((s, w) => s + w.price, 0) + selectedParts.reduce((s, p) => s + p.retailPrice, 0);
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return;
+        setIsUploading(true);
+        const file = e.target.files[0];
+        try {
+            const compressed = await imageCompression(file, { maxSizeMB: 1, useWebWorker: true });
+            const fd = new FormData();
+            fd.append("file", compressed);
+            if (initialData?.id) fd.append("repairId", initialData.id);
+
+            const res = await fetch("/api/upload", { method: "POST", body: fd });
+            const data = await res.json();
+            if (data.success) {
+                setPhotos(prev => [...prev, { storageKey: data.storageKey, fileName: data.fileName, mimeType: data.mimeType }]);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("画像アップロードエラー");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    // --- LINE SEND ---
+    const handleLineSend = (type: 'status' | 'estimate' | 'complete') => {
+        // Fallback to Clipboard + URL Scheme if no API
+        let text = "";
+        const shopName = "ヨシダ時計修理工房";
+
+        if (type === 'status') {
+            text = `
+【ステータス更新】
+現在の状況: ${STATUS_STEPS.find(s => s.id === status)?.label}
+機種: ${brand} ${model}
+管理No: ${initialData?.inquiryNumber || ""}
+
+現在、順調に進行しております。今しばらくお待ちください。
+${shopName}
+            `.trim();
+        } else if (type === 'estimate') {
+            text = `
+【お見積りのご案内】
+機種: ${brand} ${model}
+修理合計: ¥${grandTotal.toLocaleString()} (税込)
+
+詳細は添付のPDF、またはお電話にてご確認ください。
+${shopName}
+            `.trim();
+        }
+
+        navigator.clipboard.writeText(text).then(() => {
+            alert("LINE用メッセージをコピーしました。\nLINEを開きます。");
+            window.location.href = "line://"; // Try to open app
+        });
+    };
 
     return (
-        <div className="min-h-screen bg-zinc-100 flex flex-col font-sans text-zinc-800">
-            {/* Header */}
-            <div className="bg-white border-b px-4 py-2 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+        <div className="min-h-screen bg-zinc-100 font-sans text-zinc-800 flex flex-col">
+            {/* --- TOP BAR (FMP Style) --- */}
+            <div className="bg-[#e8e8e8] border-b border-zinc-300 px-4 py-2 flex items-center justify-between sticky top-0 z-30 h-14 shadow-sm">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="sm" onClick={() => router.back()} className="h-8"><ArrowLeft className="w-4 h-4 mr-1" /> 戻る</Button>
-                    <h1 className="font-bold text-lg">{mode === 'edit' ? `修理編集: ${initialData?.inquiryNumber}` : "新規修理受付"}</h1>
+                    <Button variant="ghost" size="sm" onClick={() => router.back()} className="h-9 hover:bg-zinc-200">
+                        <ArrowLeft className="w-4 h-4 mr-1 text-zinc-600" /> 一覧へ戻る
+                    </Button>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] text-zinc-500 font-bold tracking-wider">修理受付システム</span>
+                        <h1 className="text-lg font-bold leading-none text-zinc-800">
+                            {mode === 'edit' ? `修理番号: ${initialData?.inquiryNumber}` : "新規修理登録"}
+                        </h1>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="h-8 gap-1 border-zinc-300" onClick={() => window.print()}><Printer className="w-4 h-4" /> 印刷</Button>
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 shadow-sm" onClick={() => handleSave()} disabled={isSaving}>
-                        <Save className="w-4 h-4 mr-1" /> {isSaving ? "保存中..." : "保存する"}
+                <div className="flex items-center gap-3">
+                    {shippingFee > 0 && (
+                        <div className="hidden lg:flex items-center gap-1.5 px-3 h-8 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
+                            <Truck className="w-3.5 h-3.5" />
+                            送料目安: ¥{shippingFee.toLocaleString()}
+                        </div>
+                    )}
+                    {mode === 'edit' && (
+                        <div className="flex bg-white rounded-md border border-zinc-300 overflow-hidden shadow-sm mr-2">
+                            <button onClick={() => handleLineSend('status')} className="px-3 py-1.5 hover:bg-green-50 text-[10px] border-r flex items-center gap-1 text-green-700 font-bold transition-colors">
+                                <MessageCircle className="w-3.5 h-3.5" /> LINE連絡
+                            </button>
+                            <button onClick={() => setShowPdfDialog(true)} className="px-3 py-1.5 hover:bg-zinc-100 text-[10px] flex items-center gap-1 text-zinc-700 font-bold transition-colors">
+                                <FileText className="w-3.5 h-3.5" /> 帳票出力
+                            </button>
+                        </div>
+                    )}
+                    <Button
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className={cn("h-9 px-6 font-bold shadow-md transition-all active:scale-95", isSaving ? "bg-zinc-400" : "bg-blue-600 hover:bg-blue-500")}
+                    >
+                        {isSaving ? "保存中..." : "保存 (Save)"}
                     </Button>
                 </div>
             </div>
 
-            {/* Timeline */}
-            <StatusTimeline currentStatus={status} statusLog={statusLog} onStatusClick={s => setStatus(s)} onDateChange={(s, d) => setStatusLog({ ...statusLog, [s]: d })} />
 
-            <div className="flex-1 p-2 grid grid-cols-12 gap-2 overflow-hidden items-stretch">
-                {/* Left Column: History, Basic Info & Actions (3/12) */}
-                <div className="col-span-3 flex flex-col gap-2 overflow-y-auto pr-1">
-                    {mode === 'create' && (
-                        <div className="bg-white border border-zinc-200 rounded-lg shadow-sm max-h-48 overflow-y-auto mb-2">
-                            <RecentRegistrations />
-                        </div>
-                    )}
+            {/* --- MAIN CONTENT (Simple Vertical Layout) --- */}
+            <div className="flex-1 p-3 overflow-y-auto">
+                <div className="flex flex-col gap-4 max-w-4xl mx-auto h-full">
 
-                    <Card className="p-3 bg-white space-y-4 shadow-sm">
-                        <div className="flex bg-zinc-100 p-1 rounded-md">
-                            <button onClick={() => setCustomerCategory("B2B")} className={cn("flex-1 text-xs font-bold py-1.5 rounded-sm transition-all", customerCategory === "B2B" ? "bg-white shadow-sm text-blue-600" : "text-zinc-400 hover:text-zinc-600")}>業者</button>
-                            <button onClick={() => setCustomerCategory("B2C")} className={cn("flex-1 text-xs font-bold py-1.5 rounded-sm transition-all", customerCategory === "B2C" ? "bg-white shadow-sm text-green-600" : "text-zinc-400 hover:text-zinc-600")}>一般</button>
-                        </div>
-                        <div className="space-y-3">
-                            <div className="flex items-end gap-2">
-                                <div className="flex-1">
-                                    <Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">顧客名 / 業者名</Label>
-                                    <div className="flex gap-1">
-                                        <AdvancedCombobox
-                                            value={customerName}
-                                            onSearchChange={setCustomerSearch}
-                                            onChange={(val) => {
-                                                setCustomerName(val);
-                                                // Find details
-                                                const found = customerOptions.find(o => o.value === val);
-                                                if (found?.fullData) {
-                                                    const d = found.fullData;
-                                                    setCustomerId(d.id);
-                                                    setCustomerCategory(d.type === 'business' ? 'B2B' : 'B2C');
-                                                    setCustomerPrefix(d.prefix || "");
-                                                    if (d.phone) setCustomerPhone(d.phone);
-                                                    if (d.lineId) setLineId(d.lineId);
-                                                    if (d.address) setAddress(d.address);
-                                                } else {
-                                                    setCustomerId(null);
-                                                }
-                                            }}
-                                            placeholder="顧客名を入力..."
-                                            options={customerOptions}
-                                        />
-                                    </div>
+                    {/* LEFT COL: CUSTOMER & WATCH (4/12) */}
+                    {/* CUSTOMER & WATCH */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Customer Card */}
+                        <Card className="p-3 shadow-sm border-t-4 border-t-zinc-500 bg-white">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase tracking-wider">
+                                    <User className="w-3.5 h-3.5" /> 顧客情報
+                                </h3>
+                                <div className="flex bg-zinc-100 p-0.5 rounded">
+                                    <button onClick={() => setIsB2B(true)} className={cn("px-2 py-0.5 text-[10px] rounded-sm font-bold", isB2B ? "bg-white shadow text-blue-600" : "text-zinc-400")}>業者</button>
+                                    <button onClick={() => setIsB2B(false)} className={cn("px-2 py-0.5 text-[10px] rounded-sm font-bold", !isB2B ? "bg-white shadow text-green-600" : "text-zinc-400")}>一般</button>
                                 </div>
-                                <Button size="sm" className="h-8 bg-zinc-100 text-zinc-600 hover:bg-zinc-200 border border-zinc-200" onClick={() => setIsQuickRegisterOpen(true)}>
-                                    <Plus className="w-3.5 h-3.5" /> 新規
-                                </Button>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">電話番号</Label><Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-8 text-sm border-zinc-200" placeholder="090-..." /></div>
-                                <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">LINE ID</Label><Input value={lineId} onChange={e => setLineId(e.target.value)} className="h-8 text-sm border-zinc-200" placeholder="@..." /></div>
-                            </div>
-                            {customerCategory === "B2B" && (
+                            <div className="space-y-2">
+                                <div className="flex gap-1">
+                                    <AdvancedCombobox
+                                        placeholder="名前検索 / 新規入力..."
+                                        value={customerName}
+                                        onChange={setCustomerName}
+                                        onSearchChange={async (s) => {
+                                            const res = await getCustomers(s);
+                                            setCustomerOpts(res.map(c => ({ label: c.name, value: c.name, sub: c.phone || "No phone" })));
+                                        }}
+                                        options={customerOpts}
+                                    />
+                                    <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={() => setQuickRegOpen(true)}><Plus className="w-4 h-4" /></Button>
+                                </div>
+                                {isB2B && (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <Label className="text-[9px] text-zinc-400 uppercase">エンドユーザー</Label>
+                                            <Input className="h-7 text-xs" value={endUserName} onChange={e => setEndUserName(e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <Label className="text-[9px] text-zinc-400 uppercase">管理番号(Partner)</Label>
+                                            <Input className="h-7 text-xs font-mono" value={partnerRef} onChange={e => setPartnerRef(e.target.value)} />
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-2">
-                                    <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">貴社伝票番号</Label><Input value={partnerRef} onChange={e => setPartnerRef(e.target.value)} className="h-8 text-sm font-mono border-zinc-200" /></div>
-                                    <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">エンドユーザー</Label><Input value={endUserName} onChange={e => setEndUserName(e.target.value)} className="h-8 text-sm border-zinc-200" /></div>
+                                    <div><Label className="text-[9px] text-zinc-400">TEL</Label><Input className="h-7 text-xs" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} /></div>
+                                    <div><Label className="text-[9px] text-zinc-400">LINE ID</Label><Input className="h-7 text-xs" value={lineId} onChange={e => setLineId(e.target.value)} /></div>
                                 </div>
-                            )}
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">住所</Label><Input value={address} onChange={e => setAddress(e.target.value)} className="h-8 text-sm border-zinc-200" placeholder="都道府県 市区町村..." /></div>
-                        </div>
-                    </Card>
-
-                    <Card className="p-3 bg-white space-y-4 shadow-sm border-t-2 border-t-zinc-400">
-                        <div className="flex items-center gap-2 mb-1"><Watch className="w-4 h-4 text-zinc-400" /><h3 className="text-xs font-bold">時計情報</h3></div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">ブランド</Label><AdvancedCombobox value={brand} onChange={setBrand} options={brandOptions} onUpsert={v => upsertBrand(v).then(() => getBrands().then(d => setBrandOptions(d.map(b => ({ label: b.nameJp || b.name, value: b.name, id: b.id })))))} /></div>
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">モデル</Label><AdvancedCombobox value={model} onChange={setModel} options={modelOptions} onUpsert={v => brand && upsertModel(brand, v).then(() => {
-                                const b = brandOptions.find(x => x.value === brand);
-                                if (b) getModels(b.id).then(m => setModelOptions(m.map(x => ({ label: x.nameJp || x.name, value: x.nameJp || x.name, id: x.id }))));
-                            })} /></div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">リファレンス (Ref)</Label><AdvancedCombobox value={refName} onChange={setRefName} options={refOptions} onUpsert={v => model && upsertRef(model, brand, v).then(() => {
-                                const m = modelOptions.find(x => x.value === model);
-                                if (m) getRefsByModel(m.id).then(r => setRefOptions(r.map(x => ({ label: x.name, value: x.name, id: x.id, caliber: x.caliber?.name }))));
-                            })} placeholder="型番を選択..." /></div>
-                            <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">キャリバー (Cal)</Label><AdvancedCombobox value={caliber} onChange={setCaliber} options={caliberOptions} onUpsert={v => brand && upsertCaliber(v, brandOptions.find(b => b.value === brand)?.id).then(() => {
-                                const b = brandOptions.find(x => x.value === brand);
-                                const m = modelOptions.find(x => x.value === model);
-                                if (b) getCalibersForModel(b.id, m?.id).then(cals => setCaliberOptions(cals.map(c => ({ label: c.name, value: c.name }))));
-                            })} placeholder="機械番号..." /></div>
-                        </div>
-                        <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">製造番号 (Serial)</Label><Input value={serial} onChange={e => setSerial(e.target.value)} className="h-8 text-sm font-mono border-zinc-200" /></div>
-                        <div><Label className="text-[10px] text-zinc-400 uppercase font-bold px-1">付属品</Label><Input value={accessories} onChange={e => setAccessories(e.target.value)} className="h-8 text-xs border-zinc-200 placeholder:italic" placeholder="箱, 保証書, 外したコマ..." /></div>
-                    </Card>
-
-                    <Card className="p-3 bg-zinc-900 text-white shadow-xl mt-auto">
-                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 border-b border-zinc-800 pb-1 flex items-center gap-2"><Settings className="w-3 h-3" /> 各種書類 / LINE出力</h3>
-                        <div className="space-y-2">
-                            <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start" disabled={mode === 'create'}><FileText className="w-3.5 h-3.5 mr-2 text-blue-400" /> 見積書作成 (PDF)</Button>
-                            <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start" disabled={mode === 'create'}><CheckCircle className="w-3.5 h-3.5 mr-2 text-green-400" /> 納品書発行 (PDF)</Button>
-                            <div className="h-px bg-zinc-800 my-1"></div>
-                            <Button variant="outline" size="sm" className="w-full h-8 text-[10px] bg-transparent border-zinc-700 hover:bg-zinc-800 justify-start text-emerald-400 border-emerald-900/50"><MessageCircle className="w-3.5 h-3.5 mr-2" /> LINEでステータス送信</Button>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* Center Column: Estimates & Requests (5/12) */}
-                <div className="col-span-5 flex flex-col gap-2">
-                    <Card className="flex-1 p-0 bg-white flex flex-col overflow-hidden shadow-sm border-t-2 border-t-blue-500">
-                        <div className="p-2.5 border-b bg-zinc-50 flex justify-between items-center">
-                            <div className="flex items-center gap-2"><Settings className="w-4 h-4 text-blue-500" /><span className="text-xs font-bold text-zinc-700">見積項目明細</span></div>
-                            <div className="flex bg-white shadow-sm border border-zinc-200 rounded p-0.5 scale-90">
-                                <button onClick={() => setRepairType("internal")} className={cn("px-3 py-1 text-[10px] font-bold rounded-sm transition-all", repairType === "internal" ? "bg-blue-100 text-blue-700" : "text-zinc-500 hover:text-zinc-800")}>内装</button>
-                                <button onClick={() => setRepairType("external")} className={cn("px-3 py-1 text-[10px] font-bold rounded-sm transition-all", repairType === "external" ? "bg-green-100 text-green-700" : "text-zinc-500 hover:text-zinc-800")}>外装</button>
+                                <div><Label className="text-[9px] text-zinc-400">住所</Label><Input className="h-7 text-xs" value={address} onChange={e => setAddress(e.target.value)} /></div>
                             </div>
-                        </div>
-                        <div className="p-3 overflow-y-auto space-y-5 flex-1">
-                            {/* Labor Section */}
-                            <div className="space-y-2">
-                                <p className="text-[9px] font-bold text-zinc-400 border-b border-zinc-100 pb-1 uppercase tracking-wider flex justify-between items-center"><span>1. 技術料・工賃</span></p>
-                                <div className="flex gap-1">
-                                    <div className="flex-1">
-                                        <AdvancedCombobox
-                                            value={newWorkName}
-                                            onChange={(val) => {
-                                                setNewWorkName(val);
-                                                const match = workOptions.find(o => o.value === val);
-                                                if (match) setNewWorkPrice(String(match.price));
-                                            }}
-                                            options={workOptions}
-                                            placeholder="作業項目を選択または入力..."
-                                        />
-                                    </div>
-                                    <div className="relative">
-                                        <span className="absolute left-2 top-2 text-zinc-400 text-[10px]">¥</span>
-                                        <Input
-                                            placeholder="価格"
-                                            value={newWorkPrice}
-                                            onChange={e => setNewWorkPrice(e.target.value)}
-                                            className="h-8 text-xs w-20 pl-5 border-zinc-200"
-                                        />
-                                    </div>
-                                    <Button size="sm" className="h-8 w-8 p-0 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-600 hover:text-white" onClick={() => {
-                                        const p = parseInt(newWorkPrice);
-                                        if (newWorkName && !isNaN(p)) {
-                                            setSelectedWorks([...selectedWorks, { id: "new-" + Date.now(), name: newWorkName, price: p }]);
-                                            setNewWorkName("");
-                                            setNewWorkPrice("");
-                                        }
-                                    }}><Plus className="w-3.5 h-3.5" /></Button>
+                        </Card>
+
+                        {/* Watch Card */}
+                        <Card className="p-3 shadow-sm border-t-4 border-t-blue-600 bg-white flex-1">
+                            <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase tracking-wider mb-3">
+                                <Watch className="w-3.5 h-3.5" /> 時計情報
+                            </h3>
+                            <div className="space-y-3">
+                                <div>
+                                    <Label className="text-[9px] text-zinc-400">ブランド</Label>
+                                    <AdvancedCombobox value={brand} onChange={setBrand} options={brandOpts} placeholder="ブランド名..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
                                 </div>
-                                <div className="space-y-1 mt-2">
-                                    {selectedWorks.map((w, i) => (
-                                        <div key={i} className="flex justify-between items-center bg-zinc-50/80 p-2 rounded border border-zinc-100 text-xs group">
-                                            <span className="font-medium text-zinc-700">{w.name}</span>
-                                            <div className="flex items-center gap-3">
-                                                <span className="font-mono font-bold">¥{w.price.toLocaleString()}</span>
-                                                <button onClick={() => setSelectedWorks(selectedWorks.filter((_, idx) => idx !== i))} className="text-zinc-300 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div>
+                                    <Label className="text-[9px] text-zinc-400">モデル</Label>
+                                    <AdvancedCombobox value={model} onChange={setModel} options={modelOpts} placeholder="モデル名..." />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <Label className="text-[9px] text-zinc-400">リファレンス (Ref)</Label>
+                                        <AdvancedCombobox value={refName} onChange={setRefName} options={refOpts} placeholder="Ref.No..." />
+                                    </div>
+                                    <div>
+                                        <Label className="text-[9px] text-zinc-400">キャリバー (Cal)</Label>
+                                        <AdvancedCombobox value={caliber} onChange={setCaliber} options={calOpts} placeholder="機械番号..." />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label className="text-[9px] text-zinc-400">シリアル番号</Label>
+                                    <Input className="h-7 text-xs font-mono" value={serial} onChange={e => setSerial(e.target.value)} placeholder="X123456" />
+                                </div>
+                                <div>
+                                    <Label className="text-[9px] text-zinc-400">付属品</Label>
+                                    <Input className="h-7 text-xs" value={accessories} onChange={e => setAccessories(e.target.value)} placeholder="箱、保証書等..." />
                                 </div>
                             </div>
-
-                            {/* Parts Section */}
-                            <div className="space-y-2">
-                                <p className="text-[9px] font-bold text-zinc-400 border-b border-zinc-100 pb-1 uppercase tracking-wider flex justify-between items-center"><span>2. 交換部品代</span></p>
-                                <div className="flex gap-1">
-                                    <div className="flex-1">
-                                        <AdvancedCombobox
-                                            value={newPartName}
-                                            onChange={(val) => {
-                                                setNewPartName(val);
-                                                const match = partsOptions.find(o => o.value === val);
-                                                if (match) setNewPartPrice(String(match.price));
-                                            }}
-                                            options={partsOptions}
-                                            placeholder="部品を選択または入力..."
-                                        />
-                                    </div>
-                                    <div className="relative">
-                                        <span className="absolute left-2 top-2 text-zinc-400 text-[10px]">¥</span>
-                                        <Input
-                                            placeholder="価格"
-                                            value={newPartPrice}
-                                            onChange={e => setNewPartPrice(e.target.value)}
-                                            className="h-8 text-xs w-20 pl-5 border-emerald-100"
-                                        />
-                                    </div>
-                                    <Button size="sm" className="h-8 w-8 p-0 bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-600 hover:text-white" onClick={() => {
-                                        const p = parseInt(newPartPrice);
-                                        if (newPartName && !isNaN(p)) {
-                                            setSelectedParts([...selectedParts, { id: "new-p-" + Date.now(), name: newPartName, retailPrice: p }]);
-                                            setNewPartName("");
-                                            setNewPartPrice("");
-                                        }
-                                    }}><Plus className="w-3.5 h-3.5" /></Button>
-                                </div>
-                                <div className="space-y-1 mt-2">
-                                    {selectedParts.map((p, i) => (
-                                        <div key={i} className="flex justify-between items-center bg-emerald-50/30 border border-emerald-100 p-2 rounded text-xs text-emerald-900 group">
-                                            <span className="font-medium">{p.name}</span>
-                                            <div className="flex items-center gap-3">
-                                                <span className="font-mono font-bold">¥{p.retailPrice.toLocaleString()}</span>
-                                                <button onClick={() => setSelectedParts(selectedParts.filter((_, idx) => idx !== i))} className="text-emerald-200 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-3 border-t bg-zinc-900 text-white flex justify-between items-center font-bold">
-                            <div className="flex flex-col">
-                                <span className="text-zinc-200 text-xs font-normal">合計見積額 (税別)</span>
-                            </div>
-                            <span className="text-2xl font-mono tracking-tight">¥{grandTotal.toLocaleString()}</span>
-                        </div>
-                    </Card>
-
-                    <Card className="p-3 bg-white space-y-3 shadow-sm h-1/4">
-                        <div className="flex items-center gap-2 mb-1"><FileText className="w-4 h-4 text-zinc-400" /><h3 className="text-xs font-bold font-bold">依頼・備考メモ</h3></div>
-                        <div><Label className="text-[10px] text-zinc-400 font-bold ml-1">依頼内容 (お客様要望)</Label><textarea value={requestContent} onChange={e => setRequestContent(e.target.value)} className="w-full h-16 p-2 text-xs border border-zinc-200 rounded-md bg-zinc-50 focus:bg-white transition-colors resize-none" /></div>
-                        <div><Label className="text-[10px] text-zinc-400 font-bold ml-1">社内備考 (技術メモ)</Label><textarea value={internalNotes} onChange={e => setInternalNotes(e.target.value)} className="w-full h-12 p-2 text-xs border border-zinc-200 rounded-md bg-zinc-50 focus:bg-white transition-colors resize-none" /></div>
-                    </Card>
-                </div>
-
-                {/* Right Column: Photos (4/12) - Dedicated & Large */}
-                <div className="col-span-4 flex flex-col h-full bg-zinc-50 border border-zinc-200 rounded-lg overflow-hidden relative">
-                    {/* Header / Upload Controls - Compact */}
-                    <div className="p-2 border-b bg-white flex items-center justify-between shrink-0 z-10 shadow-sm">
-                        <div className="flex items-center gap-2">
-                            <ImageIcon className="w-4 h-4 text-zinc-500" />
-                            <h3 className="text-xs font-bold text-zinc-600">修理写真 ({uploadedPhotos.length})</h3>
-                        </div>
-                        <div className="flex gap-2">
-                            <input
-                                type="file"
-                                className="hidden"
-                                ref={fileInputRef}
-                                accept="image/*"
-                                multiple
-                                onChange={(e) => {
-                                    const files = Array.from(e.target.files || []);
-                                    files.forEach(f => handlePhotoUpload(f));
-                                }}
-                            />
-                            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={() => setIsMobileConnectOpen(true)}>
-                                <Smartphone className="w-3 h-3 text-blue-500" />
-                            </Button>
-                            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={() => setIsCameraOpen(true)}>
-                                <Camera className="w-3 h-3 text-zinc-600" />
-                            </Button>
-                            <Button size="sm" className="h-7 text-[10px] gap-1 bg-zinc-800 hover:bg-zinc-700" onClick={() => fileInputRef.current?.click()}>
-                                <Plus className="w-3 h-3" /> 追加
-                            </Button>
-                        </div>
+                        </Card>
                     </div>
 
-                    {/* Photo Grid - Large Area */}
-                    <div className="flex-1 overflow-y-auto p-4 bg-zinc-100/50">
-                        {isUploading && (
-                            <div className="w-full p-4 mb-4 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center gap-2 animate-pulse">
-                                <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
-                                <span className="text-xs font-bold text-blue-600">処理中...</span>
+                    {/* REPAIR CONTENT & ESTIMATE */}
+                    <div className="flex flex-col gap-4">
+                        {/* Text Areas */}
+                        <Card className="p-3 shadow-sm bg-white">
+                            <div className="grid grid-cols-1 gap-2">
+                                <div>
+                                    <Label className="text-[9px] text-zinc-400">依頼内容 / 症状</Label>
+                                    <Textarea className="min-h-[80px] text-xs resize-none bg-yellow-50/50" value={diagnosis} onChange={e => setDiagnosis(e.target.value)} />
+                                </div>
+                                <div>
+                                    <Label className="text-[9px] text-zinc-400">社内メモ</Label>
+                                    <Textarea className="min-h-[60px] text-xs resize-none bg-zinc-50" value={internalNotes} onChange={e => setInternalNotes(e.target.value)} />
+                                </div>
                             </div>
-                        )}
+                        </Card>
 
-                        <div className="grid grid-cols-1 gap-4">
-                            {uploadedPhotos.map((p, i) => (
-                                <div key={i} className="group relative bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden hover:shadow-md transition-all">
-                                    <div className="aspect-[4/3] w-full bg-zinc-50 relative cursor-pointer">
-                                        <img src={p.storageKey} alt="Repair" className="w-full h-full object-contain" />
-                                        {/* Overlay Metadata */}
-                                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm p-2 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <p className="text-[10px] truncate font-mono">{p.fileName}</p>
+                        {/* Estimate List */}
+                        <Card className="flex-1 p-0 shadow-sm border-t-4 border-t-emerald-600 bg-white flex flex-col overflow-hidden">
+                            <div className="p-2 border-b bg-zinc-50 flex justify-between items-center">
+                                <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase">
+                                    <Settings className="w-3.5 h-3.5" /> 見積・修理明細
+                                </h3>
+                                <div className="flex gap-1 text-[10px]">
+                                    <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">合計: ¥{grandTotal.toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                                {/* List Header */}
+                                <div className="grid grid-cols-12 text-[9px] text-zinc-400 font-bold border-b pb-1 px-1">
+                                    <div className="col-span-6">項目 / 部品</div>
+                                    <div className="col-span-3 text-right">単価</div>
+                                    <div className="col-span-3 text-right">操作</div>
+                                </div>
+
+                                {/* Items */}
+                                {lineItems.map((item, idx) => (
+                                    <div key={item.id} className="grid grid-cols-12 items-center text-xs p-1.5 hover:bg-zinc-50 border-b border-zinc-100 last:border-0 group">
+                                        <div className="col-span-6 flex flex-col">
+                                            <span className="font-medium truncate">{item.name}</span>
+                                            {item.spec && <span className="text-[9px] text-zinc-400">{item.spec}</span>}
+                                        </div>
+                                        <div className="col-span-3 text-right font-mono table-nums">¥{item.price.toLocaleString()}</div>
+                                        <div className="col-span-3 text-right">
+                                            <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} className="text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
                                         </div>
                                     </div>
+                                ))}
 
-                                    {/* Delete Button - Clearly Visible */}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (confirm("この写真を削除しますか？")) {
-                                                setUploadedPhotos(uploadedPhotos.filter((_, idx) => idx !== i));
-                                            }
-                                        }}
-                                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transform scale-90 hover:scale-105 transition-all z-10"
-                                        title="削除"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
+                                {/* Input Row */}
+                                <div className="bg-zinc-50 p-2 rounded border border-zinc-200 mt-2">
+                                    <div className="flex gap-1 mb-1">
+                                        <select className="h-7 text-[10px] rounded border-zinc-300 bg-white" value={addItemCategory} onChange={(e) => setAddItemCategory(e.target.value as any)}>
+                                            <option value="internal">技術料 (Work)</option>
+                                            <option value="external">部品 (Part)</option>
+                                        </select>
+                                        <AdvancedCombobox
+                                            className="flex-1"
+                                            placeholder="作業名 / 部品名を入力..."
+                                            value={newItemName}
+                                            onChange={(v) => {
+                                                setNewItemName(v);
+                                                const match = workOpts.find(w => w.value === v);
+                                                if (match) setNewItemPrice(String(match.price));
+                                            }}
+                                            options={workOpts}
+                                        />
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <Input className="h-7 text-xs flex-1" placeholder="備考/仕様 (Spec)" value={newItemSpec} onChange={e => setNewItemSpec(e.target.value)} />
+                                        <div className="relative w-20">
+                                            <span className="absolute left-1.5 top-1.5 text-[9px]">¥</span>
+                                            <Input className="h-7 text-xs pl-4 font-mono text-right" placeholder="0" value={newItemPrice} onChange={e => setNewItemPrice(e.target.value)} />
+                                        </div>
+                                        <Button size="sm" className="h-7 w-8 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
+                                            if (!newItemName) return;
+                                            setLineItems([...lineItems, {
+                                                id: `auto-${Date.now()}`,
+                                                category: addItemCategory,
+                                                name: newItemName,
+                                                price: parseInt(newItemPrice) || 0,
+                                                spec: newItemSpec
+                                            }]);
+                                            setNewItemName("");
+                                            setNewItemPrice("");
+                                            setNewItemSpec("");
+                                        }}>
+                                            <Plus className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+
+                </div>
+
+                {/* PHOTOS */}
+                <div className="flex flex-col gap-4">
+                    <Card className="shadow-sm border-t-4 border-t-purple-600 bg-white p-3 flex flex-col">
+                        <div className="flex justify-between items-center mb-2">
+                            <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase">
+                                <ImageIcon className="w-3.5 h-3.5" /> 写真
+                            </h3>
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setMobileQR(true)}>
+                                <Smartphone className="w-4 h-4 text-blue-500" />
+                            </Button>
+                        </div>
+
+                        <div className="flex-1 bg-zinc-100 rounded-md inner-shadow overflow-y-auto p-2 grid grid-cols-2 gap-2 auto-rows-min content-start">
+                            {/* Upload Button */}
+                            <label className="aspect-square border-2 border-dashed border-zinc-300 rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-white transition-all group min-h-[100px]">
+                                <Camera className="w-6 h-6 text-zinc-400 group-hover:text-blue-500 mb-1" />
+                                <span className="text-[9px] text-zinc-400 group-hover:text-blue-500">写真を追加</span>
+                                <input type="file" className="hidden" accept="image/*" multiple onChange={handlePhotoUpload} />
+                            </label>
+
+                            {photos.map((p, i) => (
+                                <div key={i} className="aspect-square relative rounded-md overflow-hidden bg-black group border border-zinc-200 shadow-sm">
+                                    <img src={`https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev/${p.storageKey}`} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                        <button className="text-white hover:text-blue-300"><Eye className="w-4 h-4" /></button>
+                                        <button onClick={() => setPhotos(photos.filter((_, x) => x !== i))} className="text-white hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                                    </div>
                                 </div>
                             ))}
-
-                            {uploadedPhotos.length === 0 && !isUploading && (
-                                <div className="flex flex-col items-center justify-center py-20 text-zinc-300 border-2 border-dashed border-zinc-200 rounded-xl">
-                                    <Camera className="w-12 h-12 mb-2 opacity-50" />
-                                    <p className="text-sm font-bold">写真がありません</p>
-                                    <p className="text-[10px]">修理品の状態を撮影して追加してください</p>
-                                </div>
-                            )}
                         </div>
-                    </div>
-
-                    {/* Footer Info */}
-                    <div className="p-2 bg-zinc-50 border-t text-[10px] text-zinc-400 text-center">
-                        Drag & Drop supported
-                    </div>
+                    </Card>
                 </div>
             </div>
 
-            <CameraCaptureDialog
-                isOpen={isCameraOpen}
-                onClose={() => setIsCameraOpen(false)}
-                onCapture={(blob) => {
-                    handlePhotoUpload(blob);
-                    // Keep open for continuous shooting if desired, or close
-                    // setIsCameraOpen(false); 
+            {/* --- DIALOGS --- */}
+            <QuickRegisterDialog
+                isOpen={quickRegOpen}
+                onClose={() => setQuickRegOpen(false)}
+                mode="customer"
+                initialName={customerName}
+                onRegister={(d) => {
+                    setCustomerName(d.name);
+                    setIsB2B(d.type === 'business');
+                    setCustomerPhone(d.phone || "");
+                    setLineId(d.lineId || "");
+                    setAddress(d.address || "");
                 }}
             />
 
-            {initialData?.id && (
-                <MobileConnectDialog
-                    isOpen={isMobileConnectOpen}
-                    onClose={() => setIsMobileConnectOpen(false)}
-                    repairId={initialData.id.toString()}
-                    onPhotosUploaded={refreshPhotos}
-                />
-            )}
-
-            <QuickRegisterDialog
-                isOpen={isQuickRegisterOpen}
-                onClose={() => setIsQuickRegisterOpen(false)}
-                onRegister={handleCustomerRegister}
-                mode="customer"
-                initialName={customerName}
+            <MobileConnectDialog
+                isOpen={mobileQR}
+                onClose={() => setMobileQR(false)}
+                repairId={initialData?.id || "new"}
+                onPhotosUploaded={() => {
+                    // Trigger refresh of photos from server if needed
+                    console.log("Photos uploaded from mobile");
+                }}
             />
 
-            {/* 重複警告ダイアログ (Repair Entry screen version) */}
-            <Dialog open={showDupDialog} onOpenChange={setShowDupDialog}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-amber-600">
-                            <AlertTriangle className="w-5 h-5" /> 重複の可能性があります
-                        </DialogTitle>
-                        <DialogDescription className="pt-2 text-zinc-600 text-xs">
-                            同じ名称の顧客が既に見つかりました。既存の顧客を選択するか（候補から選ぶ）、被っていても新しく作成するか選んでください。
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-2 py-4">
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">一致する既存顧客:</p>
-                        {dupResults.map(c => (
-                            <div key={c.id} className="p-2.5 bg-zinc-50 border rounded-md text-xs flex justify-between items-center group hover:border-blue-300 cursor-pointer transition-all"
-                                onClick={() => {
-                                    setCustomerId(c.id);
-                                    setCustomerName(c.name);
-                                    setCustomerCategory(c.type === 'business' ? 'B2B' : 'B2C');
-                                    setCustomerPrefix(c.prefix || "");
-                                    if (c.phone || c.lineId) setLineId(c.phone || c.lineId);
-                                    if (c.address) setAddress(c.address);
-                                    setShowDupDialog(false);
-                                    toast({ title: "既存顧客を選択しました", description: `${c.name} を修理に紐付けます。` });
-                                }}
-                            >
-                                <div>
-                                    <div className="font-bold text-zinc-900">{c.name}</div>
-                                    <div className="text-[10px] text-zinc-500">電話: {c.phone || "不明"} / Prefix: <span className="font-mono font-bold">{c.prefix}</span></div>
-                                </div>
-                                <div className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold opacity-0 group-hover:opacity-100">これを選択</div>
-                            </div>
-                        ))}
-                    </div>
-                    <DialogFooter className="gap-2 sm:gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setShowDupDialog(false)} className="text-xs">キャンセル・修正</Button>
-                        <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-xs" onClick={() => { setShowDupDialog(false); handleSave(true); }}>
-                            被っていても新規で保存
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <PDFPreviewDialog
+                isOpen={showPdfDialog}
+                onClose={() => setShowPdfDialog(false)}
+                repairData={currentDataForPdf}
+            />
+
         </div>
     );
 }

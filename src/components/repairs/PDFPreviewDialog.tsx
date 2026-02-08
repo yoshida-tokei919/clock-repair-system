@@ -1,101 +1,154 @@
+
 "use client";
 
-import React, { useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import React, { useState, useEffect } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { FileText } from "lucide-react";
-import { usePDF } from "@react-pdf/renderer";
-import { EstimateDocument, EstimateDocumentProps } from "@/components/pdf/EstimateDocument";
-import { InvoiceDocument, InvoiceDocumentProps } from "@/components/pdf/InvoiceDocument";
-import { WarrantyDocument, WarrantyDocumentProps } from "@/components/pdf/WarrantyDocument"; // Import Warranty
-
-// Union type for data prop
-type PDFData = EstimateDocumentProps['data'] | InvoiceDocumentProps['data'] | WarrantyDocumentProps['data'];
+import { PDFViewer, PDFDownloadLink } from "@react-pdf/renderer";
+import { EstimateDocument } from "@/components/pdf/EstimateDocument";
+import { DeliveryDocument } from "@/components/pdf/DeliveryDocument";
+import { InvoiceDocument } from "@/components/pdf/InvoiceDocument";
+import { WarrantyDocument } from "@/components/pdf/WarrantyDocument";
+import { Loader2, Printer, Download } from "lucide-react";
+import QRCode from "qrcode";
 
 interface PDFPreviewDialogProps {
-    data: PDFData;
-    className?: string;
-    onLineSend?: () => void;
-    mode?: 'estimate' | 'invoice' | 'warranty' | 'delivery'; // Added delivery while at it?
+    isOpen: boolean;
+    onClose: () => void;
+    repairData: any; // The raw data from form or DB
 }
 
-export default function PDFPreviewDialog({ data, className, onLineSend, mode = 'estimate' }: PDFPreviewDialogProps) {
-    // Select Document Component
-    let MyDoc;
-    let title = "プレビュー";
-    let buttonLabel = "作成";
-
-    switch (mode) {
-        case 'invoice':
-            MyDoc = <InvoiceDocument data={data as InvoiceDocumentProps['data']} />;
-            title = "請求書プレビュー";
-            buttonLabel = "請求書作成 (PDF)";
-            break;
-        case 'warranty':
-            MyDoc = <WarrantyDocument data={data as WarrantyDocumentProps['data']} />;
-            title = "保証書プレビュー";
-            buttonLabel = "保証書発行 (PDF)";
-            break;
-        default:
-            MyDoc = <EstimateDocument data={data as EstimateDocumentProps['data']} />;
-            title = "見積書プレビュー";
-            buttonLabel = "見積書作成 (PDF)";
-    }
-
-    const [instance, updateInstance] = usePDF({ document: MyDoc });
-    const [isOpen, setIsOpen] = React.useState(false);
+export default function PDFPreviewDialog({ isOpen, onClose, repairData }: PDFPreviewDialogProps) {
+    const [activeTab, setActiveTab] = useState("estimate");
+    const [isClient, setIsClient] = useState(false);
+    const [qrCodeUrl, setQrCodeUrl] = useState<string | undefined>(undefined);
 
     useEffect(() => {
-        if (isOpen) {
-            updateInstance(MyDoc);
-        }
-    }, [data, isOpen, updateInstance, mode]);
+        setIsClient(true);
+    }, []);
 
-    const handleLineClick = (e: React.MouseEvent) => {
-        e.preventDefault();
-        if (onLineSend) {
-            setIsOpen(false);
-            onLineSend();
-        }
+    // --- QR CODE GENERATION ---
+    useEffect(() => {
+        if (!isOpen || !repairData?.id) return;
+
+        // Construct URL for the specific repair (e.g., status or landing page)
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : "";
+        const targetUrl = `${baseUrl}/repairs/${repairData.id}/register`;
+
+        QRCode.toDataURL(targetUrl, {
+            width: 300,
+            margin: 2,
+            color: { dark: "#000000", light: "#ffffff" }
+        })
+            .then(url => setQrCodeUrl(url))
+            .catch(err => console.error("QR Gen Error:", err));
+    }, [isOpen, repairData?.id]);
+
+    if (!isOpen || !repairData) return null;
+
+    // --- DATA MAPPING (Raw -> PDF Props) ---
+    const commonCustomer = {
+        name: repairData.customer?.name || "顧客名なし",
+        address: repairData.customer?.address || "",
+        type: repairData.customer?.type || 'individual'
+    };
+
+    // Construct "Jobs" array (even if single repair, we treat as list of 1)
+    const singleJob = {
+        id: repairData.id || "preview",
+        inquiryNumber: repairData.inquiryNumber || "DRAFT",
+        partnerRef: repairData.partnerRef || "", // 貴社管理No
+        endUserName: repairData.endUserName || "",
+        watch: {
+            brand: repairData.watch?.brand || repairData.watch?.brandName || "",
+            model: repairData.watch?.model || repairData.watch?.modelName || "",
+            ref: repairData.watch?.ref || repairData.watch?.refName || "",
+            serial: repairData.watch?.serial || repairData.watch?.serialNumber || ""
+        },
+        items: repairData.estimate?.items?.map((i: any) => ({
+            name: i.name || i.itemName,
+            price: i.price || i.unitPrice || 0
+        })) || []
+    };
+
+    const jobsList = [singleJob]; // Currently single mode only
+
+    // Document Props Generators
+    const estimateData = {
+        estimateNumber: `E-${repairData.inquiryNumber || "DRAFT"}`,
+        date: new Date().toLocaleDateString("ja-JP"),
+        customer: commonCustomer,
+        jobs: jobsList
+    };
+
+    const deliveryData = {
+        deliveryNumber: `D-${repairData.inquiryNumber || "DRAFT"}`,
+        date: new Date().toLocaleDateString("ja-JP"),
+        customer: commonCustomer,
+        jobs: jobsList,
+        taxRate: 0.1,
+        shippingFee: repairData.shippingFee || 0
+    };
+
+    const invoiceData = {
+        invoiceNumber: `IV-${repairData.inquiryNumber || "DRAFT"}`,
+        date: new Date().toLocaleDateString("ja-JP"),
+        dueDate: "別途通知",
+        customer: commonCustomer,
+        items: jobsList.map(j => ({
+            date: new Date().toLocaleDateString("ja-JP"),
+            slipNumber: `D-${j.inquiryNumber}`,
+            description: `時計修理代 (${j.watch.brand} ${j.watch.model})`,
+            amount: j.items.reduce((s: number, x: any) => s + x.price, 0)
+        })),
+        taxRate: 0.1
+    };
+
+    // Warranty Date Calculation (Fix: +1 Year)
+    const today = new Date();
+    const oneYearLater = new Date(today);
+    oneYearLater.setFullYear(today.getFullYear() + 1);
+
+    const warrantyData = {
+        warrantyNumber: `W-${repairData.inquiryNumber || "DRAFT"}`,
+        issueDate: today.toLocaleDateString("ja-JP"),
+        guaranteeStart: today.toLocaleDateString("ja-JP"),
+        guaranteeEnd: oneYearLater.toLocaleDateString("ja-JP"),
+        watch: singleJob.watch,
+        repairSummary: singleJob.items.map((i: any) => i.name).join(", "),
+        qrCodeUrl: qrCodeUrl // Pass the generated QR
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className={className}>
-                    <FileText className="w-4 h-4 mr-1" /> {buttonLabel}
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-                <DialogHeader className="flex flex-row items-center justify-between pr-8">
-                    <DialogTitle>{title}</DialogTitle>
-                    {onLineSend && mode !== 'warranty' && ( // Usually don't send warranty via LINE immediately? Optional.
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-[#06c755] border-[#06c755] hover:bg-green-50 gap-2 mr-4"
-                            onClick={handleLineClick}
-                        >
-                            <span className="font-bold">LINEで送る</span>
-                        </Button>
-                    )}
-                </DialogHeader>
-                <div className="flex-1 w-full bg-zinc-100 rounded overflow-hidden relative">
-                    {instance.loading ? (
-                        <div className="flex flex-col items-center justify-center h-full gap-2">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                            <span className="text-zinc-500">Generating PDF...</span>
+        <Dialog open={isOpen} onOpenChange={(v) => !v && onClose()}>
+            <DialogContent className="max-w-[90vw] h-[90vh] flex flex-col p-0 gap-0 bg-zinc-100">
+                <div className="p-2 border-b bg-white flex justify-between items-center shadow-sm z-10">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-lg">
+                        <TabsList className="grid w-full grid-cols-4 h-8">
+                            <TabsTrigger value="estimate" className="text-xs">見積書</TabsTrigger>
+                            <TabsTrigger value="delivery" className="text-xs">納品書</TabsTrigger>
+                            <TabsTrigger value="invoice" className="text-xs">請求書</TabsTrigger>
+                            <TabsTrigger value="warranty" className="text-xs">保証書</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={onClose} >閉じる</Button>
+                    </div>
+                </div>
+
+                <div className="flex-1 bg-zinc-500 overflow-hidden relative">
+                    {!isClient ? (
+                        <div className="flex items-center justify-center h-full text-white gap-2">
+                            <Loader2 className="w-6 h-6 animate-spin" /> Preparing PDF...
                         </div>
-                    ) : instance.error ? (
-                        <div className="flex items-center justify-center h-full text-red-500">
-                            Error: {String(instance.error)}
-                        </div>
-                    ) : instance.url ? (
-                        <iframe src={instance.url} className="w-full h-full" title={title} />
                     ) : (
-                        <div className="flex items-center justify-center h-full text-zinc-400">
-                            No Data
-                        </div>
+                        <PDFViewer width="100%" height="100%" className="border-0">
+                            {activeTab === 'estimate' ? <EstimateDocument data={estimateData} /> :
+                                activeTab === 'delivery' ? <DeliveryDocument data={deliveryData} /> :
+                                    activeTab === 'invoice' ? <InvoiceDocument data={invoiceData} /> :
+                                        <WarrantyDocument data={warrantyData} />}
+                        </PDFViewer>
                     )}
                 </div>
             </DialogContent>

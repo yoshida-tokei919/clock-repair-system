@@ -32,10 +32,9 @@ export default async function DeliveryDocumentPage({ params }: { params: { id: s
         const tax = Math.floor(subtotal * 0.1);
 
         return {
-            inquiryId: repair.inquiryNumber,
+            inquiryNumber: repair.inquiryNumber,
             partnerRef: repair.partnerRef || undefined,
-            endUser: (repair as any).endUserName || undefined,
-
+            endUserName: (repair as any).endUserName || undefined,
             watch: {
                 brand: repair.watch.brand?.name || "",
                 model: repair.watch.model?.name || "",
@@ -44,25 +43,21 @@ export default async function DeliveryDocumentPage({ params }: { params: { id: s
             },
             items: estimateItems.map(i => ({
                 name: i.itemName,
-                qty: i.quantity,
                 price: i.unitPrice
-            })),
-            amount: subtotal
+            }))
         };
     });
 
     const pdfData = {
-        id: String(note.id),
         deliveryNumber: note.slipNumber,
         date: note.issuedDate.toLocaleDateString("ja-JP"),
         customer: {
             name: note.customer.name,
-            type: note.customer.type as 'individual' | 'business',
             address: note.customer.address || undefined
         },
         jobs: jobs,
-        discount: 0,
-        shipping: 0
+        taxRate: 0.1,
+        shippingFee: note.repairs[0]?.estimate?.shipping || 0
     };
 
     return <DeliveryPDFClient data={pdfData} />;

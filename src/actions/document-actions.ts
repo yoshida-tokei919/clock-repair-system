@@ -9,12 +9,14 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
 
         const repairs = await prisma.repair.findMany({
             where: { id: { in: repairIds } },
-            include: { customer: true }
+            include: {
+                customer: true,
+                estimate: { include: { items: true } }
+            }
         });
 
         if (repairs.length === 0) return { success: false, error: "Repairs not found" };
 
-        // Group by Customer ID to ensure we don't mix customers in one document
         const repairsByCustomer: Record<number, typeof repairs> = {};
         for (const r of repairs) {
             if (!repairsByCustomer[r.customerId]) repairsByCustomer[r.customerId] = [];
@@ -22,29 +24,26 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
         }
 
         const customerIds = Object.keys(repairsByCustomer).map(Number);
-
         let lastDocumentId = null;
         let createdCount = 0;
 
         for (const customerId of customerIds) {
             const customerRepairs = repairsByCustomer[customerId];
             const customer = customerRepairs[0].customer;
-
-            // Generate Numbering
-            // Prefix: customer.prefix or 'GEN' (Generic)
-            // Type: T = Delivery, I = Invoice, E = Estimate (Wait, user said "D" for Delivery? "T+DeliveryのD")
-            // User example: "T" (prefix) + "D" (Delivery) + "-001" (Seq) -> TD-001
-            // Estimate matching: "T" + "E" (Estimate) -> TE-001
-            // Invoice matching: "T" + "I" (Invoice) -> TI-001
-
-            // Assume Prefix comes from Customer.prefix (e.g. "T"). If null, maybe use "X"?
             const prefix = customer.prefix || "X";
+
+            // Calculate Totals from all selected repairs
+            let totalAmount = 0;
+            customerRepairs.forEach(r => {
+                const subtotal = r.estimate?.items.reduce((s, i) => s + (i.unitPrice * i.quantity), 0) || 0;
+                totalAmount += subtotal;
+            });
+            const taxAmount = Math.floor(totalAmount * 0.1);
 
             let seq = 0;
             let docNumber = "";
             let documentId = null;
 
-            // Update Customer Sequence atomically-ish (Prisma doesn't strictly lock, but update is atomic)
             if (type === 'delivery') {
                 const updatedCustomer = await prisma.customer.update({
                     where: { id: customerId },
@@ -53,14 +52,12 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 seq = updatedCustomer.seqDelivery;
                 docNumber = `${prefix}D-${String(seq).padStart(3, '0')}`;
 
-                // Create DeliveryNote
-                // Calculate Totals (Simplified for now, just sum existing estimate totals if available?)
-                // Actually, logic is usually recalculation.
-                // For now, let's create the shell.
                 const note = await prisma.deliveryNote.create({
                     data: {
                         slipNumber: docNumber,
                         customerId: customerId,
+                        totalAmount,
+                        taxAmount,
                         repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
                     }
                 });
@@ -73,10 +70,18 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 seq = updatedCustomer.seqInvoice;
                 docNumber = `${prefix}I-${String(seq).padStart(3, '0')}`;
 
+                // Default Due Date: End of next month
+                const dueDate = new Date();
+                dueDate.setMonth(dueDate.getMonth() + 2);
+                dueDate.setDate(0); // Last day of previous month = end of next month
+
                 const invoice = await prisma.invoice.create({
                     data: {
                         invoiceNumber: docNumber,
                         customerId: customerId,
+                        totalAmount,
+                        taxAmount,
+                        paymentDueDate: dueDate,
                         repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
                     }
                 });
@@ -93,6 +98,8 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                     data: {
                         estimateNumber: docNumber,
                         customerId: customerId,
+                        totalAmount,
+                        taxAmount,
                         repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
                     }
                 });
