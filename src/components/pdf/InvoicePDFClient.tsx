@@ -21,10 +21,10 @@ export function InvoicePDFClient({ data }: InvoiceDocumentProps) {
     return (
         <div className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
             <div className="bg-white p-4 rounded shadow mb-4 w-full max-w-4xl flex justify-between items-center">
-                <h1 className="font-bold text-lg">請求書プレビュー: {data.id}</h1>
+                <h1 className="font-bold text-lg">請求書プレビュー: {data.invoiceNumber}</h1>
                 <a
                     href={instance.url || "#"}
-                    download={`invoice_${data.id}.pdf`}
+                    download={`invoice_${data.invoiceNumber}.pdf`}
                     className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
                 >
                     PDFダウンロード

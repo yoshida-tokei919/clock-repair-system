@@ -26,30 +26,27 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
     const jobs = estimateDoc.repairs.map(repair => {
         const estimateItems = repair.estimate?.items || [];
         return {
-            inquiryId: repair.inquiryNumber,
-            endUser: (repair as any).endUserName || undefined,
+            id: String(repair.id),
+            inquiryNumber: repair.inquiryNumber,
+            endUserName: (repair as any).endUserName || undefined,
             watch: {
                 brand: repair.watch.brand?.name || "",
                 model: repair.watch.model?.name || "",
-                ref: repair.watch.reference?.name || "",
-                serial: repair.watch.serialNumber || ""
+                ref: repair.watch.reference?.name || undefined,
+                serial: repair.watch.serialNumber || undefined
             },
             items: estimateItems.map(i => ({
                 name: i.itemName,
-                qty: i.quantity,
                 price: i.unitPrice
-            })),
-            photos: []
+            }))
         };
     });
 
     const pdfData = {
-        id: String(estimateDoc.id),
         estimateNumber: estimateDoc.estimateNumber,
         date: estimateDoc.issuedDate.toLocaleDateString("ja-JP"),
         customer: {
             name: estimateDoc.customer.name,
-            type: estimateDoc.customer.type as 'individual' | 'business',
             address: estimateDoc.customer.address || undefined
         },
         jobs: jobs

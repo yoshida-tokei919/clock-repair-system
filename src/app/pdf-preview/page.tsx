@@ -98,7 +98,8 @@ export default function PDFPreviewPage() {
                             date: "2024/06/10",
                             customer: dummyCustomer,
                             jobs: dummyJobs,
-                            taxRate: 0.1
+                            taxRate: 0.1,
+                            shippingFee: 0
                         }} />
                     ) : tab === "invoice" ? (
                         <InvoiceDocument data={{

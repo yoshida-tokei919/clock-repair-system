@@ -36,14 +36,12 @@ export default function WarrantyPDFPage({ params }: { params: { id: string } }) 
         const job = pdfData.jobs[0];
 
         return {
-            id: `WAR-${pdfData.id}`,
-            repairId: pdfData.id,
-            customerName: pdfData.customer.name,
-            customerType: pdfData.customer.type,
+            warrantyNumber: `WAR-${pdfData.id}`,
+            issueDate: deliveryDate.toLocaleDateString("ja-JP"),
+            guaranteeStart: deliveryDate.toLocaleDateString("ja-JP"),
+            guaranteeEnd: expiryDate.toLocaleDateString("ja-JP"),
             watch: job.watch,
-            repairDate: deliveryDate.toLocaleDateString("ja-JP"),
-            expiryDate: expiryDate.toLocaleDateString("ja-JP"),
-            guaranteeContent: "オーバーホール修理一式"
+            repairSummary: "オーバーホール修理一式"
         };
     }, [pdfData]);
 
