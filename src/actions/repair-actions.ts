@@ -197,11 +197,11 @@ export async function updatePartOrderStatus(itemId: number, status: string) {
         const allItems = item.estimate.items.filter(i => i.type === 'part');
 
         // 部品ステータスに基づく修理ステータスの自動連動
-        // 全件入荷済み → 作業中
-        // 全件注文済み以上（入荷含む） → 部品待ち(注文済み)
-        // 1件でも未注文 → 部品待ち(未注文)
-        const hasPending   = allItems.some(i => !i.orderStatus || i.orderStatus === 'pending');
-        const allReceived  = allItems.length > 0 && allItems.every(i => i.orderStatus === 'received');
+        // 全件入荷済み                       → 作業中
+        // 全件注文済み以上（未注文なし）     → 部品待ち(注文済み)
+        // 1件でも未注文                      → 部品待ち(未注文)
+        const hasPending  = allItems.some(i => !i.orderStatus || i.orderStatus === 'pending');
+        const allReceived = allItems.length > 0 && allItems.every(i => i.orderStatus === 'received');
 
         let targetStatus: string | null = null;
         if (allReceived) {
@@ -212,9 +212,11 @@ export async function updatePartOrderStatus(itemId: number, status: string) {
             targetStatus = 'parts_wait_ordered';
         }
 
+        // 連動対象：見積中・部品待ち系・作業中（完了/納品済/キャンセル/受付中は対象外）
         const currentStatus = item.estimate.repair.status;
-        const isPartsPhase  = currentStatus.startsWith('parts_wait') || currentStatus === 'in_progress';
-        if (targetStatus && isPartsPhase) {
+        const isAutoSyncable = ['diagnosing', 'parts_wait', 'parts_wait_ordered', 'in_progress']
+            .includes(currentStatus);
+        if (targetStatus && isAutoSyncable) {
             await updateRepairStatus(repairId, targetStatus);
         }
 
