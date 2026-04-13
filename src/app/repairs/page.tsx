@@ -38,11 +38,17 @@ export default async function RepairsPage({
         where,
         orderBy: { id: "desc" },
         include: {
-            customer: true,
-            watch: { include: { brand: true, model: true } },
-            deliveryNote: true,
-            invoice: true,
-            estimateDocument: true,
+            customer: { select: { name: true, type: true } },
+            watch: {
+                select: {
+                    serialNumber: true,
+                    brand: { select: { name: true } },
+                    model: { select: { name: true } }
+                }
+            },
+            deliveryNote:     { select: { id: true, slipNumber: true } },
+            invoice:          { select: { id: true, invoiceNumber: true } },
+            estimateDocument: { select: { id: true, estimateNumber: true } },
         },
         take: 50,
     });

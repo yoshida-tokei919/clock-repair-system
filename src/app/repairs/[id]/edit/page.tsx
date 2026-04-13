@@ -26,7 +26,7 @@ export default async function EditRepairPage({ params }: { params: { id: string 
                 }
             },
             photos: true,
-            logs: true
+            logs: { select: { status: true, changedAt: true } }
         }
     });
 

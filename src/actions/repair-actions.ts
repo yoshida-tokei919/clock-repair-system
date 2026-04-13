@@ -147,14 +147,19 @@ export async function getPendingParts() {
             },
             include: {
                 estimate: {
-                    include: {
+                    select: {
                         repair: {
-                            include: {
+                            select: {
+                                id: true,
+                                inquiryNumber: true,
+                                partnerRef: true,
+                                status: true,
                                 watch: {
-                                    include: {
-                                        brand: true,
-                                        model: true,
-                                        caliber: true
+                                    select: {
+                                        brand:     { select: { name: true, nameEn: true } },
+                                        model:     { select: { name: true, nameJp: true } },
+                                        reference: { select: { name: true } },
+                                        caliber:   { select: { name: true } }
                                     }
                                 }
                             }
@@ -162,9 +167,7 @@ export async function getPendingParts() {
                     }
                 }
             },
-            orderBy: {
-                createdAt: 'asc'
-            }
+            orderBy: { createdAt: 'asc' }
         });
         return items;
     } catch (error) {

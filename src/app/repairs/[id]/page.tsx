@@ -23,13 +23,29 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
     const repair = await prisma.repair.findUnique({
         where: { id: parseInt(params.id) },
         include: {
-            customer: true,
-            watch: {
-                include: { brand: true, model: true, caliber: true, reference: true }
+            customer: {
+                select: { name: true, type: true, rank: true, phone: true, lineId: true, address: true }
             },
-            logs: { orderBy: { changedAt: 'asc' } },
-            estimate: { include: { items: true } },
-            photos: true
+            watch: {
+                include: {
+                    brand:     { select: { name: true, nameEn: true, nameJp: true } },
+                    model:     { select: { name: true, nameJp: true } },
+                    caliber:   { select: { name: true } },
+                    reference: { select: { name: true } }
+                }
+            },
+            logs: {
+                orderBy: { changedAt: 'desc' },
+                select: { id: true, status: true, changedAt: true }
+            },
+            estimate: {
+                include: {
+                    items: {
+                        select: { id: true, itemName: true, unitPrice: true, type: true, orderStatus: true }
+                    }
+                }
+            },
+            photos: { select: { storageKey: true } }
         }
     });
 
@@ -58,7 +74,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
             serial: repair.watch?.serialNumber || "-",
             caliber: repair.watch?.caliber?.name || "-",
         },
-        timeline: [...repair.logs].reverse().map(log => {
+        timeline: repair.logs.map(log => {
             const statusLabels: Record<string, string> = {
                 'reception': '受付',
                 'diagnosing': '見積中',
