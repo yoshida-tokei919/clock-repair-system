@@ -196,18 +196,25 @@ export async function updatePartOrderStatus(itemId: number, status: string) {
         const repairId = item.estimate.repairId;
         const allItems = item.estimate.items.filter(i => i.type === 'part');
 
-        // Logical check: If all parts are at least 'ordered' or 'received', suggest 'parts_wait_ordered'
-        // If any part is 'pending', the repair is effectively 'parts_wait' (Unordered)
-        const hasPending = allItems.some(i => !i.orderStatus || i.orderStatus === 'pending');
+        // 部品ステータスに基づく修理ステータスの自動連動
+        // 全件入荷済み → 作業中
+        // 全件注文済み以上（入荷含む） → 部品待ち(注文済み)
+        // 1件でも未注文 → 部品待ち(未注文)
+        const hasPending   = allItems.some(i => !i.orderStatus || i.orderStatus === 'pending');
+        const allReceived  = allItems.length > 0 && allItems.every(i => i.orderStatus === 'received');
 
-        let targetStatus = null;
-        if (hasPending) {
+        let targetStatus: string | null = null;
+        if (allReceived) {
+            targetStatus = 'in_progress';
+        } else if (hasPending) {
             targetStatus = 'parts_wait';
         } else if (allItems.length > 0) {
             targetStatus = 'parts_wait_ordered';
         }
 
-        if (targetStatus && item.estimate.repair.status.startsWith('parts_wait')) {
+        const currentStatus = item.estimate.repair.status;
+        const isPartsPhase  = currentStatus.startsWith('parts_wait') || currentStatus === 'in_progress';
+        if (targetStatus && isPartsPhase) {
             await updateRepairStatus(repairId, targetStatus);
         }
 
