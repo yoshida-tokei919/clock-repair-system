@@ -233,7 +233,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     });
 
     // Inputs for adding new items
-    const [addItemCategory, setAddItemCategory] = useState<'internal' | 'external'>('internal');
+    const [addItemCategory, setAddItemCategory] = useState<'internal' | 'part_external'>('internal');
     const [newItemName, setNewItemName] = useState("");
     const [newItemPrice, setNewItemPrice] = useState("");
     const [newItemSpec, setNewItemSpec] = useState("");
@@ -638,13 +638,24 @@ ${shopName}
                                 {/* Items */}
                                 {lineItems.map((item, idx) => (
                                     <div key={item.id} className="grid grid-cols-12 items-center text-xs p-1.5 hover:bg-zinc-50 border-b border-zinc-100 last:border-0 group">
-                                        <div className="col-span-6 flex flex-col">
-                                            <span className="font-medium truncate">{item.name}</span>
-                                            {item.spec && <span className="text-[9px] text-zinc-400">{item.spec}</span>}
+                                        <div className="col-span-6 flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLineItems(lineItems.map((li, i) =>
+                                                        i === idx ? { ...li, category: li.category.includes('part') ? 'internal' : 'part_external' } : li
+                                                    ))}
+                                                    className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${item.category.includes('part') ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-zinc-100 text-zinc-500 border-zinc-200'}`}
+                                                >
+                                                    {item.category.includes('part') ? '交換部品' : '技術料'}
+                                                </button>
+                                                <span className="font-medium truncate">{item.name}</span>
+                                            </div>
+                                            {item.spec && <span className="text-[9px] text-zinc-400 pl-0.5">{item.spec}</span>}
                                         </div>
                                         <div className="col-span-3 text-right font-mono table-nums">¥{item.price.toLocaleString()}</div>
                                         <div className="col-span-3 text-right">
-                                            <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} className="text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button type="button" onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} className="text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
@@ -655,8 +666,8 @@ ${shopName}
                                 <div className="bg-zinc-50 p-2 rounded border border-zinc-200 mt-2">
                                     <div className="flex gap-1 mb-1">
                                         <select className="h-7 text-[10px] rounded border-zinc-300 bg-white" value={addItemCategory} onChange={(e) => setAddItemCategory(e.target.value as any)}>
-                                            <option value="internal">技術料 (Work)</option>
-                                            <option value="external">部品 (Part)</option>
+                                            <option value="internal">技術料</option>
+                                            <option value="part_external">交換部品</option>
                                         </select>
                                         <AdvancedCombobox
                                             className="flex-1"
