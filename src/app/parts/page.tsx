@@ -148,6 +148,7 @@ export default function PartsManagerPage() {
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+    const [brandsCache, setBrandsCache] = useState<{ id: number; name: string }[]>([]);
     const [brandOptions, setBrandOptions] = useState<string[]>([]);
     const [modelOptions, setModelOptions] = useState<string[]>([]);
     const [refOptions, setRefOptions] = useState<string[]>([]);
@@ -159,6 +160,7 @@ export default function PartsManagerPage() {
     useEffect(() => {
         const loadInitial = async () => {
             const [bRaw, cRaw] = await Promise.all([getBrands(), getCalibers()]);
+            setBrandsCache(bRaw);
             setBrandOptions(bRaw.map(b => b.name));
             setCalOptions(cRaw.map(c => c.name));
         };
@@ -166,7 +168,9 @@ export default function PartsManagerPage() {
         refreshList();
     }, []);
 
+    // brandsCache を使用: getBrands() の重複フェッチを排除
     useEffect(() => {
+        if (brandsCache.length === 0) return;
         const loadOptions = async () => {
             if (!brand) {
                 setModelOptions([]);
@@ -175,8 +179,7 @@ export default function PartsManagerPage() {
                 return;
             }
 
-            const brandsList = await getBrands();
-            const b = brandsList.find(x => x.name === brand);
+            const b = brandsCache.find(x => x.name === brand);
             if (!b) return;
 
             const mRaw = await getModels(b.id);
@@ -187,16 +190,16 @@ export default function PartsManagerPage() {
             setCalOptions(narrowedCals.map(c => c.name));
         };
         loadOptions();
-    }, [brand, model]);
+    }, [brand, model, brandsCache]);
 
+    // brandsCache を使用: getBrands() の重複フェッチを排除
     useEffect(() => {
+        if (!model || !brand || brandsCache.length === 0) {
+            setRefOptions([]);
+            return;
+        }
         const loadRefs = async () => {
-            if (!model || !brand) {
-                setRefOptions([]);
-                return;
-            }
-            const bList = await getBrands();
-            const b = bList.find(x => x.name === brand);
+            const b = brandsCache.find(x => x.name === brand);
             if (!b) return;
             const mRaw = await getModels(b.id);
             const m = mRaw.find(x => x.nameJp === model || x.name === model);
@@ -209,7 +212,7 @@ export default function PartsManagerPage() {
             }
         };
         loadRefs();
-    }, [model, brand]);
+    }, [model, brand, brandsCache]);
 
     const refreshList = async () => {
         try {
@@ -354,14 +357,14 @@ export default function PartsManagerPage() {
         await upsertBrand(val);
         setBrand(val);
         const updated = await getBrands();
+        setBrandsCache(updated);
         setBrandOptions(updated.map(b => b.name));
     };
 
     const handleModelUpsert = async (val: string) => {
         await upsertModel(brand, val);
         setModel(val);
-        const bList = await getBrands();
-        const b = bList.find(x => x.name === brand);
+        const b = brandsCache.find(x => x.name === brand);
         if (b) {
             const updated = await getModels(b.id);
             setModelOptions(updated.map(m => m.nameJp || m.name));
@@ -369,8 +372,7 @@ export default function PartsManagerPage() {
     };
 
     const handleCaliberUpsert = async (val: string) => {
-        const bList = await getBrands();
-        const b = bList.find(x => x.name === brand);
+        const b = brandsCache.find(x => x.name === brand);
         await upsertCaliber(val, b?.id);
         setCaliber(val);
         const updated = await getCalibers(b?.id);
@@ -378,8 +380,7 @@ export default function PartsManagerPage() {
     };
 
     const handleRefUpsert = async (val: string) => {
-        const bList = await getBrands();
-        const b = bList.find(x => x.name === brand);
+        const b = brandsCache.find(x => x.name === brand);
         if (b) {
             const mRaw = await getModels(b.id);
             const m = mRaw.find(x => x.nameJp === model || x.name === model);

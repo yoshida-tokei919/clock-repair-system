@@ -4,32 +4,29 @@ import { prisma } from "@/lib/prisma";
 // GET /api/masters/pricing
 export async function GET(request: Request) {
     try {
-        const rules = await prisma.pricingRule.findMany();
+        // 4クエリを並列実行 + Mapでルックアップをすべてо(1)に
+        const [rules, brands, models, calibers] = await Promise.all([
+            prisma.pricingRule.findMany(),
+            prisma.brand.findMany({ select: { id: true, name: true } }),
+            prisma.model.findMany({ select: { id: true, name: true, nameJp: true } }),
+            prisma.caliber.findMany({ select: { id: true, name: true } }),
+        ]);
 
-        // Since relations aren't explicitly defined in Prisma for PricingRule (only IDs), 
-        // we'll fetch brands/models/calibers separately or just return IDs and let FE handle it (if mock logic is used).
-        // But for better UX, let's fetch names.
-        const brands = await prisma.brand.findMany();
-        const models = await prisma.model.findMany();
-        const calibers = await prisma.caliber.findMany();
+        const brandMap = new Map(brands.map(b => [b.id, b.name]));
+        const modelMap = new Map(models.map(m => [m.id, m.nameJp || m.name]));
+        const caliberMap = new Map(calibers.map(c => [c.id, c.name]));
 
-        const mapped = rules.map(r => {
-            const brand = brands.find(b => b.id === r.brandId);
-            const model = models.find(m => m.id === r.modelId);
-            const caliber = calibers.find(c => c.id === r.caliberId);
-
-            return {
-                id: String(r.id),
-                brandName: brand?.name || "",
-                modelName: model?.nameJp || "",
-                caliberName: caliber?.name || "",
-                workName: r.suggestedWorkName,
-                minPrice: r.minPrice,
-                maxPrice: r.maxPrice,
-                customerType: r.customerType,
-                notes: r.notes || ""
-            };
-        });
+        const mapped = rules.map(r => ({
+            id: String(r.id),
+            brandName: brandMap.get(r.brandId ?? -1) ?? "",
+            modelName: modelMap.get(r.modelId ?? -1) ?? "",
+            caliberName: caliberMap.get(r.caliberId ?? -1) ?? "",
+            workName: r.suggestedWorkName,
+            minPrice: r.minPrice,
+            maxPrice: r.maxPrice,
+            customerType: r.customerType,
+            notes: r.notes || ""
+        }));
 
         return NextResponse.json(mapped);
     } catch (error) {

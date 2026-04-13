@@ -368,54 +368,54 @@ export async function POST(req: Request) {
                     }
                 });
 
-                // 6.5 Master Data Sync (New)
-                // Automatically register items to PartsMaster/PricingRule if they don't exist
-                for (const item of estimateItems) {
-                    if (item.type === 'part') {
-                        const existingPart = await tx.partsMaster.findFirst({
-                            where: {
+                // 6.5 Master Data Sync (Batched: 2クエリで完結、N+1解消)
+                const partItems = estimateItems.filter((i: any) => i.type === 'part');
+                const laborItems = estimateItems.filter((i: any) => i.type === 'labor');
+
+                if (partItems.length > 0) {
+                    const partNames = partItems.map((i: any) => i.name);
+                    const existingParts = await tx.partsMaster.findMany({
+                        where: { nameJp: { in: partNames }, brandId: brand.id, modelId, caliberId },
+                        select: { nameJp: true }
+                    });
+                    const existingPartNames = new Set(existingParts.map((p: any) => p.nameJp));
+                    const newParts = partItems.filter((i: any) => !existingPartNames.has(i.name));
+                    if (newParts.length > 0) {
+                        await tx.partsMaster.createMany({
+                            data: newParts.map((item: any) => ({
+                                category: 'generic',
+                                brandId: brand.id,
+                                modelId,
+                                caliberId,
+                                name: item.name,
                                 nameJp: item.name,
-                                brandId: brand.id,
-                                modelId: modelId,
-                                caliberId: caliberId
-                            }
+                                nameEn: item.name,
+                                retailPrice: Math.floor(Number(item.price) || 0),
+                                stockQuantity: 0,
+                            }))
                         });
-                        if (!existingPart) {
-                            await tx.partsMaster.create({
-                                data: {
-                                    category: 'generic', // Default from repair entry
-                                    brandId: brand.id,
-                                    modelId: modelId,
-                                    caliberId: caliberId,
-                                    name: item.name,
-                                    nameJp: item.name,
-                                    nameEn: item.name,
-                                    retailPrice: Math.floor(Number(item.price) || 0),
-                                    stockQuantity: 0,
-                                }
-                            });
-                        }
-                    } else if (item.type === 'labor') {
-                        const existingRule = await tx.pricingRule.findFirst({
-                            where: {
+                    }
+                }
+
+                if (laborItems.length > 0) {
+                    const laborNames = laborItems.map((i: any) => i.name);
+                    const existingRules = await tx.pricingRule.findMany({
+                        where: { suggestedWorkName: { in: laborNames }, brandId: brand.id, modelId, caliberId },
+                        select: { suggestedWorkName: true }
+                    });
+                    const existingRuleNames = new Set(existingRules.map((r: any) => r.suggestedWorkName));
+                    const newRules = laborItems.filter((i: any) => !existingRuleNames.has(i.name));
+                    if (newRules.length > 0) {
+                        await tx.pricingRule.createMany({
+                            data: newRules.map((item: any) => ({
                                 suggestedWorkName: item.name,
+                                minPrice: Math.floor(Number(item.price) || 0),
+                                maxPrice: Math.floor(Number(item.price) || 0),
                                 brandId: brand.id,
-                                modelId: modelId,
-                                caliberId: caliberId
-                            }
+                                modelId,
+                                caliberId
+                            }))
                         });
-                        if (!existingRule) {
-                            await tx.pricingRule.create({
-                                data: {
-                                    suggestedWorkName: item.name,
-                                    minPrice: Math.floor(Number(item.price) || 0),
-                                    maxPrice: Math.floor(Number(item.price) || 0),
-                                    brandId: brand.id,
-                                    modelId: modelId,
-                                    caliberId: caliberId
-                                }
-                            });
-                        }
                     }
                 }
             }
@@ -423,7 +423,7 @@ export async function POST(req: Request) {
             // 6. Return Data
             return repair;
         }, {
-            timeout: 20000 // Handle sequential master syncs gracefully
+            timeout: 5000
         });
 
         return NextResponse.json({ success: true, repair: result });
