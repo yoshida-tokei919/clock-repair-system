@@ -76,6 +76,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
         },
         timeline: repair.logs.map(log => {
             const statusLabels: Record<string, string> = {
+                // 内部識別子
                 'reception': '受付',
                 'diagnosing': '見積中',
                 'parts_wait': '部品待 (未注文)',
@@ -83,7 +84,15 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 'in_progress': '作業中',
                 'completed': '完了',
                 'delivered': '納品済',
-                'canceled': 'キャンセル'
+                'canceled': 'キャンセル',
+                // 旧ラベル（英語混じり）の吸収
+                '受付 (Reception)': '受付',
+                '見積中 (Estimating)': '見積中',
+                '部品待 (Waiting Parts)': '部品待 (未注文)',
+                '作業中 (In Progress)': '作業中',
+                '完了 (Completed)': '完了',
+                '納品済 (Delivered)': '納品済',
+                'キャンセル (Canceled)': 'キャンセル',
             };
             return {
                 id: log.id,
