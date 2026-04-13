@@ -39,7 +39,7 @@ export function LinePreviewModal({
                         {/* Timestamp */}
                         <div className="text-center">
                             <span className="bg-[rgba(0,0,0,0.1)] text-white text-[10px] px-2 py-1 rounded-full">
-                                {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {new Date().toLocaleDateString("ja-JP", { timeZone: 'Asia/Tokyo' })} {new Date().toLocaleTimeString("ja-JP", { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
 

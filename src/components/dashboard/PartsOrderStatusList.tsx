@@ -70,7 +70,7 @@ export async function PartsOrderStatusList() {
                                             </div>
                                         </td>
                                         <td className="p-2 font-medium">
-                                            <div>{watch?.brand?.nameEn || watch?.brand?.name || '-'}</div>
+                                            <div>{watch?.brand?.nameJp || watch?.brand?.name || '-'}</div>
                                             <div className="text-[10px] text-zinc-400">{watch?.model?.nameJp || '-'}</div>
                                         </td>
                                         <td className="p-2 text-xs">

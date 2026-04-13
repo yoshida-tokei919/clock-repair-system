@@ -11,7 +11,7 @@ import { StatusDocument, StatusDocumentProps } from "@/components/pdf/StatusDocu
 
 // --- Mock Data ---
 const MOCK_STATUS_DATA: StatusDocumentProps['data'] = {
-    generatedAt: new Date().toLocaleString(),
+    generatedAt: new Date().toLocaleString("ja-JP", { timeZone: 'Asia/Tokyo' }),
     groups: [
         {
             status: "見積・診断中",

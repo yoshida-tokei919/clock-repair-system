@@ -96,7 +96,7 @@ export function InvoiceDocument({ data }: InvoiceDocumentProps) {
                     <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000', paddingBottom: 4, marginBottom: 4 }}>
                         <Text style={styles.colDate}>日付</Text>
                         <Text style={styles.colSlip}>納品書No</Text>
-                        <Text style={styles.colDesc}>適用 (Description)</Text>
+                        <Text style={styles.colDesc}>適用</Text>
                         <Text style={styles.colAmount}>金額(税抜)</Text>
                     </View>
 

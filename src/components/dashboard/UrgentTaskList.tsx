@@ -11,7 +11,8 @@ export async function UrgentTaskList() {
     const statusMap: Record<string, string> = {
         'reception': '受付',
         'diagnosing': '見積中',
-        'parts_wait': '部品待',
+        'parts_wait': '部品待 (未注文)',
+        'parts_wait_ordered': '部品待 (注文済)',
         'in_progress': '作業中',
         'completed': '完了',
         'delivered': '納品済',
@@ -36,7 +37,7 @@ export async function UrgentTaskList() {
                                 </div>
                                 <div className="ml-4 space-y-1 flex-1">
                                     <p className="text-sm font-bold leading-none text-zinc-800">
-                                        {repair.watch?.brand?.nameEn || repair.watch?.brand?.name || "ブランド不明"} {repair.watch?.model?.nameJp || ""}
+                                        {repair.watch?.brand?.nameJp || repair.watch?.brand?.name || "ブランド不明"} {repair.watch?.model?.nameJp || ""}
                                     </p>
                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                                         <User className="h-3 w-3" /> {repair.customer?.name || "顧客不明"} •

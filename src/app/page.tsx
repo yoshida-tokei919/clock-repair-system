@@ -599,7 +599,7 @@ export default async function TopPage() {
                                     <Link key={repair.id} href="/cases/gallery" className="case-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
                                         <div className="case-img" style={{ backgroundImage: `url('${heroImage}')` }}></div>
                                         <div className="case-body">
-                                            <div className="case-meta"><span>{repair.watch.brand.name}</span><span>{repair.deliveryDateActual?.toLocaleDateString()}</span></div>
+                                            <div className="case-meta"><span>{repair.watch.brand.name}</span><span>{repair.deliveryDateActual?.toLocaleDateString("ja-JP", { timeZone: 'Asia/Tokyo' })}</span></div>
                                             <h3 className="case-title">{title}</h3>
                                             <dl className="case-details">
                                                 <dt>内容:</dt><dd>オーバーホール</dd>
