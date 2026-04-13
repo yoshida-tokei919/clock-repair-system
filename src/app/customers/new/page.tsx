@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArrowLeft, Save, Building2, User, Star, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save, Building2, User, Star, AlertTriangle, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,7 +77,7 @@ export default function NewCustomerPage() {
     const performSave = async () => {
         setIsSaving(true);
         const res = await createCustomer({
-            type, name, companyName, rank, zipCode, address, phone, email, lineId,
+            type, name, companyName, kana, rank, zipCode, address, phone, email, lineId,
             prefix: type === "business" ? prefix : "C"
         });
 
@@ -116,6 +116,7 @@ export default function NewCustomerPage() {
                         <CardContent className="space-y-6 pt-6">
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* 左列：名前・プレフィックス */}
                                 <div className="space-y-4">
                                     {type === "business" ? (
                                         <div className="space-y-4">
@@ -128,16 +129,28 @@ export default function NewCustomerPage() {
                                                 <Input value={prefix} onChange={e => setPrefix(e.target.value.toUpperCase())} placeholder="例：JK" className="font-mono uppercase bg-white" maxLength={3} />
                                                 <p className="text-[10px] text-zinc-400 italic">※半角英数字のみ可（修理番号 {prefix || "JK"}-001 となります）</p>
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-zinc-500 text-xs text-xs">担当者名 (任意)</Label>
-                                                <Input value={name} onChange={e => setName(e.target.value)} placeholder="やまだ たろう" className="bg-white border-zinc-200" />
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs text-zinc-500">担当者名 (任意)</Label>
+                                                    <Input value={name} onChange={e => setName(e.target.value)} placeholder="やまだ たろう" className="bg-white border-zinc-200" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs text-zinc-500">フリガナ (任意)</Label>
+                                                    <Input value={kana} onChange={e => setKana(e.target.value)} placeholder="ヤマダ タロウ" className="bg-white border-zinc-200" />
+                                                </div>
                                             </div>
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
-                                            <div className="space-y-2">
-                                                <Label className="font-bold">お名前 <span className="text-red-500">*</span></Label>
-                                                <Input value={name} onChange={e => setName(e.target.value)} placeholder="やまだ 太郎" className="bg-white" required />
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-2">
+                                                    <Label className="font-bold">お名前 <span className="text-red-500">*</span></Label>
+                                                    <Input value={name} onChange={e => setName(e.target.value)} placeholder="やまだ 太郎" className="bg-white" required />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs text-zinc-500">フリガナ (任意)</Label>
+                                                    <Input value={kana} onChange={e => setKana(e.target.value)} placeholder="ヤマダ タロウ" className="bg-white border-zinc-200" />
+                                                </div>
                                             </div>
                                             <div className="p-3 bg-green-50 rounded-md border border-green-100">
                                                 <Label className="text-xs font-bold text-green-700">自動割り当てプレフィックス:</Label>
@@ -148,7 +161,8 @@ export default function NewCustomerPage() {
                                     )}
                                 </div>
 
-                                <div className="space-y-4 text-xs">
+                                {/* 右列：連絡先・属性 */}
+                                <div className="space-y-4">
                                     <div className="space-y-2">
                                         <Label className="font-bold text-zinc-700">顧客重要度</Label>
                                         <div className="flex items-center gap-2">
@@ -157,13 +171,31 @@ export default function NewCustomerPage() {
                                             ))}
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="font-bold">電話番号</Label>
-                                        <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="09000000000" className="bg-white" />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-zinc-700">電話番号</Label>
+                                            <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="09000000000" className="bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-zinc-700">メールアドレス</Label>
+                                            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@email.com" className="bg-white" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-zinc-700 flex items-center gap-1">
+                                                <MessageCircle className="w-3 h-3 text-emerald-500" /> LINE ID
+                                            </Label>
+                                            <Input value={lineId} onChange={e => setLineId(e.target.value)} placeholder="line_id" className="bg-white" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-zinc-700">郵便番号</Label>
+                                            <Input value={zipCode} onChange={e => setZipCode(e.target.value)} placeholder="000-0000" className="bg-white" />
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="font-bold">住所</Label>
-                                        <Input value={address} onChange={e => setAddress(e.target.value)} placeholder="とうきょうと..." className="bg-white" />
+                                        <Label className="text-xs font-bold text-zinc-700">住所</Label>
+                                        <Input value={address} onChange={e => setAddress(e.target.value)} placeholder="東京都..." className="bg-white" />
                                     </div>
                                 </div>
                             </div>
