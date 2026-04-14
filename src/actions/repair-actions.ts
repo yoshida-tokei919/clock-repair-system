@@ -185,30 +185,31 @@ export async function updatePartOrderStatus(itemId: number, status: string) {
             },
             include: {
                 estimate: {
-                    include: {
-                        repair: true,
-                        items: true
-                    }
+                    include: { repair: true }
                 }
             }
         });
 
         const repairId = item.estimate.repairId;
-        const allItems = item.estimate.items.filter(i => i.type === 'part');
+
+        // 更新後の最新状態を再取得（includeのitemsは更新対象自身が古い値を返す場合があるため）
+        const freshItems = await prisma.estimateItem.findMany({
+            where: { estimateId: item.estimateId, type: 'part' }
+        });
 
         // 部品ステータスに基づく修理ステータスの自動連動
         // 全件入荷済み                       → 作業中
         // 全件注文済み以上（未注文なし）     → 部品待ち(注文済み)
         // 1件でも未注文                      → 部品待ち(未注文)
-        const hasPending  = allItems.some(i => !i.orderStatus || i.orderStatus === 'pending');
-        const allReceived = allItems.length > 0 && allItems.every(i => i.orderStatus === 'received');
+        const hasPending  = freshItems.some(i => !i.orderStatus || i.orderStatus === 'pending');
+        const allReceived = freshItems.length > 0 && freshItems.every(i => i.orderStatus === 'received');
 
         let targetStatus: string | null = null;
         if (allReceived) {
             targetStatus = 'in_progress';
         } else if (hasPending) {
             targetStatus = 'parts_wait';
-        } else if (allItems.length > 0) {
+        } else if (freshItems.length > 0) {
             targetStatus = 'parts_wait_ordered';
         }
 
