@@ -85,9 +85,8 @@ export function InvoiceDocument({ data }: InvoiceDocumentProps) {
                     </View>
                     <View style={{ width: '40%' }}>
                         <Text style={styles.sender}>ヨシダ時計修理工房</Text>
-                        <Text style={styles.sender}>〒104-0061 東京都中央区銀座 1-2-3</Text>
-                        <Text style={styles.sender}>TEL: 03-1234-5678</Text>
-                        <Text style={styles.sender}>登録番号: T1234567890123</Text>
+                        <Text style={styles.sender}>〒651-1213 神戸市北区広陵町1-162-1-401</Text>
+                        <Text style={styles.sender}>TEL: 090-2041-8275</Text>
                     </View>
                 </View>
 
@@ -131,9 +130,9 @@ export function InvoiceDocument({ data }: InvoiceDocumentProps) {
                 {/* BANK INFO */}
                 <View style={styles.bankInfo}>
                     <Text style={{ fontSize: 9, fontWeight: 'bold', marginBottom: 4 }}>【お振込先】</Text>
-                    <Text style={{ fontSize: 9 }}>住信SBIネット銀行（0038） 法人第一支店（106）</Text>
-                    <Text style={{ fontSize: 9 }}>普通 1234567</Text>
-                    <Text style={{ fontSize: 9, marginBottom: 4 }}>カ）ヨシダトケイコウボウ</Text>
+                    <Text style={{ fontSize: 9 }}>三井住友銀行</Text>
+                    <Text style={{ fontSize: 9 }}>普通 3602468</Text>
+                    <Text style={{ fontSize: 9, marginBottom: 4 }}>ヨシダ シュウヘイ</Text>
                     <Text style={{ fontSize: 8, color: '#666' }}>※ 振込手数料は貴社にてご負担願います。</Text>
                 </View>
             </Page>

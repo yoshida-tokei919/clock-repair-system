@@ -161,7 +161,7 @@ export function WarrantyDocument({ data }: WarrantyDocumentProps) {
                             <Text>   ・誤ったご使用による故障（落下、衝撃、磁気帯び等）</Text>
                             <Text>   ・水入り、サビ、ケース・ガラス等の外装部品の損傷。</Text>
                             <Text>3. 本証の再発行は致しかねますので大切に保管してください。</Text>
-                            <Text style={{ marginTop: 4, fontWeight: 'bold' }}>ヨシダ時計修理工房 TEL: 03-1234-5678</Text>
+                            <Text style={{ marginTop: 4, fontWeight: 'bold' }}>ヨシダ時計修理工房 TEL: 090-2041-8275</Text>
                         </View>
 
                         <View style={styles.qrArea}>

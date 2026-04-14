@@ -77,8 +77,8 @@ export function ReceiptDocument({ data }: ReceiptDocumentProps) {
 
                     <View style={styles.issuer}>
                         <Text style={styles.issuerName}>ヨシダ時計修理工房</Text>
-                        <Text style={styles.issuerAddr}>〒104-0061 東京都中央区銀座 1-2-3</Text>
-                        <Text style={styles.issuerAddr}>TEL: 03-1234-5678</Text>
+                        <Text style={styles.issuerAddr}>〒651-1213 神戸市北区広陵町1-162-1-401</Text>
+                        <Text style={styles.issuerAddr}>TEL: 090-2041-8275</Text>
                         {/* Stamp Placeholder */}
                         <View style={{ width: 60, height: 60, borderWidth: 1, borderColor: '#f00', position: 'absolute', right: 0, top: -10, alignItems: 'center', justifyContent: 'center' }}>
                             <Text style={{ color: '#f00', fontSize: 8 }}>印</Text>

@@ -67,9 +67,8 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
           </View>
           <View style={{ width: '40%' }}>
             <Text style={styles.sender}>ヨシダ時計修理工房</Text>
-            <Text style={styles.sender}>〒104-0061 東京都中央区銀座 1-2-3</Text>
-            <Text style={styles.sender}>TEL: 03-1234-5678</Text>
-            <Text style={styles.sender}>登録番号: T1234567890123</Text>
+            <Text style={styles.sender}>〒651-1213 神戸市北区広陵町1-162-1-401</Text>
+            <Text style={styles.sender}>TEL: 090-2041-8275</Text>
           </View>
         </View>
 

@@ -72,7 +72,7 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
             amount: (r.estimate?.items || []).reduce((s, i) => s + i.unitPrice * i.quantity, 0)
         })),
         taxRate: 0.1,
-        bankInfo: "三菱UFJ銀行 銀座支店\n普通 1234567\nヨシダトケイシュウリコウボウ"
+        bankInfo: "三井住友銀行\n普通 3602468\nヨシダ シュウヘイ"
     };
 
     return <InvoicePDFClient data={pdfData} />;

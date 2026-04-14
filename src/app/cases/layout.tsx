@@ -44,8 +44,9 @@ export default function CasesLayout({
                         <div>
                             <h3 className="font-bold text-lg mb-4">ヨシダ時計修理工房</h3>
                             <p className="text-neutral-400 text-sm">
-                                〒000-0000<br />
-                                大阪府大阪市...
+                                〒651-1213<br />
+                                神戸市北区広陵町1-162-1-401<br />
+                                TEL: 090-2041-8275
                             </p>
                         </div>
                         <div>
