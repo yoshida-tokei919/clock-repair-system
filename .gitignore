@@ -41,6 +41,11 @@ deploy_package.tgz
 deploy_key
 deploy_key.pub
 
+# Playwright MCP / 動作確認用スクリーンショット
+.playwright-mcp/
+*.png
+tsconfig.tsbuildinfo
+
 # recovery tools
 *.php
 migrate_to_supabase*.js
