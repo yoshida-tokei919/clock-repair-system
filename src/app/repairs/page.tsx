@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { getStatusBadge } from "@/components/status-badge";
 import { RepairListStatusSelect } from "@/components/repairs/RepairListStatusSelect";
 import { RepairsTableClient } from "@/components/repairs/RepairsTableClient";
-import { PlusCircle, Search, Filter, LayoutDashboard } from "lucide-react";
+import { PlusCircle, Search, Filter, LayoutDashboard, FileText } from "lucide-react";
 import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
@@ -78,6 +78,12 @@ export default async function RepairsPage({
                         <Button variant="outline">
                             <LayoutDashboard className="mr-2 h-4 w-4" />
                             ボード表示
+                        </Button>
+                    </Link>
+                    <Link href="/invoices">
+                        <Button variant="outline">
+                            <FileText className="mr-2 h-4 w-4" />
+                            請求書管理
                         </Button>
                     </Link>
                     <Link href="/repairs/new">
