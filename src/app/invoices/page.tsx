@@ -70,7 +70,7 @@ export default function InvoicesPage() {
             .then(setInvoices);
         fetch("/api/partners")
             .then((r) => r.json())
-            .then(setPartners);
+            .then((data) => setPartners(data.partners || []));
     }, []);
 
     // 取引先または月が変わったらプレビューをリセット
