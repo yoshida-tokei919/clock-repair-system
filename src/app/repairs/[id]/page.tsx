@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RepairTimeline } from "@/components/repair-timeline";
 import { PhotoGallery } from "@/components/photo-gallery";
-import { ArrowLeft, Printer, FileText, Edit, Clock, Calendar, ShieldCheck, MapPin, Package, Settings, ChevronRight } from "lucide-react";
+import { ArrowLeft, Printer, Edit, Clock, Calendar, ShieldCheck, MapPin, Settings, ChevronRight } from "lucide-react";
 
 import { StatusUpdateForm } from "@/components/repairs/StatusUpdateForm";
 import { getStatusBadge } from "@/components/status-badge";
@@ -271,44 +271,6 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                         </CardContent>
                     </Card>
 
-                    {/* Quick Documents - Consolidated List */}
-                    <Card className="shadow-sm overflow-hidden">
-                        <CardHeader className="pb-3 bg-zinc-50 border-b">
-                            <CardTitle className="text-sm font-bold flex items-center gap-2">
-                                <FileText className="w-4 h-4" /> 帳票・書類一覧
-                            </CardTitle>
-                        </CardHeader>
-                        <div className="divide-y text-sm">
-                            <Link href={`/repairs/${params.id}/estimate/pdf`} className="flex items-center justify-between p-3 hover:bg-zinc-50 transition-colors group">
-                                <div className="flex items-center gap-3">
-                                    <FileText className="w-4 h-4 text-zinc-400 group-hover:text-blue-600" />
-                                    <span>修理見積書.pdf</span>
-                                </div>
-                                <ArrowLeft className="w-3 h-3 rotate-180 text-zinc-300" />
-                            </Link>
-                            <Link href={`/repairs/${params.id}/invoice/pdf`} className="flex items-center justify-between p-3 hover:bg-zinc-50 transition-colors group">
-                                <div className="flex items-center gap-3">
-                                    <FileText className="w-4 h-4 text-zinc-400 group-hover:text-blue-600" />
-                                    <span>修理請求書.pdf</span>
-                                </div>
-                                <ArrowLeft className="w-3 h-3 rotate-180 text-zinc-300" />
-                            </Link>
-                            <Link href={`/repairs/${params.id}/delivery/pdf`} className="flex items-center justify-between p-3 hover:bg-zinc-50 transition-colors group">
-                                <div className="flex items-center gap-3">
-                                    <Package className="w-4 h-4 text-zinc-400 group-hover:text-blue-600" />
-                                    <span>修理納品書.pdf</span>
-                                </div>
-                                <ArrowLeft className="w-3 h-3 rotate-180 text-zinc-300" />
-                            </Link>
-                            <Link href={`/repairs/${params.id}/warranty/pdf`} className="flex items-center justify-between p-3 hover:bg-zinc-50 transition-colors group">
-                                <div className="flex items-center gap-3">
-                                    <ShieldCheck className="w-4 h-4 text-zinc-400 group-hover:text-blue-600" />
-                                    <span>修理保証書.pdf</span>
-                                </div>
-                                <ArrowLeft className="w-3 h-3 rotate-180 text-zinc-300" />
-                            </Link>
-                        </div>
-                    </Card>
                 </div>
 
                 {/* Right Column: All Content Segments */}
