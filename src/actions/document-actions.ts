@@ -45,11 +45,14 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
             let documentId = null;
 
             if (type === 'delivery') {
-                const updatedCustomer = await prisma.customer.update({
-                    where: { id: customerId },
-                    data: { seqDelivery: { increment: 1 } }
+                // 既存レコードの最大SEQを取得して採番
+                const lastDelivery = await prisma.deliveryNote.findFirst({
+                    where: { slipNumber: { startsWith: prefix } },
+                    orderBy: { id: 'desc' }
                 });
-                seq = updatedCustomer.seqDelivery;
+                seq = lastDelivery
+                    ? (parseInt(lastDelivery.slipNumber.replace(/\D/g, '') || '0', 10) + 1)
+                    : 1;
                 docNumber = `${prefix}D-${String(seq).padStart(3, '0')}`;
 
                 const note = await prisma.deliveryNote.create({
@@ -61,19 +64,22 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                         repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
                     }
                 });
+                await prisma.customer.update({ where: { id: customerId }, data: { seqDelivery: seq } });
                 documentId = note.id;
             } else if (type === 'invoice') {
-                const updatedCustomer = await prisma.customer.update({
-                    where: { id: customerId },
-                    data: { seqInvoice: { increment: 1 } }
+                const lastInvoice = await prisma.invoice.findFirst({
+                    where: { invoiceNumber: { startsWith: prefix } },
+                    orderBy: { id: 'desc' }
                 });
-                seq = updatedCustomer.seqInvoice;
+                seq = lastInvoice
+                    ? (parseInt(lastInvoice.invoiceNumber.replace(/\D/g, '') || '0', 10) + 1)
+                    : 1;
                 docNumber = `${prefix}I-${String(seq).padStart(3, '0')}`;
 
                 // Default Due Date: End of next month
                 const dueDate = new Date();
                 dueDate.setMonth(dueDate.getMonth() + 2);
-                dueDate.setDate(0); // Last day of previous month = end of next month
+                dueDate.setDate(0);
 
                 const invoice = await prisma.invoice.create({
                     data: {
@@ -85,13 +91,16 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                         repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
                     }
                 });
+                await prisma.customer.update({ where: { id: customerId }, data: { seqInvoice: seq } });
                 documentId = invoice.id;
             } else if (type === 'estimate') {
-                const updatedCustomer = await prisma.customer.update({
-                    where: { id: customerId },
-                    data: { seqEstimate: { increment: 1 } }
+                const lastEstimate = await prisma.estimateDocument.findFirst({
+                    where: { estimateNumber: { startsWith: prefix } },
+                    orderBy: { id: 'desc' }
                 });
-                seq = updatedCustomer.seqEstimate;
+                seq = lastEstimate
+                    ? (parseInt(lastEstimate.estimateNumber.replace(/\D/g, '') || '0', 10) + 1)
+                    : 1;
                 docNumber = `${prefix}E-${String(seq).padStart(3, '0')}`;
 
                 const estimateDoc = await prisma.estimateDocument.create({
@@ -103,6 +112,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                         repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
                     }
                 });
+                await prisma.customer.update({ where: { id: customerId }, data: { seqEstimate: seq } });
                 documentId = estimateDoc.id;
             }
 
