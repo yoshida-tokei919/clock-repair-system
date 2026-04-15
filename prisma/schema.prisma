@@ -42,12 +42,14 @@ model Customer {
   seqEstimate  Int      @default(0)
   seqDelivery  Int      @default(0)
   seqInvoice   Int      @default(0)
-  
-  watches       Watch[]
-  repairs       Repair[]
-  deliveryNotes DeliveryNote[]
-  invoices      Invoice[]
+  seqWarranty  Int      @default(0)
+
+  watches           Watch[]
+  repairs           Repair[]
+  deliveryNotes     DeliveryNote[]
+  invoices          Invoice[]
   estimateDocuments EstimateDocument[]
+  warranties        Warranty[]
 }
 
 // 2. Watch Metadata (Smart Input)
@@ -172,12 +174,15 @@ model Repair {
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
-  
+
   invoiceId      Int?
   invoice        Invoice?      @relation(fields: [invoiceId], references: [id])
 
   estimateDocumentId Int?
   estimateDocument   EstimateDocument? @relation(fields: [estimateDocumentId], references: [id])
+
+  warrantyId Int?
+  warranty   Warranty? @relation(fields: [warrantyId], references: [id])
 }
 
 model RepairStatusLog {
@@ -320,9 +325,22 @@ model EstimateDocument {
   
   customerId      Int
   customer        Customer @relation(fields: [customerId], references: [id])
-  
+
   repairs         Repair[]
-  
+
   totalAmount     Int      @default(0)
   taxAmount       Int      @default(0)
+}
+
+model Warranty {
+  id              Int      @id @default(autoincrement())
+  warrantyNumber  String   @unique // e.g. TW-001
+  issuedDate      DateTime @default(now())
+  guaranteeStart  DateTime
+  guaranteeEnd    DateTime
+
+  customerId      Int
+  customer        Customer @relation(fields: [customerId], references: [id])
+
+  repairs         Repair[]
 }

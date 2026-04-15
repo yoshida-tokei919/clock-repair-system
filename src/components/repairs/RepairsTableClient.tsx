@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Repair, Customer, Brand, Model, Watch } from "@prisma/client";
 import { RepairListStatusSelect } from "@/components/repairs/RepairListStatusSelect";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileText, Truck, Receipt } from "lucide-react";
+import { FileText, Truck, Receipt, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ClickToCopy } from "@/components/ui/click-to-copy";
@@ -47,7 +47,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         }
     };
 
-    const handleBulkAction = async (type: 'delivery' | 'invoice' | 'estimate') => {
+    const handleBulkAction = async (type: 'delivery' | 'invoice' | 'estimate' | 'warranty') => {
         if (selectedIds.length === 0) return;
         setIsGenerating(true);
         try {
@@ -63,6 +63,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     if (type === 'delivery') router.push(`/documents/delivery/${result.documentId}`);
                     if (type === 'invoice') router.push(`/documents/invoice/${result.documentId}`);
                     if (type === 'estimate') router.push(`/documents/estimate/${result.documentId}`);
+                    if (type === 'warranty') router.push(`/documents/warranty/${result.documentId}`);
                 } else {
                     router.refresh(); // Refresh to show updated status/links
                 }
@@ -99,6 +100,10 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     <Button size="sm" variant="outline" onClick={() => handleBulkAction('invoice')} disabled={isGenerating}>
                         <Receipt className="mr-2 h-4 w-4" />
                         請求書作成
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleBulkAction('warranty')} disabled={isGenerating}>
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        保証書作成
                     </Button>
                 </div>
             )}
@@ -195,6 +200,11 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                             {(repair as any).invoice && (
                                                 <Link href={`/documents/invoice/${(repair as any).invoice.id}`} className="text-[10px] bg-purple-100 text-purple-700 px-1 rounded border border-purple-200 hover:underline">
                                                     {(repair as any).invoice.invoiceNumber}
+                                                </Link>
+                                            )}
+                                            {(repair as any).warranty && (
+                                                <Link href={`/documents/warranty/${(repair as any).warranty.id}`} className="text-[10px] bg-teal-100 text-teal-700 px-1 rounded border border-teal-200 hover:underline">
+                                                    {(repair as any).warranty.warrantyNumber}
                                                 </Link>
                                             )}
                                         </div>

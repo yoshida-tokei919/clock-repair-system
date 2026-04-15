@@ -49,6 +49,7 @@ export default async function RepairsPage({
             deliveryNote:     { select: { id: true, slipNumber: true } },
             invoice:          { select: { id: true, invoiceNumber: true } },
             estimateDocument: { select: { id: true, estimateNumber: true } },
+            warranty:         { select: { id: true, warrantyNumber: true } },
         },
         take: 50,
     });

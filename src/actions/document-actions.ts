@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate') {
+export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty') {
     try {
         if (repairIds.length === 0) return { success: false, error: "No repairs selected" };
 
@@ -114,6 +114,32 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 });
                 await prisma.customer.update({ where: { id: customerId }, data: { seqEstimate: seq } });
                 documentId = estimateDoc.id;
+            } else if (type === 'warranty') {
+                const lastWarranty = await prisma.warranty.findFirst({
+                    where: { warrantyNumber: { startsWith: prefix } },
+                    orderBy: { id: 'desc' }
+                });
+                seq = lastWarranty
+                    ? (parseInt(lastWarranty.warrantyNumber.replace(/\D/g, '') || '0', 10) + 1)
+                    : 1;
+                docNumber = `${prefix}W-${String(seq).padStart(3, '0')}`;
+
+                // 保証期間: 納品日 or 今日から1年
+                const baseDate = customerRepairs[0].deliveryDateActual || new Date();
+                const guaranteeEnd = new Date(baseDate);
+                guaranteeEnd.setFullYear(guaranteeEnd.getFullYear() + 1);
+
+                const warranty = await prisma.warranty.create({
+                    data: {
+                        warrantyNumber: docNumber,
+                        customerId,
+                        guaranteeStart: baseDate,
+                        guaranteeEnd,
+                        repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
+                    }
+                });
+                await prisma.customer.update({ where: { id: customerId }, data: { seqWarranty: seq } });
+                documentId = warranty.id;
             }
 
             if (documentId) {
