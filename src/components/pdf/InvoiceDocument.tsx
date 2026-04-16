@@ -81,7 +81,6 @@ export function InvoiceDocument({ data }: InvoiceDocumentProps) {
                             <Text style={{ fontSize: 10, fontWeight: 'bold' }}>ご請求金額: </Text>
                             <Text style={{ fontSize: 14, fontWeight: 'bold', textDecoration: 'underline' }}>¥{grandTotal.toLocaleString()}-</Text>
                         </View>
-                        <Text style={{ fontSize: 9, marginTop: 4, color: '#d00' }}>お支払期限: {data.dueDate}</Text>
                     </View>
                     <View style={{ width: '40%' }}>
                         <Text style={styles.sender}>ヨシダ時計修理工房</Text>
