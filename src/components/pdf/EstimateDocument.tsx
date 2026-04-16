@@ -120,7 +120,6 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
         {/* FOOTER NOTE (No Grand Total) */}
         <View style={{ marginTop: 20, borderTopWidth: 1, borderColor: '#ccc', paddingTop: 10 }}>
           <Text style={{ fontSize: 9 }}>※ 部品の在庫状況により納期が変動する場合がございます。</Text>
-          <Text style={{ fontSize: 9 }}>※ 本見積書の有効期限は発行日より1ヶ月です。</Text>
         </View>
       </Page>
     </Document>
