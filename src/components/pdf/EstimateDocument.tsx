@@ -34,12 +34,12 @@ export interface EstimateDocumentProps {
     date: string;
     customer: { name: string; address?: string; };
     jobs: {
-      id: string; // Internal ID
+      id: string;
       inquiryNumber: string;
-      partnerRef?: string; // 貴社管理No
+      partnerRef?: string;
       endUserName?: string;
+      customerNote?: string;
       watch: { brand: string; model: string; ref?: string; serial?: string; };
-      diagnosis?: string;
       items: { name: string; price: number; }[];
     }[];
   }
@@ -91,8 +91,8 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
             const watchInfo = `${job.watch.brand} ${job.watch.model}\nRef: ${job.watch.ref || '-'} / Ser: ${job.watch.serial || '-'}`;
 
             return (
-              <View key={idx} style={[styles.b2bRow, { minHeight: 40 }]}>
-                {/* Columns */}
+              <View key={idx} style={[styles.b2bRow, { minHeight: 30 }]}>
+                {/* メイン行 */}
                 <View style={{ flexDirection: 'row' }}>
                   <Text style={[styles.colNo, { width: '5%' }]}>{idx + 1}</Text>
                   <Text style={[styles.colInquiry, { width: '10%' }]}>{job.inquiryNumber}</Text>
@@ -100,7 +100,7 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
                   <Text style={[styles.colEndUser, { width: '15%' }]}>{job.endUserName || '-'}</Text>
                   <Text style={[styles.colWatch, { width: '30%', fontSize: 8 }]}>{watchInfo}</Text>
 
-                  {/* Items Inner List with Prices */}
+                  {/* 作業明細 */}
                   <View style={{ width: '20%', paddingLeft: 4, borderLeftWidth: 1, borderColor: '#eee' }}>
                     {job.items.map((item, i) => (
                       <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 1 }}>
@@ -112,6 +112,14 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
 
                   <Text style={[styles.colTotal, { width: '10%' }]}>¥{jobTotal.toLocaleString()}</Text>
                 </View>
+
+                {/* ご連絡事項行（入力がある場合のみ） */}
+                {job.customerNote ? (
+                  <View style={{ flexDirection: 'row', marginTop: 3, backgroundColor: '#f5f7fa', borderTopWidth: 1, borderColor: '#e2e8f0', paddingVertical: 2, paddingHorizontal: 4 }}>
+                    <Text style={{ fontSize: 7, color: '#1e40af', fontWeight: 'bold', width: '18%' }}>ご連絡事項:</Text>
+                    <Text style={{ fontSize: 7, color: '#333', width: '82%' }}>{job.customerNote}</Text>
+                  </View>
+                ) : null}
               </View>
             );
           })}

@@ -240,6 +240,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
     const [diagnosis, setDiagnosis] = useState(initialData?.workSummary || ""); // Diagnosis/Request details
     const [internalNotes, setInternalNotes] = useState(initialData?.internalNotes || "");
+    const [customerNote, setCustomerNote] = useState(initialData?.customerNote || "");
 
     // --- 4. PHOTOS ---
     const [photos, setPhotos] = useState<any[]>(initialData?.photos || []);
@@ -372,6 +373,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     diagnosis,
                     partnerRef,
                     internalNotes,
+                    customerNote,
                     accessories: accessories.split(',').map(s => s.trim()).filter(Boolean),
                     endUserName
                 },
@@ -612,6 +614,10 @@ ${shopName}
                                 <div>
                                     <Label className="text-[9px] text-zinc-400">社内メモ</Label>
                                     <Textarea className="min-h-[60px] text-xs resize-none bg-zinc-50" value={internalNotes} onChange={e => setInternalNotes(e.target.value)} />
+                                </div>
+                                <div>
+                                    <Label className="text-[9px] text-blue-500 font-semibold">お客様連絡事項（見積書に記載）</Label>
+                                    <Textarea className="min-h-[60px] text-xs resize-none bg-blue-50/40 border-blue-200" value={customerNote} onChange={e => setCustomerNote(e.target.value)} placeholder="お客様へお伝えする事項を入力（見積書のご連絡事項欄に印字されます）" />
                                 </div>
                             </div>
                         </Card>

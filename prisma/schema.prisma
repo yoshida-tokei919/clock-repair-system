@@ -152,6 +152,7 @@ model Repair {
   
   workSummary          String?
   internalNotes        String?
+  customerNote         String?
   // SEO Flags
   isPublicB2C          Boolean   @default(false)
   isPublicB2B          Boolean   @default(false)

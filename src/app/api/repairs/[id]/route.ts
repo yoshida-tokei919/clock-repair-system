@@ -168,6 +168,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     accessories: JSON.stringify(body.request?.accessories || []),
                     workSummary: body.request?.diagnosis || null,
                     internalNotes: body.request?.internalNotes || null,
+                    customerNote: body.request?.customerNote ?? null,
                     endUserName: body.customer?.endUserName || null,
                 }
             });

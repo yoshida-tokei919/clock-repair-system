@@ -28,7 +28,9 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
         return {
             id: String(repair.id),
             inquiryNumber: repair.inquiryNumber,
+            partnerRef: repair.partnerRef || undefined,
             endUserName: (repair as any).endUserName || undefined,
+            customerNote: (repair as any).customerNote || "",
             watch: {
                 brand: repair.watch.brand?.name || "",
                 model: repair.watch.model?.name || "",

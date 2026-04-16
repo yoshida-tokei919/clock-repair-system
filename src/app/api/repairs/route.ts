@@ -285,8 +285,9 @@ export async function POST(req: Request) {
                     partnerRef,
                     status: dbStatus,
                     accessories: JSON.stringify(body.request.accessories || []),
-                    workSummary: body.request.diagnosis, // Using diagnosis field as summary request
+                    workSummary: body.request.diagnosis,
                     internalNotes: body.request.internalNotes,
+                    customerNote: body.request.customerNote || null,
                     estimatedWorkMinutes: 0,
                     endUserName: body.customer.endUserName || null,
                 }

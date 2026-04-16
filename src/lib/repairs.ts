@@ -39,6 +39,8 @@ export async function getRepairDataForPDF(id: number) {
             {
                 inquiryId: repair.inquiryNumber,
                 partnerRef: repair.partnerRef,
+                endUserName: repair.endUserName,
+                customerNote: repair.customerNote || "",
                 watch: {
                     brand: repair.watch.brand.name,
                     model: repair.watch.model.name,
