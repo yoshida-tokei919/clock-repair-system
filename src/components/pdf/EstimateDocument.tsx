@@ -88,7 +88,7 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
           {/* Rows */}
           {data.jobs.map((job, idx) => {
             const jobTotal = job.items.reduce((s, i) => s + i.price, 0);
-            const watchInfo = `${job.watch.brand} ${job.watch.model}\n${job.watch.ref || '-'} / Ser.${job.watch.serial || '-'}`;
+            const watchInfo = `${job.watch.brand} ${job.watch.model}\nRef: ${job.watch.ref || '-'} / Ser: ${job.watch.serial || '-'}`;
 
             return (
               <View key={idx} style={[styles.b2bRow, { minHeight: 40 }]}>
