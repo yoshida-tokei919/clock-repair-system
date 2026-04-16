@@ -19,19 +19,19 @@ export function DeliveryPDFClient({ data }: DeliveryDocumentProps) {
     if (instance.error) return <div className="p-10 text-center text-red-500">Error: {String(instance.error)}</div>;
 
     return (
-        <div className="min-h-screen bg-gray-100 p-8 flex flex-col items-center">
-            <div className="bg-white p-4 rounded shadow mb-4 w-full max-w-4xl flex justify-between items-center">
-                <h1 className="font-bold text-lg">納品書プレビュー: {data.deliveryNumber}</h1>
+        <div className="h-screen flex flex-col bg-gray-100">
+            <div className="bg-white px-6 py-3 shadow flex justify-between items-center shrink-0">
+                <h1 className="font-bold text-lg">納品書: {data.deliveryNumber}</h1>
                 <a
                     href={instance.url || "#"}
                     download={`delivery_${data.deliveryNumber}.pdf`}
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
                 >
                     PDFダウンロード
                 </a>
             </div>
             {instance.url && (
-                <iframe src={instance.url} className="w-full max-w-4xl h-[800px] border rounded shadow" />
+                <iframe src={instance.url} className="flex-1 w-full border-0" />
             )}
         </div>
     );
