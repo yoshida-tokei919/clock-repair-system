@@ -133,7 +133,6 @@ export function InvoiceDocument({ data }: InvoiceDocumentProps) {
                     <Text style={{ fontSize: 9 }}>三井住友銀行</Text>
                     <Text style={{ fontSize: 9 }}>普通 3602468</Text>
                     <Text style={{ fontSize: 9, marginBottom: 4 }}>ヨシダ シュウヘイ</Text>
-                    <Text style={{ fontSize: 8, color: '#666' }}>※ 振込手数料は貴社にてご負担願います。</Text>
                 </View>
             </Page>
         </Document>
