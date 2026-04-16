@@ -66,7 +66,7 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
                     <Text style={styles.title}>納 品 書</Text>
                     <View style={{ alignItems: 'flex-end' }}>
                         <Text style={styles.date}>発行日: {data.date}</Text>
-                        <Text style={{ fontSize: 10, marginTop: 2 }}>伝票No. {data.deliveryNumber}</Text>
+                        <Text style={{ fontSize: 10, marginTop: 2 }}>No. {data.deliveryNumber}</Text>
                     </View>
                 </View>
 
@@ -75,7 +75,7 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
                     <View style={{ width: '55%' }}>
                         <Text style={styles.recipient}>{data.customer.name} 御中</Text>
                         <Text style={{ fontSize: 9, color: '#555', marginTop: 4 }}>{data.customer.address || ""}</Text>
-                        <Text style={{ fontSize: 9, marginTop: 10 }}>ご依頼の修理が完了いたしましたので、下記の通り納品申し上げます。</Text>
+                        <Text style={{ fontSize: 9, marginTop: 10 }}>下記の通り納品申し上げます。</Text>
                     </View>
                     <View style={{ width: '40%' }}>
                         <Text style={styles.sender}>ヨシダ時計修理工房</Text>
@@ -90,7 +90,7 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
                         <Text style={[styles.colNo, { width: '5%' }]}>No.</Text>
                         <Text style={[styles.colInquiry, { width: '10%' }]}>管理No</Text>
                         <Text style={[styles.colInquiry, { width: '10%' }]}>貴社管理No</Text>
-                        <Text style={[styles.colEndUser, { width: '15%' }]}>顧客名</Text>
+                        <Text style={[styles.colEndUser, { width: '15%' }]}>お客様名</Text>
                         <Text style={[styles.colWatch, { width: '35%' }]}>時計情報 (Ref含) / 明細(単価)</Text>
                         <Text style={[styles.colTotal, { width: '15%' }]}>小計(税抜)</Text>
                     </View>
