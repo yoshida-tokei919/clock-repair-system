@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
@@ -177,11 +177,17 @@ const AdvancedCombobox: React.FC<{
 // --- MAIN FORM ---
 interface Props {
     initialData?: any;
-    mode?: 'create' | 'edit';
+    mode?: 'create' | 'edit' | 'view';
 }
 export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const router = useRouter();
     const [isSaving, setIsSaving] = useState(false);
+    const [isEditingEnabled, setIsEditingEnabled] = useState(mode !== 'view');
+    const isReadOnly = mode === 'view' && !isEditingEnabled;
+
+    useEffect(() => {
+        setIsEditingEnabled(mode !== 'view');
+    }, [mode, initialData?.id]);
 
     // --- 1. CORE DATA ---
     const [status, setStatus] = useState<string>(initialData?.status || "reception");
@@ -245,6 +251,14 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // --- 4. PHOTOS ---
     const [photos, setPhotos] = useState<any[]>(initialData?.photos || []);
     const [isUploading, setIsUploading] = useState(false);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [isCameraReady, setIsCameraReady] = useState(false);
+    const [isCapturing, setIsCapturing] = useState(false);
+    const [cameraError, setCameraError] = useState<string | null>(null);
+    const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const mediaStreamRef = useRef<MediaStream | null>(null);
 
     // --- 5. MASTERS & OPTIONS ---
     const [brandOpts, setBrandOpts] = useState<any[]>([]);
@@ -271,12 +285,24 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         shippingFee,
         status
     };
+    const warrantyDocumentUrl = initialData?.issuedWarranty
+        ? `/documents/warranty/${initialData.issuedWarranty.id}`
+        : null;
 
     // --- AUTOMATION: Shipping Fee ---
     useEffect(() => {
         const fee = getShippingFeeByAddress(address);
         setShippingFee(fee);
     }, [address]);
+
+    useEffect(() => {
+        return () => {
+            if (mediaStreamRef.current) {
+                mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                mediaStreamRef.current = null;
+            }
+        };
+    }, []);
 
     // --- INITIAL LOAD ---
     useEffect(() => {
@@ -325,7 +351,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         if (addItemCategory === 'internal') {
             // Fetch labor/work rules
             getPricingRules(b.id, m?.id, c?.id).then(rules => {
-                setWorkOpts(rules.map(r => ({
+                const safeRules = Array.isArray(rules) ? rules : [];
+                setWorkOpts(safeRules.map(r => ({
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
                     price: r.minPrice
@@ -352,6 +379,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
     // --- ACTIONS ---
     const handleSave = async () => {
+        if (isReadOnly) return;
         if (!brand || !customerName) {
             alert("「ブランド」と「顧客名」は必須です。");
             return;
@@ -391,9 +419,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 photos
             };
 
-            const url = mode === 'edit' ? `/api/repairs/${initialData.id}` : "/api/repairs";
+            const url = mode !== 'create' ? `/api/repairs/${initialData.id}` : "/api/repairs";
             const res = await fetch(url, {
-                method: mode === 'edit' ? "PATCH" : "POST",
+                method: mode !== 'create' ? "PATCH" : "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
@@ -402,8 +430,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             const json = await res.json();
 
             // Redirect or Notify
-            if (mode === 'create') router.push(`/repairs/${json.repair.id}`);
-            else router.refresh();
+            if (mode === 'create') {
+                router.push(`/repairs/${json.repair.id}`);
+            } else {
+                if (mode === 'view') setIsEditingEnabled(false);
+                router.refresh();
+            }
 
         } catch (e) {
             console.error(e);
@@ -413,10 +445,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         }
     };
 
-    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files?.length) return;
+    const uploadPhotoFile = async (file: File) => {
         setIsUploading(true);
-        const file = e.target.files[0];
         try {
             const compressed = await imageCompression(file, { maxSizeMB: 1, useWebWorker: true });
             const fd = new FormData();
@@ -433,6 +463,118 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             alert("画像アップロードエラー");
         } finally {
             setIsUploading(false);
+        }
+    };
+
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (isReadOnly) return;
+        const file = e.target.files?.[0];
+        if (!file) return;
+        await uploadPhotoFile(file);
+        e.target.value = "";
+    };
+
+    const stopCameraStream = () => {
+        if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            mediaStreamRef.current = null;
+        }
+    };
+
+    const closeCameraDialog = () => {
+        stopCameraStream();
+        setIsCameraOpen(false);
+        setIsCameraReady(false);
+        setCapturedPreview(null);
+        setCameraError(null);
+        setIsCapturing(false);
+    };
+
+    const openCameraDialog = async () => {
+        if (isReadOnly) return;
+        if (isCapturing) return;
+
+        const isSecureContextAvailable = typeof window !== "undefined" &&
+            (window.isSecureContext || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+        if (!isSecureContextAvailable) {
+            setCameraError("カメラ機能は HTTPS または localhost でのみ利用できます。");
+            setIsCameraOpen(true);
+            return;
+        }
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+            setCameraError("このブラウザではカメラ機能を利用できません。");
+            setIsCameraOpen(true);
+            return;
+        }
+
+        setIsCameraOpen(true);
+        setIsCameraReady(false);
+        setCapturedPreview(null);
+        setCameraError(null);
+
+        try {
+            stopCameraStream();
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" },
+                audio: false
+            });
+            mediaStreamRef.current = stream;
+
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                await videoRef.current.play();
+            }
+
+            setIsCameraReady(true);
+        } catch (error) {
+            console.error(error);
+            setCameraError("カメラを起動できませんでした。ブラウザの権限設定をご確認ください。");
+        }
+    };
+
+    const captureCameraPhoto = () => {
+        if (!videoRef.current || !canvasRef.current || !isCameraReady) return;
+
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+
+        const context = canvas.getContext("2d");
+        if (!context) {
+            setCameraError("撮影画像の生成に失敗しました。");
+            return;
+        }
+
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        setCapturedPreview(canvas.toDataURL("image/jpeg", 0.92));
+        stopCameraStream();
+        setIsCameraReady(false);
+    };
+
+    const saveCapturedPhoto = async () => {
+        if (!canvasRef.current || isCapturing) return;
+
+        setIsCapturing(true);
+        try {
+            const blob = await new Promise<Blob | null>((resolve) => {
+                canvasRef.current?.toBlob(resolve, "image/jpeg", 0.92);
+            });
+
+            if (!blob) {
+                throw new Error("capture_failed");
+            }
+
+            const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+            await uploadPhotoFile(file);
+            closeCameraDialog();
+        } catch (error) {
+            console.error(error);
+            setCameraError("撮影画像の保存に失敗しました。");
+        } finally {
+            setIsCapturing(false);
         }
     };
 
@@ -480,41 +622,62 @@ ${shopName}
                     <div className="flex flex-col">
                         <span className="text-[10px] text-zinc-500 font-bold tracking-wider">修理受付システム</span>
                         <h1 className="text-lg font-bold leading-none text-zinc-800">
-                            {mode === 'edit' ? `修理番号: ${initialData?.inquiryNumber}` : "新規修理登録"}
+                            {mode !== 'create' ? `修理番号: ${initialData?.inquiryNumber}` : "新規修理登録"}
                         </h1>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    {mode === 'view' && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setIsEditingEnabled(prev => !prev)}
+                            className="h-9 px-4 font-bold"
+                        >
+                            {isReadOnly ? "編集する" : "閲覧に戻る"}
+                        </Button>
+                    )}
                     {shippingFee > 0 && (
                         <div className="hidden lg:flex items-center gap-1.5 px-3 h-8 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
                             <Truck className="w-3.5 h-3.5" />
                             送料目安: ¥{shippingFee.toLocaleString()}
                         </div>
                     )}
-                    {mode === 'edit' && (
+                    {mode !== 'create' && (
                         <div className="flex bg-white rounded-md border border-zinc-300 overflow-hidden shadow-sm mr-2">
                             <button onClick={() => handleLineSend('status')} className="px-3 py-1.5 hover:bg-green-50 text-[10px] border-r flex items-center gap-1 text-green-700 font-bold transition-colors">
                                 <MessageCircle className="w-3.5 h-3.5" /> LINE連絡
                             </button>
-                            <button onClick={() => setShowPdfDialog(true)} className="px-3 py-1.5 hover:bg-zinc-100 text-[10px] flex items-center gap-1 text-zinc-700 font-bold transition-colors">
-                                <FileText className="w-3.5 h-3.5" /> 帳票出力
+                            <button
+                                onClick={() => {
+                                    if (warrantyDocumentUrl) {
+                                        window.open(warrantyDocumentUrl, "_blank", "noopener,noreferrer");
+                                    }
+                                }}
+                                disabled={!warrantyDocumentUrl}
+                                className="px-3 py-1.5 hover:bg-zinc-100 text-[10px] flex items-center gap-1 text-zinc-700 font-bold transition-colors disabled:text-zinc-400 disabled:hover:bg-transparent"
+                            >
+                                <FileText className="w-3.5 h-3.5" /> 保証書
                             </button>
                         </div>
                     )}
-                    <Button
-                        size="sm"
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className={cn("h-9 px-6 font-bold shadow-md transition-all active:scale-95", isSaving ? "bg-zinc-400" : "bg-blue-600 hover:bg-blue-500")}
-                    >
-                        {isSaving ? "保存中..." : "保存 (Save)"}
-                    </Button>
+                    {!isReadOnly && (
+                        <Button
+                            size="sm"
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className={cn("h-9 px-6 font-bold shadow-md transition-all active:scale-95", isSaving ? "bg-zinc-400" : "bg-blue-600 hover:bg-blue-500")}
+                        >
+                            {isSaving ? "保存中..." : "保存 (Save)"}
+                        </Button>
+                    )}
                 </div>
             </div>
 
 
             {/* --- MAIN CONTENT (Simple Vertical Layout) --- */}
             <div className="flex-1 p-3 overflow-y-auto">
+                <fieldset disabled={isReadOnly} className="contents">
                 <div className="flex flex-col gap-4 max-w-4xl mx-auto h-full">
 
                     {/* LEFT COL: CUSTOMER & WATCH (4/12) */}
@@ -723,9 +886,21 @@ ${shopName}
                             <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase">
                                 <ImageIcon className="w-3.5 h-3.5" /> 写真
                             </h3>
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setMobileQR(true)}>
-                                <Smartphone className="w-4 h-4 text-blue-500" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-[10px] font-bold text-zinc-700"
+                                    onClick={openCameraDialog}
+                                    disabled={isUploading || isCapturing}
+                                >
+                                    <Camera className="w-4 h-4 mr-1 text-zinc-600" />
+                                    カメラで撮影
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { if (isReadOnly) return; setMobileQR(true); }}>
+                                    <Smartphone className="w-4 h-4 text-blue-500" />
+                                </Button>
+                            </div>
                         </div>
 
                         <div className="flex-1 bg-zinc-100 rounded-md inner-shadow overflow-y-auto p-2 grid grid-cols-2 gap-2 auto-rows-min content-start">
@@ -741,13 +916,14 @@ ${shopName}
                                     <img src={`https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev/${p.storageKey}`} className="w-full h-full object-cover" />
                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                         <button className="text-white hover:text-blue-300"><Eye className="w-4 h-4" /></button>
-                                        <button onClick={() => setPhotos(photos.filter((_, x) => x !== i))} className="text-white hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                                        <button onClick={() => { if (isReadOnly) return; setPhotos(photos.filter((_, x) => x !== i)); }} className="text-white hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </Card>
                 </div>
+                </fieldset>
             </div>
 
             {/* --- DIALOGS --- */}
@@ -774,6 +950,57 @@ ${shopName}
                     console.log("Photos uploaded from mobile");
                 }}
             />
+
+            <Dialog open={isCameraOpen} onOpenChange={(open) => { if (!open) closeCameraDialog(); }}>
+                <DialogContent className="h-[95vh] w-[95vw] max-w-none p-0">
+                    <DialogHeader>
+                        <div className="border-b bg-white px-6 py-4">
+                            <DialogTitle>カメラで撮影</DialogTitle>
+                            <DialogDescription>撮影した画像をそのまま写真一覧へ追加します。</DialogDescription>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="flex h-[calc(95vh-140px)] flex-col bg-zinc-950">
+                        {cameraError && (
+                            <div className="mx-4 mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                {cameraError}
+                            </div>
+                        )}
+
+                        <div className="min-h-0 flex-1 overflow-hidden bg-zinc-950">
+                            {capturedPreview ? (
+                                <img src={capturedPreview} alt="撮影プレビュー" className="h-full w-full object-cover" />
+                            ) : (
+                                <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                            )}
+                        </div>
+
+                        <canvas ref={canvasRef} className="hidden" />
+                    </div>
+
+                    <DialogFooter className="border-t bg-white px-6 py-4 sm:justify-between">
+                        <Button type="button" variant="outline" onClick={closeCameraDialog}>
+                            閉じる
+                        </Button>
+                        <div className="flex gap-2">
+                            {capturedPreview ? (
+                                <>
+                                    <Button type="button" variant="outline" onClick={openCameraDialog} disabled={isCapturing || isUploading}>
+                                        再撮影
+                                    </Button>
+                                    <Button type="button" onClick={saveCapturedPhoto} disabled={isCapturing || isUploading}>
+                                        {isCapturing || isUploading ? "保存中..." : "この写真を追加"}
+                                    </Button>
+                                </>
+                            ) : (
+                                <Button type="button" onClick={captureCameraPhoto} disabled={!isCameraReady || isCapturing}>
+                                    撮影
+                                </Button>
+                            )}
+                        </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <PDFPreviewDialog
                 isOpen={showPdfDialog}

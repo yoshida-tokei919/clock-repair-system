@@ -6,6 +6,9 @@ import { revalidatePath } from "next/cache";
 export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty') {
     try {
         if (repairIds.length === 0) return { success: false, error: "No repairs selected" };
+        if (type === 'invoice' || type === 'warranty') {
+            return { success: false, error: "請求書と保証書は一覧画面から作成できません" };
+        }
 
         const repairs = await prisma.repair.findMany({
             where: { id: { in: repairIds } },
@@ -151,6 +154,62 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
         revalidatePath("/repairs");
         return { success: true, count: createdCount, documentId: createdCount === 1 ? lastDocumentId : null };
 
+    } catch (e) {
+        console.error(e);
+        return { success: false, error: e instanceof Error ? e.message : "Unknown error" };
+    }
+}
+
+export async function generateWarrantyDocument(repairId: number) {
+    try {
+        const repair = await prisma.repair.findUnique({
+            where: { id: repairId },
+            include: {
+                customer: true,
+                warranty: true,
+            }
+        });
+
+        if (!repair) return { success: false, error: "Repair not found" };
+        if (repair.warrantyId && repair.warranty) {
+            return { success: true, documentId: repair.warranty.id, alreadyIssued: true };
+        }
+
+        const customer = repair.customer;
+        const prefix = customer.prefix || "X";
+
+        const lastWarranty = await prisma.warranty.findFirst({
+            where: { warrantyNumber: { startsWith: prefix } },
+            orderBy: { id: 'desc' }
+        });
+        const seq = lastWarranty
+            ? (parseInt(lastWarranty.warrantyNumber.replace(/\D/g, '') || '0', 10) + 1)
+            : 1;
+        const warrantyNumber = `${prefix}W-${String(seq).padStart(3, '0')}`;
+
+        const baseDate = repair.deliveryDateActual || new Date();
+        const guaranteeEnd = new Date(baseDate);
+        guaranteeEnd.setFullYear(guaranteeEnd.getFullYear() + 1);
+
+        const warranty = await prisma.warranty.create({
+            data: {
+                warrantyNumber,
+                customerId: customer.id,
+                guaranteeStart: baseDate,
+                guaranteeEnd,
+                repairs: { connect: [{ id: repair.id }] }
+            }
+        });
+
+        await prisma.customer.update({
+            where: { id: customer.id },
+            data: { seqWarranty: seq }
+        });
+
+        revalidatePath("/repairs");
+        revalidatePath(`/repairs/${repairId}`);
+
+        return { success: true, documentId: warranty.id, alreadyIssued: false };
     } catch (e) {
         console.error(e);
         return { success: false, error: e instanceof Error ? e.message : "Unknown error" };

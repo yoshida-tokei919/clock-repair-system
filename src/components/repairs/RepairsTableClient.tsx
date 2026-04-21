@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Repair, Customer, Brand, Model, Watch } from "@prisma/client";
 import { RepairListStatusSelect } from "@/components/repairs/RepairListStatusSelect";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileText, Truck, Receipt, ShieldCheck } from "lucide-react";
+import { FileText, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ClickToCopy } from "@/components/ui/click-to-copy";
@@ -35,19 +35,19 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         if (selectedIds.length === repairs.length) {
             setSelectedIds([]);
         } else {
-            setSelectedIds(repairs.map(r => r.id));
+            setSelectedIds(repairs.map((r) => r.id));
         }
     };
 
     const toggleSelect = (id: number) => {
         if (selectedIds.includes(id)) {
-            setSelectedIds(selectedIds.filter(i => i !== id));
+            setSelectedIds(selectedIds.filter((i) => i !== id));
         } else {
             setSelectedIds([...selectedIds, id]);
         }
     };
 
-    const handleBulkAction = async (type: 'delivery' | 'invoice' | 'estimate' | 'warranty') => {
+    const handleBulkAction = async (type: "delivery" | "estimate") => {
         if (selectedIds.length === 0) return;
         setIsGenerating(true);
         try {
@@ -57,26 +57,26 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     title: "作成完了",
                     description: `${result.count}件のドキュメントを作成しました。`,
                 });
-                // Redirect to the first created document, or a list? 
-                // For now, if single doc created, go to it.
                 if (result.documentId) {
-                    if (type === 'delivery') router.push(`/documents/delivery/${result.documentId}`);
-                    if (type === 'invoice') router.push(`/documents/invoice/${result.documentId}`);
-                    if (type === 'estimate') router.push(`/documents/estimate/${result.documentId}`);
-                    if (type === 'warranty') router.push(`/documents/warranty/${result.documentId}`);
+                    if (type === "delivery") router.push(`/documents/delivery/${result.documentId}`);
+                    if (type === "estimate") router.push(`/documents/estimate/${result.documentId}`);
                 } else {
-                    router.refresh(); // Refresh to show updated status/links
+                    router.refresh();
                 }
             } else {
                 toast({
                     title: "エラー",
                     description: result.error,
-                    variant: "destructive"
+                    variant: "destructive",
                 });
             }
         } catch (e) {
             console.error(e);
-            toast({ title: "エラー", description: "予期せぬエラーが発生しました", variant: "destructive" });
+            toast({
+                title: "エラー",
+                description: "予期せぬエラーが発生しました",
+                variant: "destructive",
+            });
         } finally {
             setIsGenerating(false);
         }
@@ -84,26 +84,17 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
 
     return (
         <div className="space-y-4">
-            {/* Bulk Actions Toolbar */}
             {selectedIds.length > 0 && (
                 <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-md animate-in fade-in slide-in-from-top-2">
                     <span className="font-bold text-blue-700">{selectedIds.length}件選択中</span>
                     <div className="h-4 w-px bg-blue-300 mx-2" />
-                    <Button size="sm" variant="outline" onClick={() => handleBulkAction('estimate')} disabled={isGenerating}>
+                    <Button size="sm" variant="outline" onClick={() => handleBulkAction("estimate")} disabled={isGenerating}>
                         <FileText className="mr-2 h-4 w-4" />
                         見積書作成
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleBulkAction('delivery')} disabled={isGenerating}>
+                    <Button size="sm" variant="outline" onClick={() => handleBulkAction("delivery")} disabled={isGenerating}>
                         <Truck className="mr-2 h-4 w-4" />
                         納品書作成
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleBulkAction('invoice')} disabled={isGenerating}>
-                        <Receipt className="mr-2 h-4 w-4" />
-                        請求書作成
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleBulkAction('warranty')} disabled={isGenerating}>
-                        <ShieldCheck className="mr-2 h-4 w-4" />
-                        保証書作成
                     </Button>
                 </div>
             )}
@@ -134,12 +125,12 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                 </td>
                             </tr>
                         ) : (
-                            repairs.map(repair => (
+                            repairs.map((repair) => (
                                 <tr
                                     key={repair.id}
                                     className={cn(
                                         "transition-colors cursor-pointer",
-                                        selectedIds.includes(repair.id) ? 'bg-blue-50/50' : 'hover:bg-slate-50'
+                                        selectedIds.includes(repair.id) ? "bg-blue-50/50" : "hover:bg-slate-50"
                                     )}
                                     onClick={() => router.push(`/repairs/${repair.id}`)}
                                 >
@@ -171,7 +162,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                         {(repair as any).endUserName && (
                                             <div className="text-xs text-slate-500 font-bold">{(repair as any).endUserName} 様</div>
                                         )}
-                                        <div className="text-xs text-slate-400">{repair.customer.type === 'business' ? '業者' : '一般'}</div>
+                                        <div className="text-xs text-slate-400">{repair.customer.type === "business" ? "業者" : "一般"}</div>
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="font-bold text-slate-800">

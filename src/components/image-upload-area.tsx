@@ -98,9 +98,9 @@ export function ImageUploadArea({ onImagesProcessed, className }: ImageUploadAre
                         <ImageIcon className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <div className="space-y-1">
-                        <h3 className="font-semibold text-lg">Upload Photos</h3>
+                        <h3 className="font-semibold text-lg">写真をアップロード</h3>
                         <p className="text-sm text-muted-foreground">
-                            Drag & drop or use buttons below
+                            ドラッグ&ドロップ、または下のボタンから追加
                         </p>
                     </div>
 
@@ -111,7 +111,7 @@ export function ImageUploadArea({ onImagesProcessed, className }: ImageUploadAre
                             onClick={open}
                             disabled={isProcessing}
                         >
-                            Select Files
+                            ファイルを選択
                         </Button>
 
                         {/* Camera Button (Mobile Friendly) */}
@@ -122,7 +122,7 @@ export function ImageUploadArea({ onImagesProcessed, className }: ImageUploadAre
                                 className="gap-2"
                             >
                                 <Camera className="w-4 h-4" />
-                                Camera
+                                カメラ
                             </Button>
                             <input
                                 type="file"
@@ -140,7 +140,7 @@ export function ImageUploadArea({ onImagesProcessed, className }: ImageUploadAre
                     <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center p-4">
                         <div className="w-full max-w-xs space-y-2">
                             <div className="flex justify-between text-sm font-medium">
-                                <span>Compressing...</span>
+                                <span>圧縮中...</span>
                                 <span>{progress.current} / {progress.total}</span>
                             </div>
                             <ProgressBar value={progress.current} max={progress.total} />
@@ -156,7 +156,7 @@ export function ImageUploadArea({ onImagesProcessed, className }: ImageUploadAre
                         <div key={idx} className="group relative aspect-square rounded-md overflow-hidden border bg-background">
                             <img
                                 src={img.previewUrl}
-                                alt="Preview"
+                                alt="プレビュー"
                                 className="w-full h-full object-cover"
                             />
                             <button

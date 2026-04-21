@@ -8,15 +8,15 @@ import { PartsOrderStatusList } from "@/components/dashboard/PartsOrderStatusLis
 import { PlusCircle, FileText, Settings, User as UserIcon } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Dashboard - Clock Repair System",
-  description: "Management Dashboard",
+  title: "ダッシュボード | 時計修理管理システム",
+  description: "管理ダッシュボード",
 };
+
 export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
-      {/* Header Actions */}
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">ダッシュボード</h2>
         <div className="flex items-center space-x-2">
@@ -59,26 +59,21 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 1. Status Cards */}
       <StatusOverview />
 
-      {/* 2. Parts Order Status (Always visible, very important for operations) */}
       <div className="grid gap-4">
         <PartsOrderStatusList />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* 3. Charts (Bottom Left) */}
         <div className="col-span-4">
           <SalesAnalytics />
         </div>
 
-        {/* 4. Recent Repairs (Bottom Right) */}
         <div className="col-span-3">
           <UrgentTaskList />
         </div>
       </div>
-
     </div>
   );
 }

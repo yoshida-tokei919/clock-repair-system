@@ -531,7 +531,7 @@ const HTML_FLOW_FOOTER = `
     <div class="container">
         <img src="/img/logo.png" alt="ヨシダ時計修理工房 ロゴ" class="footer-logo-img">
         <div class="footer-name">ヨシダ時計修理工房</div>
-        <p class="copyright">&copy; 2026 Yoshida Watch Repair Studio. All Rights Reserved.</p>
+        <p class="copyright">&copy; 2026 ヨシダ時計修理工房 All rights reserved.</p>
     </div>
 </footer>
 `;
