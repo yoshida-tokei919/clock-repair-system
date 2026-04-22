@@ -148,15 +148,34 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             }
 
             // 3. Update Repair Fields
+            // §12 確定ステータス定義
             const statusMapping: Record<string, string> = {
-                "reception": "reception",
-                "diagnosing": "diagnosing",
-                "parts_wait": "parts_wait",
+                "reception":          "reception",
+                "diagnosing":         "diagnosing",
+                "approval_wait":      "approval_wait",
+                "parts_wait":         "parts_wait",
                 "parts_wait_ordered": "parts_wait_ordered",
-                "in_progress": "in_progress",
-                "completed": "completed",
-                "delivered": "delivered",
-                "canceled": "canceled"
+                "parts_arrived":      "parts_arrived",
+                "work_wait":          "work_wait",
+                "in_progress":        "in_progress",
+                "work_completed":     "work_completed",
+                "delivered":          "delivered",
+                "canceled":           "canceled",
+                "on_hold":            "on_hold",
+            };
+            const keyToLabel: Record<string, string> = {
+                "reception":          "受付",
+                "diagnosing":         "見積中",
+                "approval_wait":      "承認待ち",
+                "parts_wait":         "部品待ち(未注文)",
+                "parts_wait_ordered": "部品待ち(注文済み)",
+                "parts_arrived":      "部品入荷済み",
+                "work_wait":          "作業待ち",
+                "in_progress":        "作業中",
+                "work_completed":     "作業完了",
+                "delivered":          "納品済み",
+                "canceled":           "キャンセル",
+                "on_hold":            "保留",
             };
             const dbStatus = statusMapping[body.status] || body.status;
 
@@ -172,6 +191,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     endUserName: body.customer?.endUserName || null,
                 }
             });
+
+            // RepairStatusLog: ステータスが変化した場合のみ記録
+            if (dbStatus !== repairRecord.status) {
+                const statusLabel = keyToLabel[dbStatus] || dbStatus;
+                const logDateStr = body.statusLog?.[dbStatus];
+                let changedAt = new Date();
+                if (logDateStr) {
+                    const parts = logDateStr.split('/');
+                    if (parts.length === 3) {
+                        changedAt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                    }
+                }
+                await tx.repairStatusLog.create({
+                    data: { repairId: id, status: statusLabel, changedAt }
+                });
+            }
 
             // 4. Update Estimates
             if (body.estimate?.items) {

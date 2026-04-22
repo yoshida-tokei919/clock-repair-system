@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import dynamic from "next/dynamic";
 import imageCompression from 'browser-image-compression';
 import {
-    ArrowLeft, Camera, Printer, Save, Search, Check, ChevronDown, User, Watch,
+    ArrowLeft, Camera, Printer, Save, Search, Check, ChevronDown, ChevronRight, User, Watch,
     Settings, Trash2, Plus, Image as ImageIcon, MapPin, Phone, Mail, MessageCircle,
     Clock, CheckCircle, Smartphone, FileText, RefreshCw, AlertTriangle, ExternalLink, Calendar,
     Eye, Truck
@@ -43,15 +43,37 @@ import { MobileConnectDialog } from "@/components/repairs/MobileConnectDialog";
 // Dynamically import PDF Dialog (Client only)
 const PDFPreviewDialog = dynamic(() => import("@/components/repairs/PDFPreviewDialog"), { ssr: false });
 
-// Define Status Steps (FMP Style Linear Flow)
+// §12 確定ステータス定義（2026/04/22）
 const STATUS_STEPS: { id: string; label: string }[] = [
-    { id: "reception", label: "受付" },
-    { id: "diagnosing", label: "見積中" },
-    { id: "parts_wait", label: "部品待" },
-    { id: "in_progress", label: "作業中" },
-    { id: "completed", label: "完了" },
-    { id: "delivered", label: "納品済" },
+    { id: "reception",          label: "受付" },
+    { id: "diagnosing",         label: "見積中" },
+    { id: "approval_wait",      label: "承認待ち" },
+    { id: "parts_wait",         label: "部品待ち(未注文)" },
+    { id: "parts_wait_ordered", label: "部品待ち(注文済み)" },
+    { id: "parts_arrived",      label: "部品入荷済み" },
+    { id: "work_wait",          label: "作業待ち" },
+    { id: "in_progress",        label: "作業中" },
+    { id: "work_completed",     label: "作業完了" },
+    { id: "delivered",          label: "納品済み" },
+    { id: "canceled",           label: "キャンセル" },
+    { id: "on_hold",            label: "保留" },
 ];
+
+// ステータスバーに横並び表示するメインフロー（保留・キャンセルは除外）
+const MAIN_STATUS_STEPS = STATUS_STEPS.filter(s => s.id !== 'canceled' && s.id !== 'on_hold');
+
+// "YYYY/M/D" ↔ "YYYY-MM-DD" 変換ヘルパー
+function toInputDate(localeDate: string): string {
+    if (!localeDate) return '';
+    const parts = localeDate.split('/');
+    if (parts.length !== 3) return '';
+    return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+}
+function toLocaleDate(isoDate: string): string {
+    if (!isoDate) return '';
+    const [y, m, d] = isoDate.split('-');
+    return `${parseInt(y)}/${parseInt(m)}/${parseInt(d)}`;
+}
 
 /**
  * INTELLIGENCE CACHE & COMBOBOX
@@ -221,19 +243,21 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         id: string;
         category: 'internal' | 'external' | 'part_internal' | 'part_external' | 'part_generic';
         name: string;
-        price: number;
-        cost?: number; // Cost price (hidden from customer)
-        partRef?: string; // Part number
-        spec?: string; // Note/Spec (e.g. "Genuine", "31.5mm")
-        status?: 'pending' | 'ordered' | 'arrived'; // For parts
+        price: number;   // 上代
+        cost?: number;   // 仕入値（管理者のみ）
+        quantity: number; // 個数
+        partRef?: string;
+        spec?: string;
+        status?: 'pending' | 'ordered' | 'arrived';
     }
     const [lineItems, setLineItems] = useState<LineItem[]>(() => {
         if (!initialData?.estimate?.items) return [];
         return initialData.estimate.items.map((i: any) => ({
             id: String(i.id),
-            category: i.type === 'labor' ? (i.category || 'internal') : 'part_external', // simplified mapping
+            category: i.type === 'labor' ? (i.category || 'internal') : 'part_external',
             name: i.itemName,
             price: i.unitPrice,
+            quantity: i.quantity || 1,
             spec: i.notes
         }));
     });
@@ -241,7 +265,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // Inputs for adding new items
     const [addItemCategory, setAddItemCategory] = useState<'internal' | 'part_external'>('internal');
     const [newItemName, setNewItemName] = useState("");
+    const [newItemCost, setNewItemCost] = useState("");
     const [newItemPrice, setNewItemPrice] = useState("");
+    const [newItemQty, setNewItemQty] = useState("1");
     const [newItemSpec, setNewItemSpec] = useState("");
 
     const [diagnosis, setDiagnosis] = useState(initialData?.workSummary || ""); // Diagnosis/Request details
@@ -272,6 +298,22 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [quickRegOpen, setQuickRegOpen] = useState(false);
     const [mobileQR, setMobileQR] = useState(false);
     const [showPdfDialog, setShowPdfDialog] = useState(false);
+
+    // --- 7. STATUS BAR ---
+    const [showHistory, setShowHistory] = useState(false);
+    const [editingDateFor, setEditingDateFor] = useState<string | null>(null);
+
+    // --- 8. TABS ---
+    const [activeTab, setActiveTab] = useState<'main' | 'photo' | 'document'>('main');
+
+    // --- 9. PARTS PANEL ---
+    const [partsPanelOpen, setPartsPanelOpen] = useState(false);
+    const [partsPanelRowIdx, setPartsPanelRowIdx] = useState<number | null>(null);
+    const [partsSearchQuery, setPartsSearchQuery] = useState('');
+
+    // --- 10. AI CHAT ---
+    const [aiChatOpen, setAiChatOpen] = useState(false);
+    const [aiChatInput, setAiChatInput] = useState('');
 
     // Construct current data object for PDF
     const currentDataForPdf = {
@@ -373,7 +415,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, [brand, model, caliber, brandOpts, modelOpts, calOpts, addItemCategory]);
 
     // --- CALCULATIONS ---
-    const totalAmount = lineItems.reduce((sum, i) => sum + i.price, 0);
+    const totalAmount = lineItems.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);
     const taxAmount = Math.floor(totalAmount * 0.1);
     const grandTotal = totalAmount + taxAmount;
 
@@ -668,24 +710,185 @@ ${shopName}
                             disabled={isSaving}
                             className={cn("h-9 px-6 font-bold shadow-md transition-all active:scale-95", isSaving ? "bg-zinc-400" : "bg-blue-600 hover:bg-blue-500")}
                         >
-                            {isSaving ? "保存中..." : "保存 (Save)"}
+                            {isSaving ? "保存中..." : "保存"}
                         </Button>
                     )}
                 </div>
             </div>
 
 
-            {/* --- MAIN CONTENT (Simple Vertical Layout) --- */}
-            <div className="flex-1 p-3 overflow-y-auto">
-                <fieldset disabled={isReadOnly} className="contents">
-                <div className="flex flex-col gap-4 max-w-4xl mx-auto h-full">
+            {/* --- STATUS BAR --- */}
+            <div className="bg-white border-b border-zinc-200 px-4 py-3 shadow-sm w-full">
+                {/* メインフロー：横一列・画面幅いっぱい */}
+                <div className="flex items-stretch w-full overflow-x-auto">
+                    {MAIN_STATUS_STEPS.map((step, idx) => {
+                        const isCurrent = status === step.id;
+                        const hasDate = !!statusLog[step.id];
+                        const isEditing = editingDateFor === step.id;
+                        return (
+                            <React.Fragment key={step.id}>
+                                {idx > 0 && (
+                                    <div className="flex items-center self-center shrink-0 px-0.5">
+                                        <ChevronRight className="w-4 h-4 text-zinc-300" />
+                                    </div>
+                                )}
+                                <div className={cn(
+                                    "flex flex-col items-center justify-center flex-1 px-2 py-2.5 rounded-lg shrink-0 transition-all",
+                                    isCurrent
+                                        ? "bg-blue-600 shadow-md ring-2 ring-blue-400 ring-offset-1"
+                                        : hasDate
+                                        ? "bg-zinc-100 hover:bg-zinc-200"
+                                        : "hover:bg-zinc-50"
+                                )}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (isReadOnly) return;
+                                            setStatus(step.id);
+                                            if (!statusLog[step.id]) {
+                                                setStatusLog(prev => ({
+                                                    ...prev,
+                                                    [step.id]: new Date().toLocaleDateString('ja-JP')
+                                                }));
+                                            }
+                                        }}
+                                        className={cn(
+                                            "text-xs font-bold leading-snug text-center w-full whitespace-nowrap",
+                                            isCurrent ? "text-white" : hasDate ? "text-zinc-700" : "text-zinc-400 hover:text-zinc-600"
+                                        )}
+                                    >
+                                        {step.label}
+                                    </button>
+                                    <div className="mt-1.5 w-full flex justify-center">
+                                        {isEditing ? (
+                                            <input
+                                                type="date"
+                                                className="text-xs border border-blue-300 rounded px-1 py-0.5 w-full max-w-[110px] text-center"
+                                                defaultValue={toInputDate(statusLog[step.id] || '')}
+                                                onChange={e => {
+                                                    setStatusLog(prev => ({
+                                                        ...prev,
+                                                        [step.id]: toLocaleDate(e.target.value)
+                                                    }));
+                                                }}
+                                                onBlur={() => setEditingDateFor(null)}
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => { if (!isReadOnly) setEditingDateFor(step.id); }}
+                                                className={cn(
+                                                    "text-xs font-mono px-1 py-0.5 rounded transition-colors",
+                                                    isCurrent
+                                                        ? "text-blue-100 hover:text-white hover:bg-blue-500"
+                                                        : "text-zinc-400 hover:text-blue-600 hover:bg-blue-50"
+                                                )}
+                                            >
+                                                {statusLog[step.id] || "―"}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </React.Fragment>
+                        );
+                    })}
 
-                    {/* LEFT COL: CUSTOMER & WATCH (4/12) */}
-                    {/* CUSTOMER & WATCH */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Customer Card */}
+                    {/* 保留・キャンセルボタン */}
+                    <div className="flex flex-col gap-2 self-center ml-4 shrink-0 border-l-2 border-zinc-200 pl-4">
+                        <button
+                            type="button"
+                            onClick={() => { if (!isReadOnly) setStatus('on_hold'); }}
+                            className={cn(
+                                "text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all",
+                                status === 'on_hold'
+                                    ? "bg-yellow-100 border-yellow-400 text-yellow-700 shadow"
+                                    : "border-zinc-300 text-zinc-400 hover:border-yellow-400 hover:text-yellow-600"
+                            )}
+                        >
+                            保留
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { if (!isReadOnly) setStatus('canceled'); }}
+                            className={cn(
+                                "text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all",
+                                status === 'canceled'
+                                    ? "bg-red-100 border-red-500 text-red-700 shadow"
+                                    : "border-zinc-300 text-zinc-400 hover:border-red-400 hover:text-red-600"
+                            )}
+                        >
+                            キャンセル
+                        </button>
+                    </div>
+                </div>
+
+                {/* 履歴トグル */}
+                <div className="mt-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowHistory(prev => !prev)}
+                        className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600 transition-colors"
+                    >
+                        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", showHistory && "rotate-180")} />
+                        履歴を見る
+                    </button>
+                    {showHistory && (
+                        <div className="mt-2 space-y-1 max-h-32 overflow-y-auto pl-3 border-l-2 border-zinc-100">
+                            {(initialData?.logs || []).length === 0 ? (
+                                <div className="text-xs text-zinc-400 italic py-1">変更履歴がありません</div>
+                            ) : (
+                                [...(initialData?.logs || [])].reverse().map((log: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-4 text-xs">
+                                        <span className="text-zinc-400 font-mono">
+                                            {new Date(log.changedAt).toLocaleDateString('ja-JP')}
+                                        </span>
+                                        <span className="text-zinc-600 font-medium">{log.status}</span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* --- TAB NAV --- */}
+            <div className="bg-white border-b border-zinc-200 flex shrink-0">
+                {([
+                    { id: 'main',     label: 'メイン' },
+                    { id: 'photo',    label: '写真' },
+                    { id: 'document', label: '書類' },
+                ] as const).map(tab => (
+                    <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        className={cn(
+                            "px-8 py-2.5 text-sm font-bold border-b-2 transition-colors",
+                            activeTab === tab.id
+                                ? "border-blue-600 text-blue-600"
+                                : "border-transparent text-zinc-400 hover:text-zinc-600 hover:border-zinc-300"
+                        )}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* --- MAIN CONTENT --- */}
+            <div className="flex-1 overflow-y-auto">
+                <fieldset disabled={isReadOnly} className="contents">
+
+                {/* メインタブ */}
+                {activeTab === 'main' && (
+                <div className="p-3 flex flex-col gap-3">
+
+                    {/* 上段：3カラム均等幅 */}
+                    <div className="grid grid-cols-3 gap-3">
+
+                        {/* ①顧客情報 */}
                         <Card className="p-3 shadow-sm border-t-4 border-t-zinc-500 bg-white">
-                            <div className="flex justify-between items-center mb-3">
+                            <div className="flex justify-between items-center mb-2">
                                 <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase tracking-wider">
                                     <User className="w-3.5 h-3.5" /> 顧客情報
                                 </h3>
@@ -694,7 +897,6 @@ ${shopName}
                                     <button onClick={() => setIsB2B(false)} className={cn("px-2 py-0.5 text-[10px] rounded-sm font-bold", !isB2B ? "bg-white shadow text-green-600" : "text-zinc-400")}>一般</button>
                                 </div>
                             </div>
-
                             <div className="space-y-2">
                                 <div className="flex gap-1">
                                     <AdvancedCombobox
@@ -716,7 +918,7 @@ ${shopName}
                                             <Input className="h-7 text-xs" value={endUserName} onChange={e => setEndUserName(e.target.value)} />
                                         </div>
                                         <div>
-                                            <Label className="text-[9px] text-zinc-400 uppercase">管理番号(Partner)</Label>
+                                            <Label className="text-[9px] text-zinc-400 uppercase">パートナー管理番号</Label>
                                             <Input className="h-7 text-xs font-mono" value={partnerRef} onChange={e => setPartnerRef(e.target.value)} />
                                         </div>
                                     </div>
@@ -729,12 +931,12 @@ ${shopName}
                             </div>
                         </Card>
 
-                        {/* Watch Card */}
-                        <Card className="p-3 shadow-sm border-t-4 border-t-blue-600 bg-white flex-1">
-                            <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase tracking-wider mb-3">
+                        {/* ②時計情報 */}
+                        <Card className="p-3 shadow-sm border-t-4 border-t-blue-600 bg-white">
+                            <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase tracking-wider mb-2">
                                 <Watch className="w-3.5 h-3.5" /> 時計情報
                             </h3>
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                                 <div>
                                     <Label className="text-[9px] text-zinc-400">ブランド</Label>
                                     <AdvancedCombobox value={brand} onChange={setBrand} options={brandOpts} placeholder="ブランド名..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
@@ -745,11 +947,11 @@ ${shopName}
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <Label className="text-[9px] text-zinc-400">リファレンス (Ref)</Label>
+                                        <Label className="text-[9px] text-zinc-400">リファレンス</Label>
                                         <AdvancedCombobox value={refName} onChange={setRefName} options={refOpts} placeholder="Ref.No..." />
                                     </div>
                                     <div>
-                                        <Label className="text-[9px] text-zinc-400">キャリバー (Cal)</Label>
+                                        <Label className="text-[9px] text-zinc-400">キャリバー</Label>
                                         <AdvancedCombobox value={caliber} onChange={setCaliber} options={calOpts} placeholder="機械番号..." />
                                     </div>
                                 </div>
@@ -763,51 +965,49 @@ ${shopName}
                                 </div>
                             </div>
                         </Card>
-                    </div>
 
-                    {/* REPAIR CONTENT & ESTIMATE */}
-                    <div className="flex flex-col gap-4">
-                        {/* Text Areas */}
-                        <Card className="p-3 shadow-sm bg-white">
-                            <div className="grid grid-cols-1 gap-2">
-                                <div>
-                                    <Label className="text-[9px] text-zinc-400">依頼内容 / 症状</Label>
-                                    <Textarea className="min-h-[80px] text-xs resize-none bg-yellow-50/50" value={diagnosis} onChange={e => setDiagnosis(e.target.value)} />
-                                </div>
-                                <div>
-                                    <Label className="text-[9px] text-zinc-400">社内メモ</Label>
-                                    <Textarea className="min-h-[60px] text-xs resize-none bg-zinc-50" value={internalNotes} onChange={e => setInternalNotes(e.target.value)} />
-                                </div>
-                                <div>
-                                    <Label className="text-[9px] text-blue-500 font-semibold">お客様連絡事項（見積書に記載）</Label>
-                                    <Textarea className="min-h-[60px] text-xs resize-none bg-blue-50/40 border-blue-200" value={customerNote} onChange={e => setCustomerNote(e.target.value)} placeholder="お客様へお伝えする事項を入力（見積書のご連絡事項欄に印字されます）" />
-                                </div>
+                        {/* ③依頼内容・社内メモ・連絡事項 */}
+                        <Card className="p-3 shadow-sm bg-white flex flex-col gap-2">
+                            <div>
+                                <Label className="text-[9px] text-zinc-400">依頼内容 / 症状</Label>
+                                <Textarea className="min-h-[70px] text-xs resize-none bg-yellow-50/50" value={diagnosis} onChange={e => setDiagnosis(e.target.value)} />
+                            </div>
+                            <div>
+                                <Label className="text-[9px] text-zinc-400">社内メモ</Label>
+                                <Textarea className="min-h-[50px] text-xs resize-none bg-zinc-50" value={internalNotes} onChange={e => setInternalNotes(e.target.value)} />
+                            </div>
+                            <div>
+                                <Label className="text-[9px] text-blue-500 font-semibold">お客様連絡事項（見積書に記載）</Label>
+                                <Textarea className="min-h-[50px] text-xs resize-none bg-blue-50/40 border-blue-200" value={customerNote} onChange={e => setCustomerNote(e.target.value)} placeholder="お客様へお伝えする事項を入力（見積書のご連絡事項欄に印字されます）" />
                             </div>
                         </Card>
+                    </div>
 
-                        {/* Estimate List */}
-                        <Card className="flex-1 p-0 shadow-sm border-t-4 border-t-emerald-600 bg-white flex flex-col overflow-hidden">
+                    {/* 下段：左右 50:50 */}
+                    <div className="grid grid-cols-2 gap-3">
+
+                        {/* ④見積・修理明細テーブル */}
+                        <Card className="p-0 shadow-sm border-t-4 border-t-emerald-600 bg-white flex flex-col overflow-hidden">
                             <div className="p-2 border-b bg-zinc-50 flex justify-between items-center">
                                 <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase">
                                     <Settings className="w-3.5 h-3.5" /> 見積・修理明細
                                 </h3>
-                                <div className="flex gap-1 text-[10px]">
-                                    <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">合計: ¥{grandTotal.toLocaleString()}</span>
-                                </div>
+                                <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold text-[10px]">合計: ¥{grandTotal.toLocaleString()}</span>
                             </div>
-
-                            <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                                {/* List Header */}
+                            <div className="overflow-y-auto p-2 space-y-2">
+                                {/* ヘッダー */}
                                 <div className="grid grid-cols-12 text-[9px] text-zinc-400 font-bold border-b pb-1 px-1">
-                                    <div className="col-span-6">項目 / 部品</div>
-                                    <div className="col-span-3 text-right">単価</div>
-                                    <div className="col-span-3 text-right">操作</div>
+                                    <div className="col-span-4">項目 / 部品</div>
+                                    <div className="col-span-2 text-right">仕入値</div>
+                                    <div className="col-span-2 text-right">上代</div>
+                                    <div className="col-span-1 text-center">個数</div>
+                                    <div className="col-span-1 text-center">🔍</div>
+                                    <div className="col-span-2 text-right">操作</div>
                                 </div>
-
-                                {/* Items */}
+                                {/* 明細行 */}
                                 {lineItems.map((item, idx) => (
                                     <div key={item.id} className="grid grid-cols-12 items-center text-xs p-1.5 hover:bg-zinc-50 border-b border-zinc-100 last:border-0 group">
-                                        <div className="col-span-6 flex flex-col gap-0.5">
+                                        <div className="col-span-4 flex flex-col gap-0.5">
                                             <div className="flex items-center gap-1">
                                                 <button
                                                     type="button"
@@ -822,16 +1022,61 @@ ${shopName}
                                             </div>
                                             {item.spec && <span className="text-[9px] text-zinc-400 pl-0.5">{item.spec}</span>}
                                         </div>
-                                        <div className="col-span-3 text-right font-mono table-nums">¥{item.price.toLocaleString()}</div>
-                                        <div className="col-span-3 text-right">
+                                        <div className="col-span-2">
+                                            <input
+                                                type="number"
+                                                className="w-full text-right text-[10px] bg-zinc-50 border border-zinc-200 rounded px-1 py-0.5 font-mono"
+                                                value={item.cost ?? ""}
+                                                placeholder="―"
+                                                onChange={e => setLineItems(lineItems.map((li, i) =>
+                                                    i === idx ? { ...li, cost: parseInt(e.target.value) || 0 } : li
+                                                ))}
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <input
+                                                type="number"
+                                                className="w-full text-right text-[10px] border border-zinc-200 rounded px-1 py-0.5 font-mono"
+                                                value={item.price}
+                                                onChange={e => setLineItems(lineItems.map((li, i) =>
+                                                    i === idx ? { ...li, price: parseInt(e.target.value) || 0 } : li
+                                                ))}
+                                            />
+                                        </div>
+                                        <div className="col-span-1">
+                                            <input
+                                                type="number"
+                                                className="w-full text-center text-[10px] border border-zinc-200 rounded px-1 py-0.5"
+                                                value={item.quantity}
+                                                min={1}
+                                                onChange={e => setLineItems(lineItems.map((li, i) =>
+                                                    i === idx ? { ...li, quantity: parseInt(e.target.value) || 1 } : li
+                                                ))}
+                                            />
+                                        </div>
+                                        {/* 🔍 部品検索 */}
+                                        <div className="col-span-1 text-center">
+                                            <button
+                                                type="button"
+                                                className={`transition-colors text-sm ${partsPanelRowIdx === idx && partsPanelOpen ? 'text-blue-500' : 'text-zinc-400 hover:text-blue-500'}`}
+                                                title="部品検索"
+                                                onClick={() => {
+                                                    setPartsPanelRowIdx(idx);
+                                                    setPartsSearchQuery('');
+                                                    setPartsPanelOpen(true);
+                                                }}
+                                            >
+                                                🔍
+                                            </button>
+                                        </div>
+                                        <div className="col-span-2 text-right">
                                             <button type="button" onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} className="text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
                                     </div>
                                 ))}
-
-                                {/* Input Row */}
+                                {/* 入力行 */}
                                 <div className="bg-zinc-50 p-2 rounded border border-zinc-200 mt-2">
                                     <div className="flex gap-1 mb-1">
                                         <select className="h-7 text-[10px] rounded border-zinc-300 bg-white" value={addItemCategory} onChange={(e) => setAddItemCategory(e.target.value as any)}>
@@ -851,22 +1096,31 @@ ${shopName}
                                         />
                                     </div>
                                     <div className="flex gap-1">
-                                        <Input className="h-7 text-xs flex-1" placeholder="備考/仕様 (Spec)" value={newItemSpec} onChange={e => setNewItemSpec(e.target.value)} />
+                                        <Input className="h-7 text-xs flex-1" placeholder="備考/仕様" value={newItemSpec} onChange={e => setNewItemSpec(e.target.value)} />
+                                        <div className="relative w-16">
+                                            <span className="absolute left-1.5 top-1.5 text-[9px] text-zinc-400">仕入</span>
+                                            <Input className="h-7 text-xs pl-6 font-mono text-right" placeholder="0" value={newItemCost} onChange={e => setNewItemCost(e.target.value)} />
+                                        </div>
                                         <div className="relative w-20">
                                             <span className="absolute left-1.5 top-1.5 text-[9px]">¥</span>
                                             <Input className="h-7 text-xs pl-4 font-mono text-right" placeholder="0" value={newItemPrice} onChange={e => setNewItemPrice(e.target.value)} />
                                         </div>
+                                        <Input className="h-7 text-xs w-12 text-center font-mono" placeholder="1" value={newItemQty} onChange={e => setNewItemQty(e.target.value)} type="number" min={1} />
                                         <Button size="sm" className="h-7 w-8 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
                                             if (!newItemName) return;
                                             setLineItems([...lineItems, {
                                                 id: `auto-${Date.now()}`,
                                                 category: addItemCategory,
                                                 name: newItemName,
+                                                cost: parseInt(newItemCost) || undefined,
                                                 price: parseInt(newItemPrice) || 0,
+                                                quantity: parseInt(newItemQty) || 1,
                                                 spec: newItemSpec
                                             }]);
                                             setNewItemName("");
+                                            setNewItemCost("");
                                             setNewItemPrice("");
+                                            setNewItemQty("1");
                                             setNewItemSpec("");
                                         }}>
                                             <Plus className="w-4 h-4" />
@@ -875,12 +1129,87 @@ ${shopName}
                                 </div>
                             </div>
                         </Card>
+
+                        {/* 部品パネル */}
+                        <div className="flex flex-col border border-zinc-200 rounded-lg bg-white overflow-hidden shadow-sm">
+                            <div className="p-2 border-b bg-zinc-50 flex justify-between items-center">
+                                <h3 className="text-xs font-bold text-zinc-700">🔍 部品パネル</h3>
+                                {partsPanelOpen && (
+                                    <button
+                                        type="button"
+                                        className="text-[10px] text-zinc-400 hover:text-zinc-600"
+                                        onClick={() => { setPartsPanelOpen(false); setPartsPanelRowIdx(null); }}
+                                    >
+                                        閉じる ✕
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex-1 p-3 overflow-y-auto">
+                                {!partsPanelOpen ? (
+                                    <div className="h-40 flex flex-col items-center justify-center text-zinc-300 gap-2">
+                                        <span className="text-3xl">🔍</span>
+                                        <p className="text-xs text-center">明細行の 🔍 ボタンを押して<br />部品を検索してください</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-3">
+                                        {/* 検索欄 */}
+                                        <div>
+                                            <Label className="text-[9px] text-zinc-400">
+                                                {partsPanelRowIdx !== null && lineItems[partsPanelRowIdx]
+                                                    ? `「${lineItems[partsPanelRowIdx].name || '（未入力）'}」の部品を検索`
+                                                    : '部品を検索'}
+                                            </Label>
+                                            <div className="flex gap-1 mt-0.5">
+                                                <Input
+                                                    className="h-7 text-xs flex-1"
+                                                    placeholder="部品名・Ref・Cal..."
+                                                    value={partsSearchQuery}
+                                                    onChange={e => setPartsSearchQuery(e.target.value)}
+                                                    autoFocus
+                                                />
+                                                <Button size="sm" className="h-7 px-2 text-[10px] bg-blue-600 hover:bg-blue-700">検索</Button>
+                                            </div>
+                                        </div>
+                                        {/* 検索結果エリア（後工程で実装） */}
+                                        <div className="border border-zinc-200 rounded bg-zinc-50 min-h-[100px] flex flex-col items-center justify-center gap-1 text-zinc-400 text-xs p-3">
+                                            <p className="text-center">検索ボタンを押すと<br />ここに結果が表示されます</p>
+                                            <p className="text-[9px] text-zinc-300">（部品検索機能は後工程で実装）</p>
+                                        </div>
+                                        {/* ヒットなし → 新規登録 */}
+                                        <div className="border border-dashed border-zinc-300 rounded p-2 flex flex-col gap-1.5">
+                                            <p className="text-[10px] text-zinc-500 font-semibold">ヒットしない場合</p>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-[10px] border-blue-300 text-blue-600 hover:bg-blue-50"
+                                            >
+                                                ＋ 新規部品登録
+                                            </Button>
+                                            <p className="text-[9px] text-zinc-400">登録後「この部品を使用」で明細に自動入力されます</p>
+                                        </div>
+                                        {/* この部品を使用 */}
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            className="w-full h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700"
+                                            disabled
+                                        >
+                                            ✓ この部品を使用（部品選択後に有効）
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                 </div>
+                )}
 
-                {/* PHOTOS */}
-                <div className="flex flex-col gap-4">
+                {/* 写真タブ */}
+                {activeTab === 'photo' && (
+                <div className="p-3">
+                <div>
                     <Card className="shadow-sm border-t-4 border-t-purple-600 bg-white p-3 flex flex-col">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase">
@@ -902,15 +1231,12 @@ ${shopName}
                                 </Button>
                             </div>
                         </div>
-
-                        <div className="flex-1 bg-zinc-100 rounded-md inner-shadow overflow-y-auto p-2 grid grid-cols-2 gap-2 auto-rows-min content-start">
-                            {/* Upload Button */}
+                        <div className="bg-zinc-100 rounded-md p-2 grid grid-cols-3 gap-2 auto-rows-min content-start min-h-[200px]">
                             <label className="aspect-square border-2 border-dashed border-zinc-300 rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-white transition-all group min-h-[100px]">
                                 <Camera className="w-6 h-6 text-zinc-400 group-hover:text-blue-500 mb-1" />
                                 <span className="text-[9px] text-zinc-400 group-hover:text-blue-500">写真を追加</span>
                                 <input type="file" className="hidden" accept="image/*" multiple onChange={handlePhotoUpload} />
                             </label>
-
                             {photos.map((p, i) => (
                                 <div key={i} className="aspect-square relative rounded-md overflow-hidden bg-black group border border-zinc-200 shadow-sm">
                                     <img src={`https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev/${p.storageKey}`} className="w-full h-full object-cover" />
@@ -923,6 +1249,39 @@ ${shopName}
                         </div>
                     </Card>
                 </div>
+                </div>
+                )}
+
+                {/* 書類タブ */}
+                {activeTab === 'document' && (
+                <div className="p-3">
+                <div>
+                    {/* 保証書 */}
+                    <Card className="p-4 shadow-sm border-t-4 border-t-purple-500 bg-white max-w-sm">
+                        <h3 className="text-sm font-bold text-zinc-700 mb-1">修理保証書</h3>
+                        {initialData?.issuedWarranty ? (
+                            <p className="text-[10px] text-zinc-400 mb-3">発行済: {initialData.issuedWarranty.number}</p>
+                        ) : (
+                            <p className="text-[10px] text-zinc-400 mb-3">未発行</p>
+                        )}
+                        <Button
+                            size="sm"
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold"
+                            onClick={() => {
+                                if (warrantyDocumentUrl) {
+                                    window.open(warrantyDocumentUrl, '_blank', 'noopener,noreferrer');
+                                }
+                            }}
+                            disabled={!warrantyDocumentUrl}
+                        >
+                            <FileText className="w-4 h-4 mr-2" />
+                            保証書発行
+                        </Button>
+                    </Card>
+                </div>
+                </div>
+                )}
+
                 </fieldset>
             </div>
 
@@ -1007,6 +1366,63 @@ ${shopName}
                 onClose={() => setShowPdfDialog(false)}
                 repairData={currentDataForPdf}
             />
+
+            {/* ── AIチャット入力（固定UI） ── */}
+            {/* 🤖 AI入力 フローティングボタン */}
+            <button
+                type="button"
+                onClick={() => setAiChatOpen(v => !v)}
+                className="fixed bottom-6 z-50 flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-900 active:scale-95 text-white text-sm font-bold px-4 py-2.5 rounded-full shadow-xl transition-all select-none" style={{ right: '76px' }}
+            >
+                🤖 <span>AI入力</span>
+            </button>
+
+            {/* スライドアップ チャット欄 */}
+            <div
+                className={`fixed bottom-0 left-0 right-0 z-40 transition-transform duration-300 ease-in-out ${aiChatOpen ? 'translate-y-0' : 'translate-y-full'}`}
+            >
+                <div className="bg-white border-t border-zinc-200 shadow-2xl px-4 py-3 flex flex-col gap-2">
+                    {/* ヘッダー */}
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm font-bold text-zinc-700 flex items-center gap-1.5">
+                            🤖 <span>AI入力</span>
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setAiChatOpen(false)}
+                            className="text-zinc-400 hover:text-zinc-700 text-xl leading-none px-1"
+                            aria-label="閉じる"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    {/* 入力エリア */}
+                    <div className="flex gap-2 items-center">
+                        <Input
+                            className="flex-1 text-sm"
+                            placeholder="例：オーバーホール15,000円、リューズ交換 部品代3,000円..."
+                            value={aiChatInput}
+                            onChange={e => setAiChatInput(e.target.value)}
+                        />
+                        <button
+                            type="button"
+                            className="text-xl leading-none text-zinc-500 hover:text-blue-500 transition-colors shrink-0"
+                            title="音声入力（後工程で実装）"
+                        >
+                            🎤
+                        </button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 shrink-0"
+                            disabled
+                        >
+                            送信
+                        </Button>
+                    </div>
+                    <p className="text-[9px] text-zinc-400 text-center">AI連携機能は後工程で実装予定です</p>
+                </div>
+            </div>
 
         </div>
     );

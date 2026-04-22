@@ -50,12 +50,16 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
     const labelToKey: Record<string, string> = {
         '受付': 'reception',
         '見積中': 'diagnosing',
-        '部品待 (未注文)': 'parts_wait',
-        '部品待 (注文済)': 'parts_wait_ordered',
+        '承認待ち': 'approval_wait',
+        '部品待ち(未注文)': 'parts_wait',
+        '部品待ち(注文済み)': 'parts_wait_ordered',
+        '部品入荷済み': 'parts_arrived',
+        '作業待ち': 'work_wait',
         '作業中': 'in_progress',
-        '完了': 'completed',
-        '納品済': 'delivered',
-        'キャンセル': 'canceled'
+        '作業完了': 'work_completed',
+        '納品済み': 'delivered',
+        'キャンセル': 'canceled',
+        '保留': 'on_hold',
     };
     const statusLog: Record<string, string> = {};
     repair.logs.forEach(log => {
