@@ -6,6 +6,28 @@ const prisma = new PrismaClient()
 async function main() {
     console.log('Seeding data...')
 
+    // 0. Supplier（購入店マスタ）初期データ
+    const suppliers = [
+        { name: 'Cousins UK',     url: 'https://www.cousinsuk.com', isOnline: true  },
+        { name: 'eBay',           url: 'https://www.ebay.com',      isOnline: true  },
+        { name: 'AliExpress',     url: 'https://www.aliexpress.com',isOnline: true  },
+        { name: 'ヤフオク',        url: 'https://auctions.yahoo.co.jp', isOnline: true },
+        { name: 'メルカリ',        url: 'https://www.mercari.com',   isOnline: true  },
+        { name: 'Yショッピング',   url: 'https://shopping.yahoo.co.jp', isOnline: true },
+        { name: '楽天',           url: 'https://www.rakuten.co.jp', isOnline: true  },
+        { name: '激安卸問屋',      url: null,                        isOnline: true  },
+        { name: '中村時計材料店',  url: null,                        isOnline: false },
+        { name: 'その他',          url: null,                        isOnline: false },
+    ]
+    for (const s of suppliers) {
+        await prisma.supplier.upsert({
+            where: { name: s.name },
+            update: {},
+            create: s,
+        })
+    }
+    console.log(`Suppliers seeded: ${suppliers.length}件`)
+
     // 1. Create Admin
     const admin = await prisma.admin.upsert({
         where: { email: 'admin@yoshida-watch.com' },

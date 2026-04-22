@@ -6,9 +6,6 @@ import { revalidatePath } from "next/cache";
 export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty') {
     try {
         if (repairIds.length === 0) return { success: false, error: "No repairs selected" };
-        if (type === 'invoice' || type === 'warranty') {
-            return { success: false, error: "請求書と保証書は一覧画面から作成できません" };
-        }
 
         const repairs = await prisma.repair.findMany({
             where: { id: { in: repairIds } },

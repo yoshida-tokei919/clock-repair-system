@@ -91,6 +91,7 @@ const AdvancedCombobox: React.FC<{
 }> = ({ value, onChange, onSearchChange, onUpsert, placeholder, options, disabled, className }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
+    const [openUpward, setOpenUpward] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -117,6 +118,15 @@ const AdvancedCombobox: React.FC<{
 
     // Sync input when closing
     useEffect(() => { if (!isOpen) setSearch(""); }, [isOpen]);
+
+    // 画面外はみ出し防止：開いた直後にドロップダウンが下にはみ出すか判定
+    useEffect(() => {
+        if (isOpen && wrapperRef.current) {
+            const rect = wrapperRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            setOpenUpward(spaceBelow < 220);
+        }
+    }, [isOpen]);
 
     return (
         <div className={cn("relative w-full", className)} ref={wrapperRef}>
@@ -150,8 +160,8 @@ const AdvancedCombobox: React.FC<{
                 <ChevronDown className="h-3 w-3 opacity-50 cursor-pointer text-zinc-600" />
             </div>
             {isOpen && (
-                <div className="absolute z-50 mt-1 w-full bg-white border border-zinc-200 rounded-sm shadow-xl min-w-[200px] max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100 origin-top-left">
-                    <div className="overflow-y-auto flex-1 p-1">
+                <div className={`absolute z-50 w-full bg-white border border-zinc-200 rounded-sm shadow-xl min-w-[200px] overflow-hidden animate-in fade-in zoom-in-95 duration-100 ${openUpward ? 'bottom-full mb-1 origin-bottom-left' : 'top-full mt-1 origin-top-left'}`}>
+                    <div className="overflow-y-auto p-1 max-h-[200px]">
                         {onUpsert && search && !options.some(o => o.value === search) && (
                             <div className="p-1.5 px-2 text-xs text-blue-600 font-bold hover:bg-blue-50 cursor-pointer rounded-sm mb-1 flex items-center" onClick={() => {
                                 onUpsert(search);
@@ -407,7 +417,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     label: p.nameJp || p.name,
                     value: p.nameJp || p.name,
                     price: p.retailPrice,
-                    sub: p.partNumber ? `Ref: ${p.partNumber} (${p.category})` : p.category
+                    sub: p.partRefs ? `Ref: ${p.partRefs} (${p.category})` : p.category
                 })));
                 console.log(`Fetched ${parts.length} matching parts for brand ${b.id}`);
             });
@@ -997,17 +1007,17 @@ ${shopName}
                             <div className="overflow-y-auto p-2 space-y-2">
                                 {/* ヘッダー */}
                                 <div className="grid grid-cols-12 text-[9px] text-zinc-400 font-bold border-b pb-1 px-1">
-                                    <div className="col-span-4">項目 / 部品</div>
-                                    <div className="col-span-2 text-right">仕入値</div>
+                                    <div className="col-span-6">項目 / 部品</div>
+                                    <div className="col-span-1 text-right">仕入値</div>
                                     <div className="col-span-2 text-right">上代</div>
                                     <div className="col-span-1 text-center">個数</div>
                                     <div className="col-span-1 text-center">🔍</div>
-                                    <div className="col-span-2 text-right">操作</div>
+                                    <div className="col-span-1 text-right">操作</div>
                                 </div>
                                 {/* 明細行 */}
                                 {lineItems.map((item, idx) => (
                                     <div key={item.id} className="grid grid-cols-12 items-center text-xs p-1.5 hover:bg-zinc-50 border-b border-zinc-100 last:border-0 group">
-                                        <div className="col-span-4 flex flex-col gap-0.5">
+                                        <div className="col-span-6 flex flex-col gap-0.5">
                                             <div className="flex items-center gap-1">
                                                 <button
                                                     type="button"
@@ -1022,7 +1032,7 @@ ${shopName}
                                             </div>
                                             {item.spec && <span className="text-[9px] text-zinc-400 pl-0.5">{item.spec}</span>}
                                         </div>
-                                        <div className="col-span-2">
+                                        <div className="col-span-1">
                                             <input
                                                 type="number"
                                                 className="w-full text-right text-[10px] bg-zinc-50 border border-zinc-200 rounded px-1 py-0.5 font-mono"
@@ -1069,7 +1079,7 @@ ${shopName}
                                                 🔍
                                             </button>
                                         </div>
-                                        <div className="col-span-2 text-right">
+                                        <div className="col-span-1 text-right">
                                             <button type="button" onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} className="text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>

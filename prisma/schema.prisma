@@ -64,7 +64,10 @@ model Brand {
   models      Model[]
   calibers    Caliber[]
   watches     Watch[]
-  parts       PartsMaster[]
+  // PartsMaster への複数FK対応：named relation
+  parts              PartsMaster[] @relation("PartsBrand")
+  movementMakerParts PartsMaster[] @relation("PartsMovementMaker")
+  baseMakerParts     PartsMaster[] @relation("PartsBaseMaker")
 }
 
 model Model {
@@ -103,7 +106,9 @@ model Caliber {
   brand      Brand?  @relation(fields: [brandId], references: [id])
   references WatchReference[]
   watches    Watch[]
-  parts      PartsMaster[]
+  // PartsMaster への複数FK対応：named relation
+  parts            PartsMaster[] @relation("PartsCaliber")
+  baseCaliberParts PartsMaster[] @relation("PartsBaseCaliber")
 }
 
 // 3. Repair & Watch
@@ -259,31 +264,74 @@ model EstimateItem {
 }
 
 // 6. Parts
-// 6. Parts
+
+// §13 購入店マスタ
+model Supplier {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  url      String?
+  isOnline Boolean @default(true) // true: オンライン店 / false: 実店舗
+  notes    String?
+
+  parts    PartsMaster[]
+}
+
+// §13 部品マスタ（内装・外装統合）
 model PartsMaster {
-  id            Int     @id @default(autoincrement())
-  brandId       Int?
-  caliberId     Int?
-  
-  name          String  // Legacy
-  nameEn        String? @map("name_en")
-  nameJp        String  @map("name_jp")
-  
-  partNumber    String? // Manufacturer Ref
-  category      String  // 'internal', 'external', 'generic'
-  
-  stockQuantity Int     @default(0)
-  latestCostYen Int     @default(0)
-  retailPrice   Int     @default(0) // Override or cached calc
-  location      String?
-  supplier      String? // e.g. "eBay", "C24"
-  notes         String?
-  photoKey      String? // URL or storage key for part photo
-  
-  brand         Brand?   @relation(fields: [brandId], references: [id])
-  caliber       Caliber? @relation(fields: [caliberId], references: [id])
-  modelId       Int?
-  model         Model?   @relation(fields: [modelId], references: [id])
+  id              Int     @id @default(autoincrement())
+
+  // ── 区分 ──────────────────────────────────
+  partType        String? // 'interior'（内装）| 'exterior'（外装）/ nullable for existing rows
+  category        String  // 'internal', 'external', 'generic'（既存互換）
+  subcategory     String? // 内装サブカテゴリ: '地板/受け'|'輪列'|'巻上'|'調速'|'裏まわり'
+
+  // ── 外装：時計情報 ────────────────────────
+  brandId         Int?
+  modelId         Int?
+  watchRefs       String? // 対応Ref（カンマ区切り）
+
+  // ── 内装：ムーブメント情報 ─────────────────
+  caliberId       Int?    // Cal.
+  baseCaliberId   Int?    // ベースムーブメントCal.
+  movementMakerId Int?    // ムーブメント製造元（brandIdと異なる場合）
+  baseMakerId     Int?    // ベースムーブメント製造元
+
+  // ── 部品情報 ──────────────────────────────
+  name            String  // Legacy
+  nameEn          String? @map("name_en")
+  nameJp          String  @map("name_jp")
+  partRefs        String? // 部品Ref（カンマ区切り複数対応）
+  cousinsNumber   String? // cousins番号
+  grade           String? // '純正' | 'FIT' | '合わせ'
+  size            String? // サイズ（外装用・カテゴリごとテンプレ）
+  photoKey        String? // 画像キー
+
+  // ── 備考 ──────────────────────────────────
+  notes1          String? @map("notes") // 備考1（既存DBカラム名保持）
+  notes2          String? // 備考2
+
+  // ── 価格情報 ──────────────────────────────
+  costCurrency    String  @default("JPY") // ¥ / £ / $ / €
+  costOriginal    Float   @default(0)     // 外貨建て仕入原価
+  latestCostYen   Int     @default(0)     // 円換算仕入価格
+  markupRate      Float   @default(1.3)   // 掛け率 1.1〜2.0
+  retailPrice     Int     @default(0)     // 上代（500円単位切り上げ）
+
+  // ── 在庫情報 ──────────────────────────────
+  stockQuantity        Int     @default(0)
+  minStockAlert        Int     @default(0)     // 最小在庫数アラートしきい値
+  minStockAlertEnabled Boolean @default(false) // アラートON/OFF
+  location             String? // 保管場所（例：A-3-2）
+  supplierId           Int?    // FK → Supplier
+
+  // ── Relations ────────────────────────────
+  brand         Brand?    @relation("PartsBrand",         fields: [brandId],         references: [id])
+  model         Model?    @relation(                      fields: [modelId],          references: [id])
+  caliber       Caliber?  @relation("PartsCaliber",       fields: [caliberId],        references: [id])
+  baseCaliber   Caliber?  @relation("PartsBaseCaliber",   fields: [baseCaliberId],    references: [id])
+  movementMaker Brand?    @relation("PartsMovementMaker", fields: [movementMakerId],  references: [id])
+  baseMaker     Brand?    @relation("PartsBaseMaker",     fields: [baseMakerId],      references: [id])
+  supplier      Supplier? @relation(                      fields: [supplierId],        references: [id])
 }
 
 // 7. Documents (Bulk Generation)

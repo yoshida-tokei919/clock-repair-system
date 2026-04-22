@@ -35,12 +35,12 @@ export async function GET(request: Request) {
             modelId: p.modelId,
             targetId: p.category === 'internal' ? p.caliber?.name : (p.model?.nameJp || p.nameEn),
             name: p.name,
-            ref: p.partNumber || "",
+            ref: p.partRefs || "",
             costPrice: p.latestCostYen,
             retailPrice: p.retailPrice,
             stock: p.stockQuantity,
-            supplier: p.supplier || "",
-            notes: p.notes || "",
+            supplierId: p.supplierId || null,
+            notes: p.notes1 || "",
             photoKey: p.photoKey || null
         }));
 
@@ -139,12 +139,11 @@ export async function POST(request: Request) {
                 name: name,
                 nameJp: name, // Required field
                 nameEn: name, // Optional but good to fill
-                partNumber: ref || "", // Allow empty ref
+                partRefs: ref || "",
                 latestCostYen: costPrice || 0,
                 retailPrice: retailPrice || 0,
                 stockQuantity: stock || 0,
-                supplier: supplier || "",
-                notes: notes || "",
+                notes1: notes || "",
                 photoKey: photoKey || null,
             }
         });

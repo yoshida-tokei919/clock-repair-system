@@ -93,12 +93,11 @@ export async function PUT(
                 name: name,
                 nameJp: name,
                 // nameEn?
-                partNumber: ref || "",
+                partRefs: ref || "",
                 latestCostYen: costPrice || 0,
                 retailPrice: retailPrice || 0,
                 stockQuantity: stock || 0,
-                supplier: supplier || "",
-                notes: notes || "",
+                notes1: notes || "",
                 photoKey: photoKey
             }
         });
