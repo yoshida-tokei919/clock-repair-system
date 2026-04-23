@@ -624,6 +624,12 @@ Ref
 ### 顧客検索API
 - エンドポイント: `GET /api/customers?search=xxx`
 - ファイル: src/app/api/customers/route.ts
-- 検索対象: name・phone・prefix（部分一致・大小文字無視）
+- 検索対象: name・kana・companyName（部分一致・大小文字無視）
+- レスポンス形式: `[{ id, name, kana, type, companyName, phone, email }]`
 - 最大20件返却
-- `RepairEntryForm`の`onSearchChange`から呼び出すほか、外部からも利用可能
+
+### 修理案件保存API（POST /api/repairs）のブランド処理
+- ブランドが見つからない場合は自動作成する（モデル・キャリバーと同様）
+  - 以前は `throw new Error("ブランドが見つかりません")` でエラーになっていた
+  - DBリセット後（ブランド0件時）も保存できるように修正済み
+- 保存ボタンには必ず `type="button"` を明示してフォーム送信イベントの干渉を防ぐ

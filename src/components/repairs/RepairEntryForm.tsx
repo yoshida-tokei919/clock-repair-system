@@ -735,6 +735,7 @@ ${shopName}
                     )}
                     {!isReadOnly && (
                         <Button
+                            type="button"
                             size="sm"
                             onClick={handleSave}
                             disabled={isSaving}

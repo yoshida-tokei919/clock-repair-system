@@ -123,8 +123,19 @@ export async function POST(req: Request) {
                 }
             }
 
+            // ブランドが見つからなければ自動作成（モデル・キャリバーと同様）
+            if (!brand && brandNameInput) {
+                brand = await tx.brand.create({
+                    data: {
+                        name: brandNameInput,
+                        nameJp: brandNameInput,
+                        nameEn: brandNameInput,
+                    }
+                });
+            }
+
             if (!brand) {
-                throw new Error(`ブランドが見つかりません: ${brandNameInput}`);
+                throw new Error("ブランド名が入力されていません");
             }
 
             let watch;

@@ -9,18 +9,18 @@ export async function GET(req: Request) {
     where: search ? {
       OR: [
         { name: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search, mode: 'insensitive' } },
-        { prefix: { contains: search, mode: 'insensitive' } },
+        { kana: { contains: search, mode: 'insensitive' } },
+        { companyName: { contains: search, mode: 'insensitive' } },
       ]
     } : {},
     select: {
       id: true,
       name: true,
-      phone: true,
+      kana: true,
       type: true,
-      address: true,
-      lineId: true,
-      prefix: true,
+      companyName: true,
+      phone: true,
+      email: true,
     },
     orderBy: { createdAt: 'desc' },
     take: 20,
