@@ -633,3 +633,16 @@ Ref
   - 以前は `throw new Error("ブランドが見つかりません")` でエラーになっていた
   - DBリセット後（ブランド0件時）も保存できるように修正済み
 - 保存ボタンには必ず `type="button"` を明示してフォーム送信イベントの干渉を防ぐ
+
+### マスタデータ自動登録・更新（§3対応確認済み）
+- POST `/api/repairs`・PATCH `/api/repairs/[id]` 両方でブランドを自動作成（findOrCreate）
+- 見積明細の「部品」→ PartsMasterにupsert（新規作成＋既存の上代を更新）
+- 見積明細の「技術料」→ PricingRuleにupsert（新規作成＋既存の料金を更新）
+- ブランド・モデル・キャリバーは修理保存時に自動登録。外部からの登録はPartsFormのInlineAdd経由
+
+### 部品マスタ登録フォームの自由入力
+- `PartsForm.tsx` のブランド・Cal・モデル・ムーブメント製造元フィールドに
+  テキスト入力＋「＋追加」ボタンを追加（`InlineAdd`コンポーネント）
+- 追加はサーバーアクション（upsertBrand/upsertModel/upsertCaliber）を呼び出し、
+  追加後に`/api/master-data`を再フェッチしてドロップダウンを即時更新
+- モデル追加はブランドが選択済みの場合のみ有効（disabled制御）

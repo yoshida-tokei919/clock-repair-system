@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { upsertBrand, upsertModel, upsertCaliber } from '@/actions/master-actions'
 
 type MasterData = {
   brands: { id: number; name: string }[]
@@ -66,6 +67,37 @@ function calcRetail(costYen: number, rate: number): number {
   return Math.ceil(raw / 500) * 500
 }
 
+// 自由入力＋追加ボタンの共通コンポーネント
+function InlineAdd({
+  value, onChange, onAdd, placeholder, disabled
+}: {
+  value: string
+  onChange: (v: string) => void
+  onAdd: () => void
+  placeholder?: string
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex gap-1 mt-1">
+      <input
+        className="input-base flex-1 text-xs"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder ?? '新規入力...'}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onAdd() } }}
+      />
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={disabled || !value.trim()}
+        className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 shrink-0"
+      >
+        ＋追加
+      </button>
+    </div>
+  )
+}
+
 export default function PartsForm({ partId }: { partId?: number }) {
   const router = useRouter()
   const [form, setForm] = useState<FormData>(INITIAL)
@@ -74,9 +106,22 @@ export default function PartsForm({ partId }: { partId?: number }) {
   const [rates, setRates] = useState<Record<string, number>>({ JPY: 1, GBP: 1, USD: 1, EUR: 1 })
   const [rateUpdatedAt, setRateUpdatedAt] = useState<string>('')
 
+  // 自由入力フィールドの状態
+  const [newBrand, setNewBrand] = useState('')
+  const [newModel, setNewModel] = useState('')
+  const [newCal, setNewCal] = useState('')
+  const [newBaseCal, setNewBaseCal] = useState('')
+  const [newMovMaker, setNewMovMaker] = useState('')
+  const [newBaseMaker, setNewBaseMaker] = useState('')
+
   // マスターデータ取得
+  const refreshMaster = async () => {
+    const data = await fetch('/api/master-data').then(r => r.json())
+    setMaster(data)
+  }
+
   useEffect(() => {
-    fetch('/api/master-data').then(r => r.json()).then(setMaster)
+    refreshMaster()
     fetch('/api/exchange-rate').then(r => r.json()).then(d => {
       setRates({ JPY: 1, GBP: d.GBP, USD: d.USD, EUR: d.EUR })
       setRateUpdatedAt(d.updatedAt)
@@ -138,6 +183,67 @@ export default function PartsForm({ partId }: { partId?: number }) {
 
   const set = (key: keyof FormData, val: string | boolean) =>
     setForm(f => ({ ...f, [key]: val }))
+
+  // ブランド追加
+  const handleAddBrand = async () => {
+    const name = newBrand.trim()
+    if (!name) return
+    const b = await upsertBrand(name)
+    await refreshMaster()
+    set('brandId', String(b.id))
+    setNewBrand('')
+  }
+
+  // モデル追加（ブランド選択必須）
+  const handleAddModel = async () => {
+    const name = newModel.trim()
+    if (!name) return
+    const brandName = master.brands.find(b => b.id === parseInt(form.brandId))?.name ?? name
+    const m = await upsertModel(brandName, name)
+    await refreshMaster()
+    set('modelId', String(m.id))
+    setNewModel('')
+  }
+
+  // Cal. 追加
+  const handleAddCal = async () => {
+    const name = newCal.trim()
+    if (!name) return
+    const c = await upsertCaliber(name)
+    await refreshMaster()
+    set('caliberId', String(c.id))
+    setNewCal('')
+  }
+
+  // ベースCal. 追加
+  const handleAddBaseCal = async () => {
+    const name = newBaseCal.trim()
+    if (!name) return
+    const c = await upsertCaliber(name)
+    await refreshMaster()
+    set('baseCaliberId', String(c.id))
+    setNewBaseCal('')
+  }
+
+  // ムーブメント製造元追加（Brand）
+  const handleAddMovMaker = async () => {
+    const name = newMovMaker.trim()
+    if (!name) return
+    const b = await upsertBrand(name)
+    await refreshMaster()
+    set('movementMakerId', String(b.id))
+    setNewMovMaker('')
+  }
+
+  // ベースムーブメント製造元追加（Brand）
+  const handleAddBaseMaker = async () => {
+    const name = newBaseMaker.trim()
+    if (!name) return
+    const b = await upsertBrand(name)
+    await refreshMaster()
+    set('baseMakerId', String(b.id))
+    setNewBaseMaker('')
+  }
 
   const handleSubmit = async () => {
     setSaving(true)
@@ -205,6 +311,11 @@ export default function PartsForm({ partId }: { partId?: number }) {
                 <option value="">選択してください</option>
                 {master.calibers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              <InlineAdd
+                value={newCal} onChange={setNewCal}
+                onAdd={handleAddCal}
+                placeholder="新規Cal.を入力..."
+              />
             </div>
             <div>
               <label className="label-sm">ベースCal.</label>
@@ -212,6 +323,11 @@ export default function PartsForm({ partId }: { partId?: number }) {
                 <option value="">なし</option>
                 {master.calibers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              <InlineAdd
+                value={newBaseCal} onChange={setNewBaseCal}
+                onAdd={handleAddBaseCal}
+                placeholder="新規ベースCal.を入力..."
+              />
             </div>
             <div>
               <label className="label-sm">ムーブメント製造元</label>
@@ -219,6 +335,11 @@ export default function PartsForm({ partId }: { partId?: number }) {
                 <option value="">選択してください</option>
                 {master.brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
+              <InlineAdd
+                value={newMovMaker} onChange={setNewMovMaker}
+                onAdd={handleAddMovMaker}
+                placeholder="新規製造元を入力..."
+              />
             </div>
             <div>
               <label className="label-sm">ベースムーブメント製造元</label>
@@ -226,6 +347,11 @@ export default function PartsForm({ partId }: { partId?: number }) {
                 <option value="">なし</option>
                 {master.brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
+              <InlineAdd
+                value={newBaseMaker} onChange={setNewBaseMaker}
+                onAdd={handleAddBaseMaker}
+                placeholder="新規製造元を入力..."
+              />
             </div>
           </div>
         </section>
@@ -242,6 +368,11 @@ export default function PartsForm({ partId }: { partId?: number }) {
                 <option value="">選択してください</option>
                 {master.brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
+              <InlineAdd
+                value={newBrand} onChange={setNewBrand}
+                onAdd={handleAddBrand}
+                placeholder="新規ブランドを入力..."
+              />
             </div>
             <div>
               <label className="label-sm">モデル</label>
@@ -249,6 +380,12 @@ export default function PartsForm({ partId }: { partId?: number }) {
                 <option value="">選択してください</option>
                 {master.models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
+              <InlineAdd
+                value={newModel} onChange={setNewModel}
+                onAdd={handleAddModel}
+                placeholder={form.brandId ? 'モデル名を入力...' : 'ブランドを先に選択'}
+                disabled={!form.brandId}
+              />
             </div>
             <div className="col-span-2">
               <label className="label-sm">対応Ref（カンマ区切り）</label>
@@ -376,11 +513,11 @@ export default function PartsForm({ partId }: { partId?: number }) {
 
       {/* ボタン */}
       <div className="flex gap-3 justify-end pb-10">
-        <button onClick={() => router.push('/parts')}
+        <button type="button" onClick={() => router.push('/parts')}
           className="px-5 py-2 rounded border text-gray-600 hover:bg-gray-50">
           キャンセル
         </button>
-        <button onClick={handleSubmit} disabled={saving || !form.nameJp}
+        <button type="button" onClick={handleSubmit} disabled={saving || !form.nameJp}
           className="px-6 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50">
           {saving ? '保存中...' : '保存する'}
         </button>

@@ -371,21 +371,27 @@ export async function POST(req: Request) {
                         select: { nameJp: true }
                     });
                     const existingPartNames = new Set(existingParts.map((p: any) => p.nameJp));
+                    // 新規登録
                     const newParts = partItems.filter((i: any) => !existingPartNames.has(i.name));
                     if (newParts.length > 0) {
                         await tx.partsMaster.createMany({
                             data: newParts.map((item: any) => ({
                                 category: 'generic',
-                                brandId: brand.id,
-                                modelId,
-                                caliberId,
-                                name: item.name,
-                                nameJp: item.name,
-                                nameEn: item.name,
+                                brandId: brand.id, modelId, caliberId,
+                                name: item.name, nameJp: item.name, nameEn: item.name,
                                 retailPrice: Math.floor(Number(item.price) || 0),
                                 stockQuantity: 0,
                             }))
                         });
+                    }
+                    // 既存エントリの上代を更新（§3：自動登録・更新）
+                    for (const item of partItems) {
+                        if (existingPartNames.has(item.name)) {
+                            await tx.partsMaster.updateMany({
+                                where: { nameJp: item.name, brandId: brand.id, modelId, caliberId },
+                                data: { retailPrice: Math.floor(Number(item.price) || 0) }
+                            });
+                        }
                     }
                 }
 
@@ -396,6 +402,7 @@ export async function POST(req: Request) {
                         select: { suggestedWorkName: true }
                     });
                     const existingRuleNames = new Set(existingRules.map((r: any) => r.suggestedWorkName));
+                    // 新規登録
                     const newRules = laborItems.filter((i: any) => !existingRuleNames.has(i.name));
                     if (newRules.length > 0) {
                         await tx.pricingRule.createMany({
@@ -403,11 +410,21 @@ export async function POST(req: Request) {
                                 suggestedWorkName: item.name,
                                 minPrice: Math.floor(Number(item.price) || 0),
                                 maxPrice: Math.floor(Number(item.price) || 0),
-                                brandId: brand.id,
-                                modelId,
-                                caliberId
+                                brandId: brand.id, modelId, caliberId
                             }))
                         });
+                    }
+                    // 既存エントリの料金を更新（§3：自動登録・更新）
+                    for (const item of laborItems) {
+                        if (existingRuleNames.has(item.name)) {
+                            await tx.pricingRule.updateMany({
+                                where: { suggestedWorkName: item.name, brandId: brand.id, modelId, caliberId },
+                                data: {
+                                    minPrice: Math.floor(Number(item.price) || 0),
+                                    maxPrice: Math.floor(Number(item.price) || 0),
+                                }
+                            });
+                        }
                     }
                 }
             }

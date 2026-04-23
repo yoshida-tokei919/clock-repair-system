@@ -51,8 +51,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     });
                 }
 
+                // ブランドが見つからなければ自動作成（POST側と同様）
+                if (!brand && brandNameInput) {
+                    brand = await tx.brand.create({
+                        data: { name: brandNameInput, nameJp: brandNameInput, nameEn: brandNameInput }
+                    });
+                }
                 if (!brand) {
-                    throw new Error(`ブランド名が確認できません: ${brandNameInput}`);
+                    throw new Error("ブランド名が入力されていません");
                 }
 
                 brandId = brand.id;
@@ -223,18 +229,27 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                             select: { nameJp: true }
                         });
                         const existingPartNames = new Set(existingParts.map((p: any) => p.nameJp));
+                        // 新規登録
                         const newParts = partItems.filter((i: any) => !existingPartNames.has(i.name));
                         if (newParts.length > 0) {
                             await tx.partsMaster.createMany({
                                 data: newParts.map((item: any) => ({
                                     category: 'generic',
                                     brandId, modelId, caliberId,
-                                    name: item.name,
-                                    nameJp: item.name,
+                                    name: item.name, nameJp: item.name,
                                     retailPrice: Math.floor(Number(item.price) || 0),
                                     stockQuantity: 0,
                                 }))
                             });
+                        }
+                        // 既存エントリの上代を更新（§3：自動登録・更新）
+                        for (const item of partItems) {
+                            if (existingPartNames.has(item.name)) {
+                                await tx.partsMaster.updateMany({
+                                    where: { nameJp: item.name, brandId, modelId, caliberId },
+                                    data: { retailPrice: Math.floor(Number(item.price) || 0) }
+                                });
+                            }
                         }
                     }
 
@@ -245,6 +260,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                             select: { suggestedWorkName: true }
                         });
                         const existingRuleNames = new Set(existingRules.map((r: any) => r.suggestedWorkName));
+                        // 新規登録
                         const newRules = laborItems.filter((i: any) => !existingRuleNames.has(i.name));
                         if (newRules.length > 0) {
                             await tx.pricingRule.createMany({
@@ -255,6 +271,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                                     brandId, modelId, caliberId
                                 }))
                             });
+                        }
+                        // 既存エントリの料金を更新（§3：自動登録・更新）
+                        for (const item of laborItems) {
+                            if (existingRuleNames.has(item.name)) {
+                                await tx.pricingRule.updateMany({
+                                    where: { suggestedWorkName: item.name, brandId, modelId, caliberId },
+                                    data: {
+                                        minPrice: Math.floor(Number(item.price) || 0),
+                                        maxPrice: Math.floor(Number(item.price) || 0),
+                                    }
+                                });
+                            }
                         }
                     }
                 }
