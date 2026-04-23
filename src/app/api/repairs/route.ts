@@ -301,7 +301,7 @@ export async function POST(req: Request) {
                 await tx.repairStatusLog.create({
                     data: {
                         repairId: repair.id,
-                        status: statusLabels[dbStatus] || "受付",
+                        status: dbStatus || "受付",
                         changedBy: 1 // Admin
                     }
                 });

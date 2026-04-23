@@ -5,19 +5,23 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const repairId = Number(params.id)
   const { status } = await req.json()
 
-  // ステータス更新
+  // ステータス更新（includeなし）
   const repair = await prisma.repair.update({
     where: { id: repairId },
     data: { status },
-    include: {
-      workItems: {
-        include: { partsMaster: true }
-      }
-    }
   })
 
   // 「作業待ち」移行時のみ在庫チェック
   if (status === '作業待ち') {
+    const estimate = await prisma.estimate.findUnique({
+      where: { repairId },
+      include: {
+        items: {
+          include: { partsMaster: true }
+        }
+      }
+    })
+
     const warnings: {
       partName: string
       required: number
@@ -25,7 +29,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       orderRequestId: number
     }[] = []
 
-    for (const item of repair.workItems) {
+    const items = estimate?.items ?? []
+
+    for (const item of items) {
       if (!item.partsMasterId || !item.partsMaster) continue
 
       const required = item.quantity ?? 1

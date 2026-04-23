@@ -592,3 +592,16 @@ Ref
   - 顧客管理: /customers
 - お客様向け公開ページ（/）にはヘッダーは表示しない
 - 各ページ内の重複ナビボタンは削除済み
+
+---
+
+## 27. ステータス更新APIの実装ルール（2026/04/23確定）
+
+- エンドポイント: src/app/api/repairs/[id]/status/route.ts
+- `Repair`モデルに`workItems`リレーションは存在しない（RepairはEstimate経由でItemを持つ）
+- `prisma.repair.update` に `include` ブロックは不要・使用禁止
+- 「作業待ち」ステータス移行時の部品取得は以下の方法を使うこと:
+  ```ts
+  prisma.estimate.findUnique({ where: { repairId }, include: { items: { include: { partsMaster: true } } } })
+  ```
+- ステータスキーの変換テーブル（statusLabels等）は不要。DBステータスはすでに日本語で統一済み。
