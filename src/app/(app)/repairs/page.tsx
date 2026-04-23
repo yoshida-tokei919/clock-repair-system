@@ -69,24 +69,6 @@ export default async function RepairsPage({
             <div className="flex items-center justify-between space-y-2">
                 <h2 className="text-3xl font-bold tracking-tight">修理案件一覧</h2>
                 <div className="flex items-center space-x-2">
-                    <Link href="/admin">
-                        <Button variant="ghost">
-                            <LayoutDashboard className="mr-2 h-4 w-4" />
-                            ダッシュボード
-                        </Button>
-                    </Link>
-                    <Link href="/repairs/board">
-                        <Button variant="outline">
-                            <LayoutDashboard className="mr-2 h-4 w-4" />
-                            ボード表示
-                        </Button>
-                    </Link>
-                    <Link href="/invoices">
-                        <Button variant="outline">
-                            <FileText className="mr-2 h-4 w-4" />
-                            請求書管理
-                        </Button>
-                    </Link>
                     <Link href="/repairs/new">
                         <Button>
                             <PlusCircle className="mr-2 h-4 w-4" />
@@ -110,14 +92,18 @@ export default async function RepairsPage({
                         className="flex h-10 w-[180px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">全てのステータス</option>
-                        <option value="reception">受付</option>
-                        <option value="diagnosing">見積中</option>
-                        <option value="parts_wait">部品待 (未注文)</option>
-                        <option value="parts_wait_ordered">部品待 (注文済)</option>
-                        <option value="in_progress">作業中</option>
-                        <option value="completed">完了</option>
-                        <option value="delivered">納品済</option>
-                        <option value="canceled">キャンセル</option>
+                        <option value="受付">受付</option>
+                        <option value="見積中">見積中</option>
+                        <option value="承認待ち">承認待ち</option>
+                        <option value="部品待ち(未注文)">部品待ち(未注文)</option>
+                        <option value="部品待ち(注文済み)">部品待ち(注文済み)</option>
+                        <option value="部品入荷済み">部品入荷済み</option>
+                        <option value="作業待ち">作業待ち</option>
+                        <option value="作業中">作業中</option>
+                        <option value="作業完了">作業完了</option>
+                        <option value="納品済み">納品済み</option>
+                        <option value="キャンセル">キャンセル</option>
+                        <option value="保留">保留</option>
                     </select>
 
                     <Button type="submit" variant="outline">

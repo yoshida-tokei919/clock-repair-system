@@ -6,7 +6,7 @@ import { KanbanCard } from "./KanbanCard";
 import { cn } from "@/lib/utils";
 
 interface KanbanColumnProps {
-    id: string; // The status key (e.g., 'reception')
+    id: string; // ステータスキー（例: '受付'）
     title: string;
     repairs: any[];
     color?: string;

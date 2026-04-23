@@ -59,7 +59,7 @@
 - **完全日本語化の徹底**: UI上のあらゆる表記から英語を排除し、日本語のみとする。
   - `顧客情報 (Client)` → `顧客情報`
   - `見積中 (Diagnosing)` → `見積中`
-  - 括弧書きの英語併記も禁止。プログラム内部の識別子（`reception` 等）が画面に漏れ出さないよう、必ず変換処理を通すこと。
+  - 括弧書きの英語併記も禁止。ステータスキーはDBも含めて日本語（`受付` / `見積中` 等）で統一済み。変換テーブルは不要。
 - **パフォーマンスとシンプルさの追求**:
   - 不要な装飾や重い処理を避け、FileMakerのような軽快な動作を目指す。
   - データベースからの取得データは必要最小限に絞り、不要な通信（Includeの多用）を抑制する。
@@ -84,86 +84,9 @@
 
 ---
 
-## 5. データベーススキーマ（変更禁止の参照定義）
+## 5. データベーススキーマ（参照先）
 
-以下のスキーマはコアデータ構造の定義。明示的な要求なくして変更禁止。
-
-```prisma
-// 1. 顧客管理
-model Customer {
-  id           Int      @id @default(autoincrement())
-  type         String   // 'individual', 'business'
-  rank         Int      @default(1) // 1〜5
-  name         String
-  kana         String?
-  companyName  String?
-  zipCode      String?
-  address      String?
-  phone        String?
-  email        String?
-  lineId       String?
-  passwordHash String?
-  createdAt    DateTime @default(now())
-
-  // パートナー拡張
-  isPartner    Boolean  @default(false)
-  prefix       String?  // 例: "T", "JK"
-  currentSeq   Int      @default(0) // 最終発番SEQ
-
-  // 帳票SEQ
-  seqEstimate  Int      @default(0)
-  seqDelivery  Int      @default(0)
-  seqInvoice   Int      @default(0)
-
-  watches       Watch[]
-  repairs       Repair[]
-  deliveryNotes DeliveryNote[]
-  invoices      Invoice[]
-  estimateDocuments EstimateDocument[]
-}
-
-// 2. 修理・時計
-model Repair {
-  id                   Int       @id @default(autoincrement())
-  uuid                 String    @unique @default(uuid())
-  inquiryNumber        String    @unique // 例: T-001
-  customerId           Int
-  watchId              Int
-  partnerRef           String?   // 業者管理番号（手入力）
-  accessories          String?   // 付属品（JSON or CSV）
-
-  receptionDate        DateTime  @default(now())
-  status               String    // 'reception', 'diagnosing' 等
-  approvalStatus       String    @default("pending")
-
-  // スケジュール・優先度
-  priorityScore        Int       @default(0)
-  scheduledDate        DateTime?
-  estimatedWorkMinutes Int       @default(0)
-
-  workSummary          String?
-  internalNotes        String?
-
-  // SEOフラグ
-  isPublicB2C          Boolean   @default(false)
-  isPublicB2B          Boolean   @default(false)
-  publicTitle          String?
-  publicDescription    String?
-  endUserName          String?   // B2Bエンドユーザー名
-
-  deliveryDateExpected DateTime?
-  deliveryDateActual   DateTime?
-
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-
-  customer Customer          @relation(fields: [customerId], references: [id])
-  watch    Watch             @relation(fields: [watchId], references: [id])
-  logs     RepairStatusLog[]
-  photos   RepairPhoto[]
-  estimate Estimate?
-}
-```
+最新スキーマは `prisma/schema.prisma` を参照すること。明示的な要求なくして変更禁止。
 
 ---
 
@@ -212,41 +135,9 @@ model Repair {
 
 ---
 
-## 8. マスタデータの構造定義 V2
+## 8. マスタデータの構造定義
 
-**原則**: 内装・外装は同一テーブル内の **「区分（Category）」フラグ** で管理する。物理テーブルは分割しない。
-
-### 1. 作業工賃マスタ（PricingRule）
-
-| 項目 | 必須 | 備考 |
-|------|------|------|
-| 区分（内装/外装） | ○ | |
-| ブランド | ○ | |
-| 作業名 | ○ | |
-| 標準工賃 | ○ | |
-| 時計Ref | — | 外装用紐付けキー |
-| キャリバー | — | 内装用紐付けキー |
-| ムーブメント製造元 | — | 内装標準用 |
-
-### 2. 部品マスタ（PartsMaster）
-
-| 項目 | 必須 | 備考 |
-|------|------|------|
-| 区分（内装/外装/共通） | ○ | 検索の第一条件 |
-| ブランド | ○ | 汎用部品は「共通」等 |
-| 部品名 | ○ | 検索メインキー |
-| 部品Ref | ○ | メーカー部品番号（空欄可だがカラムは必須） |
-| モデル名 | ○ | Ref不明時の目合わせ検索用 |
-| 備考/仕様 | ○ | サイズ、色、純正/汎用等の識別キー |
-| 仕入れ価格 | ○ | 管理者のみ閲覧・編集可 |
-| 上代（定価） | ○ | 顧客提示用価格 |
-| 時計Ref | — | 任意紐付け |
-| キャリバー | — | 任意紐付け |
-
-### インテリジェンス・キャッシュの原則
-
-- マスタデータ（静的）は即時表示。膨大な履歴データ（動的）は必要時に高速取得。
-- 5万件超のデータは「目次検索」と「詳細取得」を分離し、バックグラウンド通信でレスポンスを確保する。
+→ §13（部品マスタ設計）に統合済み。内装・外装は同一テーブル（PartsMaster）の `partType` フラグで管理する。
 
 ---
 
@@ -309,93 +200,7 @@ model Repair {
 
 ## 11. カルテ画面 UI改修仕様（2026/04/17確定）
 
-### 基本方針
-- DBは変更しない（UIのみの改修）
-- 新規登録・詳細・編集を1画面に統合する
-- 1変更ずつ実装すること
-- 以下の完成条件チェックリストが**全て✅になるまで完成とみなさない**
-
----
-
-### 現在の画面の問題点（修正必須）
-- ステータスバーが存在しない
-- タブ（メイン・写真・書類）が存在しない
-- 書類発行ボタンの場所が不明確
-- 作業明細に仕入値・上代・個数が表示されていない
-- 作業明細に部品検索ボタン（🔍）がない
-- AIチャット入力ボタンがない
-- FMP風の左右2カラムレイアウトになっていない
-- 画面密度が低くスペースが余っている
-
----
-
-### 完成条件チェックリスト
-
-#### 【A】タブ構成
-- [ ] 画面上部に[メイン][写真][書類]の3タブが存在する
-- [ ] 各タブをクリックすると対応するコンテンツに切り替わる
-- [ ] デフォルトはメインタブが選択された状態
-
-#### 【B】メインタブ：ヘッダー
-- [ ] 管理No（例：T-006）が表示されている
-- [ ] 顧客名が表示されている
-- [ ] 保存ボタンが存在する
-
-#### 【C】メインタブ：ステータスバー
-- [ ] 以下のステータスが横一列に並んでいる
-  　受付 → 見積中 → 部品待(未注文) → 部品待(注文済) → 作業中 → 完了 → 納品済
-- [ ] 各ステータスの下に日付が表示される（時刻は不要）
-- [ ] 日付部分をクリックするとカレンダーが開き日付を選択できる
-- [ ] 過去日付も選択可能
-- [ ] 日付が未入力のステータスは「-」と表示される
-- [ ] 現在のステータスがハイライト表示される
-- [ ] キャンセルは別途赤いボタンで対応
-- [ ] 「履歴を見る」で変更履歴を折りたたみ展開できる
-
-#### 【D】メインタブ：左右2カラム
-- [ ] 左カラムに時計情報（ブランド・モデル・Ref・キャリバー・シリアル・付属品・外装チェック）
-- [ ] 右カラムに依頼内容・内部メモ
-- [ ] 左右が横並びになっている（縦積みではない）
-
-#### 【E】メインタブ：作業明細テーブル
-- [ ] 以下の列が存在する：作業カテゴリ・部品名・仕入値・上代・個数・🔍ボタン・削除ボタン
-- [ ] 各行の🔍ボタンを押すと部品検索が起動する（検索機能本体は後工程でよい）
-- [ ] 行を追加できる
-- [ ] インライン編集ができる（各セルを直接編集）
-
-#### 【F】メインタブ：合計欄
-- [ ] 技術料合計・部品代合計・値引・消費税・税込合計が表示される
-- [ ] 明細の変更に連動してリアルタイムで更新される
-
-#### 【G】AIチャット入力
-- [ ] 画面右下に[🤖 AI入力]ボタンが常時表示される
-- [ ] ボタンを押すと画面下からチャット欄がスライドして出てくる
-- [ ] チャット欄にはテキスト入力欄とマイクボタン（🎤）がある
-- [ ] 閉じるボタンでチャット欄が閉じる
-- [ ] AI連携本体は後工程でよい（UIのみ先行実装）
-
-#### 【H】写真タブ
-- [ ] 写真の一覧表示ができる
-- [ ] 写真をアップロードできる
-
-#### 【I】書類タブ
-- [ ] 見積書・納品書・請求書・保証書の発行ボタンが存在する
-
----
-
-### 実装順序
-1. 新規・詳細・編集の3画面を1画面に統合
-2. ステータスバーのコンパクト化（カレンダー選択・日付のみ）
-3. タブ構成（メイン・写真・書類）
-4. メインタブの左右2カラムレイアウト
-5. 作業明細テーブルの列追加（仕入値・上代・個数・🔍ボタン）
-6. AIチャット入力UIの組み込み
-7. 書類タブの発行ボタン整備
-
-### 各ステップの完了確認方法
-各ステップ実装後に必ずPlaywright MCPでスクリーンショットを撮り、
-上記チェックリストの該当項目を1つずつ目視確認すること。
-「動作した」ではなく「チェックリストの条件を満たした」を完了基準とする。
+実装完了（2026/04/22）
 
 ---
 
@@ -691,3 +496,99 @@ Ref
 
 【価格情報】・【在庫情報】← 内装と同じ
 ```
+
+---
+
+## 19. 為替レート自動取得（2026/04/23確定）
+
+- API: frankfurter.app（無料・APIキー不要・ECBレートベース）
+- エンドポイント: src/app/api/exchange-rate/route.ts
+- 24時間キャッシュ（Next.js revalidate）
+- 対応通貨: GBP / USD / EUR → JPY
+- PartsFormで通貨選択・原価入力時に円換算を自動計算
+- レート表示は仕入通貨セレクト下に表示
+
+---
+
+## 20. 部品マスタ検索・一覧（2026/04/23確定）
+
+- /parts ページに検索UI＋一覧テーブルを統合
+- PartsSearchPanel コンポーネント（src/components/parts/PartsSearchPanel.tsx）
+  - mode="standalone"：/parts ページ用（編集ボタン表示）
+  - mode="panel"：カルテ組み込み用（選択ボタン表示）
+- 検索API：src/app/api/parts/search/route.ts
+  - 内装：Cal.＋ベースCal.横断検索
+  - 外装：Ref＋モデル検索
+  - キーワード：部品名(JP/EN)＋部品Ref
+- カルテ選択時の渡し項目：nameJp / grade / retailPrice / latestCostYen
+
+---
+
+## 21. 発注リスト・在庫連携フロー（確定仕様）
+
+### ステータスと部品の連動
+1. EstimateItemに部品登録
+   → orderStatus: pending
+   → 案件ステータス: 部品待ち(未注文)に自動変更
+
+2. 発注管理画面で「発注済み」ボタン
+   → orderStatus: ordered
+   → 案件ステータス: 部品待ち(注文済み)に自動変更
+
+3. 発注管理画面で「入荷済み」ボタン
+   → orderStatus: received
+   → PartsMaster.stockQuantity +1
+   → 全部品receivedになった時のみ
+     案件ステータス: 部品入荷済みに自動変更
+
+### 在庫引き当てフロー
+- 部品登録時に在庫あり検知
+  → 「在庫から引き当てますか？」確認ダイアログ
+  → OK: received・在庫数-1・作業待ちへ
+  → キャンセル: 発注フローへ
+
+### 在庫不足フロー
+- 在庫0 → 発注フローへ
+- 在庫あり・案件数より少ない → 警告ダイアログ
+  → ダイアログ内容：
+     案件一覧（管理No・顧客名・時計情報・納期）
+     +[詳細を見る]ボタン（別タブで案件詳細を開く）
+     +[この案件に割り当てる]ボタン
+
+### 発注管理画面（/orders）
+- 全修理案件から「要発注」「発注中」の部品を抽出して一覧表示
+- ステータス一括管理
+
+### 検索URL生成（自動アクセスなし・新タブで開く）
+- Cousins UK: https://www.cousinsuk.com/search/products?q={en}
+- eBay: https://www.ebay.com/sch/?_nkw={en}
+- AliExpress: https://www.aliexpress.com/wholesale?SearchText={en}
+- ヤフオク: https://auctions.yahoo.co.jp/search?p={jp}
+- メルカリ: https://www.mercari.com/jp/search/?keyword={jp}
+- 楽天: https://search.rakuten.co.jp/search/mall/{jp}
+- Yショッピング: https://shopping.yahoo.co.jp/search?p={jp}
+
+### 未決定事項
+- 発注管理画面の具体的なUI詳細
+- 発注履歴の管理方法
+- 複数案件で在庫不足の場合の割り当て優先順位
+
+---
+
+## 26. ナビゲーション構成（2026/04/23確定）
+
+- コンポーネント: src/components/layout/Sidebar.tsx（名前はSidebarだが上部ヘッダー）
+- ルートグループ: src/app/(app)/ 配下のページにのみ適用
+- レイアウト: src/app/(app)/layout.tsx
+- ナビ項目：
+  - ダッシュボード: /admin
+  - 修理一覧: /repairs
+  - ボード表示: /repairs/board
+  - 新規修理登録: /repairs/new
+  - 部品マスタ: /parts
+  - 発注管理: /orders
+  - 料金マスタ: /masters/pricing
+  - 請求書管理: /invoices
+  - 顧客管理: /customers
+- お客様向け公開ページ（/）にはヘッダーは表示しない
+- 各ページ内の重複ナビボタンは削除済み

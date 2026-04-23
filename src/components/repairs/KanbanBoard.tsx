@@ -14,13 +14,16 @@ interface KanbanBoardProps {
 }
 
 const COLUMNS = [
-    { id: 'reception', title: '受付', color: 'bg-slate-100' },
-    { id: 'diagnosing', title: '見積中', color: 'bg-yellow-50 text-yellow-800 border-yellow-100' },
-    { id: 'parts_wait', title: '部品待 (未注文)', color: 'bg-orange-50 text-orange-800 border-orange-100' },
-    { id: 'parts_wait_ordered', title: '部品待 (注文済)', color: 'bg-orange-100 text-orange-900 border-orange-200' },
-    { id: 'in_progress', title: '作業中', color: 'bg-blue-50 text-blue-800 border-blue-100' },
-    { id: 'completed', title: '完了', color: 'bg-green-50 text-green-800 border-green-100' },
-    { id: 'delivered', title: '納品済', color: 'bg-zinc-100 text-zinc-600' },
+    { id: '受付',             title: '受付',             color: 'bg-slate-100' },
+    { id: '見積中',           title: '見積中',           color: 'bg-yellow-50 text-yellow-800 border-yellow-100' },
+    { id: '承認待ち',         title: '承認待ち',         color: 'bg-yellow-100 text-yellow-900 border-yellow-200' },
+    { id: '部品待ち(未注文)', title: '部品待ち(未注文)', color: 'bg-orange-50 text-orange-800 border-orange-100' },
+    { id: '部品待ち(注文済み)', title: '部品待ち(注文済み)', color: 'bg-orange-100 text-orange-900 border-orange-200' },
+    { id: '部品入荷済み',     title: '部品入荷済み',     color: 'bg-cyan-50 text-cyan-800 border-cyan-100' },
+    { id: '作業待ち',         title: '作業待ち',         color: 'bg-violet-50 text-violet-800 border-violet-100' },
+    { id: '作業中',           title: '作業中',           color: 'bg-blue-50 text-blue-800 border-blue-100' },
+    { id: '作業完了',         title: '作業完了',         color: 'bg-green-50 text-green-800 border-green-100' },
+    { id: '納品済み',         title: '納品済み',         color: 'bg-zinc-100 text-zinc-600' },
 ];
 
 export function KanbanBoard({ initialRepairs }: KanbanBoardProps) {

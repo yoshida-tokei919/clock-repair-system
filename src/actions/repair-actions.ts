@@ -5,28 +5,13 @@ import { revalidatePath } from "next/cache";
 
 export async function updateRepairStatus(repairId: number, newStatus: string, note?: string) {
     try {
-        const statusMap: Record<string, string> = {
-            'reception': '受付',
-            'diagnosing': '見積中',
-            'parts_wait': '部品待 (未注文)',
-            'parts_wait_ordered': '部品待 (注文済)',
-            'in_progress': '作業中',
-            'completed': '完了',
-            'delivered': '納品済',
-            'canceled': 'キャンセル'
-        };
-
-        const statusLabel = statusMap[newStatus] || newStatus;
-
         await prisma.$transaction(async (tx) => {
             // 1. Fetch current to check approvalDate
             const current = await tx.repair.findUnique({ where: { id: repairId } });
             if (!current) throw new Error(`Repair ID ${repairId} not found`);
 
-            const isApprovalStatus = ['in_progress', 'parts_wait', 'parts_wait_ordered', 'completed', 'delivered'].includes(newStatus);
+            const isApprovalStatus = ['作業中', '部品待ち(未注文)', '部品待ち(注文済み)', '作業完了', '納品済み'].includes(newStatus);
             const shouldSetApprovalDate = isApprovalStatus && !current.approvalDate;
-
-            console.log(`Updating Repair ${repairId} to status ${newStatus}. Should set approval date: ${shouldSetApprovalDate}`);
 
             // 2. Update Repair Status
             await tx.repair.update({
@@ -38,13 +23,12 @@ export async function updateRepairStatus(repairId: number, newStatus: string, no
             });
 
             // 3. Add Log
-            // Check if admin 1 exists (fallback to null if not)
             const admin = await tx.admin.findUnique({ where: { id: 1 } });
 
             await tx.repairStatusLog.create({
                 data: {
                     repairId: repairId,
-                    status: statusLabel,
+                    status: newStatus,
                     changedBy: admin ? 1 : null
                 }
             });
@@ -94,13 +78,18 @@ export async function getRepairStats() {
 
         // Initialize with 0
         const stats: Record<string, number> = {
-            reception: 0,
-            diagnosing: 0,
-            in_progress: 0,
-            completed: 0,
-            delivered: 0,
-            parts_wait: 0,
-            parts_wait_ordered: 0
+            '受付': 0,
+            '見積中': 0,
+            '承認待ち': 0,
+            '部品待ち(未注文)': 0,
+            '部品待ち(注文済み)': 0,
+            '部品入荷済み': 0,
+            '作業待ち': 0,
+            '作業中': 0,
+            '作業完了': 0,
+            '納品済み': 0,
+            'キャンセル': 0,
+            '保留': 0,
         };
 
         counts.forEach(c => {
@@ -206,16 +195,16 @@ export async function updatePartOrderStatus(itemId: number, status: string) {
 
         let targetStatus: string | null = null;
         if (allReceived) {
-            targetStatus = 'in_progress';
+            targetStatus = '部品入荷済み';
         } else if (hasPending) {
-            targetStatus = 'parts_wait';
+            targetStatus = '部品待ち(未注文)';
         } else if (freshItems.length > 0) {
-            targetStatus = 'parts_wait_ordered';
+            targetStatus = '部品待ち(注文済み)';
         }
 
         // 連動対象：見積中・部品待ち系・作業中（完了/納品済/キャンセル/受付中は対象外）
         const currentStatus = item.estimate.repair.status;
-        const isAutoSyncable = ['diagnosing', 'parts_wait', 'parts_wait_ordered', 'in_progress']
+        const isAutoSyncable = ['見積中', '部品待ち(未注文)', '部品待ち(注文済み)', '作業中']
             .includes(currentStatus);
         if (targetStatus && isAutoSyncable) {
             await updateRepairStatus(repairId, targetStatus);

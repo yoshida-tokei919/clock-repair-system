@@ -16,10 +16,10 @@ export function LineButton({ repairId, customerName, status }: LineButtonProps) 
 
     // Mock Message Generation based on status
     const getMessage = () => {
-        if (status === 'reception') return "時計のお預かり連絡です。診断結果が出るまで今しばらくお待ちください。";
-        if (status === 'diagnosing') return "お見積もりが完了しました。詳細をご確認ください。";
-        if (status === 'parts_wait') return "部品の手配を行っております。入荷まで少々お待ちください。";
-        if (status === 'completed') return "修理が完了いたしました。ご都合の良い時にお受け取りにお越しください。";
+        if (status === '受付') return "時計のお預かり連絡です。診断結果が出るまで今しばらくお待ちください。";
+        if (status === '見積中') return "お見積もりが完了しました。詳細をご確認ください。";
+        if (status === '部品待ち(未注文)' || status === '部品待ち(注文済み)') return "部品の手配を行っております。入荷まで少々お待ちください。";
+        if (status === '作業完了') return "修理が完了いたしました。ご都合の良い時にお受け取りにお越しください。";
         return "ステータスが更新されました。";
     };
 

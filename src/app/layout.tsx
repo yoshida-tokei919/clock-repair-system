@@ -17,6 +17,7 @@ export const metadata: Metadata = {
 import { Toaster } from "@/components/ui/toaster"
 import { Providers } from "@/components/Providers"
 import { QRScannerListener } from "@/components/QRScannerListener"
+import Sidebar from "@/components/layout/Sidebar"
 
 export default function RootLayout({
     children,
@@ -29,8 +30,8 @@ export default function RootLayout({
                 <Providers>
                     <QRScannerListener />
                     {children}
+                    <Toaster />
                 </Providers>
-                <Toaster />
             </body>
         </html>
     );

@@ -39,28 +39,29 @@ import { getCustomers } from "@/actions/customer-actions";
 // --- COMPONENTS ---
 import { QuickRegisterDialog } from "@/components/repairs/QuickRegisterDialog";
 import { MobileConnectDialog } from "@/components/repairs/MobileConnectDialog";
+import PartsSearchPanel from "@/components/parts/PartsSearchPanel";
 
 // Dynamically import PDF Dialog (Client only)
 const PDFPreviewDialog = dynamic(() => import("@/components/repairs/PDFPreviewDialog"), { ssr: false });
 
 // §12 確定ステータス定義（2026/04/22）
 const STATUS_STEPS: { id: string; label: string }[] = [
-    { id: "reception",          label: "受付" },
-    { id: "diagnosing",         label: "見積中" },
-    { id: "approval_wait",      label: "承認待ち" },
-    { id: "parts_wait",         label: "部品待ち(未注文)" },
-    { id: "parts_wait_ordered", label: "部品待ち(注文済み)" },
-    { id: "parts_arrived",      label: "部品入荷済み" },
-    { id: "work_wait",          label: "作業待ち" },
-    { id: "in_progress",        label: "作業中" },
-    { id: "work_completed",     label: "作業完了" },
-    { id: "delivered",          label: "納品済み" },
-    { id: "canceled",           label: "キャンセル" },
-    { id: "on_hold",            label: "保留" },
+    { id: "受付",             label: "受付" },
+    { id: "見積中",           label: "見積中" },
+    { id: "承認待ち",         label: "承認待ち" },
+    { id: "部品待ち(未注文)", label: "部品待ち(未注文)" },
+    { id: "部品待ち(注文済み)", label: "部品待ち(注文済み)" },
+    { id: "部品入荷済み",     label: "部品入荷済み" },
+    { id: "作業待ち",         label: "作業待ち" },
+    { id: "作業中",           label: "作業中" },
+    { id: "作業完了",         label: "作業完了" },
+    { id: "納品済み",         label: "納品済み" },
+    { id: "キャンセル",       label: "キャンセル" },
+    { id: "保留",             label: "保留" },
 ];
 
 // ステータスバーに横並び表示するメインフロー（保留・キャンセルは除外）
-const MAIN_STATUS_STEPS = STATUS_STEPS.filter(s => s.id !== 'canceled' && s.id !== 'on_hold');
+const MAIN_STATUS_STEPS = STATUS_STEPS.filter(s => s.id !== 'キャンセル' && s.id !== '保留');
 
 // "YYYY/M/D" ↔ "YYYY-MM-DD" 変換ヘルパー
 function toInputDate(localeDate: string): string {
@@ -222,8 +223,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, [mode, initialData?.id]);
 
     // --- 1. CORE DATA ---
-    const [status, setStatus] = useState<string>(initialData?.status || "reception");
-    const [statusLog, setStatusLog] = useState<Record<string, string>>(initialData?.statusLog || { "reception": new Date().toISOString() });
+    const [status, setStatus] = useState<string>(initialData?.status || "受付");
+    const [statusLog, setStatusLog] = useState<Record<string, string>>(initialData?.statusLog || { "受付": new Date().toISOString() });
     const [customerId, setCustomerId] = useState<number | null>(initialData?.customer?.id || null);
     const [isB2B, setIsB2B] = useState<boolean>(initialData?.customer?.type === 'business');
     const [customerName, setCustomerName] = useState(initialData?.customer?.name || "");
@@ -259,6 +260,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         partRef?: string;
         spec?: string;
         status?: 'pending' | 'ordered' | 'arrived';
+        partsMasterId?: number | null;
     }
     const [lineItems, setLineItems] = useState<LineItem[]>(() => {
         if (!initialData?.estimate?.items) return [];
@@ -324,6 +326,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // --- 10. AI CHAT ---
     const [aiChatOpen, setAiChatOpen] = useState(false);
     const [aiChatInput, setAiChatInput] = useState('');
+
+    // --- 11. 在庫警告 ---
+    type StockWarning = { partName: string; required: number; stock: number; orderRequestId: number }
+    const [stockWarnings, setStockWarnings] = useState<StockWarning[]>([]);
 
     // Construct current data object for PDF
     const currentDataForPdf = {
@@ -463,7 +469,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         category: i.category,
                         name: i.name,
                         price: i.price,
-                        notes: i.spec
+                        notes: i.spec,
+                        partsMasterId: i.partsMasterId ?? null,
+                        quantity: i.quantity ?? 1,
                     }))
                 },
                 status,
@@ -480,6 +488,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
             if (!res.ok) throw new Error("Save failed");
             const json = await res.json();
+
+            // 在庫警告があればダイアログ表示
+            if (json.stockWarnings && json.stockWarnings.length > 0) {
+                setStockWarnings(json.stockWarnings);
+            }
 
             // Redirect or Notify
             if (mode === 'create') {
@@ -808,10 +821,10 @@ ${shopName}
                     <div className="flex flex-col gap-2 self-center ml-4 shrink-0 border-l-2 border-zinc-200 pl-4">
                         <button
                             type="button"
-                            onClick={() => { if (!isReadOnly) setStatus('on_hold'); }}
+                            onClick={() => { if (!isReadOnly) setStatus('保留'); }}
                             className={cn(
                                 "text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all",
-                                status === 'on_hold'
+                                status === '保留'
                                     ? "bg-yellow-100 border-yellow-400 text-yellow-700 shadow"
                                     : "border-zinc-300 text-zinc-400 hover:border-yellow-400 hover:text-yellow-600"
                             )}
@@ -820,10 +833,10 @@ ${shopName}
                         </button>
                         <button
                             type="button"
-                            onClick={() => { if (!isReadOnly) setStatus('canceled'); }}
+                            onClick={() => { if (!isReadOnly) setStatus('キャンセル'); }}
                             className={cn(
                                 "text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all",
-                                status === 'canceled'
+                                status === 'キャンセル'
                                     ? "bg-red-100 border-red-500 text-red-700 shadow"
                                     : "border-zinc-300 text-zinc-400 hover:border-red-400 hover:text-red-600"
                             )}
@@ -1161,53 +1174,34 @@ ${shopName}
                                         <p className="text-xs text-center">明細行の 🔍 ボタンを押して<br />部品を検索してください</p>
                                     </div>
                                 ) : (
-                                    <div className="flex flex-col gap-3">
-                                        {/* 検索欄 */}
-                                        <div>
-                                            <Label className="text-[9px] text-zinc-400">
-                                                {partsPanelRowIdx !== null && lineItems[partsPanelRowIdx]
-                                                    ? `「${lineItems[partsPanelRowIdx].name || '（未入力）'}」の部品を検索`
-                                                    : '部品を検索'}
-                                            </Label>
-                                            <div className="flex gap-1 mt-0.5">
-                                                <Input
-                                                    className="h-7 text-xs flex-1"
-                                                    placeholder="部品名・Ref・Cal..."
-                                                    value={partsSearchQuery}
-                                                    onChange={e => setPartsSearchQuery(e.target.value)}
-                                                    autoFocus
-                                                />
-                                                <Button size="sm" className="h-7 px-2 text-[10px] bg-blue-600 hover:bg-blue-700">検索</Button>
-                                            </div>
-                                        </div>
-                                        {/* 検索結果エリア（後工程で実装） */}
-                                        <div className="border border-zinc-200 rounded bg-zinc-50 min-h-[100px] flex flex-col items-center justify-center gap-1 text-zinc-400 text-xs p-3">
-                                            <p className="text-center">検索ボタンを押すと<br />ここに結果が表示されます</p>
-                                            <p className="text-[9px] text-zinc-300">（部品検索機能は後工程で実装）</p>
-                                        </div>
-                                        {/* ヒットなし → 新規登録 */}
-                                        <div className="border border-dashed border-zinc-300 rounded p-2 flex flex-col gap-1.5">
-                                            <p className="text-[10px] text-zinc-500 font-semibold">ヒットしない場合</p>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-7 text-[10px] border-blue-300 text-blue-600 hover:bg-blue-50"
-                                            >
-                                                ＋ 新規部品登録
-                                            </Button>
-                                            <p className="text-[9px] text-zinc-400">登録後「この部品を使用」で明細に自動入力されます</p>
-                                        </div>
-                                        {/* この部品を使用 */}
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            className="w-full h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700"
-                                            disabled
-                                        >
-                                            ✓ この部品を使用（部品選択後に有効）
-                                        </Button>
+                                    <div className="text-xs text-zinc-500 mb-2 px-1">
+                                        {partsPanelRowIdx !== null && lineItems[partsPanelRowIdx]
+                                            ? `「${lineItems[partsPanelRowIdx].name || '（未入力）'}」の部品を検索`
+                                            : '部品を検索'}
                                     </div>
+                                )}
+                                {partsPanelOpen && (
+                                    <PartsSearchPanel
+                                        mode="panel"
+                                        onSelect={(part) => {
+                                            if (partsPanelRowIdx === null) return;
+                                            setLineItems(lineItems.map((li, i) =>
+                                                i === partsPanelRowIdx
+                                                    ? {
+                                                        ...li,
+                                                        name: part.nameJp,
+                                                        price: part.retailPrice,
+                                                        cost: part.latestCostYen,
+                                                        spec: part.grade || li.spec,
+                                                        partsMasterId: (part as any).id ?? null,
+                                                        category: 'part_external',
+                                                    }
+                                                    : li
+                                            ));
+                                            setPartsPanelOpen(false);
+                                            setPartsPanelRowIdx(null);
+                                        }}
+                                    />
                                 )}
                             </div>
                         </div>
@@ -1434,6 +1428,35 @@ ${shopName}
                 </div>
             </div>
 
+
+        {/* 在庫不足警告ダイアログ */}
+        {stockWarnings.length > 0 && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md space-y-4">
+                    <h2 className="text-lg font-bold text-red-600">在庫不足の部品があります</h2>
+                    <div className="border rounded divide-y text-sm">
+                        {stockWarnings.map((w, i) => (
+                            <div key={i} className="px-3 py-2 flex justify-between">
+                                <span className="font-medium">{w.partName}</span>
+                                <span className="text-gray-500">
+                                    必要: <span className="font-bold text-red-500">{w.required}</span>　在庫: {w.stock}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-gray-500">不足分は自動的に発注リストに追加されました。</p>
+                    <div className="flex gap-3 justify-end">
+                        <Button variant="outline" onClick={() => setStockWarnings([])}>
+                            このまま続ける
+                        </Button>
+                        <Button onClick={() => router.push('/orders')}
+                            className="bg-blue-600 hover:bg-blue-700 text-white">
+                            発注リストを確認する
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        )}
         </div>
     );
 }

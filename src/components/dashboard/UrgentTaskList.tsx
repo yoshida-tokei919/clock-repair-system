@@ -8,16 +8,6 @@ import { ClickToCopy } from "@/components/ui/click-to-copy";
 export async function UrgentTaskList() {
     const recentRepairs = await getRecentRepairs(5);
 
-    const statusMap: Record<string, string> = {
-        'reception': '受付',
-        'diagnosing': '見積中',
-        'parts_wait': '部品待 (未注文)',
-        'parts_wait_ordered': '部品待 (注文済)',
-        'in_progress': '作業中',
-        'completed': '完了',
-        'delivered': '納品済',
-        'canceled': 'キャンセル'
-    };
 
     return (
         <Card className="col-span-4 lg:col-span-3">
@@ -48,7 +38,7 @@ export async function UrgentTaskList() {
                                 </div>
                                 <div className="font-medium text-right">
                                     <div className="text-xs bg-zinc-100 px-2 py-0.5 rounded-full inline-block mb-1 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors">
-                                        {statusMap[repair.status] || repair.status}
+                                        {repair.status}
                                     </div>
                                     <div className="text-[10px] text-zinc-400">
                                         {new Date(repair.createdAt).toLocaleDateString("ja-JP")}

@@ -174,9 +174,10 @@ model Repair {
 
   customer Customer          @relation(fields: [customerId], references: [id])
   watch    Watch             @relation(fields: [watchId], references: [id])
-  logs     RepairStatusLog[]
-  photos   RepairPhoto[]
-  estimate Estimate?
+  logs          RepairStatusLog[]
+  photos        RepairPhoto[]
+  estimate      Estimate?
+  orderRequests OrderRequest[]
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
@@ -258,8 +259,11 @@ model EstimateItem {
   orderStatus String?  @default("pending") // 'pending', 'ordered', 'received'
   orderedAt   DateTime?
   
+  partsMasterId Int?
+  partsMaster   PartsMaster? @relation(fields: [partsMasterId], references: [id])
+
   createdAt   DateTime @default(now())
-  
+
   estimate   Estimate @relation(fields: [estimateId], references: [id])
 }
 
@@ -273,7 +277,8 @@ model Supplier {
   isOnline Boolean @default(true) // true: オンライン店 / false: 実店舗
   notes    String?
 
-  parts    PartsMaster[]
+  parts         PartsMaster[]
+  orderRequests OrderRequest[]
 }
 
 // §13 部品マスタ（内装・外装統合）
@@ -332,6 +337,8 @@ model PartsMaster {
   movementMaker Brand?    @relation("PartsMovementMaker", fields: [movementMakerId],  references: [id])
   baseMaker     Brand?    @relation("PartsBaseMaker",     fields: [baseMakerId],      references: [id])
   supplier      Supplier? @relation(                      fields: [supplierId],        references: [id])
+  orderRequests OrderRequest[]
+  estimateItems EstimateItem[]
 }
 
 // 7. Documents (Bulk Generation)
@@ -392,4 +399,41 @@ model Warranty {
   customer        Customer @relation(fields: [customerId], references: [id])
 
   repairs         Repair[]
+}
+
+// §21 発注リスト
+model OrderRequest {
+  id            Int      @id @default(autoincrement())
+
+  // 部品情報
+  partsMasterId Int?
+  partsMaster   PartsMaster? @relation(fields: [partsMasterId], references: [id])
+  partNameJp    String
+  partNameEn    String?
+  partRefs      String?
+  cousinsNumber String?
+
+  // 発注情報
+  quantity      Int      @default(1)
+  supplierId    Int?
+  supplier      Supplier? @relation(fields: [supplierId], references: [id])
+
+  // ステータス
+  // pending（未発注）/ ordered（注文済み）/ received（入荷済み）/ cancelled（キャンセル）
+  status        String   @default("pending")
+
+  // 検索ワード（自動生成）
+  searchWordJp  String?
+  searchWordEn  String?
+
+  // 関連カルテ
+  repairId      Int?
+  repair        Repair?  @relation(fields: [repairId], references: [id])
+
+  // メモ・日時
+  notes         String?
+  orderedAt     DateTime?
+  receivedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

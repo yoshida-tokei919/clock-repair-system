@@ -265,17 +265,7 @@ export async function POST(req: Request) {
             }
 
             // 4. Create Repair
-            const statusMapping: Record<string, string> = {
-                "reception": "reception",
-                "diagnosing": "diagnosing",
-                "parts_wait": "parts_wait",
-                "parts_wait_ordered": "parts_wait_ordered",
-                "in_progress": "in_progress",
-                "completed": "completed",
-                "delivered": "delivered",
-                "canceled": "canceled"
-            };
-            const dbStatus = statusMapping[body.status] || body.status || "reception";
+            const dbStatus = body.status || "受付";
 
             const repair = await tx.repair.create({
                 data: {
@@ -294,23 +284,12 @@ export async function POST(req: Request) {
             });
 
             // 5. initial Log & History logs
-            const statusLabels: Record<string, string> = {
-                "reception": "受付",
-                "diagnosing": "見積中",
-                "parts_wait": "部品待 (未注文)",
-                "parts_wait_ordered": "部品待 (注文済)",
-                "in_progress": "作業中",
-                "completed": "完了",
-                "delivered": "納品済",
-                "canceled": "キャンセル"
-            };
-
             const logEntries = Object.entries(body.statusLog || {});
             for (const [sId, dateStr] of logEntries) {
                 await tx.repairStatusLog.create({
                     data: {
                         repairId: repair.id,
-                        status: statusLabels[sId] || sId,
+                        status: sId,
                         changedAt: new Date(dateStr as string),
                         changedBy: 1 // Admin
                     }
@@ -363,7 +342,8 @@ export async function POST(req: Request) {
                                 itemName: item.name,
                                 type: item.type,
                                 unitPrice: Math.floor(Number(item.price) || 0),
-                                quantity: 1
+                                quantity: item.quantity || 1,
+                                partsMasterId: item.partsMasterId ? Number(item.partsMasterId) : null,
                             }))
                         }
                     }
@@ -421,13 +401,55 @@ export async function POST(req: Request) {
                 }
             }
 
+            // 7. 在庫チェック（partsMasterId がある部品のみ）
+            const stockWarnings: { partName: string; required: number; stock: number; orderRequestId: number }[] = [];
+            const partItemsWithMaster = estimateItems.filter((i: any) => i.partsMasterId);
+            for (const item of partItemsWithMaster) {
+                const master = await tx.partsMaster.findUnique({ where: { id: Number(item.partsMasterId) } });
+                if (!master) continue;
+                const required = item.quantity || 1;
+                if (master.stockQuantity < required) {
+                    // 在庫不足 → OrderRequest 作成（重複防止）
+                    const existing = await tx.orderRequest.findFirst({
+                        where: { partsMasterId: master.id, repairId: repair.id, status: { in: ['pending', 'ordered'] } }
+                    });
+                    const orderRequest = existing ?? await tx.orderRequest.create({
+                        data: {
+                            partsMasterId: master.id,
+                            partNameJp: master.nameJp,
+                            partNameEn: master.nameEn ?? null,
+                            partRefs: master.partRefs ?? null,
+                            cousinsNumber: master.cousinsNumber ?? null,
+                            quantity: required,
+                            supplierId: master.supplierId ?? null,
+                            searchWordJp: master.nameJp,
+                            searchWordEn: master.nameEn ?? null,
+                            repairId: repair.id,
+                            status: 'pending',
+                        }
+                    });
+                    stockWarnings.push({
+                        partName: master.nameJp,
+                        required,
+                        stock: master.stockQuantity,
+                        orderRequestId: orderRequest.id,
+                    });
+                } else {
+                    // 在庫あり → 引き当て（在庫数 -1）
+                    await tx.partsMaster.update({
+                        where: { id: master.id },
+                        data: { stockQuantity: { decrement: required } }
+                    });
+                }
+            }
+
             // 6. Return Data
-            return repair;
+            return { repair, stockWarnings };
         }, {
             timeout: 5000
         });
 
-        return NextResponse.json({ success: true, repair: result });
+        return NextResponse.json({ success: true, repair: result.repair, stockWarnings: result.stockWarnings });
     } catch (error: any) {
         console.error("Transaction Error:", error);
         // Write error to file for debugging

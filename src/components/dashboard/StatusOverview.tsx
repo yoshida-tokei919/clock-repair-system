@@ -7,11 +7,11 @@ export async function StatusOverview() {
     const statsData = await getRepairStats();
 
     const stats = [
-        { title: "受付数", value: statsData?.reception || 0, icon: Clock, color: "text-blue-500", href: "/repairs?status=reception" },
-        { title: "見積中", value: statsData?.diagnosing || 0, icon: AlertCircle, color: "text-orange-500", href: "/repairs?status=diagnosing" },
-        { title: "部品待ち", value: (statsData?.parts_wait || 0) + (statsData?.parts_wait_ordered || 0), icon: Settings, color: "text-amber-600", href: "/repairs?status=parts_wait" },
-        { title: "作業中", value: statsData?.in_progress || 0, icon: TrendingUp, color: "text-purple-500", href: "/repairs?status=in_progress" },
-        { title: "完了 (未納品)", value: statsData?.completed || 0, icon: CheckCircle, color: "text-green-500", href: "/repairs?status=completed" },
+        { title: "受付数", value: statsData?.['受付'] || 0, icon: Clock, color: "text-blue-500", href: "/repairs?status=受付" },
+        { title: "見積中", value: statsData?.['見積中'] || 0, icon: AlertCircle, color: "text-orange-500", href: "/repairs?status=見積中" },
+        { title: "部品待ち", value: (statsData?.['部品待ち(未注文)'] || 0) + (statsData?.['部品待ち(注文済み)'] || 0), icon: Settings, color: "text-amber-600", href: "/repairs?status=部品待ち(未注文)" },
+        { title: "作業中", value: statsData?.['作業中'] || 0, icon: TrendingUp, color: "text-purple-500", href: "/repairs?status=作業中" },
+        { title: "作業完了", value: statsData?.['作業完了'] || 0, icon: CheckCircle, color: "text-green-500", href: "/repairs?status=作業完了" },
     ];
 
     return (

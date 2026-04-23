@@ -11,7 +11,7 @@ export function QRScannerListener() {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Only process single characters or Enter
-            if (e.key.length > 1 && e.key !== "Enter") return;
+            if (!e.key || (e.key.length > 1 && e.key !== "Enter")) return;
 
             const now = Date.now();
 

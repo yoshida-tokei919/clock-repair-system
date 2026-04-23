@@ -286,18 +286,6 @@ export default function PricingManagerPage() {
         <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 p-6 flex gap-6 font-sans">
             {/* List */}
             <div className="flex-1 space-y-4">
-                <div className="flex items-center gap-4 mb-2">
-                    <Link href="/admin">
-                        <Button variant="ghost" size="sm">
-                            <LayoutDashboard className="w-4 h-4 mr-2" /> ダッシュボード
-                        </Button>
-                    </Link>
-                    <Link href="/repairs">
-                        <Button variant="ghost" size="sm">
-                            <FileText className="w-4 h-4 mr-2" /> 修理一覧
-                        </Button>
-                    </Link>
-                </div>
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold flex items-center gap-2 text-slate-800">
                         <Settings className="w-6 h-6 text-blue-600" /> 作業内容・料金マスタ
