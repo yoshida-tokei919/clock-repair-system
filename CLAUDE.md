@@ -605,3 +605,25 @@ Ref
   prisma.estimate.findUnique({ where: { repairId }, include: { items: { include: { partsMaster: true } } } })
   ```
 - ステータスキーの変換テーブル（statusLabels等）は不要。DBステータスはすでに日本語で統一済み。
+
+---
+
+## 28. HydrationエラーとAPIエンドポイント（2026/04/23確定）
+
+### Hydrationエラーの禁止パターン
+- `useState`の初期値に`new Date()`・`Date.now()`・`Math.random()`等を使用してはならない
+- サーバーとクライアントで異なる値を生成する式はすべてHydrationエラー（#418/#423/#425）の原因になる
+- 日時の初期値が必要な場合は`useState("")`または`useState({})`で空値初期化し、`useEffect`内で設定すること
+  ```tsx
+  // NG: const [log, setLog] = useState({ "受付": new Date().toISOString() });
+  // OK:
+  const [log, setLog] = useState<Record<string, string>>({});
+  useEffect(() => { setLog({ "受付": new Date().toLocaleDateString('ja-JP') }); }, []);
+  ```
+
+### 顧客検索API
+- エンドポイント: `GET /api/customers?search=xxx`
+- ファイル: src/app/api/customers/route.ts
+- 検索対象: name・phone・prefix（部分一致・大小文字無視）
+- 最大20件返却
+- `RepairEntryForm`の`onSearchChange`から呼び出すほか、外部からも利用可能

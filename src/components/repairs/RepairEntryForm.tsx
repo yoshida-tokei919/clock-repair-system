@@ -222,9 +222,16 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         setIsEditingEnabled(mode !== 'view');
     }, [mode, initialData?.id]);
 
+    // 新規作成時のstatusLog初期化（useEffectでクライアント確定後に実行してHydrationエラーを防ぐ）
+    useEffect(() => {
+        if (!initialData?.statusLog) {
+            setStatusLog({ "受付": new Date().toLocaleDateString('ja-JP') });
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     // --- 1. CORE DATA ---
     const [status, setStatus] = useState<string>(initialData?.status || "受付");
-    const [statusLog, setStatusLog] = useState<Record<string, string>>(initialData?.statusLog || { "受付": new Date().toISOString() });
+    const [statusLog, setStatusLog] = useState<Record<string, string>>(initialData?.statusLog ?? {});
     const [customerId, setCustomerId] = useState<number | null>(initialData?.customer?.id || null);
     const [isB2B, setIsB2B] = useState<boolean>(initialData?.customer?.type === 'business');
     const [customerName, setCustomerName] = useState(initialData?.customer?.name || "");
