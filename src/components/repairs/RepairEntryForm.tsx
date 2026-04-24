@@ -425,16 +425,16 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             });
         } else {
             // Fetch parts master data
-            getPartsMatched(b.id, m?.id, c?.id).then(parts => {
-                setWorkOpts(parts.map(p => ({
-                    label: p.nameJp || p.name,
-                    value: p.nameJp || p.name,
-                    price: p.retailPrice,
-                    sub: p.partRefs ? `Ref: ${p.partRefs} (${p.category})` : p.category
-                })));
-                console.log(`Fetched ${parts.length} matching parts for brand ${b.id}`);
-            });
-        }
+                getPartsMatched(b.id, m?.id, c?.id).then(parts => {
+                    setWorkOpts(parts.map(p => ({
+                        label: p.nameJp || p.name,
+                        value: p.nameJp || p.name,
+                        price: p.retailPrice,
+                        sub: p.grade || undefined
+                    })));
+                    console.log(`Fetched ${parts.length} matching parts for brand ${b.id}`);
+                });
+            }
     }, [brand, model, caliber, brandOpts, modelOpts, calOpts, addItemCategory]);
 
     // --- CALCULATIONS ---
