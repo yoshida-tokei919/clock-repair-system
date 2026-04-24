@@ -26,6 +26,7 @@ import {
     DialogDescription
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { toast } from "@/components/ui/use-toast";
 
 // --- ACTIONS (Server) ---
@@ -86,13 +87,25 @@ const AdvancedCombobox: React.FC<{
     onSearchChange?: (s: string) => void;
     onUpsert?: (v: string) => void;
     placeholder?: string;
-    options: { label: string, value: string, sub?: string, price?: number }[];
+    options: {
+        label: string,
+        value: string,
+        sub?: string,
+        inlineTag?: string,
+        meta?: string,
+        notes?: string,
+        price?: number,
+        cost?: number,
+        partId?: number,
+        grade?: string,
+        note1?: string,
+        note2?: string,
+    }[];
     disabled?: boolean;
     className?: string;
 }> = ({ value, onChange, onSearchChange, onUpsert, placeholder, options, disabled, className }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
-    const [openUpward, setOpenUpward] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -119,15 +132,6 @@ const AdvancedCombobox: React.FC<{
 
     // Sync input when closing
     useEffect(() => { if (!isOpen) setSearch(""); }, [isOpen]);
-
-    // 画面外はみ出し防止：開いた直後にドロップダウンが下にはみ出すか判定
-    useEffect(() => {
-        if (isOpen && wrapperRef.current) {
-            const rect = wrapperRef.current.getBoundingClientRect();
-            const spaceBelow = window.innerHeight - rect.bottom;
-            setOpenUpward(spaceBelow < 220);
-        }
-    }, [isOpen]);
 
     return (
         <div className={cn("relative w-full", className)} ref={wrapperRef}>
@@ -161,8 +165,8 @@ const AdvancedCombobox: React.FC<{
                 <ChevronDown className="h-3 w-3 opacity-50 cursor-pointer text-zinc-600" />
             </div>
             {isOpen && (
-                <div className={`absolute z-50 w-full bg-white border border-zinc-200 rounded-sm shadow-xl min-w-[200px] overflow-hidden animate-in fade-in zoom-in-95 duration-100 ${openUpward ? 'bottom-full mb-1 origin-bottom-left' : 'top-full mt-1 origin-top-left'}`}>
-                    <div className="overflow-y-auto p-1 max-h-[200px]">
+                <div className="absolute top-full z-50 mt-1 w-full min-w-[200px] overflow-visible rounded-sm border border-zinc-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-100 origin-top-left">
+                    <div className="overflow-y-auto p-1 max-h-80">
                         {onUpsert && search && !options.some(o => o.value === search) && (
                             <div className="p-1.5 px-2 text-xs text-blue-600 font-bold hover:bg-blue-50 cursor-pointer rounded-sm mb-1 flex items-center" onClick={() => {
                                 onUpsert(search);
@@ -179,7 +183,7 @@ const AdvancedCombobox: React.FC<{
                             <div
                                 key={i}
                                 className={cn(
-                                    "p-1.5 px-2 text-xs hover:bg-blue-50 hover:text-blue-700 cursor-pointer rounded-sm flex justify-between items-center transition-colors",
+                                    "min-h-[64px] px-2.5 py-2 text-xs leading-snug hover:bg-blue-50 hover:text-blue-700 cursor-pointer rounded-sm transition-colors",
                                     value === opt.value ? "bg-blue-100 text-blue-800 font-bold" : "text-zinc-700"
                                 )}
                                 onClick={() => {
@@ -188,16 +192,39 @@ const AdvancedCombobox: React.FC<{
                                     setIsOpen(false);
                                 }}
                             >
-                                <div className="flex justify-between items-center w-full">
-                                    <div className="flex flex-col">
-                                        <span>{opt.label}</span>
-                                        {opt.sub && <span className="text-[9px] text-zinc-400 font-normal">{opt.sub}</span>}
+                                <div className="flex w-full items-start gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                                                    <span className="break-words text-xs leading-snug">{opt.label}</span>
+                                                    {opt.inlineTag && (
+                                                        <span className="text-xs leading-snug font-medium text-zinc-500">({opt.inlineTag})</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {opt.price !== undefined && (
+                                                <span className="shrink-0 text-[10px] font-mono bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-500">
+                                                    ¥{opt.price.toLocaleString()}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {opt.meta && (
+                                            <div className="mt-0.5 break-words text-xs leading-snug text-zinc-500 font-normal">
+                                                {opt.meta}
+                                            </div>
+                                        )}
+                                        {opt.notes && (
+                                            <div className="mt-0.5 break-words text-xs leading-snug text-zinc-400 font-normal">
+                                                {opt.notes}
+                                            </div>
+                                        )}
+                                        {!opt.meta && !opt.notes && opt.sub && (
+                                            <span className="mt-0.5 block break-words text-xs leading-snug text-zinc-400 font-normal">{opt.sub}</span>
+                                        )}
                                     </div>
-                                    {opt.price !== undefined && (
-                                        <span className="text-[10px] font-mono bg-zinc-100 px-1 rounded text-zinc-500 ml-2 truncate max-w-[80px]">¥{opt.price.toLocaleString()}</span>
-                                    )}
+                                    {value === opt.value && <Check className="mt-0.5 h-3 w-3 shrink-0" />}
                                 </div>
-                                {value === opt.value && <Check className="w-3 h-3" />}
                             </div>
                         ))}
                     </div>
@@ -266,6 +293,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         quantity: number; // 個数
         partRef?: string;
         spec?: string;
+        grade?: string;
+        note1?: string;
+        note2?: string;
         status?: 'pending' | 'ordered' | 'arrived';
         partsMasterId?: number | null;
     }
@@ -277,7 +307,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             name: i.itemName,
             price: i.unitPrice,
             quantity: i.quantity || 1,
-            spec: i.notes
+            spec: i.notes,
+            grade: i.partsMaster?.grade ?? undefined,
+            note1: i.partsMaster?.notes1 ?? undefined,
+            note2: i.partsMaster?.notes2 ?? undefined,
+            partsMasterId: i.partsMasterId ?? null,
         }));
     });
 
@@ -288,6 +322,27 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [newItemPrice, setNewItemPrice] = useState("");
     const [newItemQty, setNewItemQty] = useState("1");
     const [newItemSpec, setNewItemSpec] = useState("");
+
+    const buildPartLineItem = useCallback((base: LineItem, part: {
+        name: string;
+        retailPrice?: number;
+        latestCostYen?: number;
+        partId?: number;
+        grade?: string;
+        note1?: string;
+        note2?: string;
+    }): LineItem => ({
+        ...base,
+        name: part.name,
+        price: part.retailPrice ?? base.price,
+        cost: part.latestCostYen ?? base.cost,
+        spec: part.grade || base.spec,
+        grade: part.grade || undefined,
+        note1: part.note1 || undefined,
+        note2: part.note2 || undefined,
+        partsMasterId: part.partId ?? base.partsMasterId ?? null,
+        category: 'part_external',
+    }), []);
 
     const [diagnosis, setDiagnosis] = useState(initialData?.workSummary || ""); // Diagnosis/Request details
     const [internalNotes, setInternalNotes] = useState(initialData?.internalNotes || "");
@@ -346,7 +401,15 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         endUserName,
         partnerRef,
         watch: { brand, model, ref: refName, serial },
-        estimate: { items: lineItems.map(i => ({ name: i.name, price: i.price })) },
+        estimate: {
+            items: lineItems.map(i => ({
+                name: i.name,
+                price: i.price,
+                type: i.category.includes('part') ? 'part' : 'labor',
+                grade: i.grade,
+                note2: i.note2,
+            }))
+        },
         shippingFee,
         status
     };
@@ -430,7 +493,18 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         label: p.nameJp || p.name,
                         value: p.nameJp || p.name,
                         price: p.retailPrice,
-                        sub: p.grade || undefined
+                        cost: p.latestCostYen,
+                        partId: p.id,
+                        grade: p.grade || undefined,
+                        note1: p.notes1 || undefined,
+                        note2: p.notes2 || undefined,
+                        inlineTag: p.grade || undefined,
+                        meta: [
+                            `ID: ${p.id}`,
+                            p.partRefs ? `Ref: ${p.partRefs}` : null,
+                            p.cousinsNumber ? `Cousins: ${p.cousinsNumber}` : null,
+                        ].filter(Boolean).join(' / '),
+                        notes: [p.notes1, p.notes2].filter(Boolean).join(' / ') || undefined,
                     })));
                     console.log(`Fetched ${parts.length} matching parts for brand ${b.id}`);
                 });
@@ -1018,14 +1092,14 @@ ${shopName}
                     <div className="grid grid-cols-2 gap-3">
 
                         {/* ④見積・修理明細テーブル */}
-                        <Card className="p-0 shadow-sm border-t-4 border-t-emerald-600 bg-white flex flex-col overflow-hidden">
+                        <Card className="p-0 shadow-sm border-t-4 border-t-emerald-600 bg-white flex flex-col overflow-visible">
                             <div className="p-2 border-b bg-zinc-50 flex justify-between items-center">
                                 <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase">
                                     <Settings className="w-3.5 h-3.5" /> 見積・修理明細
                                 </h3>
                                 <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold text-[10px]">合計: ¥{grandTotal.toLocaleString()}</span>
                             </div>
-                            <div className="overflow-y-auto p-2 space-y-2">
+                            <div className="overflow-visible p-2 space-y-2">
                                 {/* ヘッダー */}
                                 <div className="grid grid-cols-12 text-[9px] text-zinc-400 font-bold border-b pb-1 px-1">
                                     <div className="col-span-6">項目 / 部品</div>
@@ -1039,7 +1113,7 @@ ${shopName}
                                 {lineItems.map((item, idx) => (
                                     <div key={item.id} className="grid grid-cols-12 items-center text-xs p-1.5 hover:bg-zinc-50 border-b border-zinc-100 last:border-0 group">
                                         <div className="col-span-6 flex flex-col gap-0.5">
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-start gap-1">
                                                 <button
                                                     type="button"
                                                     onClick={() => setLineItems(lineItems.map((li, i) =>
@@ -1049,7 +1123,13 @@ ${shopName}
                                                 >
                                                     {item.category.includes('part') ? '交換部品' : '技術料'}
                                                 </button>
-                                                <span className="font-medium truncate">{item.name}</span>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="min-w-0 break-words font-medium">
+                                                        {item.category.includes('part')
+                                                            ? formatPartDisplay(item)
+                                                            : item.name}
+                                                    </span>
+                                                </div>
                                             </div>
                                             {item.spec && <span className="text-[9px] text-zinc-400 pl-0.5">{item.spec}</span>}
                                         </div>
@@ -1121,7 +1201,10 @@ ${shopName}
                                             onChange={(v) => {
                                                 setNewItemName(v);
                                                 const match = workOpts.find(w => w.value === v);
-                                                if (match) setNewItemPrice(String(match.price));
+                                                if (match) {
+                                                    if (match.price !== undefined) setNewItemPrice(String(match.price));
+                                                    if (match.cost !== undefined) setNewItemCost(String(match.cost));
+                                                }
                                             }}
                                             options={workOpts}
                                         />
@@ -1139,7 +1222,10 @@ ${shopName}
                                         <Input className="h-7 text-xs w-12 text-center font-mono" placeholder="1" value={newItemQty} onChange={e => setNewItemQty(e.target.value)} type="number" min={1} />
                                         <Button size="sm" className="h-7 w-8 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
                                             if (!newItemName) return;
-                                            setLineItems([...lineItems, {
+                                            const match = addItemCategory === 'part_external'
+                                                ? workOpts.find(w => w.value === newItemName && w.partId)
+                                                : undefined;
+                                            const baseItem: LineItem = {
                                                 id: `auto-${Date.now()}`,
                                                 category: addItemCategory,
                                                 name: newItemName,
@@ -1147,7 +1233,19 @@ ${shopName}
                                                 price: parseInt(newItemPrice) || 0,
                                                 quantity: parseInt(newItemQty) || 1,
                                                 spec: newItemSpec
-                                            }]);
+                                            };
+                                            const nextItem = match
+                                                ? buildPartLineItem(baseItem, {
+                                                    name: match.value,
+                                                    retailPrice: match.price,
+                                                    latestCostYen: match.cost,
+                                                    partId: match.partId,
+                                                    grade: match.grade,
+                                                    note1: match.note1,
+                                                    note2: match.note2,
+                                                })
+                                                : baseItem;
+                                            setLineItems([...lineItems, nextItem]);
                                             setNewItemName("");
                                             setNewItemCost("");
                                             setNewItemPrice("");
@@ -1195,15 +1293,15 @@ ${shopName}
                                             if (partsPanelRowIdx === null) return;
                                             setLineItems(lineItems.map((li, i) =>
                                                 i === partsPanelRowIdx
-                                                    ? {
-                                                        ...li,
+                                                    ? buildPartLineItem(li, {
                                                         name: part.nameJp,
-                                                        price: part.retailPrice,
-                                                        cost: part.latestCostYen,
-                                                        spec: part.grade || li.spec,
-                                                        partsMasterId: (part as any).id ?? null,
-                                                        category: 'part_external',
-                                                    }
+                                                        retailPrice: part.retailPrice,
+                                                        latestCostYen: part.latestCostYen,
+                                                        partId: (part as any).id ?? undefined,
+                                                        grade: part.grade,
+                                                        note1: part.notes1,
+                                                        note2: part.notes2,
+                                                    })
                                                     : li
                                             ));
                                             setPartsPanelOpen(false);

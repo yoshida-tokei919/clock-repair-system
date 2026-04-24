@@ -213,7 +213,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                                 itemName: item.name,
                                 type: item.type,
                                 unitPrice: Math.floor(Number(item.price) || 0),
-                                quantity: 1
+                                quantity: 1,
+                                partsMasterId: item.partsMasterId ? Number(item.partsMasterId) : null,
                             }))
                         });
                     }

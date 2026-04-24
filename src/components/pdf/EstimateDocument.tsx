@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
+import { formatPartDisplay } from '@/lib/formatPartDisplay';
 
 Font.register({
   family: 'Noto Sans JP',
@@ -19,8 +20,8 @@ const styles = StyleSheet.create({
   b2bRow: { borderBottomWidth: 1, borderColor: '#ccc', paddingVertical: 4 },
   colNo: { fontSize: 9, fontWeight: 'bold' },
   colInquiry: { fontSize: 9 },
-  colEndUser: { fontSize: 9 },
-  colWatch: { fontSize: 9, fontWeight: 'bold' },
+  colEndUser: { fontSize: 9, textAlign: 'right' },
+  colWatch: { fontSize: 9, fontWeight: 'bold', textAlign: 'right' },
   colTotal: { fontSize: 10, textAlign: 'right', fontWeight: 'bold' },
 });
 
@@ -40,7 +41,7 @@ export interface EstimateDocumentProps {
       endUserName?: string;
       customerNote?: string;
       watch: { brand: string; model: string; ref?: string; serial?: string; };
-      items: { name: string; price: number; }[];
+      items: { name: string; price: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
     }[];
   }
 }
@@ -63,7 +64,7 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
           <View style={{ width: '55%' }}>
             <Text style={styles.recipient}>{data.customer.name} 御中</Text>
             <Text style={{ fontSize: 9, color: '#555', marginTop: 4 }}>{data.customer.address || ""}</Text>
-            <Text style={{ fontSize: 9, marginTop: 10 }}>下記修理のお見積りを申し上げます。</Text>
+            <Text style={{ fontSize: 9, marginTop: 10 }}>下記の通り御見積申し上げます。</Text>
           </View>
           <View style={{ width: '40%' }}>
             <Text style={styles.sender}>ヨシダ時計修理工房</Text>
@@ -76,36 +77,36 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
         <View style={styles.b2bContainer}>
           {/* Table Header */}
           <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000', paddingBottom: 4, marginBottom: 4, alignItems: 'flex-end' }}>
-            <Text style={[styles.colNo, { width: '5%' }]}>No.</Text>
-            <Text style={[styles.colInquiry, { width: '10%' }]}>管理No</Text>
-            <Text style={[styles.colInquiry, { width: '10%' }]}>貴社管理No</Text>
-            <Text style={[styles.colEndUser, { width: '15%' }]}>顧客名</Text>
-            <Text style={[styles.colWatch, { width: '30%' }]}>時計情報</Text>
-            <Text style={[{ width: '20%' }, { fontSize: 9, borderLeftWidth: 1, borderColor: '#ccc', paddingLeft: 4 }]}>作業明細 / 単価</Text>
+            <Text wrap={false} style={[styles.colNo, { width: '2.5%', fontSize: 8 }]}>No.</Text>
+            <Text wrap={false} style={[styles.colInquiry, { width: '6.5%', fontSize: 8 }]}>管理No</Text>
+            <Text wrap={false} style={[styles.colInquiry, { width: '8.5%', fontSize: 8 }]}>貴社管理No</Text>
+            <Text wrap={false} style={[styles.colEndUser, { width: '9%', fontSize: 8, paddingRight: 5 }]}>顧客名</Text>
+            <Text wrap={false} style={[styles.colWatch, { width: '20.5%', fontSize: 8, paddingRight: 2 }]}>時計情報</Text>
+            <Text wrap={false} style={[{ width: '44%' }, { fontSize: 9, borderLeftWidth: 1, borderColor: '#ccc', paddingLeft: 0, marginLeft: 1 }]}>作業明細・交換部品 / 単価</Text>
             <Text style={[styles.colTotal, { width: '10%' }]}>小計(税抜)</Text>
           </View>
 
           {/* Rows */}
           {data.jobs.map((job, idx) => {
             const jobTotal = job.items.reduce((s, i) => s + i.price, 0);
-            const watchInfo = `${job.watch.brand} ${job.watch.model}\nRef: ${job.watch.ref || '-'} / Ser: ${job.watch.serial || '-'}`;
+            const watchInfo = `${job.watch.brand}\n${job.watch.model}\nRef: ${job.watch.ref || '-'}\nSer: ${job.watch.serial || '-'}`;
 
             return (
               <View key={idx} style={[styles.b2bRow, { minHeight: 30 }]}>
                 {/* メイン行 */}
                 <View style={{ flexDirection: 'row' }}>
-                  <Text style={[styles.colNo, { width: '5%' }]}>{idx + 1}</Text>
-                  <Text style={[styles.colInquiry, { width: '10%' }]}>{job.inquiryNumber}</Text>
-                  <Text style={[styles.colInquiry, { width: '10%', fontSize: 8 }]}>{job.partnerRef || '-'}</Text>
-                  <Text style={[styles.colEndUser, { width: '15%' }]}>{job.endUserName || '-'}</Text>
-                  <Text style={[styles.colWatch, { width: '30%', fontSize: 8 }]}>{watchInfo}</Text>
+                  <Text style={[styles.colNo, { width: '2.5%' }]}>{idx + 1}</Text>
+                  <Text style={[styles.colInquiry, { width: '6.5%' }]}>{job.inquiryNumber}</Text>
+                  <Text style={[styles.colInquiry, { width: '8.5%', fontSize: 8 }]}>{job.partnerRef || '-'}</Text>
+                  <Text style={[styles.colEndUser, { width: '9%', paddingRight: 5 }]}>{job.endUserName || '-'}</Text>
+                  <Text style={[styles.colWatch, { width: '20.5%', fontSize: 8, paddingRight: 2 }]}>{watchInfo}</Text>
 
                   {/* 作業明細 */}
-                  <View style={{ width: '20%', paddingLeft: 4, borderLeftWidth: 1, borderColor: '#eee' }}>
+                  <View style={{ width: '44%', paddingLeft: 0, borderLeftWidth: 1, borderColor: '#eee' }}>
                     {job.items.map((item, i) => (
-                      <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 1 }}>
-                        <Text style={{ fontSize: 7, width: '70%' }}>・{item.name}</Text>
-                        <Text style={{ fontSize: 7, width: '30%', textAlign: 'right', fontFamily: 'Helvetica' }}>¥{item.price.toLocaleString()}</Text>
+                      <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', columnGap: 1, marginBottom: 1 }}>
+                        <Text style={{ fontSize: 7, width: '78%' }}>・{item.displayName || (item.type === 'part' ? formatPartDisplay({ name: item.name, grade: item.grade, note2: item.note2 }) : item.name)}</Text>
+                        <Text style={{ fontSize: 7, width: '22%', textAlign: 'right', fontFamily: 'Helvetica' }}>¥{item.price.toLocaleString()}</Text>
                       </View>
                     ))}
                   </View>

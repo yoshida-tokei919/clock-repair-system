@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { DeliveryPDFClient } from "@/components/pdf/DeliveryPDFClient";
+import { formatPartDisplay } from "@/lib/formatPartDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function DeliveryDocumentPage({ params }: { params: { id: s
             repairs: {
                 include: {
                     watch: { include: { brand: true, model: true, reference: true } },
-                    estimate: { include: { items: true } }
+                    estimate: { include: { items: { include: { partsMaster: { select: { grade: true, notes2: true } } } } } }
                 }
             }
         }
@@ -43,7 +44,13 @@ export default async function DeliveryDocumentPage({ params }: { params: { id: s
             },
             items: estimateItems.map(i => ({
                 name: i.itemName,
-                price: i.unitPrice
+                price: i.unitPrice,
+                type: i.type,
+                grade: i.partsMaster?.grade ?? undefined,
+                note2: i.partsMaster?.notes2 ?? undefined,
+                displayName: i.type === 'part'
+                    ? formatPartDisplay({ name: i.itemName, grade: i.partsMaster?.grade, note2: i.partsMaster?.notes2 })
+                    : i.itemName,
             }))
         };
     });

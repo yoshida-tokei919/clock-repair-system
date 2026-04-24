@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { upsertBrand, upsertModel, upsertCaliber } from '@/actions/master-actions'
 
 type MasterData = {
   brands: { id: number; name: string }[]
@@ -184,65 +183,108 @@ export default function PartsForm({ partId }: { partId?: number }) {
   const set = (key: keyof FormData, val: string | boolean) =>
     setForm(f => ({ ...f, [key]: val }))
 
+  const addMaster = async (payload: { type: 'brand' | 'model' | 'caliber'; name: string; brandId?: number }) => {
+    const res = await fetch('/api/master-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      throw new Error(await res.text())
+    }
+    return await res.json()
+  }
+
   // ブランド追加
   const handleAddBrand = async () => {
     const name = newBrand.trim()
     if (!name) return
-    const b = await upsertBrand(name)
-    await refreshMaster()
-    set('brandId', String(b.id))
-    setNewBrand('')
+    try {
+      const b = await addMaster({ type: 'brand', name })
+      await refreshMaster()
+      set('brandId', String(b.id))
+      setNewBrand('')
+    } catch (error) {
+      console.error('Failed to add brand:', error)
+      alert('追加に失敗しました')
+    }
   }
 
   // モデル追加（ブランド選択必須）
   const handleAddModel = async () => {
     const name = newModel.trim()
     if (!name) return
-    const brandName = master.brands.find(b => b.id === parseInt(form.brandId))?.name ?? name
-    const m = await upsertModel(brandName, name)
-    await refreshMaster()
-    set('modelId', String(m.id))
-    setNewModel('')
+    const brandId = parseInt(form.brandId)
+    if (!brandId) return
+    try {
+      const m = await addMaster({ type: 'model', name, brandId })
+      await refreshMaster()
+      set('modelId', String(m.id))
+      setNewModel('')
+    } catch (error) {
+      console.error('Failed to add model:', error)
+      alert('追加に失敗しました')
+    }
   }
 
   // Cal. 追加
   const handleAddCal = async () => {
     const name = newCal.trim()
     if (!name) return
-    const c = await upsertCaliber(name)
-    await refreshMaster()
-    set('caliberId', String(c.id))
-    setNewCal('')
+    try {
+      const c = await addMaster({ type: 'caliber', name })
+      await refreshMaster()
+      set('caliberId', String(c.id))
+      setNewCal('')
+    } catch (error) {
+      console.error('Failed to add caliber:', error)
+      alert('追加に失敗しました')
+    }
   }
 
   // ベースCal. 追加
   const handleAddBaseCal = async () => {
     const name = newBaseCal.trim()
     if (!name) return
-    const c = await upsertCaliber(name)
-    await refreshMaster()
-    set('baseCaliberId', String(c.id))
-    setNewBaseCal('')
+    try {
+      const c = await addMaster({ type: 'caliber', name })
+      await refreshMaster()
+      set('baseCaliberId', String(c.id))
+      setNewBaseCal('')
+    } catch (error) {
+      console.error('Failed to add base caliber:', error)
+      alert('追加に失敗しました')
+    }
   }
 
   // ムーブメント製造元追加（Brand）
   const handleAddMovMaker = async () => {
     const name = newMovMaker.trim()
     if (!name) return
-    const b = await upsertBrand(name)
-    await refreshMaster()
-    set('movementMakerId', String(b.id))
-    setNewMovMaker('')
+    try {
+      const b = await addMaster({ type: 'brand', name })
+      await refreshMaster()
+      set('movementMakerId', String(b.id))
+      setNewMovMaker('')
+    } catch (error) {
+      console.error('Failed to add movement maker:', error)
+      alert('追加に失敗しました')
+    }
   }
 
   // ベースムーブメント製造元追加（Brand）
   const handleAddBaseMaker = async () => {
     const name = newBaseMaker.trim()
     if (!name) return
-    const b = await upsertBrand(name)
-    await refreshMaster()
-    set('baseMakerId', String(b.id))
-    setNewBaseMaker('')
+    try {
+      const b = await addMaster({ type: 'brand', name })
+      await refreshMaster()
+      set('baseMakerId', String(b.id))
+      setNewBaseMaker('')
+    } catch (error) {
+      console.error('Failed to add base maker:', error)
+      alert('追加に失敗しました')
+    }
   }
 
   const handleSubmit = async () => {

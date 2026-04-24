@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "./prisma";
+import { formatPartDisplay } from "./formatPartDisplay";
 
 export async function getRepairDataForPDF(id: number) {
     const repair = await prisma.repair.findUnique({
@@ -11,7 +12,7 @@ export async function getRepairDataForPDF(id: number) {
                 include: { brand: true, model: true, caliber: true, reference: true }
             },
             estimate: {
-                include: { items: true }
+                include: { items: { include: { partsMaster: { select: { grade: true, notes2: true } } } } }
             },
             estimateDocument: true,
             deliveryNote: true,
@@ -51,7 +52,12 @@ export async function getRepairDataForPDF(id: number) {
                     name: item.itemName,
                     qty: 1,
                     price: item.unitPrice,
-                    type: item.type as 'technical' | 'parts' | 'other'
+                    type: item.type as 'technical' | 'parts' | 'other',
+                    grade: item.partsMaster?.grade || "",
+                    note2: item.partsMaster?.notes2 || "",
+                    displayName: item.type === 'part'
+                        ? formatPartDisplay({ name: item.itemName, grade: item.partsMaster?.grade, note2: item.partsMaster?.notes2 })
+                        : item.itemName,
                 })) || []
             }
         ],

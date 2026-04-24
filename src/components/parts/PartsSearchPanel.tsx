@@ -10,6 +10,8 @@ type Part = {
   partRefs: string | null
   cousinsNumber: string | null
   grade: string | null
+  notes1: string | null
+  notes2: string | null
   retailPrice: number
   latestCostYen: number
   stockQuantity: number
@@ -24,6 +26,8 @@ type Props = {
   onSelect?: (part: {
     nameJp: string
     grade: string
+    notes1: string
+    notes2: string
     retailPrice: number
     latestCostYen: number
   }) => void
@@ -59,6 +63,8 @@ export default function PartsSearchPanel({ mode, onSelect }: Props) {
       onSelect({
         nameJp: part.nameJp,
         grade: part.grade ?? '',
+        notes1: part.notes1 ?? '',
+        notes2: part.notes2 ?? '',
         retailPrice: part.retailPrice,
         latestCostYen: part.latestCostYen,
       })

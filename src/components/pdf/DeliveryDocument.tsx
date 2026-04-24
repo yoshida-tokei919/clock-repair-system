@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
+import { formatPartDisplay } from '@/lib/formatPartDisplay';
 
 Font.register({
     family: 'Noto Sans JP',
@@ -45,7 +46,7 @@ export interface DeliveryDocumentProps {
             endUserName?: string;
             partnerRef?: string;
             watch: { brand: string; model: string; ref?: string; serial?: string; };
-            items: { name: string; price: number; }[];
+            items: { name: string; price: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
         }[];
         taxRate: number; // 0.1
         shippingFee: number; // Added
@@ -91,7 +92,7 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
                         <Text style={[styles.colInquiry, { width: '10%' }]}>管理No</Text>
                         <Text style={[styles.colInquiry, { width: '10%' }]}>貴社管理No</Text>
                         <Text style={[styles.colEndUser, { width: '15%' }]}>お客様名</Text>
-                        <Text style={[styles.colWatch, { width: '35%' }]}>時計情報 (Ref含) / 明細(単価)</Text>
+                        <Text style={[styles.colWatch, { width: '35%' }]}>時計情報 / 単価</Text>
                         <Text style={[styles.colTotal, { width: '15%' }]}>小計(税抜)</Text>
                     </View>
 
@@ -113,7 +114,7 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
                                         <View style={{ borderLeftWidth: 1, borderColor: '#eee', paddingLeft: 4 }}>
                                             {job.items.map((item, i) => (
                                                 <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 1 }}>
-                                                    <Text style={{ fontSize: 7, color: '#555', width: '75%' }}>- {item.name}</Text>
+                                                    <Text style={{ fontSize: 7, color: '#555', width: '75%' }}>- {item.displayName || (item.type === 'part' ? formatPartDisplay({ name: item.name, grade: item.grade, note2: item.note2 }) : item.name)}</Text>
                                                     <Text style={{ fontSize: 7, color: '#333', width: '25%', textAlign: 'right' }}>¥{item.price.toLocaleString()}</Text>
                                                 </View>
                                             ))}

@@ -12,6 +12,7 @@ import { InvoiceDocument } from "@/components/pdf/InvoiceDocument";
 import { WarrantyDocument } from "@/components/pdf/WarrantyDocument";
 import { Loader2, Printer, Download } from "lucide-react";
 import QRCode from "qrcode";
+import { formatPartDisplay } from "@/lib/formatPartDisplay";
 
 interface PDFPreviewDialogProps {
     isOpen: boolean;
@@ -68,7 +69,17 @@ export default function PDFPreviewDialog({ isOpen, onClose, repairData }: PDFPre
         },
         items: repairData.estimate?.items?.map((i: any) => ({
             name: i.name || i.itemName,
-            price: i.price || i.unitPrice || 0
+            price: i.price || i.unitPrice || 0,
+            type: i.type || (i.partsMasterId ? 'part' : 'labor'),
+            grade: i.grade || i.partsMaster?.grade || '',
+            note2: i.note2 || i.partsMaster?.notes2 || '',
+            displayName: (i.type || (i.partsMasterId ? 'part' : 'labor')) === 'part'
+                ? formatPartDisplay({
+                    name: i.name || i.itemName,
+                    grade: i.grade || i.partsMaster?.grade || '',
+                    note2: i.note2 || i.partsMaster?.notes2 || '',
+                })
+                : (i.name || i.itemName),
         })) || []
     };
 
