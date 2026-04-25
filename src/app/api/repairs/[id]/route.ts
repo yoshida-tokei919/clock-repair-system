@@ -1,6 +1,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -156,7 +157,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             // 3. Update Repair Fields
             const dbStatus = body.status;
 
-            const updatedRepair = await tx.repair.update({
+            let updatedRepair = await tx.repair.update({
                 where: { id },
                 data: {
                     status: dbStatus,
@@ -287,6 +288,23 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                         }
                     }
                 }
+            }
+
+            const repairOrders = await tx.orderRequest.findMany({
+                where: {
+                    repairId: id,
+                    status: { in: ['pending', 'ordered', 'received'] }
+                },
+                select: { status: true }
+            });
+            const aggregatedRepairStatus = getRepairStatusFromOrderStatuses(
+                repairOrders.map(order => order.status as RepairPartsOrderStatus)
+            );
+            if (aggregatedRepairStatus && aggregatedRepairStatus !== updatedRepair.status) {
+                updatedRepair = await tx.repair.update({
+                    where: { id },
+                    data: { status: aggregatedRepairStatus }
+                });
             }
 
             return updatedRepair;

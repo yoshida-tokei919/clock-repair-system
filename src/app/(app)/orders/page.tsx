@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useAutoRefreshOnReturn } from '@/hooks/use-auto-refresh-on-return'
 
 type OrderRequest = {
   id: number
@@ -48,6 +49,7 @@ const STATUS_COLOR: Record<string, string> = {
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderRequest[]>([])
   const [loading, setLoading] = useState(true)
+  useAutoRefreshOnReturn()
 
   const fetchOrders = async () => {
     setLoading(true)

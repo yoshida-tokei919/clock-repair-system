@@ -24,12 +24,17 @@ type Part = {
 type Props = {
   mode: 'standalone' | 'panel'
   onSelect?: (part: {
+    id: number
     nameJp: string
     grade: string
     notes1: string
     notes2: string
+    partRefs: string
+    cousinsNumber: string
     retailPrice: number
     latestCostYen: number
+    stockQuantity: number
+    supplierName: string
   }) => void
 }
 
@@ -61,12 +66,17 @@ export default function PartsSearchPanel({ mode, onSelect }: Props) {
   const handleSelect = (part: Part) => {
     if (onSelect) {
       onSelect({
+        id: part.id,
         nameJp: part.nameJp,
         grade: part.grade ?? '',
         notes1: part.notes1 ?? '',
         notes2: part.notes2 ?? '',
+        partRefs: part.partRefs ?? '',
+        cousinsNumber: part.cousinsNumber ?? '',
         retailPrice: part.retailPrice,
         latestCostYen: part.latestCostYen,
+        stockQuantity: part.stockQuantity ?? 0,
+        supplierName: part.supplier?.name ?? '',
       })
     }
   }

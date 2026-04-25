@@ -1,6 +1,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 
 export async function POST(req: Request) {
     try {
@@ -431,24 +432,33 @@ export async function POST(req: Request) {
 
             // 7. 在庫チェック（partsMasterId がある部品のみ）
             const stockWarnings: { partName: string; required: number; stock: number; orderRequestId: number }[] = [];
-            const partItemsWithMaster = estimateItems.filter((i: any) => i.partsMasterId);
-            for (const item of partItemsWithMaster) {
-                const master = await tx.partsMaster.findUnique({ where: { id: Number(item.partsMasterId) } });
+            const requiredByPart = new Map<number, number>();
+            for (const item of estimateItems.filter((i: any) => i.partsMasterId)) {
+                const partId = Number(item.partsMasterId);
+                requiredByPart.set(partId, (requiredByPart.get(partId) ?? 0) + (item.quantity || 1));
+            }
+            for (const [partId, required] of Array.from(requiredByPart.entries())) {
+                const master = await tx.partsMaster.findUnique({ where: { id: partId } });
                 if (!master) continue;
-                const required = item.quantity || 1;
                 if (master.stockQuantity < required) {
+                    const shortage = required - master.stockQuantity;
                     // 在庫不足 → OrderRequest 作成（重複防止）
                     const existing = await tx.orderRequest.findFirst({
                         where: { partsMasterId: master.id, repairId: repair.id, status: { in: ['pending', 'ordered'] } }
                     });
-                    const orderRequest = existing ?? await tx.orderRequest.create({
+                    const orderRequest = existing
+                        ? await tx.orderRequest.update({
+                            where: { id: existing.id },
+                            data: { quantity: shortage }
+                        })
+                        : await tx.orderRequest.create({
                         data: {
                             partsMasterId: master.id,
                             partNameJp: master.nameJp,
                             partNameEn: master.nameEn ?? null,
                             partRefs: master.partRefs ?? null,
                             cousinsNumber: master.cousinsNumber ?? null,
-                            quantity: required,
+                            quantity: shortage,
                             supplierId: master.supplierId ?? null,
                             searchWordJp: master.nameJp,
                             searchWordEn: master.nameEn ?? null,
@@ -471,8 +481,25 @@ export async function POST(req: Request) {
                 }
             }
 
+            const repairOrders = await tx.orderRequest.findMany({
+                where: {
+                    repairId: repair.id,
+                    status: { in: ['pending', 'ordered', 'received'] }
+                },
+                select: { status: true }
+            });
+            const aggregatedRepairStatus = getRepairStatusFromOrderStatuses(
+                repairOrders.map(order => order.status as RepairPartsOrderStatus)
+            );
+            const finalRepair = aggregatedRepairStatus
+                ? await tx.repair.update({
+                    where: { id: repair.id },
+                    data: { status: aggregatedRepairStatus }
+                })
+                : repair;
+
             // 6. Return Data
-            return { repair, stockWarnings };
+            return { repair: finalRepair, stockWarnings };
         }, {
             timeout: 5000
         });

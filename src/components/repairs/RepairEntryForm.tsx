@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
+import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
+import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { toast } from "@/components/ui/use-toast";
 
 // --- ACTIONS (Server) ---
@@ -100,6 +102,10 @@ const AdvancedCombobox: React.FC<{
         grade?: string,
         note1?: string,
         note2?: string,
+        partRefs?: string,
+        cousinsNumber?: string,
+        stockQuantity?: number,
+        supplierName?: string,
     }[];
     disabled?: boolean;
     className?: string;
@@ -241,6 +247,7 @@ interface Props {
 }
 export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const router = useRouter();
+    useAutoRefreshOnReturn();
     const [isSaving, setIsSaving] = useState(false);
     const [isEditingEnabled, setIsEditingEnabled] = useState(mode !== 'view');
     const isReadOnly = mode === 'view' && !isEditingEnabled;
@@ -296,9 +303,13 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         grade?: string;
         note1?: string;
         note2?: string;
+        cousinsNumber?: string;
+        stockQuantity?: number;
+        supplierName?: string;
         status?: 'pending' | 'ordered' | 'arrived';
         partsMasterId?: number | null;
     }
+    type OrderListItem = { id?: number; partId: number; quantity: number; status: 'pending' | 'ordered' | 'received' };
     const [lineItems, setLineItems] = useState<LineItem[]>(() => {
         if (!initialData?.estimate?.items) return [];
         return initialData.estimate.items.map((i: any) => ({
@@ -311,9 +322,21 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             grade: i.partsMaster?.grade ?? undefined,
             note1: i.partsMaster?.notes1 ?? undefined,
             note2: i.partsMaster?.notes2 ?? undefined,
+            partRef: i.partsMaster?.partRefs ?? undefined,
+            cousinsNumber: i.partsMaster?.cousinsNumber ?? undefined,
+            stockQuantity: i.partsMaster?.stockQuantity ?? undefined,
+            supplierName: i.partsMaster?.supplier?.name ?? undefined,
             partsMasterId: i.partsMasterId ?? null,
         }));
     });
+    const [orderList, setOrderList] = useState<OrderListItem[]>(() =>
+        (initialData?.orderRequests ?? []).map((order: any) => ({
+            id: order.id,
+            partId: order.partsMasterId,
+            quantity: order.quantity,
+            status: order.status,
+        })).filter((order: OrderListItem) => Boolean(order.partId))
+    );
 
     // Inputs for adding new items
     const [addItemCategory, setAddItemCategory] = useState<'internal' | 'part_external'>('internal');
@@ -331,6 +354,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         grade?: string;
         note1?: string;
         note2?: string;
+        partRefs?: string;
+        cousinsNumber?: string;
+        stockQuantity?: number;
+        supplierName?: string;
     }): LineItem => ({
         ...base,
         name: part.name,
@@ -340,9 +367,267 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         grade: part.grade || undefined,
         note1: part.note1 || undefined,
         note2: part.note2 || undefined,
+        partRef: part.partRefs || undefined,
+        cousinsNumber: part.cousinsNumber || undefined,
+        stockQuantity: part.stockQuantity ?? base.stockQuantity,
+        supplierName: part.supplierName || undefined,
         partsMasterId: part.partId ?? base.partsMasterId ?? null,
         category: 'part_external',
     }), []);
+
+    const queuePartForOrderList = useCallback((partId: number, quantity = 1) => {
+        if (quantity <= 0) return false;
+        let changed = false;
+        setOrderList(prev => {
+            const existing = prev.find(order => order.partId === partId && ['pending', 'ordered'].includes(order.status));
+            if (existing) {
+                changed = true;
+                return prev.map(order =>
+                    order === existing ? { ...order, quantity: (order.quantity || 1) + quantity } : order
+                );
+            }
+            changed = true;
+            return [...prev, { partId, quantity, status: "pending" }];
+        });
+        return changed;
+    }, []);
+
+    const getOrderQuantitiesForPart = useCallback((partId?: number | null) => {
+        if (!partId) return { pending: 0, ordered: 0, received: 0 };
+        return orderList.reduce((acc, order) => {
+            if (order.partId !== partId) return acc;
+            const qty = Number(order.quantity) || 1;
+            if (order.status === 'pending') acc.pending += qty;
+            else if (order.status === 'ordered') acc.ordered += qty;
+            else if (order.status === 'received') acc.received += qty;
+            return acc;
+        }, { pending: 0, ordered: 0, received: 0 });
+    }, [orderList]);
+
+    const getTotalRequiredQuantityForPart = useCallback((partId?: number | null, items: LineItem[] = lineItems) => {
+        if (!partId) return 0;
+        return items.reduce((sum, item) => (
+            item.category.includes('part') && item.partsMasterId === partId
+                ? sum + (Number(item.quantity) || 1)
+                : sum
+        ), 0);
+    }, [lineItems]);
+
+    const getMissingOrderQuantityForPart = useCallback((partId?: number | null, items: LineItem[] = lineItems, stockQuantity?: number) => {
+        if (!partId) return 0;
+        const totalRequired = getTotalRequiredQuantityForPart(partId, items);
+        const fallbackStock = items.find(item => item.partsMasterId === partId)?.stockQuantity ?? 0;
+        const stock = Math.max(0, stockQuantity ?? fallbackStock ?? 0);
+        const shortage = Math.max(0, totalRequired - stock);
+        const covered = (() => {
+            const quantities = getOrderQuantitiesForPart(partId);
+            return quantities.pending + quantities.ordered;
+        })();
+        return Math.max(0, shortage - covered);
+    }, [getOrderQuantitiesForPart, getTotalRequiredQuantityForPart, lineItems]);
+
+    const getStatusLabelForLineItem = useCallback((item: LineItem, idx: number) => {
+        if (!item.category.includes('part') || !item.partsMasterId) return null;
+
+        const stock = Math.max(0, item.stockQuantity ?? 0);
+        const quantities = getOrderQuantitiesForPart(item.partsMasterId);
+        const consumedBefore = lineItems.reduce((sum, current, currentIdx) => {
+            if (currentIdx >= idx) return sum;
+            if (!current.category.includes('part') || current.partsMasterId !== item.partsMasterId) return sum;
+            return sum + (Number(current.quantity) || 1);
+        }, 0);
+        const lineQty = Number(item.quantity) || 1;
+        const remainingStockBefore = Math.max(0, stock - consumedBefore);
+        const stockCovered = Math.min(remainingStockBefore, lineQty);
+        const shortage = lineQty - stockCovered;
+
+        if (shortage <= 0) return '在庫あり';
+
+        const shortageBefore = Math.max(0, consumedBefore - stock);
+        const pendingCovered = Math.max(0, Math.min(quantities.pending - shortageBefore, shortage));
+        if (pendingCovered > 0) return '発注リスト追加済み';
+
+        const orderedOffset = Math.max(0, shortageBefore - quantities.pending);
+        const orderedCovered = Math.max(0, Math.min(quantities.ordered - orderedOffset, shortage));
+        if (orderedCovered > 0) return '注文済み';
+
+        const receivedOffset = Math.max(0, shortageBefore - quantities.pending - quantities.ordered);
+        const receivedCovered = Math.max(0, Math.min(quantities.received - receivedOffset, shortage));
+        if (receivedCovered > 0) return '入荷済み';
+
+        return '発注リスト追加済み';
+    }, [getOrderQuantitiesForPart, lineItems]);
+
+    const getActiveOrderForPart = useCallback((partId?: number | null) => {
+        if (!partId) return undefined;
+        const orders = orderList.filter(order => order.partId === partId);
+        if (orders.length === 0) return undefined;
+
+        const pending = orders.find(order => order.status === 'pending');
+        if (pending) return pending;
+
+        const ordered = orders.find(order => order.status === 'ordered');
+        if (ordered) return ordered;
+
+        const received = orders
+            .filter(order => order.status === 'received')
+            .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0];
+        return received;
+    }, [orderList]);
+
+    const upsertOrderListEntry = useCallback((order: any) => {
+        if (!order?.partsMasterId) return;
+        setOrderList(prev => {
+            const next: OrderListItem = {
+                id: order.id,
+                partId: order.partsMasterId,
+                quantity: order.quantity ?? 1,
+                status: order.status,
+            };
+            const exists = prev.some(entry => entry.id === next.id);
+            return exists
+                ? prev.map(entry => entry.id === next.id ? next : entry)
+                : [...prev, next];
+        });
+    }, []);
+
+    const fetchRepairOrders = useCallback(async () => {
+        if (!initialData?.id) return;
+        const res = await fetch(`/api/orders?repairId=${initialData.id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setOrderList((Array.isArray(data) ? data : []).map((order: any) => ({
+            id: order.id,
+            partId: order.partsMasterId,
+            quantity: order.quantity,
+            status: order.status,
+        })).filter((order: OrderListItem) => Boolean(order.partId)));
+    }, [initialData?.id]);
+
+    useEffect(() => {
+        fetchRepairOrders();
+    }, [fetchRepairOrders]);
+
+    useEffect(() => {
+        if (!initialData?.id) return;
+
+        const handleFocus = () => { void fetchRepairOrders(); };
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                void fetchRepairOrders();
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
+    }, [fetchRepairOrders, initialData?.id]);
+
+    const ensureOrderRequest = useCallback(async (item: LineItem, showToast = false) => {
+        if (!item.partsMasterId) return false;
+        const quantity = Number(item.quantity) || 1;
+        if (quantity <= 0) return false;
+
+        if (!initialData?.id) {
+            const added = queuePartForOrderList(item.partsMasterId, quantity);
+            if (added && showToast) {
+                toast({
+                    title: "発注リストに追加しました",
+                    description: item.supplierName ? `仕入先: ${item.supplierName}` : undefined,
+                });
+            }
+            return added;
+        }
+
+        const res = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                repairId: initialData.id,
+                partsMasterId: item.partsMasterId,
+                quantity,
+            })
+        });
+
+        if (!res.ok) {
+            throw new Error('failed to create order request');
+        }
+
+        const json = await res.json();
+        if (json.order) {
+            upsertOrderListEntry(json.order);
+        }
+        if (json.created && showToast) {
+            toast({
+                title: "発注リストに追加しました",
+                description: item.supplierName ? `仕入先: ${item.supplierName}` : undefined,
+            });
+        }
+        return Boolean(json.created || json.updated);
+    }, [initialData?.id, orderList, queuePartForOrderList, upsertOrderListEntry]);
+
+    const finalizePartLineItem = useCallback((item: LineItem, showToast = false) => {
+        if (!item.category.includes('part') || !item.partsMasterId) return item;
+
+        return { ...item, status: undefined };
+    }, []);
+
+    const handleOrderAction = useCallback((idx: number) => {
+        const item = lineItems[idx];
+        if (!item?.category.includes('part') || !item.partsMasterId) return;
+        const partId = item.partsMasterId;
+
+        const missingQty = getMissingOrderQuantityForPart(partId);
+
+        if (missingQty <= 0) {
+            toast({
+                title: "在庫あり",
+                description: "在庫があるため発注リスト追加は不要です。",
+            });
+            return;
+        }
+
+        setLineItems(prev => prev.map((li, i) =>
+            i === idx ? { ...li, status: 'pending' as const } : li
+        ));
+        void ensureOrderRequest({ ...item, quantity: missingQty, status: 'pending' as const }, true);
+    }, [lineItems, ensureOrderRequest, getMissingOrderQuantityForPart]);
+
+    useEffect(() => {
+        if (initialData?.id) return;
+        const missingPartIds = lineItems
+            .filter(item =>
+                item.category.includes('part') &&
+                item.partsMasterId &&
+                (item.stockQuantity ?? 0) <= 0 &&
+                getMissingOrderQuantityForPart(item.partsMasterId) > 0
+            )
+            .map(item => ({
+                partId: item.partsMasterId as number,
+                quantity: getMissingOrderQuantityForPart(item.partsMasterId),
+            }))
+            .filter(item => item.quantity > 0);
+
+        if (missingPartIds.length === 0) return;
+
+        setOrderList(prev => {
+            let next = [...prev];
+            for (const item of missingPartIds) {
+                const existing = next.find(order => order.partId === item.partId && ['pending', 'ordered'].includes(order.status));
+                if (existing) {
+                    next = next.map(order =>
+                        order === existing ? { ...order, quantity: item.quantity } : order
+                    );
+                } else {
+                    next.push({ partId: item.partId, quantity: item.quantity, status: "pending" as const });
+                }
+            }
+            return next;
+        });
+    }, [getMissingOrderQuantityForPart, initialData?.id, lineItems]);
 
     const [diagnosis, setDiagnosis] = useState(initialData?.workSummary || ""); // Diagnosis/Request details
     const [internalNotes, setInternalNotes] = useState(initialData?.internalNotes || "");
@@ -498,6 +783,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         grade: p.grade || undefined,
                         note1: p.notes1 || undefined,
                         note2: p.notes2 || undefined,
+                        partRefs: p.partRefs || undefined,
+                        cousinsNumber: p.cousinsNumber || undefined,
+                        stockQuantity: p.stockQuantity ?? 0,
+                        supplierName: (p as any).supplier?.name || undefined,
                         inlineTag: p.grade || undefined,
                         meta: [
                             `ID: ${p.id}`,
@@ -515,6 +804,28 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const totalAmount = lineItems.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);
     const taxAmount = Math.floor(totalAmount * 0.1);
     const grandTotal = totalAmount + taxAmount;
+
+    useEffect(() => {
+        const partLabels = lineItems
+            .map((item, idx) => item.category.includes('part') ? getStatusLabelForLineItem(item, idx) : null)
+            .filter(Boolean);
+
+        if (partLabels.length === 0) return;
+
+        const nextStatus = getRepairStatusFromOrderStatuses(
+            partLabels.map(label => (
+                label === '発注リスト追加済み'
+                    ? 'pending'
+                    : label === '注文済み'
+                        ? 'ordered'
+                        : 'received'
+            ) as RepairPartsOrderStatus)
+        );
+
+        if (nextStatus && status !== nextStatus) {
+            setStatus(nextStatus);
+        }
+    }, [getStatusLabelForLineItem, lineItems, status]);
 
     // --- ACTIONS ---
     const handleSave = async () => {
@@ -1110,7 +1421,10 @@ ${shopName}
                                     <div className="col-span-1 text-right">操作</div>
                                 </div>
                                 {/* 明細行 */}
-                                {lineItems.map((item, idx) => (
+                                {lineItems.map((item, idx) => {
+                                    const isPartItem = item.category.includes('part');
+                                    const statusLabel = isPartItem ? getStatusLabelForLineItem(item, idx) : null;
+                                    return (
                                     <div key={item.id} className="grid grid-cols-12 items-center text-xs p-1.5 hover:bg-zinc-50 border-b border-zinc-100 last:border-0 group">
                                         <div className="col-span-6 flex flex-col gap-0.5">
                                             <div className="flex items-start gap-1">
@@ -1125,10 +1439,30 @@ ${shopName}
                                                 </button>
                                                 <div className="min-w-0 flex-1">
                                                     <span className="min-w-0 break-words font-medium">
-                                                        {item.category.includes('part')
+                                                        {isPartItem
                                                             ? formatPartDisplay(item)
                                                             : item.name}
                                                     </span>
+                                                    {isPartItem && (
+                                                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] text-zinc-500">
+                                                            {item.partRef && <span>Ref: {item.partRef}</span>}
+                                                            {item.cousinsNumber && <span>Cousins: {item.cousinsNumber}</span>}
+                                                            {statusLabel && (
+                                                                <span className={cn(
+                                                                    "rounded border px-1 py-0.5 text-[9px]",
+                                                                    statusLabel === '在庫あり'
+                                                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                                        : statusLabel === '入荷済み'
+                                                                            ? "border-cyan-200 bg-cyan-50 text-cyan-700"
+                                                                            : statusLabel === '注文済み'
+                                                                                ? "border-amber-200 bg-amber-50 text-amber-700"
+                                                                                : "border-blue-200 bg-blue-50 text-blue-700"
+                                                                )}>
+                                                                    {statusLabel}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                             {item.spec && <span className="text-[9px] text-zinc-400 pl-0.5">{item.spec}</span>}
@@ -1181,12 +1515,24 @@ ${shopName}
                                             </button>
                                         </div>
                                         <div className="col-span-1 text-right">
-                                            <button type="button" onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} className="text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
+                                            <div className="flex items-center justify-end gap-1">
+                                                {isPartItem && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOrderAction(idx)}
+                                                        className="text-zinc-400 hover:text-amber-600 transition-colors"
+                                                        title="発注連携"
+                                                    >
+                                                        📦
+                                                    </button>
+                                                )}
+                                                <button type="button" onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} className="text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                ))}
+                                )})}
                                 {/* 入力行 */}
                                 <div className="bg-zinc-50 p-2 rounded border border-zinc-200 mt-2">
                                     <div className="flex gap-1 mb-1">
@@ -1235,7 +1581,7 @@ ${shopName}
                                                 spec: newItemSpec
                                             };
                                             const nextItem = match
-                                                ? buildPartLineItem(baseItem, {
+                                                ? finalizePartLineItem(buildPartLineItem(baseItem, {
                                                     name: match.value,
                                                     retailPrice: match.price,
                                                     latestCostYen: match.cost,
@@ -1243,9 +1589,20 @@ ${shopName}
                                                     grade: match.grade,
                                                     note1: match.note1,
                                                     note2: match.note2,
-                                                })
+                                                    partRefs: match.partRefs,
+                                                    cousinsNumber: match.cousinsNumber,
+                                                    stockQuantity: match.stockQuantity,
+                                                    supplierName: match.supplierName,
+                                                }), true)
                                                 : baseItem;
-                                            setLineItems([...lineItems, nextItem]);
+                                            const nextItems = [...lineItems, nextItem];
+                                            setLineItems(nextItems);
+                                            if (match && nextItem.category.includes('part') && nextItem.partsMasterId) {
+                                                const missingQty = getMissingOrderQuantityForPart(nextItem.partsMasterId, nextItems, nextItem.stockQuantity);
+                                                if (missingQty > 0) {
+                                                    void ensureOrderRequest({ ...nextItem, quantity: missingQty }, true);
+                                                }
+                                            }
                                             setNewItemName("");
                                             setNewItemCost("");
                                             setNewItemPrice("");
@@ -1291,9 +1648,9 @@ ${shopName}
                                         mode="panel"
                                         onSelect={(part) => {
                                             if (partsPanelRowIdx === null) return;
-                                            setLineItems(lineItems.map((li, i) =>
+                                            const nextItems = lineItems.map((li, i) =>
                                                 i === partsPanelRowIdx
-                                                    ? buildPartLineItem(li, {
+                                                    ? finalizePartLineItem(buildPartLineItem(li, {
                                                         name: part.nameJp,
                                                         retailPrice: part.retailPrice,
                                                         latestCostYen: part.latestCostYen,
@@ -1301,9 +1658,25 @@ ${shopName}
                                                         grade: part.grade,
                                                         note1: part.notes1,
                                                         note2: part.notes2,
-                                                    })
+                                                        partRefs: part.partRefs,
+                                                        cousinsNumber: part.cousinsNumber,
+                                                        stockQuantity: part.stockQuantity,
+                                                        supplierName: part.supplierName,
+                                                    }), true)
                                                     : li
-                                            ));
+                                            );
+                                            setLineItems(nextItems);
+                                            const nextItem = nextItems[partsPanelRowIdx];
+                                            if (nextItem?.partsMasterId) {
+                                                const missingQty = getMissingOrderQuantityForPart(nextItem.partsMasterId, nextItems, nextItem.stockQuantity);
+                                                if (missingQty > 0) {
+                                                    void ensureOrderRequest({
+                                                        ...nextItem,
+                                                        quantity: missingQty,
+                                                        status: 'pending',
+                                                    }, true);
+                                                }
+                                            }
                                             setPartsPanelOpen(false);
                                             setPartsPanelRowIdx(null);
                                         }}

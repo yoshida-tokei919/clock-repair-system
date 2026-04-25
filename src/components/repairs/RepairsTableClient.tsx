@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { ClickToCopy } from "@/components/ui/click-to-copy";
 import { generateBulkDocument } from "@/actions/document-actions";
 import { cn } from "@/lib/utils";
+import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 
 type RepairWithRelations = Repair & {
     customer: Customer;
@@ -30,6 +31,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     const router = useRouter();
     const { toast } = useToast();
     const [isGenerating, setIsGenerating] = useState(false);
+    useAutoRefreshOnReturn();
 
     const toggleSelectAll = () => {
         if (selectedIds.length === repairs.length) {
