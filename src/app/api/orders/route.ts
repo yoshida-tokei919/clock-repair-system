@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   const orders = await prisma.orderRequest.findMany({
     where: repairId
       ? { repairId: Number(repairId) }
-      : { status: { in: ['pending', 'ordered'] } },
+      : { status: { in: ['pending', 'ordered', 'received'] } },
     include: {
       partsMaster: {
         select: {

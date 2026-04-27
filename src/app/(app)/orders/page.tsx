@@ -35,20 +35,21 @@ const SEARCH_SITES = [
 ]
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: '未注文',
+  pending: '発注リスト追加済み',
   ordered: '注文済み',
   received: '入荷済み',
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  pending: 'bg-red-100 text-red-700',
-  ordered: 'bg-yellow-100 text-yellow-700',
+  pending: 'bg-yellow-100 text-yellow-700',
+  ordered: 'bg-blue-100 text-blue-700',
   received: 'bg-green-100 text-green-700',
 }
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [filteredOutIds, setFilteredOutIds] = useState<number[]>([])
   useAutoRefreshOnReturn()
 
   const fetchOrders = async () => {
@@ -70,10 +71,16 @@ export default function OrdersPage() {
     fetchOrders()
   }
 
+  const handleAssignToRepair = (id: number) => {
+    setFilteredOutIds(prev => prev.includes(id) ? prev : [...prev, id])
+  }
+
   const getSearchWord = (order: OrderRequest) => ({
     jp: order.searchWordJp ?? order.partNameJp,
     en: order.searchWordEn ?? order.partNameEn ?? order.partNameJp,
   })
+
+  const visibleOrders = orders.filter(order => !filteredOutIds.includes(order.id))
 
   if (loading) return <div className="p-6 text-gray-400">読み込み中...</div>
 
@@ -81,17 +88,17 @@ export default function OrdersPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-bold">発注管理</h1>
-        <span className="text-sm text-gray-500">{orders.length}件</span>
+        <span className="text-sm text-gray-500">{visibleOrders.length}件</span>
       </div>
 
-      {orders.length === 0 && (
+      {visibleOrders.length === 0 && (
         <div className="text-center py-16 text-gray-400">
-          発注待ちの部品はありません
+          表示中の部品はありません
         </div>
       )}
 
       <div className="space-y-3">
-        {orders.map(order => {
+        {visibleOrders.map(order => {
           const { jp, en } = getSearchWord(order)
           return (
             <div key={order.id} className="border rounded-lg p-4 bg-white shadow-sm">
@@ -123,6 +130,11 @@ export default function OrdersPage() {
                       発注日: {new Date(order.orderedAt).toLocaleDateString('ja-JP')}
                     </div>
                   )}
+                  {order.receivedAt && (
+                    <div className="text-xs text-green-600">
+                      入荷日: {new Date(order.receivedAt).toLocaleDateString('ja-JP')}
+                    </div>
+                  )}
                 </div>
 
                 {/* 右：ボタン */}
@@ -130,6 +142,7 @@ export default function OrdersPage() {
                   {/* ステータス更新ボタン */}
                   {order.status === 'pending' && (
                     <button
+                      type="button"
                       onClick={() => updateStatus(order.id, 'ordered')}
                       className="px-4 py-1.5 bg-yellow-500 text-white rounded text-sm font-medium hover:bg-yellow-600 whitespace-nowrap">
                       発注済みにする
@@ -137,9 +150,18 @@ export default function OrdersPage() {
                   )}
                   {order.status === 'ordered' && (
                     <button
+                      type="button"
                       onClick={() => updateStatus(order.id, 'received')}
                       className="px-4 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 whitespace-nowrap">
                       入荷済みにする
+                    </button>
+                  )}
+                  {order.status === 'received' && (
+                    <button
+                      type="button"
+                      onClick={() => handleAssignToRepair(order.id)}
+                      className="px-4 py-1.5 bg-white text-green-700 border border-green-300 rounded text-sm font-medium hover:bg-green-50 whitespace-nowrap">
+                      案件へ割当
                     </button>
                   )}
 

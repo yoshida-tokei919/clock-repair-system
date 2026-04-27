@@ -25,14 +25,20 @@ type Props = {
   mode: 'standalone' | 'panel'
   onSelect?: (part: {
     id: number
-    nameJp: string
+    partsMasterId?: number
+    partType?: string
+    name: string
+    nameJp?: string
     grade: string
-    notes1: string
-    notes2: string
-    partRefs: string
+    note1: string
+    note2: string
+    partRef: string
+    partRefs?: string
     cousinsNumber: string
-    retailPrice: number
-    latestCostYen: number
+    price: number
+    retailPrice?: number
+    cost: number
+    latestCostYen?: number
     stockQuantity: number
     supplierName: string
   }) => void
@@ -67,13 +73,19 @@ export default function PartsSearchPanel({ mode, onSelect }: Props) {
     if (onSelect) {
       onSelect({
         id: part.id,
+        partsMasterId: part.id,
+        partType: part.partType ?? undefined,
+        name: part.nameJp,
         nameJp: part.nameJp,
         grade: part.grade ?? '',
-        notes1: part.notes1 ?? '',
-        notes2: part.notes2 ?? '',
+        note1: part.notes1 ?? '',
+        note2: part.notes2 ?? '',
+        partRef: part.partRefs ?? '',
         partRefs: part.partRefs ?? '',
         cousinsNumber: part.cousinsNumber ?? '',
+        price: part.retailPrice,
         retailPrice: part.retailPrice,
+        cost: part.latestCostYen,
         latestCostYen: part.latestCostYen,
         stockQuantity: part.stockQuantity ?? 0,
         supplierName: part.supplier?.name ?? '',

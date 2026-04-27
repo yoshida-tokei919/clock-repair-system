@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 
 // --- Brand ---
 export async function getBrands() {
@@ -11,12 +12,7 @@ export async function getBrands() {
 }
 
 export async function upsertBrand(name: string) {
-    const brand = await prisma.brand.upsert({
-        where: { name: name },
-        create: { name: name, nameJp: name },
-        update: {}
-    });
-    return brand;
+    return await findOrCreateBrand(prisma, name);
 }
 
 // --- Model ---
@@ -103,14 +99,7 @@ export async function getCalibers(brandId?: number) {
 }
 
 export async function upsertCaliber(name: string, brandId?: number) {
-    const existing = await prisma.caliber.findFirst({
-        where: { name }
-    });
-    if (existing) return existing;
-
-    return await prisma.caliber.create({
-        data: { name, brandId }
-    });
+    return await findOrCreateCaliber(prisma, name, brandId);
 }
 
 /**
@@ -282,25 +271,32 @@ export async function getPartsMatched(brandId?: number, modelId?: number, calibe
     try {
         if (!brandId) return [];
 
-        const where: any = { brandId: brandId };
+        const where: any = { brandId };
         if (category) where.category = category;
-
-        const conditions: any[] = [];
-        if (modelId) conditions.push({ OR: [{ modelId: modelId }, { modelId: null }] });
-        if (caliberId) conditions.push({ OR: [{ caliberId: caliberId }, { caliberId: null }] });
-
-        if (conditions.length > 0) {
-            where.AND = conditions;
-        }
 
         const parts = await prisma.partsMaster.findMany({
             where,
             include: { brand: true, model: true, caliber: true }
         });
 
-        return parts.sort((a, b) => {
-            const scoreA = (a.caliberId ? 10 : 0) + (a.modelId ? 5 : 0);
-            const scoreB = (b.caliberId ? 10 : 0) + (b.modelId ? 5 : 0);
+        const filtered = parts.filter((part) => {
+            const isInterior = part.partType === 'interior' || part.category === 'internal';
+            if (!isInterior) return true;
+            if (!caliberId) return true;
+            return part.caliberId === caliberId;
+        });
+
+        return filtered.sort((a, b) => {
+            const scoreA =
+                (a.partRefs ? 100 : 0) +
+                (a.caliberId === caliberId && caliberId ? 20 : 0) +
+                (a.brandId === brandId ? 15 : 0) +
+                (a.modelId === modelId && modelId ? 5 : (a.modelId ? -1 : 0));
+            const scoreB =
+                (b.partRefs ? 100 : 0) +
+                (b.caliberId === caliberId && caliberId ? 20 : 0) +
+                (b.brandId === brandId ? 15 : 0) +
+                (b.modelId === modelId && modelId ? 5 : (b.modelId ? -1 : 0));
             return scoreB - scoreA;
         });
     } catch (error) {

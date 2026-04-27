@@ -21,7 +21,25 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 }
             },
             estimate: {
-                include: { items: { include: { partsMaster: { select: { grade: true, notes1: true, notes2: true, partRefs: true, cousinsNumber: true, stockQuantity: true, supplier: { select: { name: true } } } } } } }
+                include: {
+                    items: {
+                        include: {
+                            partsMaster: {
+                                select: {
+                                    partType: true,
+                                    grade: true,
+                                    notes1: true,
+                                    notes2: true,
+                                    partRefs: true,
+                                    cousinsNumber: true,
+                                    stockQuantity: true,
+                                    latestCostYen: true,
+                                    supplier: { select: { name: true } }
+                                }
+                            }
+                        }
+                    }
+                }
             },
             orderRequests: {
                 select: { id: true, partsMasterId: true, quantity: true, status: true }

@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-
-function normalizeMasterName(value: string) {
-  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
-}
+import { findOrCreateBrand, findOrCreateCaliber, normalizeMasterName } from '@/lib/master-normalize'
 
 export async function GET() {
   const [brands, models, calibers, suppliers] = await Promise.all([
@@ -26,15 +23,7 @@ export async function POST(req: Request) {
   }
 
   if (type === 'brand') {
-    const brands = await prisma.brand.findMany({
-      select: { id: true, name: true, nameEn: true, nameJp: true, kana: true, initialChar: true },
-    })
-    const existing = brands.find((brand) => normalizeMasterName(brand.name) === normalizedName)
-    if (existing) return NextResponse.json(existing)
-
-    const brand = await prisma.brand.create({
-      data: { name, nameJp: name },
-    })
+    const brand = await findOrCreateBrand(prisma, name)
     return NextResponse.json(brand)
   }
 
@@ -58,23 +47,7 @@ export async function POST(req: Request) {
   }
 
   if (type === 'caliber') {
-    const calibers = await prisma.caliber.findMany({
-      select: {
-        id: true,
-        brandId: true,
-        name: true,
-        nameEn: true,
-        nameJp: true,
-        movementType: true,
-        standardWorkMinutes: true,
-      },
-    })
-    const existing = calibers.find((caliber) => normalizeMasterName(caliber.name) === normalizedName)
-    if (existing) return NextResponse.json(existing)
-
-    const caliber = await prisma.caliber.create({
-      data: { name },
-    })
+    const caliber = await findOrCreateCaliber(prisma, name, Number(body.brandId) || null)
     return NextResponse.json(caliber)
   }
 

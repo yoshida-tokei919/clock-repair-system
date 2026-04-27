@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
+import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
+import { createOrUpdatePartsMaster } from "@/lib/parts-master";
 
 export async function POST(req: Request) {
     try {
@@ -94,49 +96,10 @@ export async function POST(req: Request) {
             // 2. Watch Handling (Simplified matching)
             // 2. Watch Handling (Simplified matching)
             const brandNameInput = body.watch.brand;
-            let brand = await tx.brand.findUnique({ where: { name: brandNameInput } });
+            const brand = brandNameInput ? await findOrCreateBrand(tx as any, brandNameInput) : null;
 
             if (!brand) {
-                brand = await tx.brand.findFirst({
-                    where: {
-                        OR: [
-                            { name: brandNameInput },
-                            { nameEn: brandNameInput },
-                            { nameJp: brandNameInput },
-                        ]
-                    }
-                });
-            }
-
-            // Extreme fallback: Handle composite names like "ROLEX ロレックス"
-            if (!brand && brandNameInput) {
-                const parts = brandNameInput.split(/[\s/／]+/); // Split by space or slash
-                if (parts.length > 0) {
-                    brand = await tx.brand.findFirst({
-                        where: {
-                            OR: [
-                                { name: { in: parts } },
-                                { nameEn: { in: parts } },
-                                { nameJp: { in: parts } }
-                            ]
-                        }
-                    });
-                }
-            }
-
-            // ブランドが見つからなければ自動作成（モデル・キャリバーと同様）
-            if (!brand && brandNameInput) {
-                brand = await tx.brand.create({
-                    data: {
-                        name: brandNameInput,
-                        nameJp: brandNameInput,
-                        nameEn: brandNameInput,
-                    }
-                });
-            }
-
-            if (!brand) {
-                throw new Error("ブランド名が入力されていません");
+                throw new Error("繝悶Λ繝ｳ繝牙錐縺鯉ｿｽE蜉帙＆繧後※縺・・ｽ・ｽ縺帙ｓ");
             }
 
             let watch;
@@ -183,23 +146,8 @@ export async function POST(req: Request) {
             let caliberId: number | null = null;
             const caliberInput = body.watch.caliber;
             if (caliberInput) {
-                const cal = await tx.caliber.findFirst({
-                    where: {
-                        OR: [
-                            { name: caliberInput },
-                            { nameEn: caliberInput },
-                            { nameJp: caliberInput }
-                        ]
-                    }
-                });
-                if (cal) {
-                    caliberId = cal.id;
-                } else {
-                    const newCal = await tx.caliber.create({
-                        data: { name: caliberInput, brandId: brand.id }
-                    });
-                    caliberId = newCal.id;
-                }
+                const cal = await findOrCreateCaliber(tx as any, caliberInput, brand.id);
+                caliberId = cal.id;
             }
 
             // Handle WatchReference
@@ -336,8 +284,73 @@ export async function POST(req: Request) {
             }
 
             // 6. Create Estimate (if items exist)
-            const estimateItems = body.estimate?.items || [];
+            let estimateItems = body.estimate?.items || [];
             if (estimateItems.length > 0) {
+                estimateItems = await Promise.all(estimateItems.map(async (item: any) => {
+                    if (item.type !== 'part') return item;
+
+                    if (item.partsMasterId) {
+                        const existingMaster = await tx.partsMaster.findUnique({ where: { id: Number(item.partsMasterId) } });
+                        if (!existingMaster) return item;
+
+                        const syncedPart = await createOrUpdatePartsMaster({
+                            id: existingMaster.id,
+                            partType: item.partType ?? existingMaster.partType,
+                            category: item.category ?? existingMaster.category,
+                            subcategory: existingMaster.subcategory,
+                            brandId: existingMaster.brandId,
+                            modelId: existingMaster.modelId,
+                            watchRefs: existingMaster.watchRefs,
+                            caliberId: existingMaster.caliberId,
+                            baseCaliberId: existingMaster.baseCaliberId,
+                            movementMakerId: existingMaster.movementMakerId,
+                            baseMakerId: existingMaster.baseMakerId,
+                            nameJp: item.name ?? existingMaster.nameJp,
+                            nameEn: existingMaster.nameEn,
+                            partRefs: item.partRef ?? existingMaster.partRefs,
+                            cousinsNumber: item.cousinsNumber ?? existingMaster.cousinsNumber,
+                            grade: item.grade ?? existingMaster.grade,
+                            notes1: item.note1 ?? existingMaster.notes1,
+                            notes2: item.note2 ?? existingMaster.notes2,
+                            size: existingMaster.size,
+                            photoKey: existingMaster.photoKey,
+                            costCurrency: existingMaster.costCurrency,
+                            costOriginal: existingMaster.costOriginal,
+                            latestCostYen: item.cost ?? existingMaster.latestCostYen,
+                            markupRate: existingMaster.markupRate,
+                            retailPrice: item.price ?? existingMaster.retailPrice,
+                            stockQuantity: item.stockQuantity ?? existingMaster.stockQuantity,
+                            minStockAlert: existingMaster.minStockAlert,
+                            minStockAlertEnabled: existingMaster.minStockAlertEnabled,
+                            location: existingMaster.location,
+                            supplierId: existingMaster.supplierId,
+                        }, tx as any);
+
+                        return { ...item, partsMasterId: syncedPart.id };
+                    }
+
+                    const syncedPart = await createOrUpdatePartsMaster({
+                        partType: item.partType,
+                        category: item.category,
+                        brandId: brand.id,
+                        modelId,
+                        caliberId,
+                        watchRefs: refNameInput || null,
+                        nameJp: item.name,
+                        nameEn: item.name,
+                        partRefs: item.partRef,
+                        cousinsNumber: item.cousinsNumber,
+                        grade: item.grade,
+                        notes1: item.note1,
+                        notes2: item.note2,
+                        latestCostYen: item.cost,
+                        retailPrice: item.price,
+                        stockQuantity: item.stockQuantity ?? 0,
+                    }, tx as any);
+
+                    return { ...item, partsMasterId: syncedPart.id };
+                }));
+
                 const total = estimateItems.reduce((sum: number, item: any) => sum + (Number(item.price) || 0), 0);
                 const techFee = estimateItems.filter((i: any) => i.type === 'labor').reduce((sum: number, i: any) => sum + (Number(i.price) || 0), 0);
                 const partsFee = estimateItems.filter((i: any) => i.type === 'part').reduce((sum: number, i: any) => sum + (Number(i.price) || 0), 0);
@@ -360,41 +373,7 @@ export async function POST(req: Request) {
                         }
                     }
                 });
-
-                // 6.5 Master Data Sync (Batched: 2クエリで完結、N+1解消)
-                const partItems = estimateItems.filter((i: any) => i.type === 'part');
                 const laborItems = estimateItems.filter((i: any) => i.type === 'labor');
-
-                if (partItems.length > 0) {
-                    const partNames = partItems.map((i: any) => i.name);
-                    const existingParts = await tx.partsMaster.findMany({
-                        where: { nameJp: { in: partNames }, brandId: brand.id, modelId, caliberId },
-                        select: { nameJp: true }
-                    });
-                    const existingPartNames = new Set(existingParts.map((p: any) => p.nameJp));
-                    // 新規登録
-                    const newParts = partItems.filter((i: any) => !existingPartNames.has(i.name));
-                    if (newParts.length > 0) {
-                        await tx.partsMaster.createMany({
-                            data: newParts.map((item: any) => ({
-                                category: 'generic',
-                                brandId: brand.id, modelId, caliberId,
-                                name: item.name, nameJp: item.name, nameEn: item.name,
-                                retailPrice: Math.floor(Number(item.price) || 0),
-                                stockQuantity: 0,
-                            }))
-                        });
-                    }
-                    // 既存エントリの上代を更新（§3：自動登録・更新）
-                    for (const item of partItems) {
-                        if (existingPartNames.has(item.name)) {
-                            await tx.partsMaster.updateMany({
-                                where: { nameJp: item.name, brandId: brand.id, modelId, caliberId },
-                                data: { retailPrice: Math.floor(Number(item.price) || 0) }
-                            });
-                        }
-                    }
-                }
 
                 if (laborItems.length > 0) {
                     const laborNames = laborItems.map((i: any) => i.name);
@@ -403,7 +382,7 @@ export async function POST(req: Request) {
                         select: { suggestedWorkName: true }
                     });
                     const existingRuleNames = new Set(existingRules.map((r: any) => r.suggestedWorkName));
-                    // 新規登録
+                    // 譁ｰ隕冗匳骭ｲ
                     const newRules = laborItems.filter((i: any) => !existingRuleNames.has(i.name));
                     if (newRules.length > 0) {
                         await tx.pricingRule.createMany({
@@ -415,7 +394,7 @@ export async function POST(req: Request) {
                             }))
                         });
                     }
-                    // 既存エントリの料金を更新（§3：自動登録・更新）
+                    // 譌｢蟄倥お繝ｳ繝医Μ縺ｮ譁呻ｿｽ・ｽ繧呈峩譁ｰ・ｽE・ｽﾂｧ3・ｽE・ｽ・ｽE蜍慕匳骭ｲ繝ｻ譖ｴ譁ｰ・ｽE・ｽE
                     for (const item of laborItems) {
                         if (existingRuleNames.has(item.name)) {
                             await tx.pricingRule.updateMany({
@@ -430,7 +409,7 @@ export async function POST(req: Request) {
                 }
             }
 
-            // 7. 在庫チェック（partsMasterId がある部品のみ）
+            // 7. 蝨ｨ蠎ｫ繝√ぉ繝・・ｽ・ｽ・ｽE・ｽEartsMasterId 縺後≠繧矩Κ蜩・ｿｽE縺ｿ・ｽE・ｽE
             const stockWarnings: { partName: string; required: number; stock: number; orderRequestId: number }[] = [];
             const requiredByPart = new Map<number, number>();
             for (const item of estimateItems.filter((i: any) => i.partsMasterId)) {
@@ -442,7 +421,7 @@ export async function POST(req: Request) {
                 if (!master) continue;
                 if (master.stockQuantity < required) {
                     const shortage = required - master.stockQuantity;
-                    // 在庫不足 → OrderRequest 作成（重複防止）
+                    // 蝨ｨ蠎ｫ荳崎ｶｳ 竊・OrderRequest 菴懶ｿｽE・ｽE・ｽ驥崎､・・ｽ・ｽ豁｢・ｽE・ｽE
                     const existing = await tx.orderRequest.findFirst({
                         where: { partsMasterId: master.id, repairId: repair.id, status: { in: ['pending', 'ordered'] } }
                     });
@@ -473,7 +452,7 @@ export async function POST(req: Request) {
                         orderRequestId: orderRequest.id,
                     });
                 } else {
-                    // 在庫あり → 引き当て（在庫数 -1）
+                    // 蝨ｨ蠎ｫ縺ゅｊ 竊・蠑輔″蠖薙※・ｽE・ｽ蝨ｨ蠎ｫ謨ｰ -1・ｽE・ｽE
                     await tx.partsMaster.update({
                         where: { id: master.id },
                         data: { stockQuantity: { decrement: required } }
@@ -514,3 +493,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: error.message || "Failed" }, { status: 500 });
     }
 }
+

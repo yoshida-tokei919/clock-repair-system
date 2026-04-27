@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { getShippingFeeByAddress } from "@/lib/shipping";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
@@ -27,7 +28,15 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
+import { createEstimateItemFromPart } from "@/lib/estimate-item";
 import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
+import {
+    DEFAULT_PART_SEARCH_SITES,
+    buildEnglishPartQueries,
+    buildJapanesePartQueries,
+    buildSearchUrls,
+    type SearchSite,
+} from "@/lib/part-search";
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { toast } from "@/components/ui/use-toast";
 
@@ -65,6 +74,7 @@ const STATUS_STEPS: { id: string; label: string }[] = [
 
 // ステータスバーに横並び表示するメインフロー（保留・キャンセルは除外）
 const MAIN_STATUS_STEPS = STATUS_STEPS.filter(s => s.id !== 'キャンセル' && s.id !== '保留');
+const PART_SEARCH_SITES_STORAGE_KEY = "repair-part-search-sites:v1";
 
 // "YYYY/M/D" ↔ "YYYY-MM-DD" 変換ヘルパー
 function toInputDate(localeDate: string): string {
@@ -92,13 +102,16 @@ const AdvancedCombobox: React.FC<{
     options: {
         label: string,
         value: string,
+        name?: string,
         sub?: string,
         inlineTag?: string,
         meta?: string,
         notes?: string,
         price?: number,
         cost?: number,
+        partRef?: string,
         partId?: number,
+        partsMasterId?: number,
         grade?: string,
         note1?: string,
         note2?: string,
@@ -294,6 +307,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     interface LineItem {
         id: string;
         category: 'internal' | 'external' | 'part_internal' | 'part_external' | 'part_generic';
+        partType?: string;
         name: string;
         price: number;   // 上代
         cost?: number;   // 仕入値（管理者のみ）
@@ -312,22 +326,26 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     type OrderListItem = { id?: number; partId: number; quantity: number; status: 'pending' | 'ordered' | 'received' };
     const [lineItems, setLineItems] = useState<LineItem[]>(() => {
         if (!initialData?.estimate?.items) return [];
-        return initialData.estimate.items.map((i: any) => ({
-            id: String(i.id),
-            category: i.type === 'labor' ? (i.category || 'internal') : 'part_external',
-            name: i.itemName,
-            price: i.unitPrice,
-            quantity: i.quantity || 1,
-            spec: i.notes,
-            grade: i.partsMaster?.grade ?? undefined,
-            note1: i.partsMaster?.notes1 ?? undefined,
-            note2: i.partsMaster?.notes2 ?? undefined,
-            partRef: i.partsMaster?.partRefs ?? undefined,
-            cousinsNumber: i.partsMaster?.cousinsNumber ?? undefined,
-            stockQuantity: i.partsMaster?.stockQuantity ?? undefined,
-            supplierName: i.partsMaster?.supplier?.name ?? undefined,
-            partsMasterId: i.partsMasterId ?? null,
-        }));
+        return initialData.estimate.items.map((i: any) => (
+            i.type === 'labor'
+                ? {
+                    id: String(i.id),
+                    category: i.category || 'internal',
+                    name: i.itemName,
+                    price: i.unitPrice,
+                    quantity: i.quantity || 1,
+                    spec: i.notes,
+                }
+                : createEstimateItemFromPart(i.partsMaster ?? {}, {
+                    id: String(i.id),
+                    category: 'part_external',
+                    name: i.itemName,
+                    price: i.unitPrice,
+                    quantity: i.quantity || 1,
+                    spec: i.notes,
+                    partsMasterId: i.partsMasterId ?? null,
+                }) as LineItem
+        ));
     });
     const [orderList, setOrderList] = useState<OrderListItem[]>(() =>
         (initialData?.orderRequests ?? []).map((order: any) => ({
@@ -346,34 +364,17 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [newItemQty, setNewItemQty] = useState("1");
     const [newItemSpec, setNewItemSpec] = useState("");
 
-    const buildPartLineItem = useCallback((base: LineItem, part: {
-        name: string;
-        retailPrice?: number;
-        latestCostYen?: number;
-        partId?: number;
-        grade?: string;
-        note1?: string;
-        note2?: string;
-        partRefs?: string;
-        cousinsNumber?: string;
-        stockQuantity?: number;
-        supplierName?: string;
-    }): LineItem => ({
-        ...base,
-        name: part.name,
-        price: part.retailPrice ?? base.price,
-        cost: part.latestCostYen ?? base.cost,
-        spec: part.grade || base.spec,
-        grade: part.grade || undefined,
-        note1: part.note1 || undefined,
-        note2: part.note2 || undefined,
-        partRef: part.partRefs || undefined,
-        cousinsNumber: part.cousinsNumber || undefined,
-        stockQuantity: part.stockQuantity ?? base.stockQuantity,
-        supplierName: part.supplierName || undefined,
-        partsMasterId: part.partId ?? base.partsMasterId ?? null,
-        category: 'part_external',
-    }), []);
+    const buildPartLineItem = useCallback((base: LineItem, part: any): LineItem => (
+        createEstimateItemFromPart(part, {
+            ...base,
+            name: part.name ?? part.nameJp ?? base.name,
+            price: part.price ?? part.retailPrice ?? base.price,
+            cost: part.cost ?? part.latestCostYen ?? base.cost,
+            spec: part.grade || base.spec,
+            category: 'part_external',
+            partsMasterId: part.partsMasterId ?? part.partId ?? part.id ?? base.partsMasterId ?? null,
+        }) as LineItem
+    ), []);
 
     const queuePartForOrderList = useCallback((partId: number, quantity = 1) => {
         if (quantity <= 0) return false;
@@ -657,6 +658,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [quickRegOpen, setQuickRegOpen] = useState(false);
     const [mobileQR, setMobileQR] = useState(false);
     const [showPdfDialog, setShowPdfDialog] = useState(false);
+    const [partSearchDialogOpen, setPartSearchDialogOpen] = useState(false);
+    const [partSearchRowIdx, setPartSearchRowIdx] = useState<number | null>(null);
+    const [searchSites, setSearchSites] = useState<SearchSite[]>(DEFAULT_PART_SEARCH_SITES);
+    const [selectedSearchSiteId, setSelectedSearchSiteId] = useState<string | null>(DEFAULT_PART_SEARCH_SITES[0]?.id ?? null);
 
     // --- 7. STATUS BAR ---
     const [showHistory, setShowHistory] = useState(false);
@@ -669,6 +674,32 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [partsPanelOpen, setPartsPanelOpen] = useState(false);
     const [partsPanelRowIdx, setPartsPanelRowIdx] = useState<number | null>(null);
     const [partsSearchQuery, setPartsSearchQuery] = useState('');
+
+    const activePartSearchItem = partSearchRowIdx !== null ? lineItems[partSearchRowIdx] ?? null : null;
+    const japanesePartQueries = useMemo(() => {
+        if (!activePartSearchItem) return [];
+        return buildJapanesePartQueries({
+            brand,
+            watchRef: refName,
+            caliber,
+            partType: activePartSearchItem.partType,
+            category: activePartSearchItem.category,
+            partName: activePartSearchItem.name,
+            partRef: activePartSearchItem.partRef,
+        });
+    }, [activePartSearchItem, brand, caliber, refName]);
+    const englishPartQueries = useMemo(() => {
+        if (!activePartSearchItem) return [];
+        return buildEnglishPartQueries({
+            brand,
+            watchRef: refName,
+            caliber,
+            partType: activePartSearchItem.partType,
+            category: activePartSearchItem.category,
+            partName: activePartSearchItem.name,
+            partRef: activePartSearchItem.partRef,
+        });
+    }, [activePartSearchItem, brand, caliber, refName]);
 
     // --- 10. AI CHAT ---
     const [aiChatOpen, setAiChatOpen] = useState(false);
@@ -701,6 +732,117 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const warrantyDocumentUrl = initialData?.issuedWarranty
         ? `/documents/warranty/${initialData.issuedWarranty.id}`
         : null;
+
+    useEffect(() => {
+        try {
+            const saved = window.localStorage.getItem(PART_SEARCH_SITES_STORAGE_KEY);
+            if (!saved) return;
+            const parsed = JSON.parse(saved);
+            if (!Array.isArray(parsed)) return;
+            const normalized = parsed
+                .filter((site): site is SearchSite =>
+                    site &&
+                    typeof site.id === "string" &&
+                    typeof site.name === "string" &&
+                    (site.lang === "ja" || site.lang === "en") &&
+                    typeof site.url === "string"
+                )
+                .map((site) => ({
+                    ...site,
+                    enabled: site.enabled !== false,
+                }));
+            if (normalized.length > 0) {
+                setSearchSites(normalized);
+                setSelectedSearchSiteId(normalized[0].id);
+            }
+        } catch {
+            // Ignore invalid localStorage payloads and keep defaults.
+        }
+    }, []);
+
+    useEffect(() => {
+        window.localStorage.setItem(PART_SEARCH_SITES_STORAGE_KEY, JSON.stringify(searchSites));
+        if (searchSites.length === 0) {
+            setSelectedSearchSiteId(null);
+            return;
+        }
+        if (!selectedSearchSiteId || !searchSites.some((site) => site.id === selectedSearchSiteId)) {
+            setSelectedSearchSiteId(searchSites[0].id);
+        }
+    }, [searchSites, selectedSearchSiteId]);
+
+    const handleOpenPartSearchDialog = useCallback((idx: number) => {
+        setPartSearchRowIdx(idx);
+        setPartSearchDialogOpen(true);
+    }, []);
+
+    const handleToggleSearchSite = useCallback((siteId: string, checked: boolean) => {
+        setSearchSites((prev) => prev.map((site) => (
+            site.id === siteId ? { ...site, enabled: checked } : site
+        )));
+    }, []);
+
+    const handleAddSearchSite = useCallback(() => {
+        const name = window.prompt("サイト名を入力してください");
+        if (!name) return;
+        const langInput = window.prompt("言語を入力してください（ja / en）", "ja");
+        if (langInput !== "ja" && langInput !== "en") {
+            toast({ title: "言語は ja か en を指定してください" });
+            return;
+        }
+        const url = window.prompt("検索URLを入力してください（{query} を含めてください）");
+        if (!url) return;
+        if (!url.includes("{query}")) {
+            toast({ title: "検索URLには {query} を含めてください" });
+            return;
+        }
+
+        const nextSite: SearchSite = {
+            id: `site-${Date.now()}`,
+            name: name.trim(),
+            lang: langInput,
+            url: url.trim(),
+            enabled: true,
+        };
+
+        setSearchSites((prev) => [...prev, nextSite]);
+        setSelectedSearchSiteId(nextSite.id);
+    }, []);
+
+    const handleDeleteSearchSite = useCallback(() => {
+        if (!selectedSearchSiteId) return;
+        const target = searchSites.find((site) => site.id === selectedSearchSiteId);
+        if (!target) return;
+        const confirmed = window.confirm(`「${target.name}」を削除しますか？`);
+        if (!confirmed) return;
+        setSearchSites((prev) => prev.filter((site) => site.id !== selectedSearchSiteId));
+    }, [searchSites, selectedSearchSiteId]);
+
+    const handleExecutePartSearch = useCallback(() => {
+        const targets = searchSites.filter((site) => site.enabled);
+        const urls = buildSearchUrls({
+            sites: targets,
+            japaneseQueries: japanesePartQueries,
+            englishQueries: englishPartQueries,
+        });
+
+        if (urls.length === 0) {
+            toast({ title: "検索できるサイトまたは検索語がありません" });
+            return;
+        }
+
+        urls.forEach(({ url }) => {
+            window.open(url, "_blank", "noopener,noreferrer");
+        });
+    }, [englishPartQueries, japanesePartQueries, searchSites]);
+
+    const handleOpenPartsPanelFromSearch = useCallback(() => {
+        if (partSearchRowIdx === null) return;
+        setPartsPanelRowIdx(partSearchRowIdx);
+        setPartsSearchQuery("");
+        setPartsPanelOpen(true);
+        setPartSearchDialogOpen(false);
+    }, [partSearchRowIdx]);
 
     // --- AUTOMATION: Shipping Fee ---
     useEffect(() => {
@@ -777,16 +919,20 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     setWorkOpts(parts.map(p => ({
                         label: p.nameJp || p.name,
                         value: p.nameJp || p.name,
+                        name: p.nameJp || p.name,
                         price: p.retailPrice,
                         cost: p.latestCostYen,
+                        partsMasterId: p.id,
                         partId: p.id,
                         grade: p.grade || undefined,
                         note1: p.notes1 || undefined,
                         note2: p.notes2 || undefined,
+                        partRef: p.partRefs || undefined,
                         partRefs: p.partRefs || undefined,
                         cousinsNumber: p.cousinsNumber || undefined,
                         stockQuantity: p.stockQuantity ?? 0,
                         supplierName: (p as any).supplier?.name || undefined,
+                        partType: p.partType || undefined,
                         inlineTag: p.grade || undefined,
                         meta: [
                             `ID: ${p.id}`,
@@ -859,9 +1005,17 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     items: lineItems.map(i => ({
                         type: i.category.includes('part') ? 'part' : 'labor',
                         category: i.category,
+                        partType: i.partType ?? null,
                         name: i.name,
                         price: i.price,
+                        cost: i.cost ?? null,
                         notes: i.spec,
+                        grade: i.grade ?? null,
+                        note1: i.note1 ?? null,
+                        note2: i.note2 ?? null,
+                        partRef: i.partRef ?? null,
+                        cousinsNumber: i.cousinsNumber ?? null,
+                        stockQuantity: i.stockQuantity ?? null,
                         partsMasterId: i.partsMasterId ?? null,
                         quantity: i.quantity ?? 1,
                     }))
@@ -1503,12 +1657,10 @@ ${shopName}
                                         <div className="col-span-1 text-center">
                                             <button
                                                 type="button"
-                                                className={`transition-colors text-sm ${partsPanelRowIdx === idx && partsPanelOpen ? 'text-blue-500' : 'text-zinc-400 hover:text-blue-500'}`}
-                                                title="部品検索"
+                                                className={`transition-colors text-sm ${partSearchRowIdx === idx && partSearchDialogOpen ? 'text-blue-500' : 'text-zinc-400 hover:text-blue-500'}`}
+                                                title="部品検索サイトを開く"
                                                 onClick={() => {
-                                                    setPartsPanelRowIdx(idx);
-                                                    setPartsSearchQuery('');
-                                                    setPartsPanelOpen(true);
+                                                    handleOpenPartSearchDialog(idx);
                                                 }}
                                             >
                                                 🔍
@@ -1581,19 +1733,7 @@ ${shopName}
                                                 spec: newItemSpec
                                             };
                                             const nextItem = match
-                                                ? finalizePartLineItem(buildPartLineItem(baseItem, {
-                                                    name: match.value,
-                                                    retailPrice: match.price,
-                                                    latestCostYen: match.cost,
-                                                    partId: match.partId,
-                                                    grade: match.grade,
-                                                    note1: match.note1,
-                                                    note2: match.note2,
-                                                    partRefs: match.partRefs,
-                                                    cousinsNumber: match.cousinsNumber,
-                                                    stockQuantity: match.stockQuantity,
-                                                    supplierName: match.supplierName,
-                                                }), true)
+                                                ? finalizePartLineItem(buildPartLineItem(baseItem, match), true)
                                                 : baseItem;
                                             const nextItems = [...lineItems, nextItem];
                                             setLineItems(nextItems);
@@ -1634,7 +1774,7 @@ ${shopName}
                                 {!partsPanelOpen ? (
                                     <div className="h-40 flex flex-col items-center justify-center text-zinc-300 gap-2">
                                         <span className="text-3xl">🔍</span>
-                                        <p className="text-xs text-center">明細行の 🔍 ボタンを押して<br />部品を検索してください</p>
+                                        <p className="text-xs text-center">明細行の 🔍 ボタンから<br />検索サイトまたは部品パネルを開いてください</p>
                                     </div>
                                 ) : (
                                     <div className="text-xs text-zinc-500 mb-2 px-1">
@@ -1650,19 +1790,7 @@ ${shopName}
                                             if (partsPanelRowIdx === null) return;
                                             const nextItems = lineItems.map((li, i) =>
                                                 i === partsPanelRowIdx
-                                                    ? finalizePartLineItem(buildPartLineItem(li, {
-                                                        name: part.nameJp,
-                                                        retailPrice: part.retailPrice,
-                                                        latestCostYen: part.latestCostYen,
-                                                        partId: (part as any).id ?? undefined,
-                                                        grade: part.grade,
-                                                        note1: part.notes1,
-                                                        note2: part.notes2,
-                                                        partRefs: part.partRefs,
-                                                        cousinsNumber: part.cousinsNumber,
-                                                        stockQuantity: part.stockQuantity,
-                                                        supplierName: part.supplierName,
-                                                    }), true)
+                                                    ? finalizePartLineItem(buildPartLineItem(li, part), true)
                                                     : li
                                             );
                                             setLineItems(nextItems);
@@ -1792,6 +1920,135 @@ ${shopName}
                     console.log("Photos uploaded from mobile");
                 }}
             />
+
+            <Dialog open={partSearchDialogOpen} onOpenChange={setPartSearchDialogOpen}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Search className="h-4 w-4" />
+                            検索サイトを選択
+                        </DialogTitle>
+                        <DialogDescription>
+                            {activePartSearchItem
+                                ? `「${activePartSearchItem.name || "（未入力）"}」の検索語を確認して、検索先を選択します。`
+                                : "検索したい明細行を選択してください。"}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid gap-4 md:grid-cols-[1.1fr_1.4fr]">
+                        <div className="space-y-3">
+                            <div className="rounded-md border border-zinc-200">
+                                <div className="border-b bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-700">
+                                    サイト一覧
+                                </div>
+                                <div className="max-h-72 space-y-1 overflow-y-auto p-2">
+                                    {searchSites.map((site) => (
+                                        <label
+                                            key={site.id}
+                                            className={cn(
+                                                "flex cursor-pointer items-start gap-2 rounded-md border px-2 py-2 text-xs transition-colors",
+                                                selectedSearchSiteId === site.id
+                                                    ? "border-blue-300 bg-blue-50"
+                                                    : "border-transparent hover:border-zinc-200 hover:bg-zinc-50"
+                                            )}
+                                            onClick={() => setSelectedSearchSiteId(site.id)}
+                                        >
+                                            <Checkbox
+                                                checked={site.enabled}
+                                                onCheckedChange={(checked) => handleToggleSearchSite(site.id, checked === true)}
+                                                className="mt-0.5"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium text-zinc-800">{site.name}</span>
+                                                    <span className="rounded border border-zinc-200 bg-white px-1 py-0.5 text-[10px] text-zinc-500">
+                                                        {site.lang.toUpperCase()}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-0.5 break-all text-[10px] text-zinc-400">
+                                                    {site.url}
+                                                </div>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                <Button type="button" size="sm" variant="outline" onClick={handleAddSearchSite}>
+                                    サイト追加
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleDeleteSearchSite}
+                                    disabled={!selectedSearchSiteId}
+                                >
+                                    サイト削除
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleOpenPartsPanelFromSearch}
+                                    disabled={partSearchRowIdx === null}
+                                >
+                                    部品パネル
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="rounded-md border border-zinc-200">
+                                <div className="border-b bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-700">
+                                    検索語プレビュー
+                                </div>
+                                <div className="grid gap-3 p-3 md:grid-cols-2">
+                                    <div>
+                                        <div className="mb-2 text-xs font-semibold text-zinc-700">日本語</div>
+                                        <div className="space-y-1 rounded-md bg-zinc-50 p-2">
+                                            {japanesePartQueries.length > 0 ? japanesePartQueries.map((query, index) => (
+                                                <div key={`ja-${index}`} className="rounded border border-zinc-200 bg-white px-2 py-1 text-[11px] text-zinc-700">
+                                                    {query}
+                                                </div>
+                                            )) : (
+                                                <div className="text-[11px] text-zinc-400">検索語を生成できませんでした</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="mb-2 text-xs font-semibold text-zinc-700">英語</div>
+                                        <div className="space-y-1 rounded-md bg-zinc-50 p-2">
+                                            {englishPartQueries.length > 0 ? englishPartQueries.map((query, index) => (
+                                                <div key={`en-${index}`} className="rounded border border-zinc-200 bg-white px-2 py-1 text-[11px] text-zinc-700">
+                                                    {query}
+                                                </div>
+                                            )) : (
+                                                <div className="text-[11px] text-zinc-400">検索語を生成できませんでした</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-500">
+                                チェックされたサイトだけ新しいタブで開きます。サイトごとの言語設定に応じて、日本語または英語の先頭検索語を使います。
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="gap-2 sm:justify-between">
+                        <div className="text-[11px] text-zinc-400">
+                            サイト設定は localStorage に保存されます。
+                        </div>
+                        <Button type="button" onClick={handleExecutePartSearch}>
+                            <ExternalLink className="mr-1.5 h-4 w-4" />
+                            検索する
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={isCameraOpen} onOpenChange={(open) => { if (!open) closeCameraDialog(); }}>
                 <DialogContent className="h-[95vh] w-[95vw] max-w-none p-0">
