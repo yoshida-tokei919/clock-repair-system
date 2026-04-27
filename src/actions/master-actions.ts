@@ -267,36 +267,104 @@ export async function getPricingRules(brandId?: number, modelId?: number, calibe
     }
 }
 
-export async function getPartsMatched(brandId?: number, modelId?: number, caliberId?: number, category?: string) {
+export async function getPartsMatched(
+    brandId?: number,
+    modelId?: number,
+    caliberId?: number,
+    category?: string,
+    movementMakerId?: number,
+    movementCaliberId?: number,
+    baseMovementMakerId?: number,
+    baseMovementCaliberId?: number
+) {
     try {
-        if (!brandId) return [];
+        const isInteriorWhere = { OR: [{ partType: 'interior' }, { category: 'internal' }] };
+        const isExteriorWhere = { NOT: isInteriorWhere };
 
-        const where: any = { brandId };
-        if (category) where.category = category;
+        const whereClauses: any[] = [];
+
+        if (brandId) {
+            const exteriorClause: any = {
+                brandId,
+                ...isExteriorWhere,
+            };
+            if (category) exteriorClause.category = category;
+            whereClauses.push(exteriorClause);
+        }
+
+        if (movementMakerId && movementCaliberId) {
+            const interiorClause: any = {
+                movementMakerId,
+                caliberId: movementCaliberId,
+                ...isInteriorWhere,
+            };
+            if (category) interiorClause.category = category;
+            whereClauses.push(interiorClause);
+        }
+
+        if (baseMovementMakerId && baseMovementCaliberId) {
+            const baseInteriorClause: any = {
+                baseMakerId: baseMovementMakerId,
+                baseCaliberId: baseMovementCaliberId,
+                ...isInteriorWhere,
+            };
+            if (category) baseInteriorClause.category = category;
+            whereClauses.push(baseInteriorClause);
+        }
+
+        if (whereClauses.length === 0) return [];
 
         const parts = await prisma.partsMaster.findMany({
-            where,
-            include: { brand: true, model: true, caliber: true }
+            where: { OR: whereClauses },
+            include: {
+                brand: true,
+                model: true,
+                caliber: true,
+                baseCaliber: true,
+                movementMaker: true,
+                baseMaker: true,
+                supplier: true,
+            }
         });
 
         const filtered = parts.filter((part) => {
             const isInterior = part.partType === 'interior' || part.category === 'internal';
-            if (!isInterior) return true;
-            if (!caliberId) return true;
-            return part.caliberId === caliberId;
+            if (isInterior) {
+                const movementMatched = Boolean(
+                    movementMakerId
+                    && movementCaliberId
+                    && part.movementMakerId === movementMakerId
+                    && part.caliberId === movementCaliberId
+                );
+                const baseMovementMatched = Boolean(
+                    baseMovementMakerId
+                    && baseMovementCaliberId
+                    && part.baseMakerId === baseMovementMakerId
+                    && part.baseCaliberId === baseMovementCaliberId
+                );
+                return movementMatched || baseMovementMatched;
+            }
+
+            return Boolean(brandId && part.brandId === brandId);
         });
 
         return filtered.sort((a, b) => {
+            const aInterior = a.partType === 'interior' || a.category === 'internal';
+            const bInterior = b.partType === 'interior' || b.category === 'internal';
             const scoreA =
                 (a.partRefs ? 100 : 0) +
-                (a.caliberId === caliberId && caliberId ? 20 : 0) +
-                (a.brandId === brandId ? 15 : 0) +
-                (a.modelId === modelId && modelId ? 5 : (a.modelId ? -1 : 0));
+                (aInterior && a.movementMakerId === movementMakerId && a.caliberId === movementCaliberId ? 40 : 0) +
+                (aInterior && a.baseMakerId === baseMovementMakerId && a.baseCaliberId === baseMovementCaliberId ? 30 : 0) +
+                (!aInterior && a.caliberId === caliberId && caliberId ? 20 : 0) +
+                (!aInterior && a.brandId === brandId ? 15 : 0) +
+                (!aInterior && a.modelId === modelId && modelId ? 5 : (!aInterior && a.modelId ? -1 : 0));
             const scoreB =
                 (b.partRefs ? 100 : 0) +
-                (b.caliberId === caliberId && caliberId ? 20 : 0) +
-                (b.brandId === brandId ? 15 : 0) +
-                (b.modelId === modelId && modelId ? 5 : (b.modelId ? -1 : 0));
+                (bInterior && b.movementMakerId === movementMakerId && b.caliberId === movementCaliberId ? 40 : 0) +
+                (bInterior && b.baseMakerId === baseMovementMakerId && b.baseCaliberId === baseMovementCaliberId ? 30 : 0) +
+                (!bInterior && b.caliberId === caliberId && caliberId ? 20 : 0) +
+                (!bInterior && b.brandId === brandId ? 15 : 0) +
+                (!bInterior && b.modelId === modelId && modelId ? 5 : (!bInterior && b.modelId ? -1 : 0));
             return scoreB - scoreA;
         });
     } catch (error) {

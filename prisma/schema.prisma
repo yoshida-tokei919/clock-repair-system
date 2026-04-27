@@ -6,6 +6,7 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 // 1. User & Customer Management
@@ -64,6 +65,8 @@ model Brand {
   models      Model[]
   calibers    Caliber[]
   watches     Watch[]
+  movementMakerRepairs     Repair[] @relation("RepairMovementMaker")
+  baseMovementMakerRepairs Repair[] @relation("RepairBaseMovementMaker")
   // PartsMaster への複数FK対応：named relation
   parts              PartsMaster[] @relation("PartsBrand")
   movementMakerParts PartsMaster[] @relation("PartsMovementMaker")
@@ -106,6 +109,8 @@ model Caliber {
   brand      Brand?  @relation(fields: [brandId], references: [id])
   references WatchReference[]
   watches    Watch[]
+  movementCaliberRepairs     Repair[] @relation("RepairMovementCaliber")
+  baseMovementCaliberRepairs Repair[] @relation("RepairBaseMovementCaliber")
   // PartsMaster への複数FK対応：named relation
   parts            PartsMaster[] @relation("PartsCaliber")
   baseCaliberParts PartsMaster[] @relation("PartsBaseCaliber")
@@ -142,6 +147,10 @@ model Repair {
   inquiryNumber        String    @unique // T-001
   customerId           Int
   watchId              Int
+  movementMakerId      Int?
+  movementCaliberId    Int?
+  baseMovementMakerId  Int?
+  baseMovementCaliberId Int?
   partnerRef           String?   // Manual Partner Mgmt No
   accessories          String?   // JSON or CSV of checked items
   
@@ -174,6 +183,10 @@ model Repair {
 
   customer Customer          @relation(fields: [customerId], references: [id])
   watch    Watch             @relation(fields: [watchId], references: [id])
+  movementMaker        Brand?   @relation("RepairMovementMaker", fields: [movementMakerId], references: [id])
+  movementCaliber      Caliber? @relation("RepairMovementCaliber", fields: [movementCaliberId], references: [id])
+  baseMovementMaker    Brand?   @relation("RepairBaseMovementMaker", fields: [baseMovementMakerId], references: [id])
+  baseMovementCaliber  Caliber? @relation("RepairBaseMovementCaliber", fields: [baseMovementCaliberId], references: [id])
   logs          RepairStatusLog[]
   photos        RepairPhoto[]
   estimate      Estimate?

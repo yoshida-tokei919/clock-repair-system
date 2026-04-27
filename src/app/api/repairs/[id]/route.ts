@@ -26,6 +26,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             let modelId = repairRecord.watch.modelId;
             let caliberId = repairRecord.watch.caliberId;
             let referenceId = repairRecord.watch.referenceId;
+            let movementMakerId = repairRecord.movementMakerId;
+            let movementCaliberId = repairRecord.movementCaliberId;
+            let baseMovementMakerId = repairRecord.baseMovementMakerId;
+            let baseMovementCaliberId = repairRecord.baseMovementCaliberId;
 
             // 1. Update Watch Details (Smart Match)
             if (body.watch) {
@@ -65,6 +69,26 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     const cal = await findOrCreateCaliber(tx as any, body.watch.caliber, brand.id);
                     caliberId = cal.id;
                 }
+
+                const movementMakerInput = (body.watch.movementMaker || "").trim();
+                movementMakerId = movementMakerInput
+                    ? (await findOrCreateBrand(tx as any, movementMakerInput)).id
+                    : null;
+
+                const movementCaliberInput = (body.watch.movementCaliber || "").trim();
+                movementCaliberId = movementCaliberInput
+                    ? (await findOrCreateCaliber(tx as any, movementCaliberInput, movementMakerId)).id
+                    : null;
+
+                const baseMovementMakerInput = (body.watch.baseMovementMaker || "").trim();
+                baseMovementMakerId = baseMovementMakerInput
+                    ? (await findOrCreateBrand(tx as any, baseMovementMakerInput)).id
+                    : null;
+
+                const baseMovementCaliberInput = (body.watch.baseMovementCaliber || "").trim();
+                baseMovementCaliberId = baseMovementCaliberInput
+                    ? (await findOrCreateCaliber(tx as any, baseMovementCaliberInput, baseMovementMakerId)).id
+                    : null;
 
                 // Reference Handling
                 if (body.watch.ref) {
@@ -119,6 +143,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 where: { id },
                 data: {
                     status: dbStatus,
+                    movementMakerId,
+                    movementCaliberId,
+                    baseMovementMakerId,
+                    baseMovementCaliberId,
                     partnerRef: body.request?.partnerRef || null,
                     accessories: JSON.stringify(body.request?.accessories || []),
                     workSummary: body.request?.diagnosis || null,
@@ -168,6 +196,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     if (body.estimate.items.length > 0) {
                         const syncedEstimateItems = await Promise.all(body.estimate.items.map(async (item: any) => {
                             if (item.type !== 'part') return item;
+                            const isInteriorPart = item.partType === 'interior'
+                                || item.category === 'internal'
+                                || item.category === 'part_internal';
 
                             if (item.partsMasterId) {
                                 const existingMaster = await tx.partsMaster.findUnique({ where: { id: Number(item.partsMasterId) } });
@@ -214,7 +245,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                                 category: item.category,
                                 brandId,
                                 modelId,
-                                caliberId,
+                                caliberId: isInteriorPart ? movementCaliberId : caliberId,
+                                baseCaliberId: baseMovementCaliberId,
+                                movementMakerId,
+                                baseMakerId: baseMovementMakerId,
                                 watchRefs: body.watch?.ref || repairRecord.watch.reference?.name || null,
                                 nameJp: item.name,
                                 nameEn: item.name,

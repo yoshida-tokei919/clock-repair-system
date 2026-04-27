@@ -150,6 +150,34 @@ export async function POST(req: Request) {
                 caliberId = cal.id;
             }
 
+            let movementMakerId: number | null = null;
+            const movementMakerInput = (body.watch.movementMaker || "").trim();
+            if (movementMakerInput) {
+                const movementMaker = await findOrCreateBrand(tx as any, movementMakerInput);
+                movementMakerId = movementMaker.id;
+            }
+
+            let movementCaliberId: number | null = null;
+            const movementCaliberInput = (body.watch.movementCaliber || "").trim();
+            if (movementCaliberInput) {
+                const movementCaliber = await findOrCreateCaliber(tx as any, movementCaliberInput, movementMakerId);
+                movementCaliberId = movementCaliber.id;
+            }
+
+            let baseMovementMakerId: number | null = null;
+            const baseMovementMakerInput = (body.watch.baseMovementMaker || "").trim();
+            if (baseMovementMakerInput) {
+                const baseMovementMaker = await findOrCreateBrand(tx as any, baseMovementMakerInput);
+                baseMovementMakerId = baseMovementMaker.id;
+            }
+
+            let baseMovementCaliberId: number | null = null;
+            const baseMovementCaliberInput = (body.watch.baseMovementCaliber || "").trim();
+            if (baseMovementCaliberInput) {
+                const baseMovementCaliber = await findOrCreateCaliber(tx as any, baseMovementCaliberInput, baseMovementMakerId);
+                baseMovementCaliberId = baseMovementCaliber.id;
+            }
+
             // Handle WatchReference
             let referenceId: number | null = null;
             const refNameInput = body.watch.ref;
@@ -232,6 +260,10 @@ export async function POST(req: Request) {
                     inquiryNumber,
                     customerId: customer.id,
                     watchId: watch.id,
+                    movementMakerId,
+                    movementCaliberId,
+                    baseMovementMakerId,
+                    baseMovementCaliberId,
                     partnerRef,
                     status: dbStatus,
                     accessories: JSON.stringify(body.request.accessories || []),
@@ -288,6 +320,9 @@ export async function POST(req: Request) {
             if (estimateItems.length > 0) {
                 estimateItems = await Promise.all(estimateItems.map(async (item: any) => {
                     if (item.type !== 'part') return item;
+                    const isInteriorPart = item.partType === 'interior'
+                        || item.category === 'internal'
+                        || item.category === 'part_internal';
 
                     if (item.partsMasterId) {
                         const existingMaster = await tx.partsMaster.findUnique({ where: { id: Number(item.partsMasterId) } });
@@ -334,7 +369,10 @@ export async function POST(req: Request) {
                         category: item.category,
                         brandId: brand.id,
                         modelId,
-                        caliberId,
+                        caliberId: isInteriorPart ? movementCaliberId : caliberId,
+                        baseCaliberId: baseMovementCaliberId,
+                        movementMakerId,
+                        baseMakerId: baseMovementMakerId,
                         watchRefs: refNameInput || null,
                         nameJp: item.name,
                         nameEn: item.name,

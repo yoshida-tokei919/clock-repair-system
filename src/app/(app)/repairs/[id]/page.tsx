@@ -12,6 +12,10 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
         where: { id: repairId },
         include: {
             customer: true,
+            movementMaker: true,
+            movementCaliber: true,
+            baseMovementMaker: true,
+            baseMovementCaliber: true,
             watch: {
                 include: {
                     brand: true,

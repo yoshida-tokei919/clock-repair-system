@@ -295,6 +295,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [model, setModel] = useState(initialData?.watch?.model?.name || "");
     const [refName, setRefName] = useState(initialData?.watch?.reference?.name || "");
     const [caliber, setCaliber] = useState(initialData?.watch?.caliber?.name || "");
+    const [movementMaker, setMovementMaker] = useState(initialData?.movementMaker?.name || "");
+    const [movementCaliber, setMovementCaliber] = useState(initialData?.movementCaliber?.name || "");
+    const [baseMovementMaker, setBaseMovementMaker] = useState(initialData?.baseMovementMaker?.name || "");
+    const [baseMovementCaliber, setBaseMovementCaliber] = useState(initialData?.baseMovementCaliber?.name || "");
     const [serial, setSerial] = useState(initialData?.watch?.serialNumber || "");
     const [accessories, setAccessories] = useState<string>(() => {
         try {
@@ -651,6 +655,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [modelOpts, setModelOpts] = useState<any[]>([]);
     const [refOpts, setRefOpts] = useState<any[]>([]);
     const [calOpts, setCalOpts] = useState<any[]>([]);
+    const [masterCalOpts, setMasterCalOpts] = useState<any[]>([]);
     const [customerOpts, setCustomerOpts] = useState<any[]>([]);
     const [workOpts, setWorkOpts] = useState<any[]>([]);
 
@@ -676,30 +681,48 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [partsSearchQuery, setPartsSearchQuery] = useState('');
 
     const activePartSearchItem = partSearchRowIdx !== null ? lineItems[partSearchRowIdx] ?? null : null;
+    const isInteriorPartSearchItem = activePartSearchItem
+        ? activePartSearchItem.partType === 'interior'
+            || activePartSearchItem.category === 'internal'
+            || activePartSearchItem.category === 'part_internal'
+        : false;
+    const partSearchContexts = useMemo(() => {
+        if (!isInteriorPartSearchItem) {
+            return [{ brand, caliber }];
+        }
+
+        const contexts = [
+            { brand: movementMaker, caliber: movementCaliber },
+            { brand: baseMovementMaker, caliber: baseMovementCaliber },
+        ].filter((context) => context.brand || context.caliber);
+
+        return contexts.length > 0 ? contexts : [{ brand, caliber }];
+    }, [isInteriorPartSearchItem, brand, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber]);
+
     const japanesePartQueries = useMemo(() => {
         if (!activePartSearchItem) return [];
-        return buildJapanesePartQueries({
-            brand,
+        return Array.from(new Set(partSearchContexts.flatMap((context) => buildJapanesePartQueries({
+            brand: context.brand,
             watchRef: refName,
-            caliber,
+            caliber: context.caliber,
             partType: activePartSearchItem.partType,
             category: activePartSearchItem.category,
             partName: activePartSearchItem.name,
             partRef: activePartSearchItem.partRef,
-        });
-    }, [activePartSearchItem, brand, caliber, refName]);
+        }))));
+    }, [activePartSearchItem, partSearchContexts, refName]);
     const englishPartQueries = useMemo(() => {
         if (!activePartSearchItem) return [];
-        return buildEnglishPartQueries({
-            brand,
+        return Array.from(new Set(partSearchContexts.flatMap((context) => buildEnglishPartQueries({
+            brand: context.brand,
             watchRef: refName,
-            caliber,
+            caliber: context.caliber,
             partType: activePartSearchItem.partType,
             category: activePartSearchItem.category,
             partName: activePartSearchItem.name,
             partRef: activePartSearchItem.partRef,
-        });
-    }, [activePartSearchItem, brand, caliber, refName]);
+        }))));
+    }, [activePartSearchItem, partSearchContexts, refName]);
 
     // --- 10. AI CHAT ---
     const [aiChatOpen, setAiChatOpen] = useState(false);
@@ -716,7 +739,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         customer: { name: customerName, type: isB2B ? 'business' : 'individual', address, phone: customerPhone },
         endUserName,
         partnerRef,
-        watch: { brand, model, ref: refName, serial },
+        watch: { brand, model, ref: refName, serial, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber },
         estimate: {
             items: lineItems.map(i => ({
                 name: i.name,
@@ -862,6 +885,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // --- INITIAL LOAD ---
     useEffect(() => {
         getBrands().then(d => setBrandOpts(d.map(b => ({ label: b.name, value: b.name, id: b.id }))));
+        getCalibers().then(d => setMasterCalOpts(d.map((c: any) => ({ label: c.name, value: c.name, id: c.id }))));
     }, []);
 
     // --- LOOKUP CHAINS ---
@@ -881,7 +905,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             // Also fetch calibers linked to model
             if (brand) {
                 const b = brandOpts.find(o => o.value === brand);
-                if (b) getCalibersForModel(b.id, m.id).then(d => setCalOpts(d.map((c: any) => ({ label: c.name, value: c.name }))));
+                if (b) getCalibersForModel(b.id, m.id).then(d => setCalOpts(d.map((c: any) => ({ label: c.name, value: c.name, id: c.id }))));
             }
         }
     }, [model, modelOpts, brand, brandOpts]);
@@ -915,7 +939,16 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             });
         } else {
             // Fetch parts master data
-                getPartsMatched(b.id, m?.id, c?.id).then(parts => {
+                getPartsMatched(
+                    b.id,
+                    m?.id,
+                    c?.id,
+                    undefined,
+                    brandOpts.find(o => o.value === movementMaker || o.label === movementMaker)?.id,
+                    masterCalOpts.find(o => o.value === movementCaliber || o.label === movementCaliber)?.id,
+                    brandOpts.find(o => o.value === baseMovementMaker || o.label === baseMovementMaker)?.id,
+                    masterCalOpts.find(o => o.value === baseMovementCaliber || o.label === baseMovementCaliber)?.id
+                ).then(parts => {
                     setWorkOpts(parts.map(p => ({
                         label: p.nameJp || p.name,
                         value: p.nameJp || p.name,
@@ -944,7 +977,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     console.log(`Fetched ${parts.length} matching parts for brand ${b.id}`);
                 });
             }
-    }, [brand, model, caliber, brandOpts, modelOpts, calOpts, addItemCategory]);
+    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory]);
 
     // --- CALCULATIONS ---
     const totalAmount = lineItems.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);
@@ -992,7 +1025,17 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     address: address,
                     prefix: isB2B ? 'P' : 'C' // Simple logic
                 },
-                watch: { brand, model, ref: refName, serial, caliber },
+                watch: {
+                    brand,
+                    model,
+                    ref: refName,
+                    serial,
+                    caliber,
+                    movementMaker,
+                    movementCaliber,
+                    baseMovementMaker,
+                    baseMovementCaliber,
+                },
                 request: {
                     diagnosis,
                     partnerRef,
@@ -1523,6 +1566,26 @@ ${shopName}
                                     <div>
                                         <Label className="text-[9px] text-zinc-400">キャリバー</Label>
                                         <AdvancedCombobox value={caliber} onChange={setCaliber} options={calOpts} placeholder="機械番号..." />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <Label className="text-[9px] text-zinc-400">ムーブメント製造元</Label>
+                                        <AdvancedCombobox value={movementMaker} onChange={setMovementMaker} options={brandOpts} placeholder="OMEGA / ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
+                                    </div>
+                                    <div>
+                                        <Label className="text-[9px] text-zinc-400">ムーブメントCal</Label>
+                                        <AdvancedCombobox value={movementCaliber} onChange={setMovementCaliber} options={masterCalOpts} placeholder="1120..." />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <Label className="text-[9px] text-zinc-400">ベースムーブメント製造元</Label>
+                                        <AdvancedCombobox value={baseMovementMaker} onChange={setBaseMovementMaker} options={brandOpts} placeholder="ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
+                                    </div>
+                                    <div>
+                                        <Label className="text-[9px] text-zinc-400">ベースムーブメントCal</Label>
+                                        <AdvancedCombobox value={baseMovementCaliber} onChange={setBaseMovementCaliber} options={masterCalOpts} placeholder="2892.A2..." />
                                     </div>
                                 </div>
                                 <div>
