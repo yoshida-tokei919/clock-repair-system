@@ -950,7 +950,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     brandOpts.find(o => o.value === movementMaker || o.label === movementMaker)?.id,
                     masterCalOpts.find(o => o.value === movementCaliber || o.label === movementCaliber)?.id,
                     brandOpts.find(o => o.value === baseMovementMaker || o.label === baseMovementMaker)?.id,
-                    masterCalOpts.find(o => o.value === baseMovementCaliber || o.label === baseMovementCaliber)?.id
+                    masterCalOpts.find(o => o.value === baseMovementCaliber || o.label === baseMovementCaliber)?.id,
+                    newItemName
                 ).then(parts => {
                     setWorkOpts(parts.map(p => ({
                         label: p.nameJp || p.name,
@@ -980,7 +981,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     console.log(`Fetched ${parts.length} matching parts for brand ${b.id}`);
                 });
             }
-    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory]);
+    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, newItemName]);
 
     // --- CALCULATIONS ---
     const totalAmount = lineItems.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);

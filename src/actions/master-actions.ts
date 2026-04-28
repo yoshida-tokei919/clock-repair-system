@@ -275,7 +275,8 @@ export async function getPartsMatched(
     movementMakerId?: number,
     movementCaliberId?: number,
     baseMovementMakerId?: number,
-    baseMovementCaliberId?: number
+    baseMovementCaliberId?: number,
+    searchTerm?: string
 ) {
     try {
         const isInteriorWhere = { OR: [{ partType: 'interior' }, { category: 'internal' }] };
@@ -348,6 +349,9 @@ export async function getPartsMatched(
             return Boolean(brandId && part.brandId === brandId);
         });
 
+        const normalizedSearchTerm = searchTerm?.trim().toLowerCase() || "";
+        const refSearchToken = normalizedSearchTerm.replace(/[\s._-]+/g, "");
+
         const getInteriorScore = (part: typeof filtered[number]) => {
             const movementMatched = Boolean(
                 movementMakerId
@@ -363,7 +367,23 @@ export async function getPartsMatched(
             );
             const hasPartRef = Boolean(part.partRefs);
             const hasPartName = Boolean(part.nameJp || part.name);
+            const normalizedPartRefs = (part.partRefs || "").toLowerCase();
+            const normalizedPartRefsToken = normalizedPartRefs.replace(/[\s._-]+/g, "");
+            const normalizedPartName = `${part.nameJp || ""} ${part.name || ""}`.toLowerCase();
+            const refMatched = Boolean(
+                normalizedSearchTerm
+                && refSearchToken
+                && normalizedPartRefsToken.includes(refSearchToken)
+            );
+            const nameMatched = Boolean(
+                normalizedSearchTerm
+                && normalizedPartName.includes(normalizedSearchTerm)
+            );
 
+            if (movementMatched && refMatched) return 600;
+            if (baseMatched && refMatched) return 500;
+            if (movementMatched && nameMatched) return 450;
+            if (baseMatched && nameMatched) return 350;
             if (movementMatched && hasPartRef) return 400;
             if (baseMatched && hasPartRef) return 300;
             if (movementMatched && hasPartName) return 200;
