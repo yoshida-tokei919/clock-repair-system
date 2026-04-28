@@ -55,3 +55,4 @@ local_build*.bat
 gen_key.bat
 deploy_to_server.bat
 MANUAL_UPLOAD_KEY.txt
+.next-dev.log
