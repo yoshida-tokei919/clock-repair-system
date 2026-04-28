@@ -348,20 +348,39 @@ export async function getPartsMatched(
             return Boolean(brandId && part.brandId === brandId);
         });
 
+        const getInteriorScore = (part: typeof filtered[number]) => {
+            const movementMatched = Boolean(
+                movementMakerId
+                && movementCaliberId
+                && part.movementMakerId === movementMakerId
+                && part.caliberId === movementCaliberId
+            );
+            const baseMatched = Boolean(
+                baseMovementMakerId
+                && baseMovementCaliberId
+                && part.baseMakerId === baseMovementMakerId
+                && part.baseCaliberId === baseMovementCaliberId
+            );
+            const hasPartRef = Boolean(part.partRefs);
+            const hasPartName = Boolean(part.nameJp || part.name);
+
+            if (movementMatched && hasPartRef) return 400;
+            if (baseMatched && hasPartRef) return 300;
+            if (movementMatched && hasPartName) return 200;
+            if (baseMatched && hasPartName) return 100;
+            return 0;
+        };
+
         return filtered.sort((a, b) => {
             const aInterior = a.partType === 'interior' || a.category === 'internal';
             const bInterior = b.partType === 'interior' || b.category === 'internal';
             const scoreA =
-                (a.partRefs ? 100 : 0) +
-                (aInterior && a.movementMakerId === movementMakerId && a.caliberId === movementCaliberId ? 40 : 0) +
-                (aInterior && a.baseMakerId === baseMovementMakerId && a.baseCaliberId === baseMovementCaliberId ? 30 : 0) +
+                (aInterior ? getInteriorScore(a) : 0) +
                 (!aInterior && a.caliberId === caliberId && caliberId ? 20 : 0) +
                 (!aInterior && a.brandId === brandId ? 15 : 0) +
                 (!aInterior && a.modelId === modelId && modelId ? 5 : (!aInterior && a.modelId ? -1 : 0));
             const scoreB =
-                (b.partRefs ? 100 : 0) +
-                (bInterior && b.movementMakerId === movementMakerId && b.caliberId === movementCaliberId ? 40 : 0) +
-                (bInterior && b.baseMakerId === baseMovementMakerId && b.baseCaliberId === baseMovementCaliberId ? 30 : 0) +
+                (bInterior ? getInteriorScore(b) : 0) +
                 (!bInterior && b.caliberId === caliberId && caliberId ? 20 : 0) +
                 (!bInterior && b.brandId === brandId ? 15 : 0) +
                 (!bInterior && b.modelId === modelId && modelId ? 5 : (!bInterior && b.modelId ? -1 : 0));
