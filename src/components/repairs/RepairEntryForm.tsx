@@ -954,8 +954,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         const c = calOpts.find(o => o.value === caliber || o.label === caliber);
 
         if (addItemCategory === 'internal') {
+            const pricingCaliberId =
+                masterCalOpts.find(o => o.value === movementCaliber || o.label === movementCaliber)?.id ??
+                masterCalOpts.find(o => o.value === baseMovementCaliber || o.label === baseMovementCaliber)?.id ??
+                c?.id;
             // Fetch labor/work rules
-            getPricingRules(b.id, m?.id, c?.id).then(rules => {
+            getPricingRules(b.id, m?.id, pricingCaliberId).then(rules => {
                 const safeRules = Array.isArray(rules) ? rules : [];
                 setWorkOpts(safeRules.map(r => ({
                     label: r.suggestedWorkName,
