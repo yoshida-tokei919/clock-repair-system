@@ -184,7 +184,10 @@ const AdvancedCombobox: React.FC<{
                 <ChevronDown className="h-3 w-3 opacity-50 cursor-pointer text-zinc-600" />
             </div>
             {isOpen && (
-                <div className="absolute top-full z-50 mt-1 w-full min-w-[200px] overflow-visible rounded-sm border border-zinc-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-100 origin-top-left">
+                <div className={cn(
+                    "absolute top-full z-50 mt-1 w-full min-w-[200px] overflow-visible rounded-sm border border-zinc-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-100 origin-top-left",
+                    filtered.length === 0 && !onUpsert && "pointer-events-none"
+                )}>
                     <div className="overflow-y-auto p-1 max-h-80">
                         {onUpsert && search && !options.some(o => o.value === search) && (
                             <div className="p-1.5 px-2 text-xs text-blue-600 font-bold hover:bg-blue-50 cursor-pointer rounded-sm mb-1 flex items-center" onClick={() => {
