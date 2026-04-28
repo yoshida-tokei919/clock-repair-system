@@ -1816,8 +1816,11 @@ ${shopName}
                                         <Input className="h-7 text-xs w-12 text-center font-mono" placeholder="1" value={newItemQty} onChange={e => setNewItemQty(e.target.value)} type="number" min={1} />
                                         <Button size="sm" className="h-7 w-8 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
                                             if (!newItemName) return;
+                                            const fallbackMatch = addItemCategory === 'part_external'
+                                                ? workOpts.find(w => w.value === newItemName && w.partId)
+                                                : undefined;
                                             const match = addItemCategory === 'part_external'
-                                                ? selectedWorkOption
+                                                ? (selectedWorkOption ?? fallbackMatch)
                                                 : undefined;
                                             const baseItem: LineItem = {
                                                 id: `auto-${Date.now()}`,

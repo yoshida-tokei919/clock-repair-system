@@ -173,19 +173,33 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
             // 4. Update Estimates
             if (body.estimate?.items) {
-                const total = body.estimate.items.reduce((sum: number, item: any) => sum + (Number(item.price) || 0), 0);
+                const total = body.estimate.items.reduce(
+                    (sum: number, item: any) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)),
+                    0
+                );
+                const techFee = body.estimate.items
+                    .filter((item: any) => item.type === 'labor')
+                    .reduce((sum: number, item: any) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
+                const partsFee = body.estimate.items
+                    .filter((item: any) => item.type === 'part')
+                    .reduce((sum: number, item: any) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
+                const taxAmount = Math.floor(total * 0.1);
 
                 // Use the returned estimate from upsert directly
                 const estimate = await tx.estimate.upsert({
                     where: { repairId: id },
                     create: {
                         repairId: id,
+                        technicalFee: techFee,
+                        partsTotal: partsFee,
                         totalAmount: total,
-                        taxAmount: Math.floor(total * 0.1),
+                        taxAmount,
                     },
                     update: {
+                        technicalFee: techFee,
+                        partsTotal: partsFee,
                         totalAmount: total,
-                        taxAmount: Math.floor(total * 0.1),
+                        taxAmount,
                     }
                 });
 
@@ -271,7 +285,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                                 itemName: item.name,
                                 type: item.type,
                                 unitPrice: Math.floor(Number(item.price) || 0),
-                                quantity: 1,
+                                quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
                                 partsMasterId: item.partsMasterId ? Number(item.partsMasterId) : null,
                             }))
                         });
