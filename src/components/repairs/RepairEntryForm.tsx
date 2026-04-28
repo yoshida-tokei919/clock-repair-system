@@ -94,6 +94,27 @@ function toLocaleDate(isoDate: string): string {
  * Independent, highly-optimized component for fast lookups.
  */
 const AdvancedCombobox: React.FC<{
+    onSelectOption?: (option: {
+        label: string,
+        value: string,
+        name?: string,
+        sub?: string,
+        inlineTag?: string,
+        meta?: string,
+        notes?: string,
+        price?: number,
+        cost?: number,
+        partRef?: string,
+        partId?: number,
+        partsMasterId?: number,
+        grade?: string,
+        note1?: string,
+        note2?: string,
+        partRefs?: string,
+        cousinsNumber?: string,
+        stockQuantity?: number,
+        supplierName?: string,
+    }) => void;
     value: string;
     onChange: (v: string) => void;
     onSearchChange?: (s: string) => void;
@@ -122,7 +143,7 @@ const AdvancedCombobox: React.FC<{
     }[];
     disabled?: boolean;
     className?: string;
-}> = ({ value, onChange, onSearchChange, onUpsert, placeholder, options, disabled, className }) => {
+}> = ({ value, onChange, onSearchChange, onSelectOption, onUpsert, placeholder, options, disabled, className }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
@@ -203,13 +224,14 @@ const AdvancedCombobox: React.FC<{
                         )}
                         {filtered.map((opt, i) => (
                             <div
-                                key={i}
+                                key={`${opt.partsMasterId ?? opt.partId ?? "opt"}-${opt.value}-${i}`}
                                 className={cn(
                                     "min-h-[64px] px-2.5 py-2 text-xs leading-snug hover:bg-blue-50 hover:text-blue-700 cursor-pointer rounded-sm transition-colors",
                                     value === opt.value ? "bg-blue-100 text-blue-800 font-bold" : "text-zinc-700"
                                 )}
                                 onClick={() => {
                                     onChange(opt.value);
+                                    onSelectOption?.(opt);
                                     setSearch(""); // Reset search on select
                                     setIsOpen(false);
                                 }}
@@ -370,6 +392,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [newItemPrice, setNewItemPrice] = useState("");
     const [newItemQty, setNewItemQty] = useState("1");
     const [newItemSpec, setNewItemSpec] = useState("");
+    const [selectedWorkOption, setSelectedWorkOption] = useState<any | null>(null);
 
     const buildPartLineItem = useCallback((base: LineItem, part: any): LineItem => (
         createEstimateItemFromPart(part, {
@@ -1765,11 +1788,17 @@ ${shopName}
                                             value={newItemName}
                                             onChange={(v) => {
                                                 setNewItemName(v);
+                                                setSelectedWorkOption(null);
                                                 const match = workOpts.find(w => w.value === v);
                                                 if (match) {
                                                     if (match.price !== undefined) setNewItemPrice(String(match.price));
                                                     if (match.cost !== undefined) setNewItemCost(String(match.cost));
                                                 }
+                                            }}
+                                            onSelectOption={(option) => {
+                                                setSelectedWorkOption(option);
+                                                if (option.price !== undefined) setNewItemPrice(String(option.price));
+                                                if (option.cost !== undefined) setNewItemCost(String(option.cost));
                                             }}
                                             options={workOpts}
                                         />
@@ -1788,7 +1817,7 @@ ${shopName}
                                         <Button size="sm" className="h-7 w-8 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
                                             if (!newItemName) return;
                                             const match = addItemCategory === 'part_external'
-                                                ? workOpts.find(w => w.value === newItemName && w.partId)
+                                                ? selectedWorkOption
                                                 : undefined;
                                             const baseItem: LineItem = {
                                                 id: `auto-${Date.now()}`,
@@ -1815,6 +1844,7 @@ ${shopName}
                                             setNewItemPrice("");
                                             setNewItemQty("1");
                                             setNewItemSpec("");
+                                            setSelectedWorkOption(null);
                                         }}>
                                             <Plus className="w-4 h-4" />
                                         </Button>
