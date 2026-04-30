@@ -289,6 +289,25 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                                 partsMasterId: item.partsMasterId ? Number(item.partsMasterId) : null,
                             }))
                         });
+
+                        const pendingOrderQuantities = new Map<number, number>();
+                        for (const item of syncedEstimateItems) {
+                            if (item.type !== 'part' || !item.partsMasterId) continue;
+                            const partId = Number(item.partsMasterId);
+                            const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+                            pendingOrderQuantities.set(partId, (pendingOrderQuantities.get(partId) ?? 0) + quantity);
+                        }
+
+                        for (const [partsMasterId, quantity] of Array.from(pendingOrderQuantities.entries())) {
+                            await tx.orderRequest.updateMany({
+                                where: {
+                                    repairId: id,
+                                    partsMasterId,
+                                    status: 'pending',
+                                },
+                                data: { quantity },
+                            });
+                        }
                     }
                     const laborItems = body.estimate.items.filter((i: any) => i.type === 'labor');
 
