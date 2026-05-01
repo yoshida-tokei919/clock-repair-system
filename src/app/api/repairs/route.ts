@@ -414,9 +414,23 @@ export async function POST(req: Request) {
                 const laborItems = estimateItems.filter((i: any) => i.type === 'labor');
 
                 if (laborItems.length > 0) {
+                    try {
+                    const pricingRuleWhere = {
+                        brandId: brand.id,
+                        ...(modelId != null ? { modelId } : {}),
+                        ...(caliberId != null ? { caliberId } : {}),
+                    };
+                    const pricingRuleData = {
+                        brandId: brand.id,
+                        modelId: modelId ?? null,
+                        caliberId: caliberId ?? null,
+                    };
                     const laborNames = laborItems.map((i: any) => i.name);
                     const existingRules = await tx.pricingRule.findMany({
-                        where: { suggestedWorkName: { in: laborNames }, brandId: brand.id, modelId, caliberId },
+                        where: {
+                            suggestedWorkName: { in: laborNames },
+                            ...pricingRuleWhere,
+                        },
                         select: { suggestedWorkName: true }
                     });
                     const existingRuleNames = new Set(existingRules.map((r: any) => r.suggestedWorkName));
@@ -428,7 +442,7 @@ export async function POST(req: Request) {
                                 suggestedWorkName: item.name,
                                 minPrice: Math.floor(Number(item.price) || 0),
                                 maxPrice: Math.floor(Number(item.price) || 0),
-                                brandId: brand.id, modelId, caliberId
+                                ...pricingRuleData,
                             }))
                         });
                     }
@@ -436,13 +450,20 @@ export async function POST(req: Request) {
                     for (const item of laborItems) {
                         if (existingRuleNames.has(item.name)) {
                             await tx.pricingRule.updateMany({
-                                where: { suggestedWorkName: item.name, brandId: brand.id, modelId, caliberId },
+                                where: {
+                                    suggestedWorkName: item.name,
+                                    ...pricingRuleWhere,
+                                },
                                 data: {
                                     minPrice: Math.floor(Number(item.price) || 0),
                                     maxPrice: Math.floor(Number(item.price) || 0),
                                 }
                             });
                         }
+                    }
+                    } catch (error) {
+                        console.error("Failed to sync pricing rules during repair create:", error);
+                        throw error;
                     }
                 }
             }
