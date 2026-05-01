@@ -688,6 +688,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // --- 6. DIALOGS ---
     const [quickRegOpen, setQuickRegOpen] = useState(false);
     const [mobileQR, setMobileQR] = useState(false);
+    const canUseMobileQR = Boolean(initialData?.id);
     const [showPdfDialog, setShowPdfDialog] = useState(false);
     const [partSearchDialogOpen, setPartSearchDialogOpen] = useState(false);
     const [partSearchRowIdx, setPartSearchRowIdx] = useState<number | null>(null);
@@ -1944,8 +1945,15 @@ ${shopName}
                                     <Camera className="w-4 h-4 mr-1 text-zinc-600" />
                                     カメラで撮影
                                 </Button>
-                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { if (isReadOnly) return; setMobileQR(true); }}>
-                                    <Smartphone className="w-4 h-4 text-blue-500" />
+                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => {
+                                    if (isReadOnly) return;
+                                    if (!canUseMobileQR) {
+                                        toast({ title: "スマホ撮影は案件保存後に利用できます。" });
+                                        return;
+                                    }
+                                    setMobileQR(true);
+                                }}>
+                                    <Smartphone className={cn("w-4 h-4", canUseMobileQR ? "text-blue-500" : "text-zinc-300")} />
                                 </Button>
                             </div>
                         </div>
