@@ -1671,6 +1671,7 @@ ${shopName}
                                 {/* 明細行 */}
                                 {lineItems.map((item, idx) => {
                                     const isPartItem = item.category.includes('part');
+                                    const isSearchablePartItem = ((item as { type?: 'labor' | 'part' }).type ?? (isPartItem ? 'part' : 'labor')) === 'part';
                                     const statusLabel = isPartItem ? getStatusLabelForLineItem(item, idx) : null;
                                     return (
                                     <div key={item.id} className="grid grid-cols-12 items-center text-xs p-1.5 hover:bg-zinc-50 border-b border-zinc-100 last:border-0 group">
@@ -1749,16 +1750,18 @@ ${shopName}
                                         </div>
                                         {/* 🔍 部品検索 */}
                                         <div className="col-span-1 text-center">
-                                            <button
-                                                type="button"
-                                                className={`transition-colors text-sm ${partSearchRowIdx === idx && partSearchDialogOpen ? 'text-blue-500' : 'text-zinc-400 hover:text-blue-500'}`}
-                                                title="部品検索サイトを開く"
-                                                onClick={() => {
-                                                    handleOpenPartSearchDialog(idx);
-                                                }}
-                                            >
-                                                🔍
-                                            </button>
+                                            {isSearchablePartItem && (
+                                                <button
+                                                    type="button"
+                                                    className={`transition-colors text-sm ${partSearchRowIdx === idx && partSearchDialogOpen ? 'text-blue-500' : 'text-zinc-400 hover:text-blue-500'}`}
+                                                    title="部品検索サイトを開く"
+                                                    onClick={() => {
+                                                        handleOpenPartSearchDialog(idx);
+                                                    }}
+                                                >
+                                                    🔍
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="col-span-1 text-right">
                                             <div className="flex items-center justify-end gap-1">
