@@ -1664,7 +1664,7 @@ ${shopName}
                                 <div className="grid grid-cols-12 text-[9px] text-zinc-400 font-bold border-b pb-1 px-1">
                                     <div className="col-span-6">項目 / 部品</div>
                                     <div className="col-span-1 text-right">仕入値</div>
-                                    <div className="col-span-2 text-right">上代</div>
+                                    <div className="col-span-2 text-right">上代（税抜）</div>
                                     <div className="col-span-1 text-center">個数</div>
                                     <div className="col-span-1 text-center">🔍</div>
                                     <div className="col-span-1 text-right">操作</div>
@@ -1737,6 +1737,9 @@ ${shopName}
                                                     i === idx ? { ...li, price: parseInt(e.target.value) || 0 } : li
                                                 ))}
                                             />
+                                            <div className="mt-0.5 text-right text-[9px] text-zinc-400">
+                                                税抜小計 ¥{(item.price * (item.quantity || 1)).toLocaleString()}
+                                            </div>
                                         </div>
                                         <div className="col-span-1">
                                             <input
