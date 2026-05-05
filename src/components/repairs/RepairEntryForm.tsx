@@ -31,6 +31,13 @@ import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { createEstimateItemFromPart } from "@/lib/estimate-item";
 import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import {
+    PART_INPUT_TYPES,
+    type PartInputType,
+    getPartCategoriesByType,
+    getPartNameOptionByKey,
+    getPartNamesByCategory,
+} from "@/lib/part-input-options";
+import {
     DEFAULT_PART_SEARCH_SITES,
     buildEnglishPartQueries,
     buildJapanesePartQueries,
@@ -393,6 +400,45 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [newItemQty, setNewItemQty] = useState("1");
     const [newItemSpec, setNewItemSpec] = useState("");
     const [selectedWorkOption, setSelectedWorkOption] = useState<any | null>(null);
+    const [selectedPartInputType, setSelectedPartInputType] = useState<PartInputType>("part_external");
+    const [selectedPartCategoryKey, setSelectedPartCategoryKey] = useState("");
+    const [selectedPartNameKey, setSelectedPartNameKey] = useState("");
+
+    const isAddingPartItem = addItemCategory.includes("part");
+    const partCategoryOptions = useMemo(
+        () => getPartCategoriesByType(selectedPartInputType),
+        [selectedPartInputType]
+    );
+    const partNameOptions = useMemo(
+        () => selectedPartCategoryKey ? getPartNamesByCategory(selectedPartCategoryKey) : [],
+        [selectedPartCategoryKey]
+    );
+
+    const handlePartInputTypeChange = useCallback((nextType: PartInputType) => {
+        setSelectedPartInputType(nextType);
+        setSelectedPartCategoryKey("");
+        setSelectedPartNameKey("");
+        setNewItemName("");
+        setSelectedWorkOption(null);
+    }, []);
+
+    const handlePartCategoryChange = useCallback((nextCategoryKey: string) => {
+        setSelectedPartCategoryKey(nextCategoryKey);
+        setSelectedPartNameKey("");
+        setNewItemName("");
+        setSelectedWorkOption(null);
+    }, []);
+
+    const handlePartNameChange = useCallback((nextPartNameKey: string) => {
+        setSelectedPartNameKey(nextPartNameKey);
+        const selected = getPartNameOptionByKey(nextPartNameKey);
+        if (selected) {
+            setNewItemName(selected.displayJa ?? selected.nameJa);
+            setSelectedWorkOption(null);
+        } else {
+            setNewItemName("");
+        }
+    }, []);
 
     const buildPartLineItem = useCallback((base: LineItem, part: any): LineItem => (
         createEstimateItemFromPart(part, {
@@ -1789,7 +1835,18 @@ ${shopName}
                                 {/* 入力行 */}
                                 <div className="bg-zinc-50 p-2 rounded border border-zinc-200 mt-2">
                                     <div className="flex gap-1 mb-1">
-                                        <select className="h-7 text-[10px] rounded border-zinc-300 bg-white" value={addItemCategory} onChange={(e) => setAddItemCategory(e.target.value as any)}>
+                                        <select
+                                            className="h-7 text-[10px] rounded border-zinc-300 bg-white"
+                                            value={addItemCategory}
+                                            onChange={(e) => {
+                                                const nextCategory = e.target.value as typeof addItemCategory;
+                                                setAddItemCategory(nextCategory);
+                                                if (!nextCategory.includes("part")) {
+                                                    setSelectedPartCategoryKey("");
+                                                    setSelectedPartNameKey("");
+                                                }
+                                            }}
+                                        >
                                             <option value="internal">技術料</option>
                                             <option value="part_external">交換部品</option>
                                         </select>
@@ -1814,6 +1871,46 @@ ${shopName}
                                             options={workOpts}
                                         />
                                     </div>
+                                    {isAddingPartItem && (
+                                        <div className="mb-1 grid gap-1 md:grid-cols-[120px_1fr_1.2fr]">
+                                            <select
+                                                className="h-7 rounded border border-zinc-300 bg-white px-2 text-[10px]"
+                                                value={selectedPartInputType}
+                                                onChange={(e) => handlePartInputTypeChange(e.target.value as PartInputType)}
+                                            >
+                                                {PART_INPUT_TYPES.map((type) => (
+                                                    <option key={type.value} value={type.value}>
+                                                        {type.labelJa}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <select
+                                                className="h-7 rounded border border-zinc-300 bg-white px-2 text-[10px]"
+                                                value={selectedPartCategoryKey}
+                                                onChange={(e) => handlePartCategoryChange(e.target.value)}
+                                            >
+                                                <option value="">部品カテゴリを選択</option>
+                                                {partCategoryOptions.map((category) => (
+                                                    <option key={category.key} value={category.key}>
+                                                        {category.labelJa}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <select
+                                                className="h-7 rounded border border-zinc-300 bg-white px-2 text-[10px]"
+                                                value={selectedPartNameKey}
+                                                onChange={(e) => handlePartNameChange(e.target.value)}
+                                                disabled={!selectedPartCategoryKey}
+                                            >
+                                                <option value="">部品名を選択</option>
+                                                {partNameOptions.map((option) => (
+                                                    <option key={option.key} value={option.key}>
+                                                        {option.displayJa ?? option.nameJa}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                     <div className="flex gap-1">
                                         <Input className="h-7 text-xs flex-1" placeholder="備考/仕様" value={newItemSpec} onChange={e => setNewItemSpec(e.target.value)} />
                                         <div className="relative w-16">
@@ -1859,6 +1956,7 @@ ${shopName}
                                             setNewItemQty("1");
                                             setNewItemSpec("");
                                             setSelectedWorkOption(null);
+                                            setSelectedPartNameKey("");
                                         }}>
                                             <Plus className="w-4 h-4" />
                                         </Button>
