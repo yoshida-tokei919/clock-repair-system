@@ -23,6 +23,8 @@ type Part = {
 
 type Props = {
   mode: 'standalone' | 'panel'
+  initialKeyword?: string
+  initialPartType?: 'interior' | 'exterior'
   onSelect?: (part: {
     id: number
     partsMasterId?: number
@@ -44,10 +46,10 @@ type Props = {
   }) => void
 }
 
-export default function PartsSearchPanel({ mode, onSelect }: Props) {
+export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', initialPartType }: Props) {
   const router = useRouter()
-  const [partType, setPartType] = useState<'all' | 'interior' | 'exterior'>('all')
-  const [keyword, setKeyword] = useState('')
+  const [partType, setPartType] = useState<'all' | 'interior' | 'exterior'>(initialPartType ?? 'all')
+  const [keyword, setKeyword] = useState(initialKeyword)
   const [calNumber, setCalNumber] = useState('')
   const [refKeyword, setRefKeyword] = useState('')
   const [parts, setParts] = useState<Part[]>([])
