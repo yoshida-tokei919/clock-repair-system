@@ -768,6 +768,31 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, [lineItems, newItemName, partsPanelRowIdx, selectedPartNameOption]);
     const partsPanelInitialPartType: "interior" | "exterior" =
         selectedPartInputType === "part_internal" ? "interior" : "exterior";
+    const activePartsPanelLineItem = partsPanelRowIdx !== null ? lineItems[partsPanelRowIdx] : undefined;
+    const derivePartsSearchPartTypeFromLineItem = useCallback((item: LineItem | undefined): "interior" | "exterior" | undefined => {
+        if (!item) return undefined;
+
+        if (item.partType === "interior" || item.partType === "exterior") {
+            return item.partType;
+        }
+        if (item.partType === "internal") return "interior";
+        if (item.partType === "external") return "exterior";
+
+        if (item.category === "part_internal") return "interior";
+        if (item.category === "part_external") return "exterior";
+
+        return undefined;
+    }, []);
+    const existingLineInitialPartType = useMemo(
+        () => derivePartsSearchPartTypeFromLineItem(activePartsPanelLineItem),
+        [activePartsPanelLineItem, derivePartsSearchPartTypeFromLineItem]
+    );
+    const partsPanelEffectiveInitialPartType =
+        partsPanelRowIdx !== null
+            ? existingLineInitialPartType
+            : isAddingPartItem
+                ? partsPanelInitialPartType
+                : undefined;
 
     const activePartSearchItem = partSearchRowIdx !== null ? lineItems[partSearchRowIdx] ?? null : null;
     const isInteriorPartSearchItem = activePartSearchItem
@@ -2012,7 +2037,7 @@ ${shopName}
                                     <PartsSearchPanel
                                         mode="panel"
                                         initialKeyword={partsPanelInitialKeyword}
-                                        initialPartType={isAddingPartItem ? partsPanelInitialPartType : undefined}
+                                        initialPartType={partsPanelEffectiveInitialPartType}
                                         onSelect={(part) => {
                                             if (partsPanelRowIdx === null) return;
                                             const nextItems = lineItems.map((li, i) =>
