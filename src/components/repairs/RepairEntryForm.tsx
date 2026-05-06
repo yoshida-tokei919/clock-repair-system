@@ -1842,16 +1842,22 @@ ${shopName}
                                         {/* 🔍 部品検索 */}
                                         <div className="col-span-1 text-center">
                                             {isSearchablePartItem && (
-                                                <button
-                                                    type="button"
-                                                    className={`transition-colors text-sm ${partSearchRowIdx === idx && partSearchDialogOpen ? 'text-blue-500' : 'text-zinc-400 hover:text-blue-500'}`}
+                                                <span
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    className={`cursor-pointer transition-colors text-sm ${partSearchRowIdx === idx && partSearchDialogOpen ? 'text-blue-500' : 'text-zinc-400 hover:text-blue-500'}`}
                                                     title="部品検索サイトを開く"
                                                     onClick={() => {
                                                         handleOpenPartSearchDialog(idx);
                                                     }}
+                                                    onKeyDown={(event) => {
+                                                        if (event.key !== "Enter" && event.key !== " ") return;
+                                                        event.preventDefault();
+                                                        handleOpenPartSearchDialog(idx);
+                                                    }}
                                                 >
                                                     🔍
-                                                </button>
+                                                </span>
                                             )}
                                         </div>
                                         <div className="col-span-1 text-right">
@@ -2038,7 +2044,7 @@ ${shopName}
                                         mode="panel"
                                         initialKeyword={partsPanelInitialKeyword}
                                         initialPartType={partsPanelEffectiveInitialPartType}
-                                        onSelect={(part) => {
+                                        onSelect={isReadOnly ? undefined : (part) => {
                                             if (partsPanelRowIdx === null) return;
                                             const nextItems = lineItems.map((li, i) =>
                                                 i === partsPanelRowIdx
