@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import PartsWebSearchPanel from './PartsWebSearchPanel'
 
 type Part = {
   id: number
@@ -221,6 +222,14 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
           </tbody>
         </table>
       </div>
+
+      <PartsWebSearchPanel
+        watchRef={refKeyword}
+        cal={calNumber}
+        partType={partType === 'all' ? initialPartType : partType}
+        partName={keyword}
+        disabled={loading}
+      />
     </div>
   )
 }
