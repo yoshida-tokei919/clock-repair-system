@@ -159,16 +159,17 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
               <th className="px-3 py-2 text-left">Cal. / Ref</th>
               <th className="px-3 py-2 text-left">グレード</th>
               <th className="px-3 py-2 text-right">上代</th>
+              <th className="px-3 py-2 text-right">仕入</th>
               <th className="px-3 py-2 text-right">在庫</th>
               <th className="px-3 py-2 text-center">操作</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} className="text-center py-8 text-gray-400">読み込み中...</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-gray-400">読み込み中...</td></tr>
             )}
             {!loading && parts.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-8 text-gray-400">該当する部品がありません</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-gray-400">該当する部品がありません</td></tr>
             )}
             {!loading && parts.map(part => (
               <tr key={part.id} className="border-t hover:bg-gray-50">
@@ -190,6 +191,9 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
                 <td className="px-3 py-2">{part.grade ?? '-'}</td>
                 <td className="px-3 py-2 text-right font-mono">
                   ¥{part.retailPrice.toLocaleString()}
+                </td>
+                <td className="px-3 py-2 text-right font-mono">
+                  ¥{part.latestCostYen.toLocaleString()}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <span className={part.stockQuantity === 0 ? 'text-red-500 font-bold' : ''}>
