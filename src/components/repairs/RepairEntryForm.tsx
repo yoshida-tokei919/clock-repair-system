@@ -444,17 +444,31 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         }
     }, []);
 
+    const buildSelectedPartName = useCallback((baseName: string, part: any) => {
+        const selectedName = [part.name, part.nameJp, part.itemName]
+            .find((value) => typeof value === "string" && value.trim().length > 0)
+            ?.trim();
+        const stripGradeText = (name: string) =>
+            name
+                .replace(/（(純正|FIT|合わせ)）/g, "")
+                .replace(/\((純正|FIT|合わせ)\)/g, "")
+                .trim();
+        const name = stripGradeText(selectedName ?? baseName);
+        return name;
+    }, []);
+
     const buildPartLineItem = useCallback((base: LineItem, part: any): LineItem => (
         createEstimateItemFromPart(part, {
             ...base,
-            name: part.name ?? part.nameJp ?? base.name,
+            name: buildSelectedPartName(base.name, part),
             price: part.price ?? part.retailPrice ?? base.price,
             cost: part.cost ?? part.latestCostYen ?? base.cost,
+            grade: part.grade ?? base.grade,
             spec: part.grade || base.spec,
             category: 'part_external',
             partsMasterId: part.partsMasterId ?? part.partId ?? part.id ?? base.partsMasterId ?? null,
         }) as LineItem
-    ), []);
+    ), [buildSelectedPartName]);
 
     const queuePartForOrderList = useCallback((partId: number, quantity = 1) => {
         if (quantity <= 0) return false;
