@@ -18,23 +18,28 @@ type PartSearchInput = {
 
 const PART_NAME_EN_ALIASES: Record<string, string[]> = {
     "ゼンマイ": ["mainspring"],
+    "香箱真": ["barrel arbor"],
     "リューズ": ["crown"],
-    "リュウズ": ["crown"],
+    "竜頭": ["crown"],
+    "チューブ": ["crown tube"],
     "ガラス": ["crystal"],
     "風防": ["crystal"],
     "パッキン": ["gasket"],
-    "裏押さえ": ["case back gasket", "case back ring"],
-    "裏押え": ["case back gasket", "case back ring"],
+    "裏蓋": ["case back"],
+    "裏蓋パッキン": ["case back gasket", "case back ring"],
     "文字盤": ["dial"],
     "針": ["hands"],
     "天真": ["balance staff"],
     "バネ棒": ["spring bar"],
+    "巻真": ["stem"],
+    "ローター": ["rotor"],
+    "切替車": ["reversing wheel"],
 };
 
 export const DEFAULT_PART_SEARCH_SITES: SearchSite[] = [
     {
         id: "yahoo-auctions",
-        name: "ヤフオク",
+        name: "Yahooオークション",
         lang: "ja",
         url: "https://auctions.yahoo.co.jp/search/search?p={query}",
         enabled: true,
@@ -127,17 +132,21 @@ function getBrandVariants(brand?: string) {
     return uniqueQueries(variants);
 }
 
+function stripParentheticalPartNotes(value: string) {
+    return value.replace(/（.*?）/g, "").replace(/\(.*?\)/g, "").trim();
+}
+
 function getJapanesePartTerms(partName?: string) {
     const cleaned = cleanValue(partName);
     if (!cleaned) return [];
-    const plain = cleaned.replace(/（.*?）|\(.*?\)/g, "").trim();
+    const plain = stripParentheticalPartNotes(cleaned);
     return uniqueQueries([cleaned, plain]);
 }
 
 function getEnglishPartTerms(partName?: string) {
     const cleaned = cleanValue(partName);
     if (!cleaned) return [];
-    const plain = cleaned.replace(/（.*?）|\(.*?\)/g, "").trim();
+    const plain = stripParentheticalPartNotes(cleaned);
     const aliases = Object.entries(PART_NAME_EN_ALIASES).reduce<string[]>((result, [key, values]) => {
         if (plain.includes(key) || cleaned.includes(key)) {
             return result.concat(values);
