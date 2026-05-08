@@ -29,6 +29,8 @@ export type PartsMasterInput = ResolveMasterRefsInput & {
     partType?: string | null;
     category?: string | null;
     subcategory?: string | null;
+    standardPartNameId?: string | null;
+    gradeId?: string | null;
     watchRefs?: string | null;
     name?: string | null;
     nameJp?: string | null;
@@ -191,6 +193,8 @@ function buildNormalizedPartsMasterData(input: PartsMasterInput, refs: Awaited<R
         partType: inferPartType(input.partType, input.category),
         category: normalizeCategoryValue(input.category),
         subcategory: cleanText(input.subcategory),
+        standardPartNameId: cleanText(input.standardPartNameId),
+        gradeId: cleanText(input.gradeId),
         brandId: refs.brandId,
         modelId: refs.modelId,
         watchRefs,

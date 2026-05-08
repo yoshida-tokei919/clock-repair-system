@@ -404,6 +404,8 @@ export default function PartsForm({ partId }: { partId?: number }) {
       retailPrice: parseInt(form.retailPrice) || 0,
       stockQuantity: parseInt(form.stockQuantity) || 0,
       minStockAlert: parseInt(form.minStockAlert) || 0,
+      standardPartNameId: selectedStandardPartNameId || null,
+      gradeId: selectedGradeId || null,
       name: form.nameJp, // Legacyフィールド
     }
     const url = partId ? `/api/parts/${partId}` : '/api/parts'
