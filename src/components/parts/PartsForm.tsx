@@ -442,13 +442,6 @@ export default function PartsForm({ partId }: { partId?: number }) {
           <h2 className="font-semibold text-sm text-blue-700">ムーブメント情報</h2>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label-sm">サブカテゴリ</label>
-              <select className="input-base" value={form.subcategory} onChange={e => set('subcategory', e.target.value)}>
-                <option value="">選択してください</option>
-                {['地板/受け','輪列','巻上','調速','裏まわり'].map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
               <label className="label-sm">Cal.（キャリバー）</label>
               <select className="input-base" value={form.caliberId} onChange={e => set('caliberId', e.target.value)}>
                 <option value="">選択してください</option>
