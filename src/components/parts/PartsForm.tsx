@@ -7,6 +7,39 @@ type MasterData = {
   models: { id: number; name: string }[]
   calibers: { id: number; name: string }[]
   suppliers: { id: number; name: string }[]
+  partCategories: StandardPartCategory[]
+  partNames: StandardPartName[]
+  partGrades: StandardPartGrade[]
+}
+
+type StandardPartCategory = {
+  id: string
+  key: string
+  partType: string
+  nameJa: string
+  nameEn: string | null
+  sortOrder: number
+}
+
+type StandardPartName = {
+  id: string
+  key: string
+  partType: string
+  categoryId: string
+  categoryKey?: string
+  nameJa: string
+  nameEn: string | null
+  displayJa: string | null
+  displayEn: string | null
+  sortOrder: number
+}
+
+type StandardPartGrade = {
+  id: string
+  key: string
+  nameJa: string
+  nameEn: string | null
+  sortOrder: number
 }
 
 type FormData = {
@@ -66,6 +99,13 @@ function calcRetail(costYen: number, rate: number): number {
   return Math.ceil(raw / 500) * 500
 }
 
+function toStandardPartType(value: string | null | undefined) {
+  if (value === 'interior') return 'part_internal'
+  if (value === 'exterior') return 'part_external'
+  if (value === 'part_internal' || value === 'part_external') return value
+  return ''
+}
+
 // 自由入力＋追加ボタンの共通コンポーネント
 function InlineAdd({
   value, onChange, onAdd, placeholder, disabled
@@ -100,7 +140,18 @@ function InlineAdd({
 export default function PartsForm({ partId }: { partId?: number }) {
   const router = useRouter()
   const [form, setForm] = useState<FormData>(INITIAL)
-  const [master, setMaster] = useState<MasterData>({ brands: [], models: [], calibers: [], suppliers: [] })
+  const [master, setMaster] = useState<MasterData>({
+    brands: [],
+    models: [],
+    calibers: [],
+    suppliers: [],
+    partCategories: [],
+    partNames: [],
+    partGrades: [],
+  })
+  const [selectedPartCategoryId, setSelectedPartCategoryId] = useState('')
+  const [selectedStandardPartNameId, setSelectedStandardPartNameId] = useState('')
+  const [selectedGradeId, setSelectedGradeId] = useState('')
   const [saving, setSaving] = useState(false)
   const [rates, setRates] = useState<Record<string, number>>({ JPY: 1, GBP: 1, USD: 1, EUR: 1 })
   const [rateUpdatedAt, setRateUpdatedAt] = useState<string>('')
@@ -131,6 +182,8 @@ export default function PartsForm({ partId }: { partId?: number }) {
   useEffect(() => {
     if (!partId) return
     fetch(`/api/parts/${partId}`).then(r => r.json()).then((d) => {
+      setSelectedStandardPartNameId(d.standardPartNameId ?? '')
+      setSelectedGradeId(d.gradeId ?? '')
       setForm({
         partType: d.partType ?? 'interior',
         category: d.category ?? 'internal',
@@ -165,6 +218,12 @@ export default function PartsForm({ partId }: { partId?: number }) {
     })
   }, [partId])
 
+  useEffect(() => {
+    if (!selectedStandardPartNameId || selectedPartCategoryId) return
+    const partName = master.partNames.find(p => p.id === selectedStandardPartNameId)
+    if (partName) setSelectedPartCategoryId(partName.categoryId)
+  }, [master.partNames, selectedPartCategoryId, selectedStandardPartNameId])
+
   // 外貨→円換算
   useEffect(() => {
     if (form.costCurrency === 'JPY') return
@@ -182,6 +241,46 @@ export default function PartsForm({ partId }: { partId?: number }) {
 
   const set = (key: keyof FormData, val: string | boolean) =>
     setForm(f => ({ ...f, [key]: val }))
+
+  const standardPartType = toStandardPartType(form.partType)
+  const partCategoryOptions = master.partCategories.filter(category => category.partType === standardPartType)
+  const partNameOptions = master.partNames.filter(partName =>
+    partName.partType === standardPartType &&
+    (!selectedPartCategoryId || partName.categoryId === selectedPartCategoryId)
+  )
+
+  const handlePartTypeChange = (partType: string) => {
+    setSelectedPartCategoryId('')
+    setSelectedStandardPartNameId('')
+    setForm(f => ({
+      ...f,
+      partType,
+      category: partType === 'interior' ? 'internal' : partType === 'exterior' ? 'external' : f.category,
+    }))
+  }
+
+  const handlePartCategoryChange = (categoryId: string) => {
+    setSelectedPartCategoryId(categoryId)
+    setSelectedStandardPartNameId('')
+  }
+
+  const handleStandardPartNameChange = (partNameId: string) => {
+    setSelectedStandardPartNameId(partNameId)
+    const partName = master.partNames.find(p => p.id === partNameId)
+    if (!partName) return
+
+    setForm(f => ({
+      ...f,
+      nameJp: f.nameJp || partName.displayJa || partName.nameJa,
+      nameEn: f.nameEn || partName.displayEn || partName.nameEn || '',
+    }))
+  }
+
+  const handleGradeChange = (gradeId: string) => {
+    setSelectedGradeId(gradeId)
+    const grade = master.partGrades.find(g => g.id === gradeId)
+    if (grade) set('grade', grade.nameJa)
+  }
 
   const addMaster = async (payload: { type: 'brand' | 'model' | 'caliber'; name: string; brandId?: number }) => {
     const res = await fetch('/api/master-data', {
@@ -328,7 +427,7 @@ export default function PartsForm({ partId }: { partId?: number }) {
             <label key={t} className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="partType" value={t}
                 checked={form.partType === t}
-                onChange={() => set('partType', t)} />
+                onChange={() => handlePartTypeChange(t)} />
               <span>{t === 'interior' ? '内装（ムーブメント）' : '外装（ケース・ベルト等）'}</span>
             </label>
           ))}
@@ -444,6 +543,34 @@ export default function PartsForm({ partId }: { partId?: number }) {
         <h2 className="font-semibold text-sm text-gray-500 uppercase tracking-wide">部品情報</h2>
         <div className="grid grid-cols-2 gap-3">
           <div>
+            <label className="label-sm">部品カテゴリ</label>
+            <select
+              className="input-base"
+              value={selectedPartCategoryId}
+              onChange={e => handlePartCategoryChange(e.target.value)}
+            >
+              <option value="">選択してください</option>
+              {partCategoryOptions.map(category => (
+                <option key={category.id} value={category.id}>{category.nameJa}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label-sm">標準部品名</label>
+            <select
+              className="input-base"
+              value={selectedStandardPartNameId}
+              onChange={e => handleStandardPartNameChange(e.target.value)}
+            >
+              <option value="">選択してください</option>
+              {partNameOptions.map(partName => (
+                <option key={partName.id} value={partName.id}>
+                  {partName.displayJa ?? partName.nameJa}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="label-sm">部品名（日本語）<span className="text-red-500">*</span></label>
             <input className="input-base" value={form.nameJp} onChange={e => set('nameJp', e.target.value)} placeholder="例: 主ゼンマイ" />
           </div>
@@ -461,8 +588,11 @@ export default function PartsForm({ partId }: { partId?: number }) {
           </div>
           <div>
             <label className="label-sm">グレード</label>
-            <select className="input-base" value={form.grade} onChange={e => set('grade', e.target.value)}>
-              {['純正','FIT','合わせ'].map(g => <option key={g}>{g}</option>)}
+            <select className="input-base" value={selectedGradeId} onChange={e => handleGradeChange(e.target.value)}>
+              <option value="">{form.grade || '選択してください'}</option>
+              {master.partGrades.map(grade => (
+                <option key={grade.id} value={grade.id}>{grade.nameJa}</option>
+              ))}
             </select>
           </div>
           <div>
