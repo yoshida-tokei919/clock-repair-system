@@ -295,8 +295,73 @@ model Supplier {
 }
 
 // §13 部品マスタ（内装・外装統合）
+// Standard part category master for selectable part categories.
+model PartCategoryMaster {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  partType  String
+  nameJa    String
+  nameEn    String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+
+  partNames PartNameMaster[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partType])
+  @@index([partType, sortOrder])
+}
+
+// Standard part name master. Prices, stock, suppliers, and refs belong to PartsMaster.
+model PartNameMaster {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  categoryId String
+  partType   String
+
+  nameJa     String
+  nameEn     String?
+  displayJa  String?
+  displayEn  String?
+
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+
+  category   PartCategoryMaster @relation(fields: [categoryId], references: [id])
+  parts      PartsMaster[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([partType])
+  @@index([categoryId])
+  @@index([partType, categoryId])
+  @@index([partType, sortOrder])
+}
+
+// Grade master. Genuine/FIT/custom-fit can imply different price, quality, supplier, and stock.
+model PartGradeMaster {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  nameJa    String
+  nameEn    String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+
+  parts     PartsMaster[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+}
+
 model PartsMaster {
   id              Int     @id @default(autoincrement())
+  standardPartNameId String?
+  gradeId            String?
 
   // ── 区分 ──────────────────────────────────
   partType        String? // 'interior'（内装）| 'exterior'（外装）/ nullable for existing rows
@@ -350,8 +415,13 @@ model PartsMaster {
   movementMaker Brand?    @relation("PartsMovementMaker", fields: [movementMakerId],  references: [id])
   baseMaker     Brand?    @relation("PartsBaseMaker",     fields: [baseMakerId],      references: [id])
   supplier      Supplier? @relation(                      fields: [supplierId],        references: [id])
+  standardPartName PartNameMaster?  @relation(fields: [standardPartNameId], references: [id])
+  gradeMaster      PartGradeMaster? @relation(fields: [gradeId],            references: [id])
   orderRequests OrderRequest[]
   estimateItems EstimateItem[]
+
+  @@index([standardPartNameId])
+  @@index([gradeId])
 }
 
 // 7. Documents (Bulk Generation)
