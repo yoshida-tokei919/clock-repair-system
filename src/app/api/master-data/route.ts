@@ -3,13 +3,66 @@ import { prisma } from '@/lib/prisma'
 import { findOrCreateBrand, findOrCreateCaliber, normalizeMasterName } from '@/lib/master-normalize'
 
 export async function GET() {
-  const [brands, models, calibers, suppliers] = await Promise.all([
+  const [brands, models, calibers, suppliers, partCategories, partNames, partGrades] = await Promise.all([
     prisma.brand.findMany({ orderBy: { name: 'asc' } }),
     prisma.model.findMany({ orderBy: { name: 'asc' } }),
     prisma.caliber.findMany({ orderBy: { name: 'asc' } }),
     prisma.supplier.findMany({ orderBy: { id: 'asc' } }),
+    prisma.partCategoryMaster.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        key: true,
+        partType: true,
+        nameJa: true,
+        nameEn: true,
+        sortOrder: true,
+      },
+      orderBy: [{ sortOrder: 'asc' }, { nameJa: 'asc' }],
+    }),
+    prisma.partNameMaster.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        key: true,
+        partType: true,
+        categoryId: true,
+        nameJa: true,
+        nameEn: true,
+        displayJa: true,
+        displayEn: true,
+        sortOrder: true,
+        category: {
+          select: { key: true },
+        },
+      },
+      orderBy: [{ partType: 'asc' }, { categoryId: 'asc' }, { sortOrder: 'asc' }, { nameJa: 'asc' }],
+    }),
+    prisma.partGradeMaster.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        key: true,
+        nameJa: true,
+        nameEn: true,
+        sortOrder: true,
+      },
+      orderBy: [{ sortOrder: 'asc' }, { nameJa: 'asc' }],
+    }),
   ])
-  return NextResponse.json({ brands, models, calibers, suppliers })
+
+  return NextResponse.json({
+    brands,
+    models,
+    calibers,
+    suppliers,
+    partCategories,
+    partNames: partNames.map(({ category, ...partName }) => ({
+      ...partName,
+      categoryKey: category.key,
+    })),
+    partGrades,
+  })
 }
 
 export async function POST(req: Request) {
