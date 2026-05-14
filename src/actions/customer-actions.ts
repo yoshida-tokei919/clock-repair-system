@@ -43,7 +43,20 @@ export async function createCustomer(data: any) {
         const displayName = type === 'business' ? data.companyName : data.name;
 
         // プレフィックスの決定: 個人は強制的に 'C'
-        const finalPrefix = type === 'business' ? data.prefix?.toUpperCase() : 'C';
+        const finalPrefix = type === 'business'
+            ? data.prefix?.trim().toUpperCase()
+            : 'C';
+        if (type === 'business' && !finalPrefix) {
+            return { success: false, error: "業者登録ではプレフィックスを入力してください。" };
+        }
+        if (type === 'business') {
+            const existingPrefixCustomer = await prisma.customer.findFirst({
+                where: { type: 'business', prefix: finalPrefix }
+            });
+            if (existingPrefixCustomer) {
+                return { success: false, error: "このプレフィックスは既に使用されています。別のプレフィックスを指定してください。" };
+            }
+        }
 
         const customer = await prisma.customer.create({
             data: {
@@ -56,8 +69,9 @@ export async function createCustomer(data: any) {
                 zipCode: data.zipCode,
                 kana: data.kana,
                 companyName: data.companyName,
-                isPartner: true, // 全員プレフィックス持ちなので Partner 扱い
+                isPartner: type === 'business',
                 prefix: finalPrefix,
+                currentSeq: type === 'individual' ? 9999 : 0,
                 rank: parseInt(data.rank || "1"),
             }
         });
@@ -75,7 +89,24 @@ export async function updateCustomer(id: number, data: any) {
     try {
         const type = data.type || 'individual';
         const displayName = type === 'business' ? data.companyName : data.name;
-        const finalPrefix = type === 'business' ? data.prefix?.toUpperCase() : 'C';
+        const finalPrefix = type === 'business'
+            ? data.prefix?.trim().toUpperCase()
+            : 'C';
+        if (type === 'business' && !finalPrefix) {
+            return { success: false, error: "業者登録ではプレフィックスを入力してください。" };
+        }
+        if (type === 'business') {
+            const existingPrefixCustomer = await prisma.customer.findFirst({
+                where: {
+                    type: 'business',
+                    prefix: finalPrefix,
+                    NOT: { id }
+                }
+            });
+            if (existingPrefixCustomer) {
+                return { success: false, error: "このプレフィックスは既に使用されています。別のプレフィックスを指定してください。" };
+            }
+        }
 
         const updated = await prisma.customer.update({
             where: { id },
@@ -86,7 +117,7 @@ export async function updateCustomer(id: number, data: any) {
                 email: data.email,
                 lineId: data.lineId,
                 address: data.address,
-                isPartner: true,
+                isPartner: type === 'business',
                 prefix: finalPrefix,
                 companyName: data.companyName,
                 kana: data.kana,

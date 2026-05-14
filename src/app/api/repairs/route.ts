@@ -22,21 +22,40 @@ export async function POST(req: Request) {
             if (!customer) {
                 const type = body.customer.type || 'individual';
                 const name = (body.customer.name || "").trim();
+                const companyName = (body.customer.companyName || name).trim();
 
                 if (type === 'business') {
+                    const businessName = companyName || name;
                     // B2B: Match by Name (be more aggressive to avoid duplicates)
                     customer = await tx.customer.findFirst({
-                        where: { name: name, type: 'business' }
+                        where: {
+                            type: 'business',
+                            OR: [
+                                { name: businessName },
+                                { companyName: businessName }
+                            ]
+                        }
                     });
 
                     if (!customer) {
                         // Create New B2B
-                        const prefix = body.customer.prefix || name.slice(0, 2).toUpperCase();
+                        const prefix = (body.customer.prefix || "").trim().toUpperCase();
+                        if (!prefix) {
+                            throw new Error("業者登録ではプレフィックスを入力してください。");
+                        }
+                        const existingPrefixCustomer = await tx.customer.findFirst({
+                            where: { type: 'business', prefix }
+                        });
+                        if (existingPrefixCustomer) {
+                            throw new Error("このプレフィックスは既に使用されています。別のプレフィックスを指定してください。");
+                        }
+
                         customer = await tx.customer.create({
                             data: {
                                 type: 'business',
                                 isPartner: true,
-                                name: name,
+                                name: name || businessName,
+                                companyName: businessName,
                                 prefix: prefix,
                                 currentSeq: 0,
                                 address: body.customer.address,
@@ -80,7 +99,8 @@ export async function POST(req: Request) {
                                 type: 'individual',
                                 name: name,
                                 prefix: 'C',
-                                isPartner: true, // Personal is also "partner" for C-001 logic
+                                isPartner: false,
+                                currentSeq: 9999,
                                 rank: 1,
                                 phone: phone || null,
                                 lineId: body.customer.lineId || null,
@@ -235,22 +255,22 @@ export async function POST(req: Request) {
             let inquiryNumber = "";
             let partnerRef = body.request.partnerRef || null;
 
-            if (customer.isPartner && customer.prefix) {
-                // B2B Logic: "T-101"
-                const nextSeq = customer.currentSeq + 1;
-                inquiryNumber = `${customer.prefix}-${String(nextSeq).padStart(3, '0')}`;
-
-                // Increment Partner Seq
-                await tx.customer.update({
-                    where: { id: customer.id },
-                    data: { currentSeq: nextSeq }
-                });
-            } else {
-                // B2C Logic: "2026-0001" (Year + Global Seq)
-                // Better: count today's repairs?
-                const count = await tx.repair.count();
-                inquiryNumber = `R-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+            const customerPrefix = customer.type === 'individual'
+                ? 'C'
+                : (customer.prefix || "").toUpperCase();
+            if (!customerPrefix) {
+                throw new Error("業者登録ではプレフィックスを入力してください。");
             }
+            const nextSeq = customer.currentSeq + 1;
+            inquiryNumber = `${customerPrefix}-${String(nextSeq).padStart(3, '0')}`;
+
+            await tx.customer.update({
+                where: { id: customer.id },
+                data: {
+                    currentSeq: nextSeq,
+                    prefix: customer.prefix || customerPrefix,
+                }
+            });
 
             // 4. Create Repair
             const dbStatus = body.status || "受付";

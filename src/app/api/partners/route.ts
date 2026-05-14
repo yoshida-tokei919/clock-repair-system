@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 export async function GET() {
     try {
         const partners = await prisma.customer.findMany({
-            where: { isPartner: true },
+            where: { type: 'business', isPartner: true },
             orderBy: { id: 'asc' },
         });
 
@@ -23,13 +23,20 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         const { name, prefix, address, phone } = body;
+        const normalizedPrefix = typeof prefix === 'string' ? prefix.trim().toUpperCase() : '';
 
-        if (!name || !prefix) {
+        if (!name || !normalizedPrefix) {
             return NextResponse.json({ error: "Name and Prefix are required" }, { status: 400 });
         }
 
         const existing = await prisma.customer.findFirst({
-            where: { name: name, isPartner: true }
+            where: {
+                type: 'business',
+                OR: [
+                    { name: name },
+                    { prefix: normalizedPrefix }
+                ]
+            }
         });
 
         if (existing) {
@@ -41,7 +48,7 @@ export async function POST(req: Request) {
                 type: 'business',
                 isPartner: true,
                 name,
-                prefix,
+                prefix: normalizedPrefix,
                 currentSeq: 0,
                 address: address || "",
                 phone: phone || ""

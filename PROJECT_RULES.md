@@ -7,18 +7,27 @@ The AI assistant MUST read and follow these rules before making any changes.
 ### Global Rules
 - **Formatting:** All customer IDs must follow the format `[PREFIX]-[SEQ]`.
 - **Sequence:** The sequence number (SEQ) must be auto-incremented for each prefix group.
+- **Current Numbering Source:** `Customer.type` is the source of truth for B2B/B2C. Do not use `Customer.isPartner` for numbering or B2B/B2C checks.
+- **B2C Repair Inquiry Numbers:** B2C prefix is fixed to `C`; B2C repair inquiry numbers start from `C-10000`, then `C-10001`, `C-10002`, and so on.
+- **B2B Repair Inquiry Numbers:** B2B repair inquiry numbers use each business partner's manually entered prefix and start from `001`, e.g. `T-001`, `T-002`.
+- **B2B Prefix Requirements:** B2B prefix is required, must be unique in real operation, must stop registration when empty or duplicated, must not be inferred automatically, and must never be hardcoded to `P`.
 
 ### Business Partners (B2B)
 - **Registration:** When registering a new business partner, the user MUST be able to manually input a unique Prefix (1-3 chars).
   - Example: "TRUST" -> Prefix "T" -> ID "T-001"
+  - Example: "じゅえりー工房" -> Prefix "J" -> ID "J-001"
   - Example: "Brand Ichiban" -> Prefix "BR" -> ID "BR-001"
 - **UI:** The registration dialog must have a field for "Prefix".
+- **Prefix Rules:** B2B prefixes must be entered by the user, must be unique in practice, and must not be inferred automatically or hardcoded to "P".
+- **Numbering:** B2B repair numbers start from `001` per customer record, e.g. `T-001`, `T-002`.
 
 ### Individual Customers (B2C)
 - **Prefix:** Fixed to **"C"** (Customer).
-- **ID Generation:** All individual customers share the same prefix "C".
-  - Example: "C-001", "C-002", "C-003"...
+- **ID Generation:** All individual customers share the same prefix "C", but B2C repair numbers start from **C-10000**, not C-001.
+  - Example: "C-10000", "C-10001", "C-10002"...
+  - Reason: "C-001" may look like the business has just started if visible to individual customers.
 - **UI:** The prefix input should be hidden or disabled (fixed to "C") for individual customers.
+- **Implementation:** `Customer.type` is the source of truth for B2B/B2C. Do not use `Customer.isPartner` for numbering or B2B/B2C checks. B2C prefix duplication is allowed; B2B prefix duplication is not.
 
 ## 2. UI/UX PRESERVATION & LOCALIZATION
 - **完全日本語化の徹底**: UI上のあらゆる表記から英語を排除し、日本語のみとする。

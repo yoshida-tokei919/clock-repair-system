@@ -314,6 +314,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [customerId, setCustomerId] = useState<number | null>(initialData?.customer?.id || null);
     const [isB2B, setIsB2B] = useState<boolean>(initialData?.customer?.type === 'business');
     const [customerName, setCustomerName] = useState(initialData?.customer?.name || "");
+    const [customerPrefix, setCustomerPrefix] = useState(initialData?.customer?.prefix || "");
     const [endUserName, setEndUserName] = useState(initialData?.endUserName || "");
     const [partnerRef, setPartnerRef] = useState(initialData?.partnerRef || ""); // 貴社管理No
     const [customerPhone, setCustomerPhone] = useState(initialData?.customer?.phone || "");
@@ -1152,11 +1153,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 customer: {
                     id: customerId,
                     name: customerName,
+                    companyName: isB2B ? customerName : undefined,
                     type: isB2B ? 'business' : 'individual',
                     phone: customerPhone,
                     lineId: lineId,
                     address: address,
-                    prefix: isB2B ? 'P' : 'C' // Simple logic
+                    prefix: isB2B ? (customerPrefix || undefined) : 'C',
                 },
                 watch: {
                     brand,
@@ -2184,6 +2186,7 @@ ${shopName}
                 onRegister={(d) => {
                     setCustomerName(d.name);
                     setIsB2B(d.type === 'business');
+                    setCustomerPrefix(d.type === 'business' ? (d.prefix || "") : "C");
                     setCustomerPhone(d.phone || "");
                     setLineId(d.lineId || "");
                     setAddress(d.address || "");
