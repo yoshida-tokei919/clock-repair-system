@@ -22,6 +22,48 @@ type Part = {
   supplier?: { name: string } | null
 }
 
+type StandardPartCategory = {
+  id: string
+  key: string
+  partType: string
+  nameJa: string
+  nameEn: string | null
+  sortOrder: number
+}
+
+type StandardPartName = {
+  id: string
+  key: string
+  partType: string
+  categoryId: string
+  categoryKey?: string
+  nameJa: string
+  nameEn: string | null
+  displayJa: string | null
+  displayEn: string | null
+  sortOrder: number
+}
+
+type StandardPartGrade = {
+  id: string
+  key: string
+  nameJa: string
+  nameEn: string | null
+  sortOrder: number
+}
+
+type SupplierOption = {
+  id: number
+  name: string
+}
+
+type MasterData = {
+  partCategories: StandardPartCategory[]
+  partNames: StandardPartName[]
+  partGrades: StandardPartGrade[]
+  suppliers: SupplierOption[]
+}
+
 type Props = {
   mode: 'standalone' | 'panel'
   initialKeyword?: string
@@ -47,14 +89,56 @@ type Props = {
   }) => void
 }
 
+function toStandardPartType(value: 'all' | 'interior' | 'exterior') {
+  if (value === 'interior') return 'part_internal'
+  if (value === 'exterior') return 'part_external'
+  return ''
+}
+
 export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', initialPartType }: Props) {
   const router = useRouter()
   const [partType, setPartType] = useState<'all' | 'interior' | 'exterior'>(initialPartType ?? 'all')
   const [keyword, setKeyword] = useState(initialKeyword)
   const [calNumber, setCalNumber] = useState('')
   const [refKeyword, setRefKeyword] = useState('')
+  const [selectedPartCategoryId, setSelectedPartCategoryId] = useState('')
+  const [selectedStandardPartNameId, setSelectedStandardPartNameId] = useState('')
+  const [selectedGradeId, setSelectedGradeId] = useState('')
+  const [selectedSupplierId, setSelectedSupplierId] = useState('')
+  const [masterData, setMasterData] = useState<MasterData>({
+    partCategories: [],
+    partNames: [],
+    partGrades: [],
+    suppliers: [],
+  })
   const [parts, setParts] = useState<Part[]>([])
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadMasterData() {
+      try {
+        const res = await fetch('/api/master-data')
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled) return
+        setMasterData({
+          partCategories: Array.isArray(data.partCategories) ? data.partCategories : [],
+          partNames: Array.isArray(data.partNames) ? data.partNames : [],
+          partGrades: Array.isArray(data.partGrades) ? data.partGrades : [],
+          suppliers: Array.isArray(data.suppliers) ? data.suppliers : [],
+        })
+      } catch {
+        // Keep legacy search usable even if master data cannot be loaded.
+      }
+    }
+
+    loadMasterData()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const search = useCallback(async () => {
     setLoading(true)
@@ -71,6 +155,21 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
 
   // 初回全件表示
   useEffect(() => { search() }, [])
+
+  const standardPartType = toStandardPartType(partType)
+  const filteredPartCategories = masterData.partCategories.filter(category =>
+    !standardPartType || category.partType === standardPartType
+  )
+  const filteredPartNames = masterData.partNames.filter(partName =>
+    (!standardPartType || partName.partType === standardPartType) &&
+    (!selectedPartCategoryId || partName.categoryId === selectedPartCategoryId)
+  )
+
+  const handlePartTypeChange = (nextPartType: 'all' | 'interior' | 'exterior') => {
+    setPartType(nextPartType)
+    setSelectedPartCategoryId('')
+    setSelectedStandardPartNameId('')
+  }
 
   const handleSelect = (part: Part) => {
     if (onSelect) {
@@ -104,12 +203,75 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
         <div className="flex gap-2">
           {([['all','すべて'],['interior','内装'],['exterior','外装']] as const).map(([val, label]) => (
             <button key={val}
-              onClick={() => setPartType(val)}
+              onClick={() => handlePartTypeChange(val)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors
                 ${partType === val ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
               {label}
             </button>
           ))}
+        </div>
+
+        <div className="grid grid-cols-4 gap-3">
+          <div>
+            <label className="label-sm">標準カテゴリ</label>
+            <select
+              className="input-base"
+              value={selectedPartCategoryId}
+              onChange={event => {
+                setSelectedPartCategoryId(event.target.value)
+                setSelectedStandardPartNameId('')
+              }}
+            >
+              <option value="">すべて</option>
+              {filteredPartCategories.map(category => (
+                <option key={category.id} value={category.id}>{category.nameJa}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label-sm">標準部品名</label>
+            <select
+              className="input-base"
+              value={selectedStandardPartNameId}
+              onChange={event => setSelectedStandardPartNameId(event.target.value)}
+            >
+              <option value="">すべて</option>
+              {filteredPartNames.map(partName => (
+                <option key={partName.id} value={partName.id}>
+                  {partName.displayJa ?? partName.nameJa}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label-sm">グレード</label>
+            <select
+              className="input-base"
+              value={selectedGradeId}
+              onChange={event => setSelectedGradeId(event.target.value)}
+            >
+              <option value="">すべて</option>
+              {masterData.partGrades.map(grade => (
+                <option key={grade.id} value={grade.id}>{grade.nameJa}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label-sm">仕入先</label>
+            <select
+              className="input-base"
+              value={selectedSupplierId}
+              onChange={event => setSelectedSupplierId(event.target.value)}
+            >
+              <option value="">すべて</option>
+              {masterData.suppliers.map(supplier => (
+                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
