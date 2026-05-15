@@ -29,7 +29,13 @@ The AI assistant MUST read and follow these rules before making any changes.
 - **UI:** The prefix input should be hidden or disabled (fixed to "C") for individual customers.
 - **Implementation:** `Customer.type` is the source of truth for B2B/B2C. Do not use `Customer.isPartner` for numbering or B2B/B2C checks. B2C prefix duplication is allowed; B2B prefix duplication is not.
 
-## 2. UI/UX PRESERVATION & LOCALIZATION
+## 2. REPAIR STATUS WORKFLOW
+- **Status Workflow Source:** Repair status names, transitions, triggers, and automation limits are defined in `docs/design/repair-status-workflow-rules.md`.
+- **Do Not Change Casually:** Do not add, remove, rename, or reinterpret repair statuses without an explicit request.
+- **Business Logic Location:** n8n may detect external events, but repair status transition decisions must stay in the app-side API/service logic.
+- **Human Confirmation Required:** Do not auto-confirm received parts from email alone, do not fully automate part assignment, and do not auto-transition cancellation or hold statuses.
+
+## 3. UI/UX PRESERVATION & LOCALIZATION
 - **完全日本語化の徹底**: UI上のあらゆる表記から英語を排除し、日本語のみとする。
   - `顧客情報 (Client)` → `顧客情報`
   - `見積中 (Diagnosing)` → `見積中`
@@ -42,15 +48,15 @@ The AI assistant MUST read and follow these rules before making any changes.
 - **Registration Flow:** The "New Registration" button next to the customer name input is critical. It must always trigger the detailed registration dialog (`QuickRegisterDialog`).
 - **Layout Changes:** When refactoring layouts (e.g., to 3 columns), ensure all original functional elements are preserved and relocated, not deleted.
 
-## 3. MASTER DATA PERSISTENCE
+## 4. MASTER DATA PERSISTENCE
 - **Automatic Registration:** When a new repair is created or updated, any "Work Items" (Labor) or "Parts" entered in the estimate section MUST be automatically registered/updated in the `PricingRule` (Work Master) and `PartsMaster` tables respectively if they don't already exist for that specific watch (Brand/Model/Caliber).
 - **Naming Priority:** Always display Japanese names (`nameJp`) for Brands and Models if available. Fall back to `name` or English only if `nameJp` is empty.
 - **Ref/Model Management:** Model and Reference (Ref) fields are mandatory for accurate part matching.
 
-## 4. COMMANDS
+## 5. COMMANDS
 - **"ルール追加" (Add Rule):** When the user prompts "ルール追加", add the new rule to this file immediately.
 
-## 5. DATABASE SCHEMA (IMMUTABLE REFERENCE)
+## 6. DATABASE SCHEMA (IMMUTABLE REFERENCE)
 The following schema defines the core data structure. Any changes to this schema must be explicitly requested.
 
 ```prisma
