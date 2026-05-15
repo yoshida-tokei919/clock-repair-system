@@ -273,7 +273,9 @@ export async function POST(req: Request) {
             });
 
             // 4. Create Repair
-            const dbStatus = body.status || "受付";
+            const hasEstimateItems = Array.isArray(body.estimate?.items) && body.estimate.items.length > 0;
+            const requestedStatus = body.status || "受付";
+            const dbStatus = requestedStatus === "受付" && hasEstimateItems ? "見積中" : requestedStatus;
 
             const repair = await tx.repair.create({
                 data: {
@@ -297,6 +299,7 @@ export async function POST(req: Request) {
 
             // 5. initial Log & History logs
             const logEntries = Object.entries(body.statusLog || {});
+            const loggedStatuses = new Set<string>();
             for (const [sId, dateStr] of logEntries) {
                 await tx.repairStatusLog.create({
                     data: {
@@ -306,6 +309,7 @@ export async function POST(req: Request) {
                         changedBy: 1 // Admin
                     }
                 });
+                loggedStatuses.add(sId);
             }
 
             if (logEntries.length === 0) {
@@ -313,7 +317,18 @@ export async function POST(req: Request) {
                 await tx.repairStatusLog.create({
                     data: {
                         repairId: repair.id,
-                        status: dbStatus || "受付",
+                        status: "受付",
+                        changedBy: 1 // Admin
+                    }
+                });
+                loggedStatuses.add("受付");
+            }
+
+            if (dbStatus !== "受付" && !loggedStatuses.has(dbStatus)) {
+                await tx.repairStatusLog.create({
+                    data: {
+                        repairId: repair.id,
+                        status: dbStatus,
                         changedBy: 1 // Admin
                     }
                 });

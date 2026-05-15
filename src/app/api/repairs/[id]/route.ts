@@ -137,7 +137,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             }
 
             // 3. Update Repair Fields
-            const dbStatus = body.status;
+            const hasEstimateItems = Array.isArray(body.estimate?.items) && body.estimate.items.length > 0;
+            const requestedStatus = body.status ?? repairRecord.status;
+            const dbStatus = requestedStatus === "受付" && hasEstimateItems ? "見積中" : requestedStatus;
 
             let updatedRepair = await tx.repair.update({
                 where: { id },
@@ -157,7 +159,32 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             });
 
             // RepairStatusLog: スチE�Eタスが変化した場合�Eみ記録
-            if (dbStatus !== repairRecord.status) {
+            if (hasEstimateItems && dbStatus === "見積中") {
+                const receptionLog = await tx.repairStatusLog.findFirst({
+                    where: { repairId: id, status: "受付" }
+                });
+                if (!receptionLog) {
+                    await tx.repairStatusLog.create({
+                        data: { repairId: id, status: "受付", changedAt: repairRecord.createdAt }
+                    });
+                }
+                const logDateStr = body.statusLog?.[dbStatus];
+                let changedAt = new Date();
+                if (logDateStr) {
+                    const parts = logDateStr.split('/');
+                    if (parts.length === 3) {
+                        changedAt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                    }
+                }
+                const existingStatusLog = await tx.repairStatusLog.findFirst({
+                    where: { repairId: id, status: dbStatus }
+                });
+                if (!existingStatusLog) {
+                    await tx.repairStatusLog.create({
+                        data: { repairId: id, status: dbStatus, changedAt }
+                    });
+                }
+            } else if (dbStatus !== repairRecord.status) {
                 const logDateStr = body.statusLog?.[dbStatus];
                 let changedAt = new Date();
                 if (logDateStr) {

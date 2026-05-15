@@ -303,8 +303,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
     // 新規作成時のstatusLog初期化（useEffectでクライアント確定後に実行してHydrationエラーを防ぐ）
     useEffect(() => {
-        if (!initialData?.statusLog) {
-            setStatusLog({ "受付": new Date().toLocaleDateString('ja-JP') });
+        if (!initialData?.statusLog?.["受付"] && (initialData?.status ?? "受付") === "受付") {
+            const receptionDate = initialData?.createdAt
+                ? new Date(initialData.createdAt).toLocaleDateString('ja-JP')
+                : new Date().toLocaleDateString('ja-JP');
+            setStatusLog(prev => prev["受付"] ? prev : { ...prev, "受付": receptionDate });
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1149,6 +1152,20 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         }
         setIsSaving(true);
         try {
+            const hasEstimateItems = lineItems.length > 0;
+            const nextStatus = status === "受付" && hasEstimateItems ? "見積中" : status;
+            const nextStatusLog = { ...statusLog };
+            if (hasEstimateItems && (nextStatus === "見積中" || status === "見積中")) {
+                if (!nextStatusLog["受付"]) {
+                    nextStatusLog["受付"] = initialData?.createdAt
+                        ? new Date(initialData.createdAt).toLocaleDateString('ja-JP')
+                        : new Date().toLocaleDateString('ja-JP');
+                }
+                if (!nextStatusLog["見積中"]) {
+                    nextStatusLog["見積中"] = new Date().toLocaleDateString('ja-JP');
+                }
+            }
+
             const payload = {
                 customer: {
                     id: customerId,
@@ -1198,8 +1215,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         quantity: i.quantity ?? 1,
                     }))
                 },
-                status,
-                statusLog,
+                status: nextStatus,
+                statusLog: nextStatusLog,
                 photos
             };
 
@@ -1222,6 +1239,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             if (mode === 'create') {
                 router.push(`/repairs/${json.repair.id}`);
             } else {
+                setStatus(nextStatus);
+                if (hasEstimateItems && (nextStatus === "見積中" || status === "見積中")) {
+                    setStatusLog(prev => ({ ...prev, ...nextStatusLog }));
+                }
                 if (mode === 'view') setIsEditingEnabled(false);
                 router.refresh();
             }
