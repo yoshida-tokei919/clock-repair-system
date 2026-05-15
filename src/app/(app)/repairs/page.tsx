@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getStatusBadge } from "@/components/status-badge";
@@ -52,6 +53,24 @@ export default async function RepairsPage({
             warranty:         { select: { id: true, warrantyNumber: true } },
         },
         take: 50,
+    });
+    const repairIds = repairs.map((repair) => repair.id);
+    const unreadMessages = repairIds.length
+        ? await prisma.$queryRaw<{ id: number; repairId: number; body: string; createdAt: Date }[]>`
+            SELECT DISTINCT ON ("repairId") "id", "repairId", "body", "createdAt"
+            FROM "RepairCustomerMessage"
+            WHERE "repairId" IN (${Prisma.join(repairIds)})
+              AND "readAt" IS NULL
+            ORDER BY "repairId", "createdAt" DESC
+          `
+        : [];
+    const unreadMessageByRepairId = new Map(unreadMessages.map((message) => [message.repairId, message]));
+    const repairsWithMessages = repairs.map((repair) => {
+        const unreadMessage = unreadMessageByRepairId.get(repair.id);
+        return {
+            ...repair,
+            customerMessages: unreadMessage ? [unreadMessage] : [],
+        };
     });
 
     async function searchAction(formData: FormData) {
@@ -114,7 +133,7 @@ export default async function RepairsPage({
             </div>
 
             {/* Data Table */}
-            <RepairsTableClient repairs={repairs as any} />
+            <RepairsTableClient repairs={repairsWithMessages as any} />
         </div>
     );
 }

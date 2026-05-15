@@ -60,6 +60,17 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
         },
         jobs: jobs
     };
+    const repairOptions = estimateDoc.repairs.map((repair) => ({
+        id: repair.id,
+        label: repair.inquiryNumber,
+    }));
 
-    return <EstimatePDFClient data={pdfData} />;
+    return (
+        <EstimatePDFClient
+            data={pdfData}
+            documentId={estimateDoc.id}
+            customerType={estimateDoc.customer.type}
+            repairOptions={repairOptions}
+        />
+    );
 }

@@ -239,3 +239,18 @@ model Repair {
     - 機能: FMPのように、各フィールド（顧客、ブランド、期間、ステータス、品番等）を組み合わせてAND/OR検索ができる高度な絞り込みパネルを実装する。
   - **修理事例公開 (WEB Publish)**:
     - 機能: 「WEB公開」ボタン押下時、修理情報（写真、作業内容）から個人情報を除いた「修理事例記事（ブログ形式）」を自動生成・公開する機能とする。マイページ機能ではない。
+
+## Customer Communication Rules
+
+- LINE is notification/entry only.
+- Approval, comments, and progress confirmation must be handled on shared web pages.
+- Estimate generation alone must NOT move status to 承認待ち.
+- Only successful LINE send may move status to 承認待ち.
+- Shared pages must support different B2B/B2C UI behavior.
+- B2B UI prioritizes speed and PDF access.
+- B2C UI prioritizes explanation and optional recommendations.
+- PDF estimate download must always be available.
+- Customer message text limit is 500 chars max.
+- Web and PDF customer message content must remain identical.
+- Customer comments must appear as unread indicators on repair list UI.
+- B2C cancellation should use consultation/confirmation flow, not immediate cancel.

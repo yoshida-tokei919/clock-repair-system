@@ -188,6 +188,7 @@ model Repair {
   baseMovementMaker    Brand?   @relation("RepairBaseMovementMaker", fields: [baseMovementMakerId], references: [id])
   baseMovementCaliber  Caliber? @relation("RepairBaseMovementCaliber", fields: [baseMovementCaliberId], references: [id])
   logs          RepairStatusLog[]
+  customerMessages RepairCustomerMessage[]
   photos        RepairPhoto[]
   estimate      Estimate?
   orderRequests OrderRequest[]
@@ -213,6 +214,18 @@ model RepairStatusLog {
   changedBy Int?     // Admin ID
   
   repair    Repair   @relation(fields: [repairId], references: [id])
+}
+
+model RepairCustomerMessage {
+  id        Int       @id @default(autoincrement())
+  repairId  Int
+  body      String
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  repair    Repair    @relation(fields: [repairId], references: [id])
+
+  @@index([repairId, readAt])
 }
 
 // 4. Photos

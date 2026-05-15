@@ -13,6 +13,7 @@ import { ClickToCopy } from "@/components/ui/click-to-copy";
 import { generateBulkDocument } from "@/actions/document-actions";
 import { cn } from "@/lib/utils";
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type RepairWithRelations = Repair & {
     customer: Customer;
@@ -20,6 +21,11 @@ type RepairWithRelations = Repair & {
         brand: Brand;
         model: Model;
     };
+    customerMessages?: {
+        id: number;
+        body: string;
+        createdAt: Date;
+    }[];
 };
 
 interface RepairsTableClientProps {
@@ -28,6 +34,13 @@ interface RepairsTableClientProps {
 
 export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [readRepairIds, setReadRepairIds] = useState<number[]>([]);
+    const [activeMessage, setActiveMessage] = useState<{
+        repairId: number;
+        inquiryNumber: string;
+        body: string;
+        createdAt: Date;
+    } | null>(null);
     const router = useRouter();
     const { toast } = useToast();
     const [isGenerating, setIsGenerating] = useState(false);
@@ -84,6 +97,24 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         }
     };
 
+    const handleMarkRead = async () => {
+        if (!activeMessage) return;
+
+        const res = await fetch(`/api/repairs/${activeMessage.repairId}/messages/read`, { method: "POST" });
+        if (!res.ok) {
+            toast({
+                title: "エラー",
+                description: "既読にできませんでした",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setReadRepairIds((prev) => [...prev, activeMessage.repairId]);
+        setActiveMessage(null);
+        router.refresh();
+    };
+
     return (
         <div className="space-y-4">
             {selectedIds.length > 0 && (
@@ -114,6 +145,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                             <th className="px-4 py-3">管理番号</th>
                             <th className="px-4 py-3">ステータス</th>
                             <th className="px-4 py-3">お客様名</th>
+                            <th className="px-4 py-3">コメント</th>
                             <th className="px-4 py-3">時計</th>
                             <th className="px-4 py-3">日付</th>
                             <th className="px-4 py-3 text-right">アクション</th>
@@ -122,7 +154,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     <tbody className="divide-y">
                         {repairs.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                                     該当する修理案件は見つかりませんでした。
                                 </td>
                             </tr>
@@ -165,6 +197,31 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                             <div className="text-xs text-slate-500 font-bold">{(repair as any).endUserName} 様</div>
                                         )}
                                         <div className="text-xs text-slate-400">{repair.customer.type === "business" ? "業者" : "一般"}</div>
+                                    </td>
+                                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                        {(() => {
+                                            const latestMessage = repair.customerMessages?.[0];
+                                            const isRead = readRepairIds.includes(repair.id);
+                                            if (!latestMessage || isRead) {
+                                                return <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-200" aria-label="未読コメントなし" />;
+                                            }
+
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setActiveMessage({
+                                                            repairId: repair.id,
+                                                            inquiryNumber: repair.inquiryNumber,
+                                                            body: latestMessage.body,
+                                                            createdAt: latestMessage.createdAt,
+                                                        })
+                                                    }
+                                                    className="inline-flex h-3 w-3 rounded-full bg-blue-500 ring-4 ring-blue-100"
+                                                    aria-label="未読コメントあり"
+                                                />
+                                            );
+                                        })()}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="font-bold text-slate-800">
@@ -213,6 +270,31 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     </tbody>
                 </table>
             </div>
+            <Dialog open={!!activeMessage} onOpenChange={(open) => !open && setActiveMessage(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>お客様コメント</DialogTitle>
+                    </DialogHeader>
+                    {activeMessage && (
+                        <div className="space-y-3">
+                            <div className="text-xs text-slate-500">
+                                {activeMessage.inquiryNumber} / {activeMessage.createdAt.toLocaleString("ja-JP")}
+                            </div>
+                            <div className="whitespace-pre-wrap rounded border bg-slate-50 p-3 text-sm">
+                                {activeMessage.body}
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        {activeMessage && (
+                            <Link href={`/repairs/${activeMessage.repairId}`}>
+                                <Button variant="outline">詳細を開く</Button>
+                            </Link>
+                        )}
+                        <Button onClick={handleMarkRead}>既読にする</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
