@@ -74,6 +74,10 @@ Ordered can be confirmed by:
 - Manual action in the parts order screen
 - Order confirmation email detected by n8n and sent to the app API
 
+In the initial operation phase, order confirmation emails should usually create a suggested update that requires human confirmation.
+
+Automatic ordered updates may be considered only when the email and order data match with high confidence.
+
 Business judgment must stay in the app API or service, not in n8n.
 
 ## From Waiting Parts Ordered To Parts Ready
@@ -83,6 +87,8 @@ Move from `waiting_parts_ordered` to `parts_ready` when all required parts are m
 Received must be confirmed after physical item inspection.
 
 Do not confirm received status from email alone.
+
+Even if a delivery completed email exists, the part must not be marked received until physical inspection confirms that there was no wrong delivery, shortage, or damage.
 
 ## From Parts Ready To Waiting Work
 
