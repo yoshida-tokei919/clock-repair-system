@@ -243,7 +243,7 @@ model Repair {
 ## Customer Communication Rules
 
 - LINE is notification/entry only.
-- Approval, comments, and progress confirmation must be handled on shared web pages.
+- Shared web pages handle approval, comments, and progress confirmation.
 - Estimate generation alone must NOT move status to 承認待ち.
 - Only successful LINE send may move status to 承認待ち.
 - Shared pages must support different B2B/B2C UI behavior.
@@ -253,4 +253,7 @@ model Repair {
 - Customer message text limit is 500 chars max.
 - Web and PDF customer message content must remain identical.
 - Customer comments must appear as unread indicators on repair list UI.
-- B2C cancellation should use consultation/confirmation flow, not immediate cancel.
+- B2C cancellation should use consultation/confirmation flow.
+- LINE notifications should be minimized to reduce message usage.
+- Repair must remain the central communication entity.
+- n8n is external event detection only, not business logic.
