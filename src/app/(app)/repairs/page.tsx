@@ -55,15 +55,20 @@ export default async function RepairsPage({
         take: 50,
     });
     const repairIds = repairs.map((repair) => repair.id);
-    const unreadMessages = repairIds.length
-        ? await prisma.$queryRaw<{ id: number; repairId: number; body: string; createdAt: Date }[]>`
+    let unreadMessages: { id: number; repairId: number; body: string; createdAt: Date }[] = [];
+    if (repairIds.length) {
+        try {
+            unreadMessages = await prisma.$queryRaw<{ id: number; repairId: number; body: string; createdAt: Date }[]>`
             SELECT DISTINCT ON ("repairId") "id", "repairId", "body", "createdAt"
             FROM "RepairCustomerMessage"
             WHERE "repairId" IN (${Prisma.join(repairIds)})
               AND "readAt" IS NULL
             ORDER BY "repairId", "createdAt" DESC
-          `
-        : [];
+          `;
+        } catch (error) {
+            console.warn("RepairCustomerMessage table is not available yet.", error);
+        }
+    }
     const unreadMessageByRepairId = new Map(unreadMessages.map((message) => [message.repairId, message]));
     const repairsWithMessages = repairs.map((repair) => {
         const unreadMessage = unreadMessageByRepairId.get(repair.id);

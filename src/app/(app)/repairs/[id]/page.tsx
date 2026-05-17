@@ -53,6 +53,10 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 orderBy: { changedAt: 'asc' },
                 select: { status: true, changedAt: true }
             },
+            customerMessages: {
+                orderBy: { createdAt: 'desc' },
+                select: { id: true, body: true, createdAt: true, readAt: true }
+            },
             // 書類タブ用：発行済み帳票への参照
             estimateDocument: {
                 select: { id: true, estimateNumber: true }
@@ -71,26 +75,11 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
 
     if (!repair) return notFound();
 
-    // ステータスログをUIキー → 日付のマップに変換
-    const labelToKey: Record<string, string> = {
-        '受付': 'reception',
-        '見積中': 'diagnosing',
-        '承認待ち': 'approval_wait',
-        '部品待ち(未注文)': 'parts_wait',
-        '部品待ち(注文済み)': 'parts_wait_ordered',
-        '部品入荷済み': 'parts_arrived',
-        '作業待ち': 'work_wait',
-        '作業中': 'in_progress',
-        '作業完了': 'work_completed',
-        '納品済み': 'delivered',
-        'キャンセル': 'canceled',
-        '保留': 'on_hold',
-    };
+    // RepairEntryForm のステータスバーは日本語ステータス名をキーにして日付を読む。
     const statusLog: Record<string, string> = {};
     repair.logs.forEach(log => {
-        const key = labelToKey[log.status] || log.status;
         // 同一ステータスが複数ある場合は最新を使用
-        statusLog[key] = log.changedAt.toLocaleDateString("ja-JP");
+        statusLog[log.status] = log.changedAt.toLocaleDateString("ja-JP");
     });
 
     // JSON.parse(JSON.stringify(...)) で Date オブジェクトを文字列化してクライアントへ渡す

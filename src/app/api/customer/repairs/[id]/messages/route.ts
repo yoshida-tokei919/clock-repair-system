@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { findRepairIdByIdOrToken } from "../_workflow";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const repairId = Number(params.id);
-  if (!Number.isInteger(repairId)) {
-    return NextResponse.json({ error: "修理IDが不正です。" }, { status: 400 });
-  }
+  const repairId = await findRepairIdByIdOrToken(params.id);
 
   const body = await request.json().catch(() => null);
   const messageBody = typeof body?.body === "string" ? body.body.trim() : "";
@@ -18,12 +16,7 @@ export async function POST(
     return NextResponse.json({ error: "コメントを入力してください。" }, { status: 400 });
   }
 
-  const repair = await prisma.repair.findUnique({
-    where: { id: repairId },
-    select: { id: true },
-  });
-
-  if (!repair) {
+  if (!repairId) {
     return NextResponse.json({ error: "修理案件が見つかりません。" }, { status: 404 });
   }
 

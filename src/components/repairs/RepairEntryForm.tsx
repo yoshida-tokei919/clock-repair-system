@@ -29,7 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { createEstimateItemFromPart } from "@/lib/estimate-item";
-import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
+import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import {
     PART_INPUT_TYPES,
     type PartInputType,
@@ -731,6 +731,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [diagnosis, setDiagnosis] = useState(initialData?.workSummary || ""); // Diagnosis/Request details
     const [internalNotes, setInternalNotes] = useState(initialData?.internalNotes || "");
     const [customerNote, setCustomerNote] = useState(initialData?.customerNote || "");
+    const [staffReply, setStaffReply] = useState("");
+    const [isSendingStaffReply, setIsSendingStaffReply] = useState(false);
 
     // --- 4. PHOTOS ---
     const [photos, setPhotos] = useState<any[]>(initialData?.photos || []);
@@ -1126,7 +1128,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             .map((item, idx) => item.category.includes('part') ? getStatusLabelForLineItem(item, idx) : null)
             .filter(Boolean);
 
-        if (partLabels.length === 0) return;
+        if (partLabels.length === 0 || !canApplyPartsOrderStatus(status)) return;
 
         const nextStatus = getRepairStatusFromOrderStatuses(
             partLabels.map(label => (
@@ -1227,8 +1229,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 body: JSON.stringify(payload)
             });
 
-            if (!res.ok) throw new Error("Save failed");
             const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Save failed");
 
             // 在庫警告があればダイアログ表示
             if (json.stockWarnings && json.stockWarnings.length > 0) {
@@ -1240,18 +1242,61 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 router.push(`/repairs/${json.repair.id}`);
             } else {
                 setStatus(nextStatus);
-                if (hasEstimateItems && (nextStatus === "見積中" || status === "見積中")) {
-                    setStatusLog(prev => ({ ...prev, ...nextStatusLog }));
-                }
+                setStatusLog(prev => ({ ...prev, ...nextStatusLog }));
                 if (mode === 'view') setIsEditingEnabled(false);
                 router.refresh();
             }
 
         } catch (e) {
             console.error(e);
-            alert("保存に失敗しました。");
+            alert(e instanceof Error ? `保存に失敗しました: ${e.message}` : "保存に失敗しました。");
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleStaffReply = async () => {
+        if (!initialData?.id) {
+            toast({ title: "案件保存後に返信できます。" });
+            return;
+        }
+
+        const body = staffReply.trim();
+        if (!body) {
+            toast({ title: "返信内容を入力してください。" });
+            return;
+        }
+
+        setIsSendingStaffReply(true);
+        try {
+            const res = await fetch(`/api/repairs/${initialData.id}/messages`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ body }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(json.error || "返信送信に失敗しました。");
+            }
+
+            setStaffReply("");
+            toast({
+                title: json.notification?.sent
+                    ? "返信を送信しました"
+                    : "返信を保存しました",
+                description: json.notification?.sent
+                    ? "LINEで共有ページへの通知を送信しました。"
+                    : "LINE通知は未送信です。共有ページには表示されます。",
+            });
+            router.refresh();
+        } catch (error) {
+            console.error(error);
+            toast({
+                title: "返信送信に失敗しました",
+                description: error instanceof Error ? error.message : undefined,
+            });
+        } finally {
+            setIsSendingStaffReply(false);
         }
     };
 
@@ -1620,6 +1665,51 @@ ${shopName}
                     )}
                 </div>
             </div>
+
+            {initialData?.id && (
+                <div className="bg-white border-b border-zinc-200 px-4 py-3">
+                    <div className="text-xs font-bold text-zinc-700 mb-2">共有ページコメント</div>
+                    {(initialData?.customerMessages || []).length > 0 ? (
+                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                            {(initialData?.customerMessages || []).map((message: any) => (
+                                <div
+                                    key={message.id}
+                                    className="rounded border border-blue-100 bg-blue-50 px-3 py-2 text-xs"
+                                >
+                                    <div className="flex items-center justify-between text-[10px] text-zinc-500">
+                                        <span className="font-bold text-zinc-600">共有ページコメント</span>
+                                        <span>{new Date(message.createdAt).toLocaleString('ja-JP')}</span>
+                                        {!message.readAt && <span className="font-bold text-blue-600">未読</span>}
+                                    </div>
+                                    <div className="mt-1 whitespace-pre-wrap text-zinc-700">{message.body}</div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="rounded border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+                            共有ページからのコメントはまだありません。
+                        </div>
+                    )}
+                    <div className="mt-3 flex gap-2">
+                        <Textarea
+                            value={staffReply}
+                            onChange={(event) => setStaffReply(event.target.value.slice(0, 500))}
+                            placeholder="共有ページへ返信する内容を入力..."
+                            className="min-h-16 text-xs"
+                            maxLength={500}
+                        />
+                        <Button
+                            type="button"
+                            onClick={handleStaffReply}
+                            disabled={isSendingStaffReply || !staffReply.trim()}
+                            className="h-auto shrink-0 bg-blue-600 hover:bg-blue-700"
+                        >
+                            返信する
+                        </Button>
+                    </div>
+                    <div className="mt-1 text-right text-[10px] text-zinc-400">{staffReply.length}/500</div>
+                </div>
+            )}
 
             {/* --- TAB NAV --- */}
             <div className="bg-white border-b border-zinc-200 flex shrink-0">

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from '@/lib/repair-parts-status'
+import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from '@/lib/repair-parts-status'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -104,7 +104,11 @@ export async function POST(req: Request) {
     const nextRepairStatus = getRepairStatusFromOrderStatuses(
       repairOrders.map(order => order.status as RepairPartsOrderStatus)
     )
-    if (nextRepairStatus) {
+    const repairForStatus = await prisma.repair.findUnique({
+      where: { id: Number(repairId) },
+      select: { status: true },
+    })
+    if (nextRepairStatus && canApplyPartsOrderStatus(repairForStatus?.status)) {
       await prisma.repair.update({
         where: { id: Number(repairId) },
         data: { status: nextRepairStatus }
@@ -156,7 +160,11 @@ export async function POST(req: Request) {
   const nextRepairStatus = getRepairStatusFromOrderStatuses(
     repairOrders.map(existingOrder => existingOrder.status as RepairPartsOrderStatus)
   )
-  if (nextRepairStatus) {
+  const repairForStatus = await prisma.repair.findUnique({
+    where: { id: Number(repairId) },
+    select: { status: true },
+  })
+  if (nextRepairStatus && canApplyPartsOrderStatus(repairForStatus?.status)) {
     await prisma.repair.update({
       where: { id: Number(repairId) },
       data: { status: nextRepairStatus }

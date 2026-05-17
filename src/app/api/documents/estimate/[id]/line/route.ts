@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import React from "react";
-import { Font, renderToStream } from "@react-pdf/renderer";
 
 import { prisma } from "@/lib/prisma";
-import { EstimateDocument, EstimateDocumentProps } from "@/components/pdf/EstimateDocument";
+import {
+  createEstimateServerDocumentElement,
+  EstimateServerDocumentProps,
+} from "@/components/pdf/EstimateServerDocument";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 
 const WAITING_FOR_APPROVAL_STATUS = "承認待ち";
@@ -63,14 +65,98 @@ async function writeStreamToFile(stream: NodeJS.ReadableStream, filePath: string
   });
 }
 
-async function saveEstimatePdf(data: EstimateDocumentProps["data"], filePath: string) {
+async function saveEstimatePdf(data: EstimateServerDocumentProps["data"], filePath: string) {
+  const nodeRequire = eval("require") as NodeRequire;
+  const ReactRuntime = nodeRequire("react");
+  const renderer = nodeRequire("@react-pdf/renderer");
+  const { Font, renderToStream } = renderer;
+
   Font.register({
     family: "Noto Sans JP",
     src: path.join(process.cwd(), "public", "fonts", "NotoSansJP-Regular.otf"),
   });
 
-  const stream = await renderToStream(React.createElement(EstimateDocument, { data }) as any);
+  const documentElement = createEstimateServerDocumentElement(ReactRuntime, renderer, data);
+  const stream = await renderToStream(documentElement);
   await writeStreamToFile(stream, filePath);
+}
+
+async function ensureRepairPublicToken(repairId: number) {
+  const [existing] = await prisma.$queryRaw<{ publicToken: string | null }[]>`
+    SELECT "publicToken"
+    FROM "Repair"
+    WHERE "id" = ${repairId}
+  `;
+
+  if (existing?.publicToken) {
+    return existing.publicToken;
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const token = crypto.randomBytes(24).toString("base64url");
+    const updated = await prisma.$executeRaw`
+      UPDATE "Repair"
+      SET "publicToken" = ${token},
+          "publicTokenCreatedAt" = NOW()
+      WHERE "id" = ${repairId}
+        AND "publicToken" IS NULL
+    `;
+
+    if (updated === 1) {
+      return token;
+    }
+
+    const [current] = await prisma.$queryRaw<{ publicToken: string | null }[]>`
+      SELECT "publicToken"
+      FROM "Repair"
+      WHERE "id" = ${repairId}
+    `;
+
+    if (current?.publicToken) {
+      return current.publicToken;
+    }
+  }
+
+  throw new Error("Failed to create repair public token");
+}
+
+async function ensureEstimateDocumentPublicToken(documentId: number) {
+  const [existing] = await prisma.$queryRaw<{ publicToken: string | null }[]>`
+    SELECT "publicToken"
+    FROM "EstimateDocument"
+    WHERE "id" = ${documentId}
+  `;
+
+  if (existing?.publicToken) {
+    return existing.publicToken;
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const token = crypto.randomBytes(24).toString("base64url");
+    const updated = await prisma.$executeRaw`
+      UPDATE "EstimateDocument"
+      SET "publicToken" = ${token},
+          "publicTokenCreatedAt" = NOW()
+      WHERE "id" = ${documentId}
+        AND "publicToken" IS NULL
+    `;
+
+    if (updated === 1) {
+      return token;
+    }
+
+    const [current] = await prisma.$queryRaw<{ publicToken: string | null }[]>`
+      SELECT "publicToken"
+      FROM "EstimateDocument"
+      WHERE "id" = ${documentId}
+    `;
+
+    if (current?.publicToken) {
+      return current.publicToken;
+    }
+  }
+
+  throw new Error("Failed to create estimate document public token");
 }
 
 export async function POST(
@@ -130,7 +216,17 @@ export async function POST(
     );
   }
 
-  const estimateUrl = new URL(`/documents/estimate/${documentId}`, request.url).toString();
+  const primaryRepair = estimateDocument.repairs[0];
+  if (!primaryRepair) {
+    return NextResponse.json(
+      { success: false, error: "見積書に修理案件が紐づいていません。" },
+      { status: 400 }
+    );
+  }
+
+  const publicToken = await ensureEstimateDocumentPublicToken(estimateDocument.id);
+  await Promise.all(estimateDocument.repairs.map((repair) => ensureRepairPublicToken(repair.id)));
+  const estimateUrl = new URL(`/customer/repairs/${publicToken}`, request.url).toString();
   const jobs = estimateDocument.repairs.map((repair) => {
     const estimateItems = repair.estimate?.items || [];
     return {
@@ -162,11 +258,11 @@ export async function POST(
       })),
     };
   });
-  const pdfData: EstimateDocumentProps["data"] = {
+  const pdfData: EstimateServerDocumentProps["data"] = {
     estimateNumber: estimateDocument.estimateNumber,
     date: estimateDocument.issuedDate.toLocaleDateString("ja-JP"),
     customer: {
-      name: estimateDocument.customer.name,
+      name: estimateDocument.customer.type === "business" ? primaryRepair.endUserName?.trim() || "" : "",
       address: estimateDocument.customer.address || undefined,
     },
     jobs,

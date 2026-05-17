@@ -1,7 +1,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
+import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
 
@@ -193,9 +193,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                         changedAt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
                     }
                 }
-                await tx.repairStatusLog.create({
-                    data: { repairId: id, status: dbStatus, changedAt }
+                const existingStatusLog = await tx.repairStatusLog.findFirst({
+                    where: { repairId: id, status: dbStatus }
                 });
+                if (!existingStatusLog) {
+                    await tx.repairStatusLog.create({
+                        data: { repairId: id, status: dbStatus, changedAt }
+                    });
+                }
             }
 
             // 4. Update Estimates
@@ -383,7 +388,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             const aggregatedRepairStatus = getRepairStatusFromOrderStatuses(
                 repairOrders.map(order => order.status as RepairPartsOrderStatus)
             );
-            if (aggregatedRepairStatus && aggregatedRepairStatus !== updatedRepair.status) {
+            if (
+                aggregatedRepairStatus &&
+                aggregatedRepairStatus !== updatedRepair.status &&
+                canApplyPartsOrderStatus(updatedRepair.status)
+            ) {
                 updatedRepair = await tx.repair.update({
                     where: { id },
                     data: { status: aggregatedRepairStatus }

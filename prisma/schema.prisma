@@ -144,6 +144,8 @@ model Watch {
 model Repair {
   id                   Int       @id @default(autoincrement())
   uuid                 String    @unique @default(uuid())
+  publicToken          String?   @unique
+  publicTokenCreatedAt DateTime?
   inquiryNumber        String    @unique // T-001
   customerId           Int
   watchId              Int
@@ -474,6 +476,8 @@ model EstimateDocument {
   id              Int      @id @default(autoincrement())
   estimateNumber  String   @unique // e.g. TE-001
   issuedDate      DateTime @default(now())
+  publicToken     String?  @unique
+  publicTokenCreatedAt DateTime?
   
   customerId      Int
   customer        Customer @relation(fields: [customerId], references: [id])

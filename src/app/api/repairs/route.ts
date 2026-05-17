@@ -1,9 +1,17 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
+import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+
+function extractInquirySequence(inquiryNumber: string | null, prefix: string) {
+    if (!inquiryNumber) return 0;
+    const prefixWithSeparator = `${prefix}-`;
+    if (!inquiryNumber.startsWith(prefixWithSeparator)) return 0;
+    const seq = Number(inquiryNumber.slice(prefixWithSeparator.length));
+    return Number.isFinite(seq) ? seq : 0;
+}
 
 export async function POST(req: Request) {
     try {
@@ -261,7 +269,15 @@ export async function POST(req: Request) {
             if (!customerPrefix) {
                 throw new Error("業者登録ではプレフィックスを入力してください。");
             }
-            const nextSeq = customer.currentSeq + 1;
+            const existingRepairsForPrefix = await tx.repair.findMany({
+                where: { inquiryNumber: { startsWith: `${customerPrefix}-` } },
+                select: { inquiryNumber: true },
+            });
+            const maxExistingSeq = existingRepairsForPrefix.reduce(
+                (max, repair) => Math.max(max, extractInquirySequence(repair.inquiryNumber, customerPrefix)),
+                0
+            );
+            const nextSeq = Math.max(customer.currentSeq || 0, maxExistingSeq) + 1;
             inquiryNumber = `${customerPrefix}-${String(nextSeq).padStart(3, '0')}`;
 
             await tx.customer.update({
@@ -564,7 +580,7 @@ export async function POST(req: Request) {
             const aggregatedRepairStatus = getRepairStatusFromOrderStatuses(
                 repairOrders.map(order => order.status as RepairPartsOrderStatus)
             );
-            const finalRepair = aggregatedRepairStatus
+            const finalRepair = aggregatedRepairStatus && canApplyPartsOrderStatus(repair.status)
                 ? await tx.repair.update({
                     where: { id: repair.id },
                     data: { status: aggregatedRepairStatus }

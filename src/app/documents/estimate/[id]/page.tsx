@@ -55,7 +55,7 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
         estimateNumber: estimateDoc.estimateNumber,
         date: estimateDoc.issuedDate.toLocaleDateString("ja-JP"),
         customer: {
-            name: estimateDoc.customer.name,
+            name: estimateDoc.customer.type === "business" ? estimateDoc.repairs[0]?.endUserName?.trim() || "" : "",
             address: estimateDoc.customer.address || undefined
         },
         jobs: jobs

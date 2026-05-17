@@ -71,8 +71,14 @@ export default function OrdersPage() {
     fetchOrders()
   }
 
-  const handleAssignToRepair = (id: number) => {
+  const handleAssignToRepair = async (id: number) => {
+    await fetch(`/api/orders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'assigned' })
+    })
     setFilteredOutIds(prev => prev.includes(id) ? prev : [...prev, id])
+    fetchOrders()
   }
 
   const getSearchWord = (order: OrderRequest) => ({
