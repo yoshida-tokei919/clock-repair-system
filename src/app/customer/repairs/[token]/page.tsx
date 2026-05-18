@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { CustomerRepairAccordionItem, CustomerRepairAccordionRoot } from "./CustomerRepairAccordion";
 import { CustomerRepairActions, CopyExplanationButton, PartnerPrivateMemo } from "./CustomerRepairActions";
+import { CustomerExportTools, CustomerGuideAmountInput } from "./CustomerExportTools";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +104,23 @@ export default async function CustomerRepairPage({ params }: PageProps) {
     const estimateItems = repair.estimate?.items ?? [];
     return sum + estimateItems.reduce((itemSum, item) => itemSum + item.unitPrice * (item.quantity || 1), 0);
   }, 0);
+  const exportRepairs = repairs.map((repair) => {
+    const estimateItems = repair.estimate?.items ?? [];
+    const amountToken = repair.publicToken || `${token}:${repair.id}`;
+    return {
+      amountKey: `customer-guide-amount:${amountToken}:${repair.id}`,
+      inquiryNumber: repair.inquiryNumber,
+      customerName: repair.endUserName || repair.customer.name || "",
+      brand: repair.watch.brand?.name || "",
+      model: repair.watch.model?.name || "",
+      reference: repair.watch.reference?.name || "",
+      shopEstimate: estimateItems.reduce((sum, item) => sum + item.unitPrice * (item.quantity || 1), 0),
+      customerEstimate: "",
+      status: repair.status,
+      contact: "",
+      memo: "",
+    };
+  });
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
@@ -161,13 +179,17 @@ export default async function CustomerRepairPage({ params }: PageProps) {
         )}
 
         {isBusiness ? (
-          <CustomerRepairAccordionRoot>
-            {repairs.map((repair, index) => {
+          <>
+            <CustomerExportTools repairs={exportRepairs} />
+            <CustomerRepairAccordionRoot>
+              {repairs.map((repair, index) => {
               const estimateItems = repair.estimate?.items ?? [];
               const total = estimateItems.reduce((sum, item) => sum + item.unitPrice * (item.quantity || 1), 0);
               const watchName = [repair.watch.brand?.name, repair.watch.model?.name].filter(Boolean).join(" ");
               const endUserExplanation = repair.customerNote?.trim() || "";
               const repairActionToken = repair.publicToken || token;
+              const amountToken = repair.publicToken || `${token}:${repair.id}`;
+              const amountKey = `customer-guide-amount:${amountToken}:${repair.id}`;
               const latestMessages = repair.customerMessages.slice(0, 2);
 
               const summary = (
@@ -204,24 +226,24 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                 </div>
               );
 
-              return (
-                <CustomerRepairAccordionItem key={repair.id} index={index} summary={summary}>
+                return (
+                  <CustomerRepairAccordionItem key={repair.id} index={index} summary={summary}>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <div className="text-sm font-bold text-slate-500">案件番号</div>
-                        <div className="font-mono text-lg font-bold text-slate-950">{repair.inquiryNumber}</div>
+                        <div className="text-xs font-bold text-slate-500">案件番号</div>
+                        <div className="font-mono text-base font-bold text-slate-950">{repair.inquiryNumber}</div>
                         {repair.endUserName && (
-                          <div className="mt-1 text-lg font-bold text-slate-700">エンドユーザー: {repair.endUserName}</div>
+                          <div className="mt-1 text-sm font-bold text-slate-600">エンドユーザー: {repair.endUserName}</div>
                         )}
                       </div>
                       <span className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${getStatusBadgeClass(repair.status)}`}>
                         {repair.status}
                       </span>
                     </div>
-                    <div className="mt-4 text-sm font-bold text-slate-500">時計情報</div>
+                    <div className="mt-4 text-xs font-bold text-slate-500">時計情報</div>
                     <div className="mt-1 text-base font-bold">{watchName || "-"}</div>
-                    <div className="mt-1 text-base text-slate-600">
+                    <div className="mt-1 text-sm text-slate-600">
                       Ref: {repair.watch.reference?.name || "-"} / Serial: {repair.watch.serialNumber || "-"}
                     </div>
                   </div>
@@ -233,9 +255,17 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                     </div>
                   </div>
 
-                  <div>
+                  <CustomerGuideAmountInput amountKey={amountKey} baseAmount={total} />
+
+                  <CustomerRepairActions
+                    token={repairActionToken}
+                    isBusiness={isBusiness}
+                    inquiryNumber={repair.inquiryNumber}
+                  />
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="mb-2">
-                      <h2 className="text-lg font-bold">お見積内容</h2>
+                      <h2 className="text-base font-bold text-slate-800">お見積内容</h2>
                     </div>
 
                     <div className="divide-y overflow-hidden rounded-lg border border-slate-200">
@@ -268,17 +298,17 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                     {repair.estimateDocument && (
                       <Link
                         href={`/documents/estimate/${repair.estimateDocument.id}`}
-                        className="mt-3 flex h-12 w-full items-center justify-center rounded-lg bg-slate-900 px-4 text-base font-bold text-white hover:bg-slate-700"
+                        className="mt-3 flex h-11 w-full items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-bold text-blue-700 hover:bg-blue-100"
                       >
                         PDFを見る
                       </Link>
                     )}
                   </div>
 
-                  <section className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+                  <section className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h2 className="text-lg font-bold">エンドユーザー様への説明文</h2>
+                        <h2 className="text-base font-bold">エンドユーザー様への説明文</h2>
                         <p className="mt-1 text-sm text-slate-500">
                           以下の文章は、お客様へのご説明にそのままご利用いただけます。
                         </p>
@@ -286,21 +316,15 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                       {endUserExplanation && <CopyExplanationButton text={endUserExplanation} />}
                     </div>
                     {endUserExplanation ? (
-                      <div className="mt-3 whitespace-pre-wrap rounded-lg border border-indigo-100 bg-white p-4 text-base leading-7 text-slate-800">
+                      <div className="mt-3 whitespace-pre-wrap rounded-lg border border-indigo-100 bg-white p-3 text-sm leading-7 text-slate-800">
                         {endUserExplanation}
                       </div>
                     ) : (
-                      <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white p-4 text-base text-slate-500">
+                      <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-500">
                         説明文はまだ登録されていません。
                       </div>
                     )}
                   </section>
-
-                  <CustomerRepairActions
-                    token={repairActionToken}
-                    isBusiness={isBusiness}
-                    inquiryNumber={repair.inquiryNumber}
-                  />
 
                   {latestMessages.length > 0 && (
                     <section className="rounded-xl border bg-white p-4 shadow-sm">
@@ -331,10 +355,11 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                   )}
 
                   <PartnerPrivateMemo token={repairActionToken} inquiryNumber={repair.inquiryNumber} />
-                </CustomerRepairAccordionItem>
-              );
-            })}
-          </CustomerRepairAccordionRoot>
+                  </CustomerRepairAccordionItem>
+                );
+              })}
+            </CustomerRepairAccordionRoot>
+          </>
         ) : (
           repairs.map((repair, index) => {
           const estimateItems = repair.estimate?.items ?? [];
