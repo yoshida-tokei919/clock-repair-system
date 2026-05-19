@@ -292,6 +292,8 @@ export async function POST(req: Request) {
             const hasEstimateItems = Array.isArray(body.estimate?.items) && body.estimate.items.length > 0;
             const requestedStatus = body.status || "受付";
             const dbStatus = requestedStatus === "受付" && hasEstimateItems ? "見積中" : requestedStatus;
+            const rawEndUserName = body.customer?.endUserName ?? body.request?.endUserName ?? null;
+            const endUserName = rawEndUserName && String(rawEndUserName).trim() ? String(rawEndUserName).trim() : null;
 
             const repair = await tx.repair.create({
                 data: {
@@ -309,7 +311,7 @@ export async function POST(req: Request) {
                     internalNotes: body.request.internalNotes,
                     customerNote: body.request.customerNote || null,
                     estimatedWorkMinutes: 0,
-                    endUserName: body.customer.endUserName || null,
+                    endUserName,
                 }
             });
 

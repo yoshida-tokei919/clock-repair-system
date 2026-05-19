@@ -4,7 +4,12 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { CustomerRepairAccordionItem, CustomerRepairAccordionRoot } from "./CustomerRepairAccordion";
-import { CustomerRepairActions, CopyExplanationButton, PartnerPrivateMemo } from "./CustomerRepairActions";
+import {
+  CopyExplanationButton,
+  CustomerRepairActions,
+  PartnerPrivateMemo,
+  PdfLinkButton,
+} from "./CustomerRepairActions";
 import { CustomerExportTools, CustomerGuideAmountInput } from "./CustomerExportTools";
 
 export const dynamic = "force-dynamic";
@@ -28,19 +33,41 @@ const repairInclude = {
   estimateDocument: { select: { id: true, estimateNumber: true, issuedDate: true } },
   customerMessages: {
     orderBy: { createdAt: "desc" as const },
-    select: { id: true, body: true, createdAt: true },
+    select: { id: true, body: true, createdAt: true, readAt: true, senderType: true },
   },
 };
 
 function getStatusBadgeClass(status: string) {
-  if (status === "保留" || status === "キャンセル") return "bg-red-50 text-red-700 border-red-200";
-  if (status === "承認待ち") return "bg-orange-50 text-orange-700 border-orange-200";
-  if (status === "作業完了" || status === "納品済み") return "bg-green-50 text-green-700 border-green-200";
-  if (status === "部品待ち(未注文)" || status === "部品待ち(注文済み)" || status === "部品入荷済み" || status === "作業待ち" || status === "作業中") {
-    return "bg-green-50 text-green-700 border-green-200";
-  }
-  return "bg-slate-50 text-slate-700 border-slate-200";
+  if (status.includes("承認") || status.includes("作業")) return "bg-green-50 text-green-700 border-green-200";
+  if (status.includes("差戻") || status.includes("保留") || status.includes("キャンセル")) return "bg-red-50 text-red-700 border-red-200";
+  return "bg-orange-50 text-orange-700 border-orange-200";
 }
+
+function getEstimateItems(repair: any) {
+  return repair.estimate?.items ?? [];
+}
+
+function getEstimateTotal(repair: any) {
+  return getEstimateItems(repair).reduce((sum: number, item: any) => sum + item.unitPrice * (item.quantity || 1), 0);
+}
+
+function getCustomerDisplayName(repair: any) {
+  return repair.endUserName?.trim() || "お客様";
+}
+
+function getWatchLine(repair: any) {
+  return [
+    repair.watch?.brand?.name,
+    repair.watch?.model?.name,
+    repair.watch?.reference?.name,
+    repair.watch?.serialNumber,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+const defaultExplanation =
+  "このお見積は、現在の状態を確認したうえで作成したものです。\n修理内容や金額についてご不明な点がございましたら、承認前にいつでもご質問ください。";
 
 export default async function CustomerRepairPage({ params }: PageProps) {
   const token = params.token?.trim();
@@ -53,7 +80,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
     LIMIT 1
   `;
 
-  let repairs = [];
+  let repairs: any[] = [];
   let documentMeta: { id: number; estimateNumber: string; issuedDate: Date } | null = null;
 
   if (documentTokenRow) {
@@ -100,180 +127,113 @@ export default async function CustomerRepairPage({ params }: PageProps) {
   const customerName = isBusiness
     ? primaryRepair.customer.companyName || primaryRepair.customer.name
     : primaryRepair.customer.name;
-  const pageTotal = repairs.reduce((sum, repair) => {
-    const estimateItems = repair.estimate?.items ?? [];
-    return sum + estimateItems.reduce((itemSum, item) => itemSum + item.unitPrice * (item.quantity || 1), 0);
-  }, 0);
+  const pageTotal = repairs.reduce((sum, repair) => sum + getEstimateTotal(repair), 0);
   const exportRepairs = repairs.map((repair) => {
-    const estimateItems = repair.estimate?.items ?? [];
     const amountToken = repair.publicToken || `${token}:${repair.id}`;
+    const repairActionToken = repair.publicToken || token;
+    const privateMemoToken = repair.publicToken || `${token}:${repair.id}`;
     return {
       amountKey: `customer-guide-amount:${amountToken}:${repair.id}`,
-      inquiryNumber: repair.inquiryNumber,
-      customerName: repair.endUserName || repair.customer.name || "",
-      brand: repair.watch.brand?.name || "",
-      model: repair.watch.model?.name || "",
-      reference: repair.watch.reference?.name || "",
-      shopEstimate: estimateItems.reduce((sum, item) => sum + item.unitPrice * (item.quantity || 1), 0),
+      privateMemoKey: `customer-repair-partner-private-memo:${privateMemoToken}`,
+      partnerRef: repair.partnerRef?.trim() || "",
+      inquiryNumber: repair.inquiryNumber || "",
+      customerName: getCustomerDisplayName(repair),
+      brand: repair.watch?.brand?.name || "",
+      model: repair.watch?.model?.name || "",
+      reference: repair.watch?.reference?.name || "",
+      serialNumber: repair.watch?.serialNumber || "",
+      shopEstimate: getEstimateTotal(repair),
       customerEstimate: "",
-      status: repair.status,
-      contact: "",
-      memo: "",
+      explanation: repair.customerNote?.trim() || defaultExplanation,
+      privateMemo: "",
     };
   });
 
-  return (
-    <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
-      <div className={`mx-auto space-y-4 ${isBusiness ? "max-w-5xl" : "max-w-2xl"}`}>
-        <header className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold text-blue-600">
-                {isBusiness ? "B2B Estimate Confirmation" : "Estimate Confirmation"}
-              </p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight">お見積確認ページ</h1>
-              <p className="mt-1 text-sm text-slate-600">
-                {isBusiness
-                  ? "複数案件がある場合は、案件ごとに内容をご確認ください。コメント・承認・差戻しは各案件ごとに保存されます。"
-                  : "内容をご確認いただき、ご不明点があれば承認前にコメントでご相談ください。"}
-              </p>
-            </div>
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-              {repairs.length}件
-            </span>
-          </div>
-        </header>
+  if (isBusiness) {
+    const commentCount = repairs.filter((repair) => repair.customerMessages.length > 0).length;
+    const approvedCount = repairs.filter((repair) => repair.status.includes("承認")).length;
+    const pendingCount = repairs.length - approvedCount;
 
-        <section className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <div className="text-xs font-bold text-slate-500">
-                {isBusiness ? "取引先" : "お客様"}
+    return (
+      <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
+        <div className="mx-auto max-w-5xl space-y-4">
+          <header className="space-y-3">
+            <div className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-bold tracking-tight">お見積確認ページ</h1>
+                <span className="rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-sm font-bold text-blue-700">
+                  B2B専用
+                </span>
               </div>
-              <div className="text-lg font-bold">{customerName || "お客様"}</div>
+              <p className="mt-3 text-base text-slate-700">共有先: {customerName} 様</p>
               {documentMeta && (
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-sm text-slate-500">
                   {documentMeta.estimateNumber} / {documentMeta.issuedDate.toLocaleDateString("ja-JP")}
                 </p>
               )}
             </div>
-            {!isBusiness && (
-              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-right">
-                <div className="text-xs font-bold text-blue-700">税込合計</div>
-                <div className="font-mono text-3xl font-bold text-blue-700">
-                  ¥{pageTotal.toLocaleString()}
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
 
-        {!isBusiness && (
-          <section className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-relaxed text-blue-950 shadow-sm">
-            <h2 className="text-base font-bold">修理内容のご説明</h2>
-            <p className="mt-2">
-              今回のお見積りは、時計の状態確認にもとづいて作成しています。
-              作業内容や金額についてご不明点がございましたら、承認前に下のコメント欄よりお気軽にご相談ください。
-            </p>
-          </section>
-        )}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 text-base font-bold shadow-sm">全 {repairs.length}件</div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 text-base font-bold shadow-sm">未確認 {pendingCount}</div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 text-base font-bold shadow-sm">コメントあり {commentCount}</div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 text-base font-bold shadow-sm">承認済み {approvedCount}</div>
+            </div>
+          </header>
 
-        {isBusiness ? (
-          <>
-            <CustomerExportTools repairs={exportRepairs} />
-            <CustomerRepairAccordionRoot>
-              {repairs.map((repair, index) => {
-              const estimateItems = repair.estimate?.items ?? [];
-              const total = estimateItems.reduce((sum, item) => sum + item.unitPrice * (item.quantity || 1), 0);
-              const watchName = [repair.watch.brand?.name, repair.watch.model?.name].filter(Boolean).join(" ");
-              const endUserExplanation = repair.customerNote?.trim() || "";
+          <CustomerExportTools repairs={exportRepairs} />
+
+          <CustomerRepairAccordionRoot>
+            {repairs.map((repair, index) => {
+              const estimateItems = getEstimateItems(repair);
+              const total = getEstimateTotal(repair);
+              const explanationText = repair.customerNote?.trim() || defaultExplanation;
               const repairActionToken = repair.publicToken || token;
               const amountToken = repair.publicToken || `${token}:${repair.id}`;
+              const privateMemoToken = repair.publicToken || `${token}:${repair.id}`;
               const amountKey = `customer-guide-amount:${amountToken}:${repair.id}`;
-              const latestMessages = repair.customerMessages.slice(0, 2);
+              const customerDisplayName = getCustomerDisplayName(repair);
+              const partnerRef = repair.partnerRef?.trim() || "";
+              const watchLine = getWatchLine(repair);
+              const latestMessages = repair.customerMessages.slice(0, 2).map((message: any) => ({
+                ...message,
+                createdAt: message.createdAt.toISOString(),
+                readAt: message.readAt ? message.readAt.toISOString() : null,
+                senderType: message.senderType || "partner",
+              }));
 
-              const summary = (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                      {index + 1}
+              const repairHeader = (
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className={`mt-0.5 shrink-0 rounded-full border px-3 py-1 text-sm font-bold ${getStatusBadgeClass(repair.status)}`}>
+                    {repair.status}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-slate-900">
+                      <span className="font-bold">{customerDisplayName} 様</span>
+                      {partnerRef && <span>管 {partnerRef}</span>}
+                      <span>問 {repair.inquiryNumber}</span>
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm font-bold text-slate-900">{repair.inquiryNumber}</span>
-                        {repair.customerMessages.length > 0 && (
-                          <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-700">
-                            コメントあり
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 truncate text-base font-bold text-slate-900">
-                        {repair.endUserName || "エンドユーザー未登録"}
-                      </div>
-                      <div className="mt-1 truncate text-sm text-slate-500">{watchName || "-"}</div>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-slate-500">税込合計</div>
-                      <div className="font-mono text-lg font-bold text-slate-950">¥{total.toLocaleString()}</div>
-                    </div>
-                    <span className={`rounded-full border px-3 py-1 text-xs font-bold ${getStatusBadgeClass(repair.status)}`}>
-                      {repair.status}
-                    </span>
-                    <span className="text-sm font-bold text-blue-600">詳細を開く</span>
+                    <div className="mt-1 truncate text-base font-medium text-slate-700">{watchLine || "-"}</div>
                   </div>
                 </div>
               );
 
-                return (
-                  <CustomerRepairAccordionItem key={repair.id} index={index} summary={summary}>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="text-xs font-bold text-slate-500">案件番号</div>
-                        <div className="font-mono text-base font-bold text-slate-950">{repair.inquiryNumber}</div>
-                        {repair.endUserName && (
-                          <div className="mt-1 text-sm font-bold text-slate-600">エンドユーザー: {repair.endUserName}</div>
-                        )}
-                      </div>
-                      <span className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${getStatusBadgeClass(repair.status)}`}>
-                        {repair.status}
-                      </span>
-                    </div>
-                    <div className="mt-4 text-xs font-bold text-slate-500">時計情報</div>
-                    <div className="mt-1 text-base font-bold">{watchName || "-"}</div>
-                    <div className="mt-1 text-sm text-slate-600">
-                      Ref: {repair.watch.reference?.name || "-"} / Serial: {repair.watch.serialNumber || "-"}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-right">
-                    <div className="text-sm font-bold text-blue-700">この案件の税込合計</div>
-                    <div className="font-mono text-4xl font-bold text-blue-700">
-                      ¥{total.toLocaleString()}
-                    </div>
-                  </div>
-
-                  <CustomerGuideAmountInput amountKey={amountKey} baseAmount={total} />
-
-                  <CustomerRepairActions
-                    token={repairActionToken}
-                    isBusiness={isBusiness}
-                    inquiryNumber={repair.inquiryNumber}
-                  />
-
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="mb-2">
-                      <h2 className="text-base font-bold text-slate-800">お見積内容</h2>
+              return (
+                <CustomerRepairAccordionItem key={repair.id} index={index} summary={repairHeader}>
+                  <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h2 className="text-lg font-bold text-slate-900">見積内容</h2>
+                      {repair.estimateDocument && <PdfLinkButton href={`/documents/estimate/${repair.estimateDocument.id}`} />}
                     </div>
 
-                    <div className="divide-y overflow-hidden rounded-lg border border-slate-200">
+                    <div className="space-y-2">
                       {estimateItems.length === 0 ? (
-                        <div className="p-4 text-base text-slate-500">見積明細はまだありません。</div>
+                        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-base text-slate-500">
+                          見積明細はまだありません。
+                        </div>
                       ) : (
-                        estimateItems.map((item) => (
-                          <div key={item.id} className="flex items-start justify-between gap-3 px-3 py-3 text-base">
+                        estimateItems.map((item: any) => (
+                          <div key={item.id} className="flex items-start justify-between gap-3 text-base">
                             <div className="min-w-0">
                               <div className="font-medium">
                                 {item.type === "part"
@@ -284,9 +244,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                                     })
                                   : item.itemName}
                               </div>
-                              {item.quantity > 1 && (
-                                <div className="text-xs text-slate-500">数量: {item.quantity}</div>
-                              )}
+                              {item.quantity > 1 && <div className="text-sm text-slate-500">数量 {item.quantity}</div>}
                             </div>
                             <div className="shrink-0 whitespace-nowrap font-mono font-bold">
                               ¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}
@@ -295,77 +253,79 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                         ))
                       )}
                     </div>
-                    {repair.estimateDocument && (
-                      <Link
-                        href={`/documents/estimate/${repair.estimateDocument.id}`}
-                        className="mt-3 flex h-11 w-full items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-bold text-blue-700 hover:bg-blue-100"
-                      >
-                        PDFを見る
-                      </Link>
-                    )}
-                  </div>
 
-                  <section className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="text-base font-bold">エンドユーザー様への説明文</h2>
-                        <p className="mt-1 text-sm text-slate-500">
-                          以下の文章は、お客様へのご説明にそのままご利用いただけます。
-                        </p>
+                    <div className="mt-4 border-t border-slate-200 pt-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="font-bold text-slate-900">税込合計</div>
+                        <div className="font-mono text-2xl font-bold text-blue-700">¥{total.toLocaleString()}</div>
                       </div>
-                      {endUserExplanation && <CopyExplanationButton text={endUserExplanation} />}
                     </div>
-                    {endUserExplanation ? (
-                      <div className="mt-3 whitespace-pre-wrap rounded-lg border border-indigo-100 bg-white p-3 text-sm leading-7 text-slate-800">
-                        {endUserExplanation}
-                      </div>
-                    ) : (
-                      <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-500">
-                        説明文はまだ登録されていません。
-                      </div>
-                    )}
                   </section>
 
-                  {latestMessages.length > 0 && (
-                    <section className="rounded-xl border bg-white p-4 shadow-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <h2 className="text-lg font-bold">コメント履歴</h2>
-                          <p className="mt-1 text-sm text-slate-500">
-                            このコメントは本案件に紐づいて保存されます。
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700">
-                          {repair.customerMessages.length}件
-                        </span>
-                      </div>
+                  <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <h2 className="text-lg font-bold text-slate-900">お客様への説明文</h2>
+                      <CopyExplanationButton text={explanationText} />
+                    </div>
+                    <div className="mt-3 whitespace-pre-wrap rounded-lg bg-white p-3 text-base leading-7 text-slate-800">
+                      {explanationText}
+                    </div>
+                  </section>
 
-                      <div className="mt-3 space-y-2">
-                        {latestMessages.map((message) => (
-                          <div key={message.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-base">
-                            <div className="flex items-center justify-between gap-3 text-sm text-slate-500">
-                              <span className="font-bold text-slate-700">{customerName || "お客様"} 様</span>
-                              <span>{message.createdAt.toLocaleString("ja-JP")}</span>
-                            </div>
-                            <div className="mt-2 whitespace-pre-wrap leading-7">{message.body}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
+                  <CustomerGuideAmountInput amountKey={amountKey} baseAmount={total} />
 
-                  <PartnerPrivateMemo token={repairActionToken} inquiryNumber={repair.inquiryNumber} />
-                  </CustomerRepairAccordionItem>
-                );
-              })}
-            </CustomerRepairAccordionRoot>
-          </>
-        ) : (
-          repairs.map((repair, index) => {
-          const estimateItems = repair.estimate?.items ?? [];
-          const total = estimateItems.reduce((sum, item) => sum + item.unitPrice * (item.quantity || 1), 0);
-          const watchName = [repair.watch.brand?.name, repair.watch.model?.name].filter(Boolean).join(" ");
-          const endUserExplanation = repair.customerNote?.trim() || "";
+                  <CustomerRepairActions
+                    token={repairActionToken}
+                    isBusiness={isBusiness}
+                    inquiryNumber={repair.inquiryNumber}
+                    messages={latestMessages}
+                    customerName={customerName || "取引先"}
+                  />
+
+                  <PartnerPrivateMemo token={privateMemoToken} inquiryNumber={repair.inquiryNumber} />
+                </CustomerRepairAccordionItem>
+              );
+            })}
+          </CustomerRepairAccordionRoot>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
+      <div className="mx-auto max-w-2xl space-y-4">
+        <header className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+          <p className="text-xs font-bold text-blue-600">Estimate Confirmation</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">お見積確認ページ</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            内容をご確認いただき、ご不明点があれば承認前にコメントでご相談ください。
+          </p>
+        </header>
+
+        <section className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-xs font-bold text-slate-500">お客様</div>
+              <div className="text-lg font-bold">{customerName || "お客様"}</div>
+              {documentMeta && (
+                <p className="mt-1 text-xs text-slate-500">
+                  {documentMeta.estimateNumber} / {documentMeta.issuedDate.toLocaleDateString("ja-JP")}
+                </p>
+              )}
+            </div>
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-right">
+              <div className="text-xs font-bold text-blue-700">税込合計</div>
+              <div className="font-mono text-3xl font-bold text-blue-700">¥{pageTotal.toLocaleString()}</div>
+            </div>
+          </div>
+        </section>
+
+        {repairs.map((repair, index) => {
+          const estimateItems = getEstimateItems(repair);
+          const total = getEstimateTotal(repair);
+          const watchName = [repair.watch?.brand?.name, repair.watch?.model?.name].filter(Boolean).join(" ");
+          const explanationText = repair.customerNote?.trim() || "";
           const repairActionToken = repair.publicToken || token;
 
           return (
@@ -380,7 +340,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <div className="text-xs font-bold text-slate-500">案件番号</div>
+                        <div className="text-xs font-bold text-slate-500">お問合番号</div>
                         <div className="font-mono text-xl font-bold text-slate-950">{repair.inquiryNumber}</div>
                       </div>
                       <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
@@ -391,11 +351,8 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                       <div className="text-xs font-bold text-slate-500">時計情報</div>
                       <div className="mt-1 text-base font-bold">{watchName || "-"}</div>
                       <div className="mt-1 text-xs text-slate-500">
-                        Ref: {repair.watch.reference?.name || "-"} / Serial: {repair.watch.serialNumber || "-"}
+                        Ref: {repair.watch?.reference?.name || "-"} / Serial: {repair.watch?.serialNumber || "-"}
                       </div>
-                      {isBusiness && repair.endUserName && (
-                        <div className="mt-2 text-xs text-slate-600">エンドユーザー: {repair.endUserName}</div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -404,7 +361,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
               <div className="space-y-4 p-4">
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <h2 className="text-base font-bold">お見積内容</h2>
+                    <h2 className="text-base font-bold">見積内容</h2>
                     {repair.estimateDocument && (
                       <Link
                         href={`/documents/estimate/${repair.estimateDocument.id}`}
@@ -419,7 +376,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                     {estimateItems.length === 0 ? (
                       <div className="p-4 text-sm text-slate-500">見積明細はまだありません。</div>
                     ) : (
-                      estimateItems.map((item) => (
+                      estimateItems.map((item: any) => (
                         <div key={item.id} className="flex items-start justify-between gap-3 p-3 text-sm">
                           <div className="min-w-0">
                             <div className="font-medium">
@@ -431,9 +388,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                                   })
                                 : item.itemName}
                             </div>
-                            {item.quantity > 1 && (
-                              <div className="text-xs text-slate-500">数量: {item.quantity}</div>
-                            )}
+                            {item.quantity > 1 && <div className="text-xs text-slate-500">数量 {item.quantity}</div>}
                           </div>
                           <div className="shrink-0 whitespace-nowrap font-mono font-bold">
                             ¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}
@@ -445,72 +400,21 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                 </div>
 
                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-right">
-                  <div className="text-xs font-bold text-blue-700">この案件の税込合計</div>
-                  <div className="font-mono text-3xl font-bold text-blue-700">
-                    ¥{total.toLocaleString()}
-                  </div>
+                  <div className="text-xs font-bold text-blue-700">このお見積の税込合計</div>
+                  <div className="font-mono text-3xl font-bold text-blue-700">¥{total.toLocaleString()}</div>
                 </div>
 
-                {isBusiness && (
-                  <PartnerPrivateMemo token={repairActionToken} inquiryNumber={repair.inquiryNumber} />
-                )}
-
-                {isBusiness && (
+                {explanationText && (
                   <section className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="text-base font-bold">エンドユーザー様への説明文</h2>
-                        <p className="mt-1 text-xs text-slate-500">
-                          以下の文章は、お客様へのご説明にそのままご利用いただけます。
-                        </p>
-                      </div>
-                      {endUserExplanation && <CopyExplanationButton text={endUserExplanation} />}
+                      <h2 className="text-base font-bold">お客様への説明文</h2>
+                      <CopyExplanationButton text={explanationText} />
                     </div>
-                    {endUserExplanation ? (
-                      <div className="mt-3 whitespace-pre-wrap rounded-lg border border-indigo-100 bg-white p-3 text-sm leading-relaxed text-slate-800">
-                        {endUserExplanation}
-                      </div>
-                    ) : (
-                      <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-500">
-                        説明文はまだ登録されていません。
-                      </div>
-                    )}
+                    <div className="mt-3 whitespace-pre-wrap rounded-lg border border-indigo-100 bg-white p-3 text-sm leading-relaxed text-slate-800">
+                      {explanationText}
+                    </div>
                   </section>
                 )}
-
-                <section className="rounded-xl border bg-white p-4 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-bold">コメント履歴</h2>
-                      <p className="mt-1 text-xs text-slate-500">
-                        このコメントは本案件に紐づいて保存されます。
-                      </p>
-                    </div>
-                    {repair.customerMessages.length > 0 && (
-                      <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700">
-                        {repair.customerMessages.length}件
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-3 space-y-2">
-                    {repair.customerMessages.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
-                        まだコメントはありません。
-                      </div>
-                    ) : (
-                      repair.customerMessages.map((message) => (
-                        <div key={message.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-                          <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
-                            <span className="font-bold text-slate-700">{customerName || "お客様"} 様</span>
-                            <span>{message.createdAt.toLocaleString("ja-JP")}</span>
-                          </div>
-                          <div className="mt-2 whitespace-pre-wrap leading-relaxed">{message.body}</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </section>
 
                 <CustomerRepairActions
                   token={repairActionToken}
@@ -520,18 +424,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
               </div>
             </section>
           );
-          })
-        )}
-
-        {!isBusiness && (
-          <section className="rounded-xl border border-blue-100 bg-white p-4 text-sm leading-relaxed text-slate-700 shadow-sm">
-            <h2 className="font-bold text-slate-900">ご相談について</h2>
-            <p className="mt-2">
-              追加作業や交換部品の状態によって、追加のご提案をさせていただく場合があります。
-              迷われる場合はすぐに承認せず、コメント欄よりご相談ください。
-            </p>
-          </section>
-        )}
+        })}
       </div>
     </main>
   );

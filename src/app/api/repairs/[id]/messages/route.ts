@@ -112,8 +112,8 @@ export async function POST(
   const [message] = await prisma.$queryRaw<
     { id: number; body: string; createdAt: Date }[]
   >`
-    INSERT INTO "RepairCustomerMessage" ("repairId", "body", "readAt")
-    VALUES (${repairId}, ${messageBody}, NOW())
+    INSERT INTO "RepairCustomerMessage" ("repairId", "body", "readAt", "senderType")
+    VALUES (${repairId}, ${messageBody}, NOW(), 'shop')
     RETURNING "id", "body", "createdAt"
   `;
 

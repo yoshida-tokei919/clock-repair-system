@@ -140,6 +140,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             const hasEstimateItems = Array.isArray(body.estimate?.items) && body.estimate.items.length > 0;
             const requestedStatus = body.status ?? repairRecord.status;
             const dbStatus = requestedStatus === "受付" && hasEstimateItems ? "見積中" : requestedStatus;
+            const rawEndUserName = body.customer?.endUserName ?? body.request?.endUserName ?? null;
+            const endUserName = rawEndUserName && String(rawEndUserName).trim() ? String(rawEndUserName).trim() : null;
 
             let updatedRepair = await tx.repair.update({
                 where: { id },
@@ -154,7 +156,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     workSummary: body.request?.diagnosis || null,
                     internalNotes: body.request?.internalNotes || null,
                     customerNote: body.request?.customerNote ?? null,
-                    endUserName: body.customer?.endUserName || null,
+                    endUserName,
                 }
             });
 

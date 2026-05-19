@@ -224,6 +224,7 @@ model RepairCustomerMessage {
   body      String
   createdAt DateTime  @default(now())
   readAt    DateTime?
+  senderType String    @default("partner")
 
   repair    Repair    @relation(fields: [repairId], references: [id])
 
