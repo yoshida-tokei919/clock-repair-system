@@ -33,7 +33,7 @@ export interface EstimateDocumentProps {
   data: {
     estimateNumber: string;
     date: string;
-    customer: { name: string; address?: string; };
+    customer: { name: string; address?: string; type?: string; };
     jobs: {
       id: string;
       inquiryNumber: string;
@@ -44,6 +44,24 @@ export interface EstimateDocumentProps {
       items: { name: string; price: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
     }[];
   }
+}
+
+function stripHonorific(value: string) {
+  return value.trim().replace(/\s*(御中|様)$/, "").trim();
+}
+
+function withOnchu(value: string) {
+  const name = stripHonorific(value);
+  return name ? `${name} 御中` : "御中";
+}
+
+function withSama(value?: string) {
+  const name = stripHonorific(value || "");
+  return name ? `${name} 様` : "-";
+}
+
+function withCustomerHonorific(value: string, customerType?: string) {
+  return customerType === "business" ? withOnchu(value) : withSama(value);
 }
 
 export function EstimateDocument({ data }: EstimateDocumentProps) {
@@ -62,7 +80,7 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
         {/* INFO */}
         <View style={styles.infoArea}>
           <View style={{ width: '55%' }}>
-            <Text style={styles.recipient}>{data.customer.name} 御中</Text>
+            <Text style={styles.recipient}>{withCustomerHonorific(data.customer.name, data.customer.type)}</Text>
             <Text style={{ fontSize: 9, color: '#555', marginTop: 4 }}>{data.customer.address || ""}</Text>
             <Text style={{ fontSize: 9, marginTop: 10 }}>下記の通り御見積申し上げます。</Text>
           </View>
@@ -98,7 +116,7 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
                   <Text style={[styles.colNo, { width: '2.5%' }]}>{idx + 1}</Text>
                   <Text style={[styles.colInquiry, { width: '6.5%' }]}>{job.inquiryNumber}</Text>
                   <Text style={[styles.colInquiry, { width: '8.5%', fontSize: 8 }]}>{job.partnerRef || '-'}</Text>
-                  <Text style={[styles.colEndUser, { width: '9%', paddingRight: 5 }]}>{job.endUserName || '-'}</Text>
+                  <Text style={[styles.colEndUser, { width: '9%', paddingRight: 5 }]}>{withSama(job.endUserName)}</Text>
                   <Text style={[styles.colWatch, { width: '20.5%', fontSize: 8, paddingRight: 2 }]}>{watchInfo}</Text>
 
                   {/* 作業明細 */}

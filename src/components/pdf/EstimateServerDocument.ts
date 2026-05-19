@@ -2,7 +2,7 @@ export interface EstimateServerDocumentProps {
   data: {
     estimateNumber: string;
     date: string;
-    customer: { name: string; address?: string };
+    customer: { name: string; address?: string; type?: string };
     jobs: {
       id: string;
       inquiryNumber: string;
@@ -29,6 +29,17 @@ export function createEstimateServerDocumentElement(
 ) {
   const { Document, Page, StyleSheet, Text, View } = renderer;
   const el = ReactRuntime.createElement;
+  const stripHonorific = (value: string) => value.trim().replace(/\s*(御中|様)$/, "").trim();
+  const withOnchu = (value: string) => {
+    const name = stripHonorific(value);
+    return name ? `${name} 御中` : "御中";
+  };
+  const withSama = (value?: string) => {
+    const name = stripHonorific(value || "");
+    return name ? `${name} 様` : "-";
+  };
+  const withCustomerHonorific = (value: string, customerType?: string) =>
+    customerType === "business" ? withOnchu(value) : withSama(value);
 
   const styles = StyleSheet.create({
     page: {
@@ -110,7 +121,7 @@ export function createEstimateServerDocumentElement(
         el(
           View,
           { style: { width: "55%" } },
-          el(Text, { style: styles.recipient }, `${data.customer.name} 御中`),
+          el(Text, { style: styles.recipient }, withCustomerHonorific(data.customer.name, data.customer.type)),
           el(Text, { style: { marginTop: 4 } }, data.customer.address || ""),
           el(Text, { style: { marginTop: 10 } }, "下記の通りお見積申し上げます。")
         ),
@@ -145,7 +156,7 @@ export function createEstimateServerDocumentElement(
               el(Text, { style: [styles.small, { width: "4%" }] }, String(index + 1)),
               el(Text, { style: [styles.small, { width: "12%" }] }, job.inquiryNumber),
               el(Text, { style: [styles.small, { width: "13%" }] }, job.partnerRef || "-"),
-              el(Text, { style: [styles.small, { width: "13%" }] }, job.endUserName || "-"),
+              el(Text, { style: [styles.small, { width: "13%" }] }, withSama(job.endUserName)),
               el(Text, { style: [styles.small, { width: "22%" }] }, watchInfo),
               el(
                 View,

@@ -153,6 +153,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
     const commentCount = repairs.filter((repair) => repair.customerMessages.length > 0).length;
     const approvedCount = repairs.filter((repair) => repair.status.includes("承認")).length;
     const pendingCount = repairs.length - approvedCount;
+    const publicPdfHref = `/customer/repairs/${token}/estimate.pdf`;
 
     return (
       <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
@@ -223,7 +224,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                   <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <h2 className="text-lg font-bold text-slate-900">見積内容</h2>
-                      {repair.estimateDocument && <PdfLinkButton href={`/documents/estimate/${repair.estimateDocument.id}`} />}
+                      {repair.estimateDocument && <PdfLinkButton href={publicPdfHref} />}
                     </div>
 
                     <div className="space-y-2">

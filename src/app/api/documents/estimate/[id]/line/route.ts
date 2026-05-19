@@ -43,6 +43,18 @@ function getCustomerDisplayName(customer: {
   return customer.name?.trim() || customer.companyName?.trim() || "お客様";
 }
 
+function getPdfCustomerName(customer: {
+  type: string;
+  name: string;
+  companyName: string | null;
+}) {
+  if (customer.type === "business") {
+    return customer.companyName?.trim() || customer.name?.trim() || "";
+  }
+
+  return customer.name?.trim() || "";
+}
+
 function getUniqueFilePath(directory: string, baseName: string) {
   let candidate = path.join(directory, `${baseName}.pdf`);
   let index = 2;
@@ -262,7 +274,8 @@ export async function POST(
     estimateNumber: estimateDocument.estimateNumber,
     date: estimateDocument.issuedDate.toLocaleDateString("ja-JP"),
     customer: {
-      name: estimateDocument.customer.type === "business" ? primaryRepair.endUserName?.trim() || "" : "",
+      name: getPdfCustomerName(estimateDocument.customer),
+      type: estimateDocument.customer.type,
       address: estimateDocument.customer.address || undefined,
     },
     jobs,

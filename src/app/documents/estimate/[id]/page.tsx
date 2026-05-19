@@ -5,6 +5,13 @@ import { formatPartDisplay } from "@/lib/formatPartDisplay";
 
 export const dynamic = "force-dynamic";
 
+function getPdfCustomerName(customer: { type: string; name: string; companyName: string | null }) {
+    if (customer.type === "business") {
+        return customer.companyName?.trim() || customer.name?.trim() || "";
+    }
+    return customer.name?.trim() || "";
+}
+
 export default async function EstimateDocumentPage({ params }: { params: { id: string } }) {
     const id = parseInt(params.id);
     if (isNaN(id)) return notFound();
@@ -55,7 +62,8 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
         estimateNumber: estimateDoc.estimateNumber,
         date: estimateDoc.issuedDate.toLocaleDateString("ja-JP"),
         customer: {
-            name: estimateDoc.customer.type === "business" ? estimateDoc.repairs[0]?.endUserName?.trim() || "" : "",
+            name: getPdfCustomerName(estimateDoc.customer),
+            type: estimateDoc.customer.type,
             address: estimateDoc.customer.address || undefined
         },
         jobs: jobs

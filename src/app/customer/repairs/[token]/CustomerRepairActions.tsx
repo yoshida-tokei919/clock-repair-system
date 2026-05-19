@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle, Clipboard, Copy, FileText, RefreshCw, Share2, X } from "lucide-react";
 
@@ -49,14 +48,16 @@ export function PdfLinkButton({ href }: { href: string }) {
 
   return (
     <>
-      <Link
+      <a
         href={href}
+        target="_blank"
+        rel="noopener noreferrer"
         onClick={() => showToast("PDFを開きました")}
         className="inline-flex h-8 items-center gap-1.5 rounded-md border border-blue-200 bg-white px-3 text-sm font-bold text-blue-700 hover:bg-blue-50"
       >
         <FileText className="h-4 w-4" />
         PDF
-      </Link>
+      </a>
       <MiniToast message={toast} onClose={() => setToast("")} />
     </>
   );
