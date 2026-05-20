@@ -6,6 +6,10 @@
 - public PDF routeは保存済みPDFを返すだけにする
 - 共有画面アクセス時にPDFを都度生成しない
 - 管理画面で確認したPDFと共有PDFは同じstorageKeyを参照する
+- LINE送信時にPDFを生成しない
+- LINE送信時にPDFをローカル保存しない
+- LINEでPDF添付はしない
+- LINEではB2B共有ページURLのみを送る
 
 ## 旧PDF生成経路
 
@@ -59,7 +63,7 @@ POST /api/documents/estimate/[id]/pdf/generate
 現在:
 
 - 管理画面PDFページ
-- `EstimatePDFClient`で動的PDF previewを生成
+- 保存済みPDFを表示
 
 最終方針:
 
@@ -103,7 +107,9 @@ Storage:
 
 現在:
 
-- 未実装
+- 実装済み
+- 管理者ログイン必須
+- 保存済みPDFを返す
 
 目的:
 
@@ -128,22 +134,24 @@ PDF生成:
 
 - public PDF route
 - tokenから`EstimateDocument`または`Repair`を特定
-- server側PDFを都度生成して返す
+- 保存済みPDFを返す
+- `f4b33ec Serve saved estimate PDF from public route` で切替済み
 
-最終方針:
+方針:
 
 - URLは維持
 - token検証は維持
 - PDF生成はしない
 - 保存済みPDFを返すだけにする
+- public URL / signed URL は返さない
 
-想定flow:
+flow:
 
 ```txt
 token検証
 → EstimateDocument特定
-→ currentPdfFile取得
-→ storageKey取得
+→ EstimateDocument.currentPdfFileId取得
+→ EstimatePdfFile.storageKey取得
 → Supabase Storage documents bucketからdownload
 → Content-Type: application/pdf で返す
 ```
@@ -159,7 +167,7 @@ PDF生成:
 
 PDF未生成時:
 
-- 404またはPDF未生成エラー
+- `PDF not generated`
 - 取引先アクセス時に自動生成しない
 
 ### POST /api/documents/estimate/[id]/line
@@ -167,15 +175,21 @@ PDF未生成時:
 現在:
 
 - LINE送信route
-- `EstimateServerDocument.ts`でPDF生成しローカル保存している
-- LINEには共有URLを送る
+- 保存済みPDFの存在を確認したうえで共有URLのみ送る
+- `8e75b2d Require saved estimate PDF before LINE sharing` で切替済み
 
-最終方針:
+方針:
 
 - LINE送信時に毎回PDFを生成しない
-- `currentPdfFile`が存在することを前提にする
+- LINE送信時にPDFをローカル保存しない
+- LINE送信時に別PDFを作らない
+- LINEでPDF添付はしない
+- 今後もLINEでPDF添付はしない
+- `currentPdfFileId` と `storageKey` が存在することを前提にする
 - 未生成なら送信停止
 - 共有URL内のPDFボタンが保存済みPDFを返す
+- `savedFilePath` はレスポンスから削除済み
+- `EstimateServerDocument`, `renderToStream`, `fs`, Google Drive保存パスなどはLINE routeから削除済み
 
 認証:
 
@@ -184,6 +198,22 @@ PDF未生成時:
 PDF生成:
 
 - しない
+
+LINE送信内容:
+
+```txt
+お見積りを共有いたします。
+
+下記URLより、対象案件・お見積内容をご確認ください。
+{sharedUrl}
+
+ご確認後、画面上の「承認」または「差戻し」よりご回答ください。
+```
+
+PDF未生成時:
+
+- `currentPdfFileId` または `storageKey` が無い場合は送信停止
+- `PDF not generated`
 
 ## 生成するroute / 生成しないroute
 

@@ -15,6 +15,32 @@ version = 3
 id = 1, id = 2 は失敗テスト分で status = void
 ```
 
+## 現在の完成状態
+
+```txt
+管理画面PDF:
+保存済みPDFを表示
+
+B2B共有PDF:
+保存済みPDFを返す
+
+LINE:
+保存済みPDFの存在を確認したうえで、B2B共有ページURLのみ送信
+PDFは添付しない
+```
+
+完了済みcommit:
+
+- `f4b33ec Serve saved estimate PDF from public route`
+- `8e75b2d Require saved estimate PDF before LINE sharing`
+
+次に残っていること:
+
+- 実URLでB2B共有PDFボタンを確認する
+- LINE送信APIの実送信テストを必要に応じて行う
+- PDF未生成時の管理画面UI/共有画面UIをさらに整える
+- 必要ならPDF再生成導線を既存見積書生成フローとどう接続するか検討する
+
 ## Step 1: 管理者用保存済みPDF取得routeを追加
 
 追加route:
@@ -121,6 +147,11 @@ GET /api/documents/estimate/[id]/pdf
 
 ## Step 4: public PDF routeを保存済みPDF返却へ変更
 
+状態:
+
+- 完了済み
+- commit: `f4b33ec Serve saved estimate PDF from public route`
+
 対象route:
 
 ```txt
@@ -155,8 +186,15 @@ B2B共有画面のPDFボタンから、保存済みPDFを返す。
 - route内でPDFを生成しない
 - `currentPdfFileId → storageKey`からPDFを返す
 - PDF未生成時は404または明確なエラー
+- public URL / signed URL は返さない
+- 取引先アクセス時にPDFを自動生成しない
 
 ## Step 5: LINE送信をcurrentPdfFile前提に変更
+
+状態:
+
+- 完了済み
+- commit: `8e75b2d Require saved estimate PDF before LINE sharing`
 
 目的:
 
@@ -169,6 +207,8 @@ LINE送信時に毎回PDFを生成せず、保存済みPDFが存在すること�
 やらないこと:
 
 - LINE送信時のPDF再生成
+- LINE送信時のPDFローカル保存
+- LINEでPDF添付
 - public PDF route内でのPDF生成
 - DB schema変更
 
@@ -180,8 +220,13 @@ LINE送信時に毎回PDFを生成せず、保存済みPDFが存在すること�
 完了条件:
 
 - `currentPdfFileId`がない場合は送信停止
+- `storageKey`がない場合は送信停止
 - 共有URL内のPDFボタンが保存済みPDFを返す
 - LINE送信routeではPDFを生成しない
+- LINE送信routeではPDFをローカル保存しない
+- LINEではB2B共有ページURLのみ送る
+- `savedFilePath` はレスポンスから削除済み
+- `EstimateServerDocument`, `renderToStream`, `fs`, Google Drive保存パスなどはLINE routeから削除済み
 
 ## Step 6: PDF未生成/古いPDF/再生成のUI整備
 

@@ -108,19 +108,23 @@ B2B共有画面には、取引先が自分向けに残すメモ機能がある�
 現在:
 
 - public PDF routeへリンクする
-- route側でPDFを生成している箇所が残っている
+- `/customer/repairs/[token]/estimate.pdf`
+- route側ではPDFを生成しない
+- 保存済みPDFを返す
+- `f4b33ec Serve saved estimate PDF from public route` で切替済み
 
-最終方針:
+方針:
 
 - PDFボタンは既存URLを維持
 - `/customer/repairs/[token]/estimate.pdf`
 - route内ではPDFを生成しない
 - `EstimateDocument.currentPdfFileId → EstimatePdfFile.storageKey`を使って保存済みPDFを返す
+- public URL / signed URL は返さない
 
 PDF未生成時:
 
 - 自動生成しない
-- 404またはPDF未生成エラー
+- `PDF not generated`
 - 管理画面で先に生成・確認する運用にする
 
 絶対方針:

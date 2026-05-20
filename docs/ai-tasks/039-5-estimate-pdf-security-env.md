@@ -64,8 +64,14 @@ B2B共有route:
 LINE送信:
 
 - 管理者操作から呼ぶ
-- `currentPdfFile`がない場合は送信停止
-- LINEには共有URLを送る方針でよい
+- `EstimateDocument.currentPdfFileId` と `EstimatePdfFile.storageKey/status` を確認する
+- `currentPdfFileId` または `storageKey` がない場合は送信停止
+- LINEにはB2B共有ページURLのみを送る
+- LINE送信時にPDFを生成しない
+- LINE送信時にPDFをローカル保存しない
+- LINEでPDF添付はしない
+- 今後もLINEでPDF添付はしない
+- PDF確認は共有ページ内のPDFボタンから行う
 
 ## server-onlyを使う理由
 
@@ -113,6 +119,10 @@ PDF binary upload/download
 - `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`を使う
 - `documents` bucketをpublicにする
 - PDFのpublic URLを返す
+- PDFのsigned URLを返す
 - B2B共有画面アクセス時にPDFを自動生成する
+- LINE送信時にPDFを生成する
+- LINE送信時にPDFをローカル保存する
+- LINEでPDF添付する
 - 取引先が未確認PDFを見られる状態にする
 - 本番DB / Supabase / Railway DBを確認なしに触る

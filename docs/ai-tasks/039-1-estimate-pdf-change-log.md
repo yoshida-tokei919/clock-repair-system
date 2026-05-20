@@ -165,3 +165,85 @@ B2B共有画面は取引先が見る画面であり、案件カード上部が�
 - `fileSize = 78876`
 - `status = current`
 - `version = 3`
+
+## f4b33ec Serve saved estimate PDF from public route
+
+目的:
+
+B2B共有画面のPDFボタンから開くpublic PDF routeを、都度生成PDFではなく保存済みPDF返却へ切り替えた。
+
+主な変更ファイル:
+
+- `src/app/customer/repairs/[token]/estimate.pdf/route.ts`
+
+変更内容:
+
+- `/customer/repairs/[token]/estimate.pdf` のURLを維持
+- 既存のtoken検証を維持
+- `EstimateDocument.publicToken` を先に確認し、なければ `Repair.publicToken` から `EstimateDocument` を特定
+- route内でPDFを都度生成しない
+- `EstimateDocument.currentPdfFileId → EstimatePdfFile.storageKey → Supabase Storage documents bucket` から保存済みPDFを取得して返す
+- 保存済みPDFがない場合は `PDF not generated`
+- `Content-Type: application/pdf`
+- `Cache-Control: no-store`
+- public URL / signed URL は返さない
+
+なぜ必要だったか:
+
+管理画面PDFとB2B共有PDFを同じ保存済みPDFに統一し、取引先アクセス時に未確認PDFが自動生成される状態を避けるため。
+
+触っていないもの:
+
+- 管理画面UI
+- 管理画面PDF route
+- LINE送信処理
+- PDF生成API
+- PDFコンポーネント
+- Prisma schema / migration
+
+確認結果:
+
+- `npx.cmd prisma validate` 成功
+- `npx.cmd tsc --noEmit` 成功
+
+## 8e75b2d Require saved estimate PDF before LINE sharing
+
+目的:
+
+LINE送信時にPDFを生成・保存・添付せず、保存済みPDFがあることを確認したうえでB2B共有ページURLのみ送る方針に変更した。
+
+主な変更ファイル:
+
+- `src/app/api/documents/estimate/[id]/line/route.ts`
+
+変更内容:
+
+- LINE送信前に `EstimateDocument.currentPdfFileId` と `EstimatePdfFile.storageKey/status` を確認
+- `currentPdfFileId` または `storageKey` が無い場合は送信停止
+- LINE送信時にPDFを生成しない
+- LINE送信時にPDFをローカル保存しない
+- LINE送信時に別PDFを作らない
+- LINEでPDF添付はしない
+- 今後もLINEでPDF添付はしない
+- LINEではB2B共有ページURLのみを送る
+- PDF確認は共有ページ内のPDFボタンから行う
+- `savedFilePath` はレスポンスから削除
+- `EstimateServerDocument`, `renderToStream`, `fs`, Google Drive保存パスなどはLINE routeから削除
+
+なぜ必要だったか:
+
+LINE送信経路でもPDFを別生成しない方針を徹底し、管理画面PDF、B2B共有PDF、LINE案内後に取引先が見るPDFを同じ保存済みPDFに統一するため。
+
+触っていないもの:
+
+- public PDF route
+- 管理画面UI
+- 管理画面PDF route
+- PDF生成API
+- PDFコンポーネント
+- Prisma schema / migration
+
+確認結果:
+
+- `npx.cmd prisma validate` 成功
+- `npx.cmd tsc --noEmit` 成功

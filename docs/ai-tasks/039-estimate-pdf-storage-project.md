@@ -64,6 +64,10 @@ EstimateDocument.currentPdfFileId
 - `ecaee3a Add estimate PDF file schema`
 - `b20d4b3 Add estimate PDF storage helpers`
 - `a549524 Add estimate PDF generation storage API`
+- `e1f8bff Add admin estimate PDF retrieval API`
+- `ec4fb7c Show saved estimate PDF in admin page`
+- `f4b33ec Serve saved estimate PDF from public route`
+- `8e75b2d Require saved estimate PDF before LINE sharing`
 
 詳細は [039-1-estimate-pdf-change-log.md](./039-1-estimate-pdf-change-log.md) を参照。
 
@@ -75,7 +79,26 @@ EstimateDocument.currentPdfFileId
 - `EstimateDocument.currentPdfFileId` 追加済み
 - Supabase Storage helper追加済み
 - PDF生成・Supabase保存API追加済み
+- 管理者用の保存済みPDF取得route追加済み
+- 管理画面で保存済みPDF表示済み
+- public PDF routeは保存済みPDF返却へ切替済み
+- LINE送信は保存済みPDFの存在確認を前提に変更済み
+- LINE送信時のPDF生成・ローカル保存は廃止済み
 - ローカル動作確認済み
+
+現在の完成状態:
+
+```txt
+管理画面PDF:
+保存済みPDFを表示
+
+B2B共有PDF:
+/customer/repairs/[token]/estimate.pdf のURLを維持し、保存済みPDFを返す
+
+LINE:
+保存済みPDFの存在を確認したうえで、B2B共有ページURLのみ送信
+PDFは添付しない
+```
 
 ローカル動作確認:
 
@@ -92,14 +115,13 @@ version = 3
 id = 1, id = 2 は失敗テスト分で status = void
 ```
 
-## 未完了タスク
+## 残タスク
 
-- 管理者用の保存済みPDF取得route
-- 管理画面で保存済みPDFをiframeまたはlink表示
-- 管理画面のPDF生成/再生成ボタン
-- public PDF routeを保存済みPDF返却へ変更
-- LINE送信を`currentPdfFile`前提へ変更
+- 実URLでB2B共有PDFボタンを確認する
+- LINE送信APIの実送信テストを必要に応じて行う
 - PDF未生成時のUI
+- PDF未生成時の管理画面UI/共有画面UIをさらに整える
+- 必要ならPDF再生成導線を既存見積書生成フローとどう接続するか検討する
 - 旧PDF / `void` / `superseded` の管理UI
 - PDFが古いかどうかの判定
 - `EstimateServerDocument.ts` と `EstimateDocument.tsx` の整理
@@ -113,32 +135,47 @@ id = 1, id = 2 は失敗テスト分で status = void
 - [039-5-estimate-pdf-security-env.md](./039-5-estimate-pdf-security-env.md): security / env運用
 - [039-6-estimate-pdf-roadmap.md](./039-6-estimate-pdf-roadmap.md): 今後の実装roadmap
 
-## 次Task
+## 直近完了したTask
 
-管理者用の保存済み見積PDF取得routeを追加する。
+### public PDF route切替
 
-追加route:
-
-```txt
-GET /api/documents/estimate/[id]/pdf
-```
-
-目的:
+commit:
 
 ```txt
-EstimateDocument.currentPdfFileId
-→ EstimatePdfFile.storageKey
-→ Supabase Storage documents bucketからdownload
-→ Content-Type: application/pdf で返す
+f4b33ec Serve saved estimate PDF from public route
 ```
 
-このTaskでは以下を触らない:
+内容:
 
-- 管理画面UI
-- public PDF route
-- LINE送信
-- PDFコンポーネント
-- Prisma schema / migration
+- `/customer/repairs/[token]/estimate.pdf` はURLを維持
+- token検証は維持
+- PDFをroute内で都度生成しない
+- `EstimateDocument.currentPdfFileId → EstimatePdfFile.storageKey → Supabase Storage documents bucket` から保存済みPDFを取得して返す
+- 保存済みPDFがない場合は `PDF not generated`
+- 取引先アクセス時にPDFを自動生成しない
+- public URL / signed URL は返さない
+
+### LINE送信ルール変更
+
+commit:
+
+```txt
+8e75b2d Require saved estimate PDF before LINE sharing
+```
+
+内容:
+
+- LINE送信前に `EstimateDocument.currentPdfFileId` と `EstimatePdfFile.storageKey/status` を確認
+- `currentPdfFileId` または `storageKey` が無い場合は送信停止
+- LINE送信時にPDFを生成しない
+- LINE送信時にPDFをローカル保存しない
+- LINE送信時に別PDFを作らない
+- LINEでPDF添付はしない
+- 今後もLINEでPDF添付はしない
+- LINEではB2B共有ページURLのみを送る
+- PDF確認は共有ページ内のPDFボタンから行う
+- `savedFilePath` はレスポンスから削除済み
+- `EstimateServerDocument`, `renderToStream`, `fs`, Google Drive保存パスなどはLINE routeから削除済み
 
 ## 絶対方針
 
@@ -146,6 +183,10 @@ EstimateDocument.currentPdfFileId
 - 共有画面アクセス時にPDFを都度生成しない
 - 取引先アクセス時に未確認PDFを自動生成しない
 - 管理画面で確認したPDFと共有PDFは同じstorageKeyを参照する
+- LINE送信時にPDFを生成しない
+- LINE送信時にPDFをローカル保存しない
+- LINEでPDF添付しない
+- LINEではB2B共有ページURLのみを送る
 - service role keyはclient側に出さない
 - `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` は絶対に使わない
 - Supabase bucketはprivate
