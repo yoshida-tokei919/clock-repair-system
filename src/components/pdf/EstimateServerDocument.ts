@@ -40,6 +40,15 @@ export function createEstimateServerDocumentElement(
   };
   const withCustomerHonorific = (value: string, customerType?: string) =>
     customerType === "business" ? withOnchu(value) : withSama(value);
+  const columns = {
+    no: "3%",
+    inquiry: "9%",
+    partnerRef: "10%",
+    endUser: "10%",
+    watch: "20%",
+    items: "36%",
+    total: "12%",
+  };
 
   const styles = StyleSheet.create({
     page: {
@@ -145,17 +154,18 @@ export function createEstimateServerDocumentElement(
         View,
         { style: styles.table },
         // 保存済み見積PDFは管理画面・B2B共有・LINE共有後のPDFで共通利用するため、
-        // 表ヘッダーは削除しない。
+        // 表ヘッダーは削除せず、列幅はヘッダー行と明細行で揃える。
+        // 表ヘッダーは同じfontSizeで統一し、主要ラベル（お問合せNo / 金額(税抜)）は改行させない。
         el(
           View,
           { style: styles.tableHeader },
-          el(Text, { wrap: false, style: [styles.small, { width: "2.5%", fontWeight: "bold" }] }, "No."),
-          el(Text, { wrap: false, style: [styles.small, { width: "6.5%" }] }, "管理No"),
-          el(Text, { wrap: false, style: [styles.small, { width: "8.5%" }] }, "貴社管理No"),
-          el(Text, { wrap: false, style: [styles.small, { width: "9%", textAlign: "right", paddingRight: 5 }] }, "顧客名"),
-          el(Text, { wrap: false, style: [styles.small, { width: "20.5%", textAlign: "right", paddingRight: 2, fontWeight: "bold" }] }, "時計情報"),
-          el(Text, { wrap: false, style: { width: "44%", fontSize: 9, borderLeftWidth: 1, borderColor: "#ccc", paddingLeft: 0, marginLeft: 1 } }, "作業明細・交換部品 / 単価"),
-          el(Text, { style: { width: "10%", textAlign: "right", fontSize: 10, fontWeight: "bold" } }, "小計(税抜)")
+          el(Text, { wrap: false, style: { width: columns.no, fontSize: 7, fontWeight: "bold" } }, "No."),
+          el(Text, { wrap: false, style: { width: columns.inquiry, fontSize: 7 } }, "お問合せNo"),
+          el(Text, { wrap: false, style: { width: columns.partnerRef, fontSize: 7, paddingLeft: 2 } }, "貴社管理No"),
+          el(Text, { wrap: false, style: { width: columns.endUser, fontSize: 7, textAlign: "right", paddingRight: 5 } }, "お客様名"),
+          el(Text, { wrap: false, style: { width: columns.watch, fontSize: 7, textAlign: "right", paddingRight: 4, fontWeight: "bold" } }, "時計情報"),
+          el(Text, { wrap: false, style: { width: columns.items, fontSize: 7, borderLeftWidth: 1, borderColor: "#ccc", paddingLeft: 4 } }, "作業明細・交換部品 / 単価"),
+          el(Text, { wrap: false, style: { width: columns.total, textAlign: "right", fontSize: 7, fontWeight: "bold" } }, "金額(税抜)")
         ),
         data.jobs.map((job, index) => {
           const jobTotal = job.items.reduce((sum, item) => sum + item.price, 0);
@@ -169,14 +179,14 @@ export function createEstimateServerDocumentElement(
             el(
               View,
               { style: styles.mainRow },
-              el(Text, { style: [styles.small, { width: "2.5%", fontWeight: "bold" }] }, String(index + 1)),
-              el(Text, { style: [styles.small, { width: "6.5%" }] }, job.inquiryNumber),
-              el(Text, { style: [styles.small, { width: "8.5%" }] }, job.partnerRef || "-"),
-              el(Text, { style: [styles.small, { width: "9%", textAlign: "right", paddingRight: 5 }] }, withSama(job.endUserName)),
-              el(Text, { style: [styles.small, { width: "20.5%", textAlign: "right", paddingRight: 2, fontWeight: "bold" }] }, watchInfo),
+              el(Text, { style: [styles.small, { width: columns.no, fontWeight: "bold" }] }, String(index + 1)),
+              el(Text, { style: [styles.small, { width: columns.inquiry }] }, job.inquiryNumber),
+              el(Text, { style: [styles.small, { width: columns.partnerRef, paddingLeft: 2 }] }, job.partnerRef || "-"),
+              el(Text, { style: [styles.small, { width: columns.endUser, textAlign: "right", paddingRight: 5 }] }, withSama(job.endUserName)),
+              el(Text, { style: [styles.small, { width: columns.watch, textAlign: "right", paddingRight: 4, fontWeight: "bold" }] }, watchInfo),
               el(
                 View,
-                { style: { width: "44%", paddingLeft: 0, borderLeftWidth: 1, borderColor: "#eee" } },
+                { style: { width: columns.items, paddingLeft: 4, borderLeftWidth: 1, borderColor: "#eee" } },
                 job.items.map((item, itemIndex) =>
                   el(
                     View,
@@ -196,7 +206,7 @@ export function createEstimateServerDocumentElement(
               ),
               el(
                 Text,
-                { style: { width: "10%", textAlign: "right" } },
+                { style: { width: columns.total, textAlign: "right" } },
                 `¥${jobTotal.toLocaleString()}`
               )
             ),
