@@ -73,10 +73,18 @@ export function createEstimateServerDocumentElement(
       borderTopWidth: 2,
       borderColor: "#333",
     },
+    tableHeader: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderColor: "#000",
+      paddingBottom: 4,
+      marginBottom: 4,
+      alignItems: "flex-end",
+    },
     row: {
       borderBottomWidth: 1,
       borderColor: "#ccc",
-      paddingVertical: 6,
+      paddingVertical: 4,
     },
     mainRow: {
       flexDirection: "row",
@@ -136,43 +144,51 @@ export function createEstimateServerDocumentElement(
       el(
         View,
         { style: styles.table },
+        // 保存済み見積PDFは管理画面・B2B共有・LINE共有後のPDFで共通利用するため、
+        // 表ヘッダーは削除しない。
+        el(
+          View,
+          { style: styles.tableHeader },
+          el(Text, { wrap: false, style: [styles.small, { width: "2.5%", fontWeight: "bold" }] }, "No."),
+          el(Text, { wrap: false, style: [styles.small, { width: "6.5%" }] }, "管理No"),
+          el(Text, { wrap: false, style: [styles.small, { width: "8.5%" }] }, "貴社管理No"),
+          el(Text, { wrap: false, style: [styles.small, { width: "9%", textAlign: "right", paddingRight: 5 }] }, "顧客名"),
+          el(Text, { wrap: false, style: [styles.small, { width: "20.5%", textAlign: "right", paddingRight: 2, fontWeight: "bold" }] }, "時計情報"),
+          el(Text, { wrap: false, style: { width: "44%", fontSize: 9, borderLeftWidth: 1, borderColor: "#ccc", paddingLeft: 0, marginLeft: 1 } }, "作業明細・交換部品 / 単価"),
+          el(Text, { style: { width: "10%", textAlign: "right", fontSize: 10, fontWeight: "bold" } }, "小計(税抜)")
+        ),
         data.jobs.map((job, index) => {
           const jobTotal = job.items.reduce((sum, item) => sum + item.price, 0);
-          const watchInfo = [
-            job.watch.brand,
-            job.watch.model,
-            job.watch.ref ? `Ref: ${job.watch.ref}` : null,
-            job.watch.serial ? `Ser: ${job.watch.serial}` : null,
-          ]
-            .filter(Boolean)
-            .join("\n");
+          const watchInfo = `${job.watch.brand}\n${job.watch.model}\nRef: ${
+            job.watch.ref || "-"
+          }\nSer: ${job.watch.serial || "-"}`;
 
           return el(
             View,
-            { key: job.id || index, style: styles.row },
+            { key: job.id || index, style: [styles.row, { minHeight: 30 }] },
             el(
               View,
               { style: styles.mainRow },
-              el(Text, { style: [styles.small, { width: "4%" }] }, String(index + 1)),
-              el(Text, { style: [styles.small, { width: "12%" }] }, job.inquiryNumber),
-              el(Text, { style: [styles.small, { width: "13%" }] }, job.partnerRef || "-"),
-              el(Text, { style: [styles.small, { width: "13%" }] }, withSama(job.endUserName)),
-              el(Text, { style: [styles.small, { width: "22%" }] }, watchInfo),
+              el(Text, { style: [styles.small, { width: "2.5%", fontWeight: "bold" }] }, String(index + 1)),
+              el(Text, { style: [styles.small, { width: "6.5%" }] }, job.inquiryNumber),
+              el(Text, { style: [styles.small, { width: "8.5%" }] }, job.partnerRef || "-"),
+              el(Text, { style: [styles.small, { width: "9%", textAlign: "right", paddingRight: 5 }] }, withSama(job.endUserName)),
+              el(Text, { style: [styles.small, { width: "20.5%", textAlign: "right", paddingRight: 2, fontWeight: "bold" }] }, watchInfo),
               el(
                 View,
-                { style: { width: "26%" } },
+                { style: { width: "44%", paddingLeft: 0, borderLeftWidth: 1, borderColor: "#eee" } },
                 job.items.map((item, itemIndex) =>
                   el(
                     View,
                     { key: itemIndex, style: styles.itemRow },
                     el(
                       Text,
-                      { style: { width: "72%", fontSize: 8 } },
+                      { style: { width: "78%", fontSize: 7 } },
                       `・${item.displayName || item.name}`
                     ),
                     el(
                       Text,
-                      { style: { width: "28%", textAlign: "right", fontSize: 8 } },
+                      { style: { width: "22%", textAlign: "right", fontSize: 7 } },
                       `¥${item.price.toLocaleString()}`
                     )
                   )
