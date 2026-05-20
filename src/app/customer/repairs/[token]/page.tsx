@@ -38,9 +38,13 @@ const repairInclude = {
 };
 
 function getStatusBadgeClass(status: string) {
-  if (status.includes("承認") || status.includes("作業")) return "bg-green-50 text-green-700 border-green-200";
+  if (isApprovedRepairStatus(status)) return "bg-green-50 text-green-700 border-green-200";
   if (status.includes("差戻") || status.includes("保留") || status.includes("キャンセル")) return "bg-red-50 text-red-700 border-red-200";
   return "bg-orange-50 text-orange-700 border-orange-200";
+}
+
+function isApprovedRepairStatus(status: string) {
+  return status === "承認済み" || status.startsWith("作業") || status.startsWith("部品");
 }
 
 function getEstimateItems(repair: any) {
@@ -51,16 +55,14 @@ function getEstimateTotal(repair: any) {
   return getEstimateItems(repair).reduce((sum: number, item: any) => sum + item.unitPrice * (item.quantity || 1), 0);
 }
 
-function getCustomerDisplayName(repair: any) {
-  return repair.endUserName?.trim() || "お客様";
+function getEndUserDisplayName(repair: any) {
+  return repair.endUserName?.trim() || "";
 }
 
-function getWatchLine(repair: any) {
+function getWatchBrandModelLine(repair: any) {
   return [
     repair.watch?.brand?.name,
     repair.watch?.model?.name,
-    repair.watch?.reference?.name,
-    repair.watch?.serialNumber,
   ]
     .filter(Boolean)
     .join(" ");
@@ -137,7 +139,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
       privateMemoKey: `customer-repair-partner-private-memo:${privateMemoToken}`,
       partnerRef: repair.partnerRef?.trim() || "",
       inquiryNumber: repair.inquiryNumber || "",
-      customerName: getCustomerDisplayName(repair),
+      customerName: getEndUserDisplayName(repair),
       brand: repair.watch?.brand?.name || "",
       model: repair.watch?.model?.name || "",
       reference: repair.watch?.reference?.name || "",
@@ -151,7 +153,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
 
   if (isBusiness) {
     const commentCount = repairs.filter((repair) => repair.customerMessages.length > 0).length;
-    const approvedCount = repairs.filter((repair) => repair.status.includes("承認")).length;
+    const approvedCount = repairs.filter((repair) => isApprovedRepairStatus(repair.status)).length;
     const pendingCount = repairs.length - approvedCount;
     const publicPdfHref = `/customer/repairs/${token}/estimate.pdf`;
 
@@ -193,9 +195,11 @@ export default async function CustomerRepairPage({ params }: PageProps) {
               const amountToken = repair.publicToken || `${token}:${repair.id}`;
               const privateMemoToken = repair.publicToken || `${token}:${repair.id}`;
               const amountKey = `customer-guide-amount:${amountToken}:${repair.id}`;
-              const customerDisplayName = getCustomerDisplayName(repair);
+              const endUserDisplayName = getEndUserDisplayName(repair);
               const partnerRef = repair.partnerRef?.trim() || "";
-              const watchLine = getWatchLine(repair);
+              const brandModelLine = getWatchBrandModelLine(repair);
+              const referenceName = repair.watch?.reference?.name || "";
+              const serialNumber = repair.watch?.serialNumber || "";
               const latestMessages = repair.customerMessages.slice(0, 2).map((message: any) => ({
                 ...message,
                 createdAt: message.createdAt.toISOString(),
@@ -204,17 +208,24 @@ export default async function CustomerRepairPage({ params }: PageProps) {
               }));
 
               const repairHeader = (
-                <div className="flex min-w-0 items-start gap-3">
-                  <span className={`mt-0.5 shrink-0 rounded-full border px-3 py-1 text-sm font-bold ${getStatusBadgeClass(repair.status)}`}>
+                <div className="min-w-0 space-y-2">
+                  <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-sm font-bold ${getStatusBadgeClass(repair.status)}`}>
                     {repair.status}
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-slate-900">
-                      <span className="font-bold">{customerDisplayName} 様</span>
-                      {partnerRef && <span>管 {partnerRef}</span>}
-                      <span>問 {repair.inquiryNumber}</span>
+                  {(endUserDisplayName || partnerRef || repair.inquiryNumber) && (
+                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                      {endUserDisplayName && <span className="text-base font-semibold leading-6 text-slate-900">{endUserDisplayName} 様</span>}
+                      {partnerRef && <span className="text-sm font-medium leading-5 text-slate-700">管 {partnerRef}</span>}
+                      {repair.inquiryNumber && <span className="text-sm font-medium leading-5 text-slate-700">問 {repair.inquiryNumber}</span>}
                     </div>
-                    <div className="mt-1 truncate text-base font-medium text-slate-700">{watchLine || "-"}</div>
+                  )}
+                  <div className="min-w-0 truncate text-base font-medium leading-6 text-slate-800">{brandModelLine || "-"}</div>
+                  <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-sm font-medium leading-5 text-slate-600">
+                    {referenceName && <span className="break-all">Ref: {referenceName}</span>}
+                    {serialNumber && <span className="break-all">Ser: {serialNumber}</span>}
+                    {!referenceName && !serialNumber && (
+                      <span>-</span>
+                    )}
                   </div>
                 </div>
               );
