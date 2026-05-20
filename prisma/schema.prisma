@@ -50,6 +50,7 @@ model Customer {
   deliveryNotes     DeliveryNote[]
   invoices          Invoice[]
   estimateDocuments EstimateDocument[]
+  estimatePdfFiles  EstimatePdfFile[]
   warranties        Warranty[]
 }
 
@@ -479,14 +480,44 @@ model EstimateDocument {
   issuedDate      DateTime @default(now())
   publicToken     String?  @unique
   publicTokenCreatedAt DateTime?
+  currentPdfFileId Int?    @unique
   
   customerId      Int
   customer        Customer @relation(fields: [customerId], references: [id])
 
   repairs         Repair[]
+  pdfFiles        EstimatePdfFile[] @relation("EstimateDocumentPdfFiles")
+  currentPdfFile  EstimatePdfFile?  @relation("CurrentEstimatePdfFile", fields: [currentPdfFileId], references: [id], onDelete: SetNull)
 
   totalAmount     Int      @default(0)
   taxAmount       Int      @default(0)
+}
+
+model EstimatePdfFile {
+  id                 Int              @id @default(autoincrement())
+  estimateDocumentId Int
+  customerId         Int?
+  storageKey         String
+  fileName           String
+  contentType        String           @default("application/pdf")
+  fileSize           Int?
+  hash               String?
+  version            Int
+  status             String           @default("current")
+  generatedAt        DateTime         @default(now())
+  generatedBy        String?
+  sentAt             DateTime?
+  approvedAt         DateTime?
+  supersededAt       DateTime?
+
+  estimateDocument   EstimateDocument  @relation("EstimateDocumentPdfFiles", fields: [estimateDocumentId], references: [id], onDelete: Cascade)
+  currentForDocument EstimateDocument? @relation("CurrentEstimatePdfFile")
+  customer           Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([estimateDocumentId])
+  @@index([customerId])
+  @@index([status])
+  @@unique([estimateDocumentId, version])
 }
 
 model Warranty {
