@@ -56,6 +56,14 @@ POST /api/documents/estimate/[id]/pdf/generate
 
 このrouteだけがPDFを生成する。
 
+## 保存済みPDFレイアウトの再発防止ルール
+
+- `EstimateServerDocument.ts` は保存済み見積PDFの正本
+- 表ヘッダーは削除しない
+- 列幅はヘッダー行と明細行で共通化する
+- ヘッダー表記は `金額(税抜)` に統一する
+- `お問合せNo` と `金額(税抜)` は1行表示を維持する
+
 ## Route別仕様
 
 ### GET /documents/estimate/[id]
