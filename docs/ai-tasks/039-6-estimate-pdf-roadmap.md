@@ -40,6 +40,40 @@ PDFは添付しない
 - LINE送信APIの実送信テストを必要に応じて行う
 - PDF未生成時の管理画面UI/共有画面UIをさらに整える
 - 必要ならPDF再生成導線を既存見積書生成フローとどう接続するか検討する
+- 既存の請求書生成・表示・月次請求フローを調査する
+
+## Next Task: 請求書生成・共有フロー調査
+
+次に調査すべき内容:
+
+既存の請求書生成・表示・月次請求フローを調査する。
+
+確認対象:
+
+- `/invoices`
+- `/api/invoices`
+- `/api/invoices/preview`
+- `/documents/invoice/[id]`
+- Invoice model
+- InvoiceDocument.tsx
+- 月次請求の作成導線
+- 請求書PDFを保存済みPDF化する最小差分
+- 請求書共有URLを作る場合のtoken設計
+- LINEで請求書共有URLだけ送るAPI設計
+
+調査時に守ること:
+
+- 実装コード変更禁止
+- API追加禁止
+- route変更禁止
+- Prisma schema変更禁止
+- migration作成禁止
+- UI変更禁止
+- LINE送信処理変更禁止
+- PDFコンポーネント変更禁止
+- `.env` / `.env.local` を触らない
+- `.next-dev.err.log` を触らない
+- 本番DB / Supabase / Railway DB を触らない
 
 ## Step 1: 管理者用保存済みPDF取得routeを追加
 

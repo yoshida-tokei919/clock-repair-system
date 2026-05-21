@@ -73,6 +73,17 @@ LINE送信:
 - 今後もLINEでPDF添付はしない
 - PDF確認は共有ページ内のPDFボタンから行う
 
+請求書LINE送信:
+
+- 請求書は見積書と同じく、LINEで共有URLだけを送る
+- LINEで請求書PDFを添付しない
+- LINE本文に請求金額は書かない
+- 支払期限も現時点では本文に必須ではない
+- メールアドレスがない取引先も多いため、メール必須にはしない
+- `{請求書共有URL}` は `https://` から始まる完全URLにする
+- LINE上で自動的にクリック可能なURLにする
+- URL先で請求書PDFを確認・ダウンロードできるようにする
+
 ## server-onlyを使う理由
 
 `src/lib/supabase-admin.ts` と `src/lib/estimate-pdf-storage.ts` はserver専用。
@@ -124,5 +135,8 @@ PDF binary upload/download
 - LINE送信時にPDFを生成する
 - LINE送信時にPDFをローカル保存する
 - LINEでPDF添付する
+- 請求書LINE本文に請求金額を書く
+- 請求書PDFをLINE添付する
+- 請求書共有URLを相対URLのまま送る
 - 取引先が未確認PDFを見られる状態にする
 - 本番DB / Supabase / Railway DBを確認なしに触る
