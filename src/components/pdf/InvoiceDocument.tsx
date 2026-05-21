@@ -24,9 +24,9 @@ const styles = StyleSheet.create({
   sender: { fontSize: 9, textAlign: 'right', lineHeight: 1.3 },
   b2bContainer: { marginTop: 10, borderTopWidth: 2, borderColor: '#333' },
   b2bRow: { borderBottomWidth: 1, borderColor: '#ccc', paddingVertical: 4 },
-  colDate: { fontSize: 9, width: '15%' },
-  colSlip: { fontSize: 9, width: '20%' },
-  colDesc: { fontSize: 9, width: '40%' },
+  colSlip: { fontSize: 9, width: '25%' },
+  colDate: { fontSize: 9, width: '20%' },
+  colDesc: { fontSize: 9, width: '30%' },
   colAmount: { fontSize: 10, width: '25%', textAlign: 'right' },
   bankInfo: {
     marginTop: 20,
@@ -89,7 +89,7 @@ export function InvoiceDocument({ data }: InvoiceDocumentProps) {
           </View>
           <View style={{ width: '40%' }}>
             <Text style={styles.sender}>ヨシダ時計修理工房</Text>
-            <Text style={styles.sender}>〒251-1213 神奈川県藤沢市亀井野1-162-1-401</Text>
+            <Text style={styles.sender}>〒651-1213 神戸市北区広陵町1-162-1-401</Text>
             <Text style={styles.sender}>TEL: 090-2041-8275</Text>
             <Text style={styles.sender}>支払期限: {data.dueDate}</Text>
           </View>
@@ -97,17 +97,17 @@ export function InvoiceDocument({ data }: InvoiceDocumentProps) {
 
         <View style={styles.b2bContainer}>
           <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000', paddingBottom: 4, marginBottom: 4 }}>
-            <Text style={styles.colDate}>日付</Text>
-            <Text style={styles.colSlip}>伝票番号</Text>
-            <Text style={styles.colDesc}>摘要</Text>
-            <Text style={styles.colAmount}>金額(税込)</Text>
+            <Text style={styles.colSlip}>納品書番号</Text>
+            <Text style={styles.colDate}>納品日</Text>
+            <Text style={styles.colDesc}>納品点数</Text>
+            <Text style={styles.colAmount}>金額</Text>
           </View>
 
           {data.items.map((item, idx) => (
             <View key={idx} style={styles.b2bRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.colDate}>{item.date}</Text>
                 <Text style={styles.colSlip}>{item.slipNumber}</Text>
+                <Text style={styles.colDate}>{item.date}</Text>
                 <Text style={styles.colDesc}>{item.description}</Text>
                 <Text style={styles.colAmount}>¥{item.amount.toLocaleString()}</Text>
               </View>
@@ -136,7 +136,7 @@ export function InvoiceDocument({ data }: InvoiceDocumentProps) {
             <Text style={{ fontSize: 9 }}>{data.bankInfo}</Text>
           ) : (
             <>
-              <Text style={{ fontSize: 9 }}>湘南農業協同組合</Text>
+              <Text style={{ fontSize: 9 }}>三井住友銀行　店番411</Text>
               <Text style={{ fontSize: 9 }}>普通 3602468</Text>
               <Text style={{ fontSize: 9, marginBottom: 4 }}>ヨシダ シュウヘイ</Text>
             </>

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { InvoicePDFClient } from "@/components/pdf/InvoicePDFClient"; // Will create this
+import { InvoicePDFClient } from "@/components/pdf/InvoicePDFClient";
 
 export const dynamic = "force-dynamic";
 
@@ -25,37 +25,52 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
 
     if (!invoice) return notFound();
 
-    const jobs = invoice.repairs.map(repair => {
-        const estimateItems = repair.estimate?.items || [];
+    const deliveryGroups = new Map<
+        string,
+        {
+            slipNumber: string;
+            date: Date;
+            repairCount: number;
+            amount: number;
+        }
+    >();
 
-        return {
-            inquiryId: repair.inquiryNumber,
-            watch: {
-                brand: repair.watch.brand?.name || "",
-                model: repair.watch.model?.name || "",
-                ref: repair.watch.reference?.name || "",
-                serial: repair.watch.serialNumber || ""
-            },
-            items: estimateItems.map(i => ({
-                name: i.itemName,
-                qty: i.quantity,
-                price: i.unitPrice
-            })),
-            // For B2B Invoice List
-            date: repair.deliveryDateActual?.toLocaleDateString("ja-JP") || invoice.issuedDate.toLocaleDateString("ja-JP"),
-        };
-    });
+    for (const repair of invoice.repairs) {
+        const groupKey = repair.deliveryNoteId
+            ? `delivery-note-id:${repair.deliveryNoteId}`
+            : repair.deliveryNote?.slipNumber
+              ? `delivery-note-slip:${repair.deliveryNote.slipNumber}`
+              : "unlinked-delivery-note";
 
-    // Transform to B2B Invoice props
-    const deliveries = invoice.repairs.map(r => {
-        const total = (r.estimate?.items || []).reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-        return {
-            date: r.deliveryDateActual?.toLocaleDateString("ja-JP") || invoice.issuedDate.toLocaleDateString("ja-JP"),
-            slipNo: r.deliveryNote?.slipNumber || r.inquiryNumber,
-            count: 1,
-            amount: Math.floor(total * 1.1)
-        };
-    });
+        const repairAmount = (repair.estimate?.items || []).reduce(
+            (sum, item) => sum + item.unitPrice * item.quantity,
+            0
+        );
+        const groupDate = repair.deliveryNote?.issuedDate || repair.deliveryDateActual || invoice.issuedDate;
+        const existing = deliveryGroups.get(groupKey);
+
+        if (existing) {
+            existing.repairCount += 1;
+            existing.amount += repairAmount;
+            if (groupDate < existing.date) existing.date = groupDate;
+        } else {
+            deliveryGroups.set(groupKey, {
+                slipNumber: repair.deliveryNote?.slipNumber || "未紐付け",
+                date: groupDate,
+                repairCount: 1,
+                amount: repairAmount
+            });
+        }
+    }
+
+    const invoiceItems = Array.from(deliveryGroups.values())
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+        .map((group) => ({
+            date: group.date.toLocaleDateString("ja-JP"),
+            slipNumber: group.slipNumber,
+            description: `${group.repairCount}点`,
+            amount: group.amount
+        }));
 
     const pdfData = {
         invoiceNumber: invoice.invoiceNumber,
@@ -65,14 +80,9 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
             name: invoice.customer.name,
             address: invoice.customer.address || undefined
         },
-        items: invoice.repairs.map(r => ({
-            date: r.deliveryDateActual?.toLocaleDateString("ja-JP") || invoice.issuedDate.toLocaleDateString("ja-JP"),
-            slipNumber: r.deliveryNote?.slipNumber || r.inquiryNumber,
-            description: `${r.watch.brand?.name} ${r.watch.model?.name} 修理代`,
-            amount: (r.estimate?.items || []).reduce((s, i) => s + i.unitPrice * i.quantity, 0)
-        })),
+        items: invoiceItems,
         taxRate: 0.1,
-        bankInfo: "三井住友銀行\n普通 3602468\nヨシダ シュウヘイ"
+        bankInfo: "三井住友銀行　店番411\n普通 3602468\nヨシダ シュウヘイ"
     };
 
     return <InvoicePDFClient data={pdfData} />;
