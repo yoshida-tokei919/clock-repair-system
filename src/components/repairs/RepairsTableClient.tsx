@@ -46,20 +46,25 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     const [isGenerating, setIsGenerating] = useState(false);
     useAutoRefreshOnReturn();
 
-    const toggleSelectAll = () => {
-        if (selectedIds.length === repairs.length) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(repairs.map((r) => r.id));
-        }
+    const toggleSelectAll = (checked: boolean | "indeterminate") => {
+        setSelectedIds(checked === true ? repairs.map((r) => r.id) : []);
     };
 
-    const toggleSelect = (id: number) => {
-        if (selectedIds.includes(id)) {
-            setSelectedIds(selectedIds.filter((i) => i !== id));
-        } else {
-            setSelectedIds([...selectedIds, id]);
-        }
+    const setRepairSelected = (id: number, checked: boolean | "indeterminate") => {
+        setSelectedIds((prev) => {
+            if (checked === true) {
+                return prev.includes(id) ? prev : [...prev, id];
+            }
+            return prev.filter((selectedId) => selectedId !== id);
+        });
+    };
+
+    const toggleRepairSelected = (id: number) => {
+        setSelectedIds((prev) =>
+            prev.includes(id)
+                ? prev.filter((selectedId) => selectedId !== id)
+                : [...prev, id]
+        );
     };
 
     const handleBulkAction = async (type: "delivery" | "estimate") => {
@@ -136,10 +141,18 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                 <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 border-b text-slate-500 font-medium">
                         <tr>
-                            <th className="px-4 py-3 w-[50px]">
+                            <th
+                                className="px-4 py-3 w-[50px]"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleSelectAll(!(repairs.length > 0 && selectedIds.length === repairs.length));
+                                }}
+                            >
                                 <Checkbox
                                     checked={repairs.length > 0 && selectedIds.length === repairs.length}
                                     onCheckedChange={toggleSelectAll}
+                                    className="cursor-pointer"
+                                    onClick={(e) => e.stopPropagation()}
                                 />
                             </th>
                             <th className="px-4 py-3">管理番号</th>
@@ -168,10 +181,18 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                     )}
                                     onClick={() => router.push(`/repairs/${repair.id}`)}
                                 >
-                                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                    <td
+                                        className="px-4 py-3"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleRepairSelected(repair.id);
+                                        }}
+                                    >
                                         <Checkbox
                                             checked={selectedIds.includes(repair.id)}
-                                            onCheckedChange={() => toggleSelect(repair.id)}
+                                            onCheckedChange={(checked) => setRepairSelected(repair.id, checked)}
+                                            className="cursor-pointer"
+                                            onClick={(e) => e.stopPropagation()}
                                         />
                                     </td>
                                     <td className="px-4 py-3 font-mono font-bold text-slate-700">
