@@ -51,6 +51,7 @@ model Customer {
   invoices          Invoice[]
   estimateDocuments EstimateDocument[]
   estimatePdfFiles  EstimatePdfFile[]
+  invoicePdfFiles   InvoicePdfFile[]
   warranties        Warranty[]
 }
 
@@ -460,16 +461,23 @@ model Invoice {
   id            Int      @id @default(autoincrement())
   invoiceNumber String   @unique // e.g. TI-001
   issuedDate    DateTime @default(now())
+  billingMonth  String?
+  publicToken   String?  @unique
+  publicTokenCreatedAt DateTime?
+  currentPdfFileId Int? @unique
   
   customerId    Int
   customer      Customer @relation(fields: [customerId], references: [id])
   
   repairs       Repair[]
+  pdfFiles      InvoicePdfFile[] @relation("InvoicePdfFiles")
+  currentPdfFile InvoicePdfFile? @relation("CurrentInvoicePdfFile", fields: [currentPdfFileId], references: [id], onDelete: SetNull)
   
   totalAmount   Int      @default(0)
   taxAmount     Int      @default(0)
   status        String   @default("issued") // issued, paid
   paymentDueDate DateTime?
+  sentAt        DateTime?
 }
 
 
@@ -518,6 +526,42 @@ model EstimatePdfFile {
   @@index([customerId])
   @@index([status])
   @@unique([estimateDocumentId, version])
+}
+
+model InvoicePdfFile {
+  id Int @id @default(autoincrement())
+
+  invoiceId Int
+  invoice Invoice @relation("InvoicePdfFiles", fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  currentForInvoice Invoice? @relation("CurrentInvoicePdfFile")
+
+  customerId Int?
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  storageKey String
+  fileName String
+  contentType String @default("application/pdf")
+  fileSize Int?
+  hash String?
+
+  version Int
+  status String @default("draft")
+
+  generatedAt DateTime @default(now())
+  generatedBy String?
+
+  sentAt DateTime?
+  paidAt DateTime?
+  supersededAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([invoiceId, version])
+  @@index([invoiceId])
+  @@index([customerId])
+  @@index([status])
 }
 
 model Warranty {
