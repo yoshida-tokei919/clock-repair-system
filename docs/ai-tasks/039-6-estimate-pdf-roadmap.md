@@ -316,3 +316,21 @@ LINE送信時に毎回PDFを生成せず、保存済みPDFが存在すること�
 - `current` / `sent` / `approved` / `superseded` / `void` が見分けられる
 - どのPDFが現在提示中か分かる
 - 再見積時の扱いが明確
+
+## 2026-05-24 残タスク
+
+本番反映前:
+
+- 本番DB migration適用方針の確認
+- Supabase Storage `documents` bucket確認
+- Railway env確認
+- `NEXTAUTH_URL` / `NEXT_PUBLIC_APP_URL` 等のURL生成設定確認
+- 本番での見積書PDF生成確認
+- 本番での請求書PDF生成確認
+- 本番でのLINE送信テスト
+- public共有URLが本番ドメインで生成されるか確認
+
+運用後:
+
+- 修理スケジュール / 作業キュー
+- 部品検索ワード生成・複数サイト検索の詰め

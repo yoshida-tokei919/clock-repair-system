@@ -276,3 +276,52 @@ PDFを生成しない:
 - `GET /api/documents/estimate/[id]/pdf`
 - `GET /customer/repairs/[token]/estimate.pdf`
 - `POST /api/documents/estimate/[id]/line`
+
+## 2026-05-24 現在の完成状態
+
+見積書PDFは保存済みPDFを正本とする。
+
+管理画面PDF、B2B共有画面PDF、LINE共有後に取引先が見るPDFは、同じ保存済みPDFを参照する。
+
+実装済みroute:
+
+- `POST /api/documents/estimate/[id]/pdf/generate`
+- `GET /api/documents/estimate/[id]/pdf`
+- `GET /customer/repairs/[token]/estimate.pdf`
+- `POST /api/documents/estimate/[id]/line`
+
+管理画面UI:
+
+- `/documents/estimate/[id]` に見積書PDF操作ボタンを復旧済み。
+- 保存済みPDFなし: `PDFを生成`
+- 保存済みPDFあり: `PDFを開く` / `PDFを生成` / `LINEで送信`
+
+LINE送信方針:
+
+- LINEではB2B共有ページURLのみ送る。
+- PDF添付はしない。
+- PDF route URLを直接送らない。
+- signed URL / public storage URL は送らない。
+- LINE送信時にPDF生成・保存は行わない。
+- 保存済みPDFが無い場合はLINE送信を停止する。
+
+認証:
+
+- `POST /api/documents/estimate/[id]/line` は `getServerSession(authOptions)` による管理者認証を追加済み。
+- 未ログイン時は `401 Unauthorized`。
+
+## 管理画面操作フロー
+
+見積書・請求書共通の管理画面操作フロー:
+
+1. 帳票作成後、帳票詳細ページでPDFを生成する。
+2. PDFを開いて確認する。
+3. 問題なければLINEで送信する。
+4. LINEで送るのは共有ページURLのみ。
+
+共通UI:
+
+- 保存済みPDFなし: `PDFを生成`
+- 保存済みPDFあり: `PDFを開く` / `PDFを生成` / `LINEで送信`
+
+`PDFを生成` は、保存済みPDFが既にある場合でも現在の内容で新しいPDFを生成し、`current` を更新する。旧PDFは `superseded` 扱いになる。

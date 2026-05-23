@@ -303,3 +303,107 @@ LINE共有URL送信APIを追加する。
 - 本番DB / Supabase / Railway DB を触らない
 - `git add .` 禁止
 - commit禁止
+
+## 2026-05-24 現在の完成状態
+
+請求書PDFは保存済みPDFを正本とする。
+
+管理画面PDF、請求書共有ページPDF、LINE共有後に取引先が見るPDFは、同じ保存済みPDFを参照する。
+
+実装済みDB:
+
+- `Invoice.billingMonth`
+- `Invoice.publicToken`
+- `Invoice.publicTokenCreatedAt`
+- `Invoice.currentPdfFileId`
+- `Invoice.sentAt`
+- `InvoicePdfFile`
+
+実装済みroute:
+
+- `POST /api/invoices/[id]/pdf/generate`
+- `GET /api/invoices/[id]/pdf`
+- `GET /customer/invoices/[token]`
+- `GET /customer/invoices/[token]/invoice.pdf`
+- `POST /api/invoices/[id]/line`
+
+管理画面UI:
+
+- `/documents/invoice/[id]` に請求書PDF操作ボタンを追加済み。
+- 保存済みPDFなし: `PDFを生成`
+- 保存済みPDFあり: `PDFを開く` / `PDFを生成` / `LINEで送信`
+
+`PDFを生成` は、保存済みPDFが既にある場合でも現在の内容で新しいPDFを生成し、`current` を更新する。旧PDFは `superseded` 扱いになる。
+
+## 請求書共有ページ
+
+`/customer/invoices/[token]` を追加済み。
+
+- `Invoice.publicToken` で検証する。
+- 見積書共有ページと同じ白背景、青アクセント、角丸カード、スマホ前提のUI方針。
+- 承認、差戻し、コメント欄は不要。
+- PDF確認と請求概要確認に特化する。
+
+public PDF route:
+
+- `/customer/invoices/[token]/invoice.pdf` は保存済みPDFのみ返す。
+- PDFを都度生成しない。
+- public URL / signed URL は返さない。
+
+## LINE送信方針
+
+- LINEでは請求書共有ページURLのみ送る。
+- PDF添付はしない。
+- PDF route URLを直接送らない。
+- signed URL / public storage URL は送らない。
+- 請求金額はLINE本文に書かない。
+- LINE送信時にPDF生成・保存は行わない。
+- 保存済みPDFが無い場合はLINE送信を停止する。
+
+LINE本文:
+
+```text
+いつもお世話になり有難うございます。
+〇月分の請求書を発行いたしました。
+
+下記URLより請求書PDFをご確認ください。
+{請求書共有URL}
+
+よろしくお願いいたします。
+```
+
+## 請求書PDF表示仕様
+
+請求書明細は `1明細 = 1納品書` とする。
+
+明細列:
+
+- 納品書番号
+- 納品日
+- 納品点数
+- 金額
+
+納品点数の単位は `点`。
+
+修正済み表示内容:
+
+- 自社住所: `〒651-1213 神戸市北区広陵町1-162-1-401`
+- 振込先: `三井住友銀行　店番411`
+- 振込先: `普通 3602468`
+- 振込先: `ヨシダ シュウヘイ`
+
+請求書PDFの文字化けは修正済み。
+
+## 管理画面操作フロー
+
+見積書・請求書共通の管理画面操作フロー:
+
+1. 帳票作成後、帳票詳細ページでPDFを生成する。
+2. PDFを開いて確認する。
+3. 問題なければLINEで送信する。
+4. LINEで送るのは共有ページURLのみ。
+
+共通UI:
+
+- 保存済みPDFなし: `PDFを生成`
+- 保存済みPDFあり: `PDFを開く` / `PDFを生成` / `LINEで送信`
