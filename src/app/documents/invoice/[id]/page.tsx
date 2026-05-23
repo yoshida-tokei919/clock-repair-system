@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-
+import { InvoicePdfActions } from "@/components/invoices/InvoicePdfActions";
 export const dynamic = "force-dynamic";
 
 function formatPdfGeneratedAt(date: Date) {
@@ -60,12 +60,7 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
                                 保存済みPDFを表示しています。管理画面と共有画面は同じPDFファイルを参照します。
                             </p>
                         </div>
-                        <a
-                            href={`/api/invoices/${invoice.id}/pdf`}
-                            className="inline-flex h-9 items-center justify-center rounded bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
-                        >
-                            PDFを開く
-                        </a>
+                        <InvoicePdfActions invoiceId={invoice.id} hasPdf={true} />
                     </div>
                     <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600">
                         <div className="flex gap-1">
@@ -104,9 +99,9 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
                 <p className="mt-1 text-xs text-amber-800">
                     管理画面と共有画面で同じPDFを表示するため、先に請求書PDFを生成してください。
                 </p>
-                <p className="mt-1 text-xs text-amber-800">
-                    POST /api/invoices/{invoice.id}/pdf/generate で保存済みPDFを生成できます。
-                </p>
+                <div className="mt-4">
+                    <InvoicePdfActions invoiceId={invoice.id} hasPdf={false} />
+                </div>
             </div>
         </div>
     );
