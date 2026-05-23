@@ -76,7 +76,7 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
       if (groupDate < existing.date) existing.date = groupDate;
     } else {
       deliveryGroups.set(groupKey, {
-        slipNumber: repair.deliveryNote?.slipNumber || "譛ｪ邏蝉ｻ倥￠",
+        slipNumber: repair.deliveryNote?.slipNumber || "未紐付け",
         date: groupDate,
         repairCount: 1,
         amount: repairAmount,
@@ -89,7 +89,7 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     .map((group) => ({
       date: group.date.toLocaleDateString("ja-JP"),
       slipNumber: group.slipNumber,
-      description: `${group.repairCount}轤ｹ`,
+      description: `${group.repairCount}点`,
       amount: group.amount,
     }));
 
@@ -103,7 +103,7 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     },
     items: invoiceItems,
     taxRate: 0.1,
-    bankInfo: "荳我ｺ穂ｽ丞暑驫陦後蠎礼分411\n譎ｮ騾・3602468\n繝ｨ繧ｷ繝 繧ｷ繝･繧ｦ繝倥う",
+    bankInfo: "三井住友銀行　店番411\n普通 3602468\nヨシダ シュウヘイ",
   } satisfies InvoiceDocumentProps["data"];
 }
 
