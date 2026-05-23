@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import { EstimatePdfActions } from "@/components/estimates/EstimatePdfActions";
 
 export const dynamic = "force-dynamic";
 
@@ -63,12 +64,7 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
                                 保存済みPDFを表示しています。管理画面と共有画面は同じPDFファイルを参照します。
                             </p>
                         </div>
-                        <a
-                            href={`/api/documents/estimate/${estimateDoc.id}/pdf`}
-                            className="inline-flex h-9 items-center justify-center rounded bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
-                        >
-                            PDFを開く
-                        </a>
+                        <EstimatePdfActions estimateDocumentId={estimateDoc.id} hasPdf={true} />
                     </div>
                     <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600">
                         <div className="flex gap-1">
@@ -106,6 +102,9 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
                 <p className="mt-1 text-xs text-amber-800">
                     管理画面と共有画面で同じPDFを表示するため、保存済みPDFを生成してから確認してください。
                 </p>
+                <div className="mt-4">
+                    <EstimatePdfActions estimateDocumentId={estimateDoc.id} hasPdf={false} />
+                </div>
             </div>
         </div>
     );
