@@ -47,6 +47,18 @@ function fmtDate(iso: string) {
     });
 }
 
+function invoiceStatusLabel(status: string) {
+    if (status === "paid") return "入金済み";
+    if (status === "void") return "取消済み";
+    return "未入金";
+}
+
+function invoiceStatusClass(status: string) {
+    if (status === "paid") return "bg-green-100 text-green-700";
+    if (status === "void") return "bg-red-100 text-red-700";
+    return "bg-yellow-100 text-yellow-700";
+}
+
 export default function InvoicesPage() {
     const router = useRouter();
 
@@ -179,13 +191,9 @@ export default function InvoicesPage() {
                                                 </span>
                                             </div>
                                             <span
-                                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                                    inv.status === "paid"
-                                                        ? "bg-green-100 text-green-700"
-                                                        : "bg-yellow-100 text-yellow-700"
-                                                }`}
+                                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${invoiceStatusClass(inv.status)}`}
                                             >
-                                                {inv.status === "paid" ? "入金済" : "未入金"}
+                                                {invoiceStatusLabel(inv.status)}
                                             </span>
                                         </div>
                                         <div className="mt-2 flex gap-4 text-xs text-gray-500">

@@ -60,8 +60,14 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
                                 保存済みPDFを表示しています。管理画面と共有画面は同じPDFファイルを参照します。
                             </p>
                         </div>
-                        <InvoicePdfActions invoiceId={invoice.id} hasPdf={true} />
+                        <InvoicePdfActions invoiceId={invoice.id} hasPdf={true} invoiceStatus={invoice.status} />
                     </div>
+                    {invoice.status === "void" ? (
+                        <div className="mt-3 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                            <p className="font-semibold">この請求書は取消済みです。</p>
+                            <p className="mt-1">紐づいていた納品書は未請求状態に戻されています。</p>
+                        </div>
+                    ) : null}
                     <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600">
                         <div className="flex gap-1">
                             <dt className="font-medium text-slate-800">version:</dt>
@@ -100,8 +106,14 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
                     管理画面と共有画面で同じPDFを表示するため、先に請求書PDFを生成してください。
                 </p>
                 <div className="mt-4">
-                    <InvoicePdfActions invoiceId={invoice.id} hasPdf={false} />
+                    <InvoicePdfActions invoiceId={invoice.id} hasPdf={false} invoiceStatus={invoice.status} />
                 </div>
+                {invoice.status === "void" ? (
+                    <div className="mt-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                        <p className="font-semibold">この請求書は取消済みです。</p>
+                        <p className="mt-1">紐づいていた納品書は未請求状態に戻されています。</p>
+                    </div>
+                ) : null}
             </div>
         </div>
     );
