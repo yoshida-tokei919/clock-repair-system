@@ -521,26 +521,6 @@ nav a:hover { color: var(--accent-color); }
 .slider-btn.next { right: -10px; }
 
 /* 流れ・保証・FAQ */
-.flow-section { background-color: var(--white); }
-.flow-steps { display: flex; justify-content: space-between; margin-bottom: 60px; position: relative; }
-.flow-steps::after {
-    content: ''; position: absolute; top: 25px; left: 10%; width: 80%; height: 2px; background: var(--gray); z-index: 1;
-}
-.step { flex: 1; text-align: center; position: relative; z-index: 2; }
-.step-icon {
-    width: 50px; height: 50px; line-height: 50px; border-radius: 50%;
-    background: var(--gray); color: var(--white); font-size: 1.5rem; font-weight: bold; margin: 0 auto 20px;
-}
-.step.active .step-icon { background: var(--accent-color); }
-
-.step h4 { font-size: 1.15rem; color: var(--primary-color); margin-bottom: 10px; font-weight: bold;}
-.step p { font-size: 0.9rem; color: #666; padding: 0 5px; line-height: 1.5;}
-
-.kit-banner {
-    background-color: #eff6ff; border: 2px solid var(--accent-color); padding: 40px; border-radius: 8px;
-    display: flex; align-items: center; gap: 30px; margin-top: 50px;
-}
-.kit-icon { font-size: 4rem; color: var(--accent-color); }
 .warranty-section { background-color: var(--bg-color); text-align: center;}
 .warranty-box {
     background: var(--white); padding: 60px; border-radius: 8px;
@@ -732,9 +712,6 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     .contact-section h2 { font-size: 1.5rem; }
     .line-btn { width: 100%; box-sizing: border-box; }
     .cases-grid { grid-template-columns: 1fr; }
-    .flow-steps { flex-direction: column; gap: 20px; }
-    .flow-steps::after { display: none; }
-    .kit-banner { flex-direction: column; text-align: center; }
     .slider-btn { display: none; }
     /* スマホでの検索フォーム調整 */
     .wp-search-form { flex-direction: column; }
@@ -876,41 +853,6 @@ const HTML_ABOUT_PRICE = `
 `;
 
 const HTML_FLOW_FOOTER = `
-<section id="flow" class="section flow-section">
-    <div class="container">
-        <h2 class="section-title">郵送修理の流れ</h2>
-        <div class="flow-steps">
-            <div class="step active">
-                <div class="step-icon">1</div>
-                <h4>ご相談・概算見積もり</h4>
-                <p>LINEまたはフォームよりご連絡ください。</p>
-            </div>
-            <div class="step active">
-                <div class="step-icon">2</div>
-                <h4>配送キット受取・発送</h4>
-                <p>キットに時計を入れ、着払いで発送。</p>
-            </div>
-            <div class="step">
-                <div class="step-icon">3</div>
-                <h4>正式なお見積り</h4>
-                <p>到着した時計を点検し、正確な費用をご案内。</p>
-            </div>
-            <div class="step">
-                <div class="step-icon">4</div>
-                <h4>修理・お支払い</h4>
-                <p>修理完了後、銀行振込（入金確認後に発送）または代金引換（ヤマト運輸）にてご返送いたします。</p>
-            </div>
-        </div>
-        <div class="kit-banner">
-            <div class="kit-icon">📦</div>
-            <div class="kit-text">
-                <h3>無料配送キットをご用意しております</h3>
-                <p>「箱がない」「送り方が不安」という方もご安心ください。<br>専用の梱包材、緩衝材、着払い伝票をセットにして無料でお送りします。</p>
-            </div>
-        </div>
-    </div>
-</section>
-
 <section id="faq" class="section faq-section" style="background-color: white;">
     <div class="container">
         <h2 class="section-title">&#12424;&#12367;&#12354;&#12427;&#36074;&#21839;</h2>
