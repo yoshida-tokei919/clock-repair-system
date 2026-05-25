@@ -570,6 +570,54 @@ nav a:hover { color: var(--accent-color); }
 }
 
 /* お問い合わせ */
+.business-guide-section {
+    padding: 0 20px 90px;
+    background: #fff;
+}
+.business-guide-panel {
+    max-width: 1000px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 26px 42px;
+    align-items: center;
+    padding: 34px 42px;
+    border: 1px solid #dce5ee;
+    border-radius: 10px;
+    background: #f8fafc;
+    box-shadow: 0 10px 24px rgba(26, 43, 75, 0.04);
+}
+.business-guide-panel h2 {
+    margin: 0 0 14px;
+    color: var(--primary-color);
+    font-size: 1.5rem;
+    line-height: 1.45;
+    letter-spacing: 0.03em;
+}
+.business-guide-panel p {
+    margin: 0;
+    color: #405166;
+    font-size: 0.96rem;
+    line-height: 1.9;
+}
+.business-guide-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 220px;
+    padding: 14px 20px;
+    border-radius: 6px;
+    background: var(--primary-color);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 8px 18px rgba(26, 43, 75, 0.14);
+}
+.business-guide-button:hover {
+    background: #233b66;
+    transform: translateY(-1px);
+}
+
 .contact-section { background-color: var(--primary-color); color: var(--white); text-align: center; padding: 80px 20px;}
 .line-wrapper { background: var(--white); color: var(--text-color); padding: 40px; border-radius: 12px; display: inline-block; margin-top: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);}
 
@@ -640,6 +688,13 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     }
     .consultation-safe-panel h2 { font-size: 1.35rem; }
     .consultation-safe-button { width: 100%; box-sizing: border-box; }
+    .business-guide-section { padding: 0 20px 60px; }
+    .business-guide-panel {
+        grid-template-columns: 1fr;
+        padding: 28px 22px;
+    }
+    .business-guide-panel h2 { font-size: 1.35rem; }
+    .business-guide-button { width: 100%; box-sizing: border-box; }
     .cases-grid { grid-template-columns: 1fr; }
     .flow-steps { flex-direction: column; gap: 20px; }
     .flow-steps::after { display: none; }
@@ -845,6 +900,16 @@ const HTML_FLOW_FOOTER = `
                 <p class="faq-answer">&#29366;&#24907;&#12420;&#37096;&#21697;&#20837;&#25163;&#29366;&#27841;&#12395;&#12424;&#12426;&#12414;&#12377;&#12364;&#12289;&#37096;&#21697;&#35519;&#36948;&#12539;&#21152;&#24037;&#12539;&#35069;&#20316;&#12418;&#21547;&#12417;&#12390;&#20462;&#29702;&#12398;&#21487;&#33021;&#24615;&#12434;&#30906;&#35469;&#12375;&#12414;&#12377;&#12290;&#12414;&#12378;&#12399;&#20889;&#30495;&#12392;&#30151;&#29366;&#12434;&#12362;&#36865;&#12426;&#12367;&#12384;&#12373;&#12356;&#12290;</p>
             </div>
         </div>
+    </div>
+</section>
+
+<section class="business-guide-section">
+    <div class="business-guide-panel">
+        <div>
+            <h2>&#26989;&#32773;&#27096;&#12408;</h2>
+            <p>&#21462;&#24341;&#20808;&#27096;&#21521;&#12369;&#12395;&#12289;&#23455;&#21209;&#21028;&#26029;&#12395;&#24441;&#31435;&#12388;&#20462;&#29702;&#20107;&#20363;&#12434;&#12372;&#29992;&#24847;&#12375;&#12390;&#12356;&#12414;&#12377;&#12290;<br>&#12502;&#12521;&#12531;&#12489;&#12539;&#22411;&#30058;&#12539;Cal&#12539;&#20462;&#29702;&#20869;&#23481;&#12539;&#20132;&#25563;&#37096;&#21697;&#12289;&#36027;&#29992;&#24863;&#12394;&#12393;&#12434;&#30906;&#35469;&#12375;&#12289;<br>&#26178;&#35336;&#12434;&#36865;&#12427;&#21069;&#12398;&#21028;&#26029;&#26448;&#26009;&#12392;&#12375;&#12390;&#12372;&#21033;&#29992;&#12356;&#12383;&#12384;&#12369;&#12414;&#12377;&#12290;</p>
+        </div>
+        <a class="business-guide-button" href="/cases/biz">&#26989;&#32773;&#27096;&#21521;&#12369;&#12506;&#12540;&#12472;&#12434;&#35211;&#12427;</a>
     </div>
 </section>
 
