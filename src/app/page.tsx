@@ -582,10 +582,29 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
 
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
-    .nav-container { flex-direction: column; padding: 15px; }
-    nav ul { gap: 15px; margin-top: 10px; }
-    .hero { margin-top: 130px; }
-    .hero-inner { padding: 48px 20px 44px; }
+    header { padding: 6px 0; }
+    .nav-container { flex-direction: column; align-items: flex-start; padding: 8px 14px 6px; }
+    .logo-wrapper { gap: 10px; }
+    .logo-img { height: 44px; }
+    .site-name { font-size: 1rem; }
+    nav {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    nav::-webkit-scrollbar { display: none; }
+    nav ul {
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 16px;
+        margin-top: 8px;
+        width: max-content;
+    }
+    nav li { flex: 0 0 auto; }
+    nav a { white-space: nowrap; font-size: 0.82rem; }
+    .hero { margin-top: 116px; }
+    .hero-inner { padding: 58px 20px 44px; }
     .hero-title { font-size: 2.35rem; }
     .hero-lead { font-size: 0.95rem; line-height: 1.9; }
     .hero-actions { flex-direction: column; align-items: stretch; }
