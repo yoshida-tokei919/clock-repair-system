@@ -730,7 +730,6 @@ const HTML_HEADER = `
         <nav>
             <ul>
                 <li><a href="#about">こだわり</a></li>
-                <li><a href="#price">料金</a></li>
                 <li><a href="#cases">修理事例</a></li>
                 <li><a href="#flow">修理の流れ</a></li>
                 <li><a href="#contact">お問い合わせ</a></li>
@@ -799,7 +798,7 @@ const HTML_ABOUT_PRICE = `
     </div>
 </section>
 
-<section class="homepage-flow-section">
+<section id="flow" class="homepage-flow-section">
     <div class="homepage-flow-inner">
         <h2 class="homepage-flow-heading">修理の流れ</h2>
         <p class="homepage-flow-lead">LINEでのご相談から、正式見積り、修理、精度・防水確認、納品までの流れをご確認いただけます。</p>
