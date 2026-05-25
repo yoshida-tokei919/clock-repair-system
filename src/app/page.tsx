@@ -325,6 +325,69 @@ nav a:hover { color: var(--accent-color); }
     background: #233b66;
     transform: translateY(-1px);
 }
+.homepage-flow-section {
+    padding: 0 20px 96px;
+    background: #fff;
+}
+.homepage-flow-inner {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+.homepage-flow-heading {
+    margin: 0 0 16px;
+    text-align: center;
+    color: var(--primary-color);
+    font-size: 2rem;
+    line-height: 1.45;
+    letter-spacing: 0.04em;
+}
+.homepage-flow-lead {
+    max-width: 720px;
+    margin: 0 auto 36px;
+    text-align: center;
+    color: #405166;
+    font-size: 0.98rem;
+    line-height: 1.9;
+}
+.homepage-flow-steps {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 12px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.homepage-flow-step {
+    min-height: 118px;
+    box-sizing: border-box;
+    padding: 20px 12px;
+    border: 1px solid #dce5ee;
+    border-radius: 8px;
+    background: #fff;
+    text-align: center;
+    box-shadow: 0 8px 20px rgba(26, 43, 75, 0.035);
+}
+.homepage-flow-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin-bottom: 14px;
+    border: 1px solid #cfd9e4;
+    border-radius: 50%;
+    color: #1a2b4b;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+.homepage-flow-label {
+    display: block;
+    color: var(--primary-color);
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.55;
+}
 /* 修理事例（スライダー＆WordPress検索） */
 .cases-section { background-color: var(--bg-color); }
 
@@ -456,6 +519,25 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     }
     .case-finder-panel h2 { font-size: 1.35rem; }
     .case-finder-button { width: 100%; box-sizing: border-box; }
+    .homepage-flow-section { padding: 0 20px 60px; }
+    .homepage-flow-heading { font-size: 1.6rem; }
+    .homepage-flow-lead {
+        margin-bottom: 28px;
+        text-align: left;
+    }
+    .homepage-flow-steps { grid-template-columns: 1fr; gap: 10px; }
+    .homepage-flow-step {
+        min-height: auto;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 16px 18px;
+        text-align: left;
+    }
+    .homepage-flow-number {
+        flex: 0 0 auto;
+        margin: 0;
+    }
     .cases-grid { grid-template-columns: 1fr; }
     .flow-steps { flex-direction: column; gap: 20px; }
     .flow-steps::after { display: none; }
@@ -544,6 +626,43 @@ const HTML_ABOUT_PRICE = `
             </div>
         </div>
         <a class="case-finder-button" href="/cases/gallery">&#20462;&#29702;&#20107;&#20363;&#12434;&#26908;&#32034;&#12377;&#12427;</a>
+    </div>
+</section>
+
+<section class="homepage-flow-section">
+    <div class="homepage-flow-inner">
+        <h2 class="homepage-flow-heading">修理の流れ</h2>
+        <p class="homepage-flow-lead">LINEでのご相談から、正式見積り、修理、精度・防水確認、納品までの流れをご確認いただけます。</p>
+        <ol class="homepage-flow-steps">
+            <li class="homepage-flow-step">
+                <span class="homepage-flow-number">01</span>
+                <span class="homepage-flow-label">LINE相談</span>
+            </li>
+            <li class="homepage-flow-step">
+                <span class="homepage-flow-number">02</span>
+                <span class="homepage-flow-label">概算案内</span>
+            </li>
+            <li class="homepage-flow-step">
+                <span class="homepage-flow-number">03</span>
+                <span class="homepage-flow-label">受付</span>
+            </li>
+            <li class="homepage-flow-step">
+                <span class="homepage-flow-number">04</span>
+                <span class="homepage-flow-label">正式見積り</span>
+            </li>
+            <li class="homepage-flow-step">
+                <span class="homepage-flow-number">05</span>
+                <span class="homepage-flow-label">修理</span>
+            </li>
+            <li class="homepage-flow-step">
+                <span class="homepage-flow-number">06</span>
+                <span class="homepage-flow-label">精度・防水確認</span>
+            </li>
+            <li class="homepage-flow-step">
+                <span class="homepage-flow-number">07</span>
+                <span class="homepage-flow-label">納品</span>
+            </li>
+        </ol>
     </div>
 </section>
 
