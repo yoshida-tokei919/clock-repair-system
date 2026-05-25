@@ -618,13 +618,45 @@ nav a:hover { color: var(--accent-color); }
     transform: translateY(-1px);
 }
 
-.contact-section { background-color: var(--primary-color); color: var(--white); text-align: center; padding: 80px 20px;}
-.line-wrapper { background: var(--white); color: var(--text-color); padding: 40px; border-radius: 12px; display: inline-block; margin-top: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);}
-
-.qr-code-img { width: 180px; height: auto; margin: 0 auto 20px; display: block; border: 1px solid var(--gray); background-color: #eee;}
-
-.line-btn { background-color: #06c755; margin-top: 15px;}
-.line-btn:hover { background-color: #05b34c;}
+.contact-section {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    color: var(--primary-color);
+    text-align: center;
+    padding: 20px 20px 92px;
+}
+.line-wrapper {
+    max-width: 860px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    padding: 44px 36px;
+    border: 1px solid #dce5ee;
+    border-radius: 10px;
+    background: var(--white);
+    box-shadow: 0 14px 30px rgba(26, 43, 75, 0.06);
+}
+.contact-section h2 {
+    margin: 0 0 16px;
+    color: var(--primary-color);
+    font-size: 1.9rem;
+    line-height: 1.45;
+    letter-spacing: 0.04em;
+}
+.contact-section p {
+    margin: 0 auto 26px;
+    max-width: 620px;
+    color: #405166;
+    font-size: 0.98rem;
+    line-height: 1.9;
+}
+.line-btn {
+    background-color: var(--primary-color);
+    color: #fff;
+    min-width: 190px;
+    padding: 14px 24px;
+    border-radius: 6px;
+    box-shadow: 0 8px 18px rgba(26, 43, 75, 0.16);
+}
+.line-btn:hover { background-color: #233b66;}
 
 /* フッター */
 footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);}
@@ -695,6 +727,10 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     }
     .business-guide-panel h2 { font-size: 1.35rem; }
     .business-guide-button { width: 100%; box-sizing: border-box; }
+    .contact-section { padding: 0 20px 60px; }
+    .line-wrapper { padding: 32px 22px; }
+    .contact-section h2 { font-size: 1.5rem; }
+    .line-btn { width: 100%; box-sizing: border-box; }
     .cases-grid { grid-template-columns: 1fr; }
     .flow-steps { flex-direction: column; gap: 20px; }
     .flow-steps::after { display: none; }
@@ -915,13 +951,10 @@ const HTML_FLOW_FOOTER = `
 
 <section id="contact" class="contact-section section">
     <div class="container">
-        <h2>お問い合わせ</h2>
-        <p>時計の不調、メンテナンス、お気軽にご相談ください。</p>
         <div class="line-wrapper">
-            <img src="/img/line-qr.png" alt="公式LINE QRコード" class="qr-code-img">
-            <h3>公式LINEで相談する</h3>
-            <p>写真を送るだけで、簡単お見積もり</p>
-            <a href="https://lin.ee/3C0XfJW" class="btn line-btn">LINE 友だち追加</a>
+            <h2>&#12414;&#12378;&#12399;LINE&#12391;&#12372;&#30456;&#35527;&#12367;&#12384;&#12373;&#12356;</h2>
+            <p>&#20889;&#30495;&#12539;&#22411;&#30058;&#12539;&#30151;&#29366;&#12434;&#12362;&#36865;&#12426;&#12356;&#12383;&#12384;&#12369;&#12428;&#12400;&#12289;&#21463;&#20184;&#21069;&#12398;&#27010;&#31639;&#30456;&#35527;&#12364;&#21487;&#33021;&#12391;&#12377;&#12290;<br>&#12372;&#30456;&#35527;&#12384;&#12369;&#12391;&#20462;&#29702;&#21463;&#20184;&#12395;&#12399;&#12394;&#12426;&#12414;&#12379;&#12435;&#12290;</p>
+            <a href="https://lin.ee/3C0XfJW" class="btn line-btn">LINE&#12391;&#30456;&#35527;&#12377;&#12427;</a>
         </div>
     </div>
 </section>
