@@ -325,21 +325,6 @@ nav a:hover { color: var(--accent-color); }
     background: #233b66;
     transform: translateY(-1px);
 }
-.price-section table {
-    width: 100%; border-collapse: collapse; border: 1px solid var(--gray);
-    background: var(--white); border-radius: 8px; overflow: hidden;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05); font-size: 0.95rem;
-}
-.price-section th, .price-section td {
-    padding: 15px 10px; border: 1px solid var(--gray); text-align: center;
-}
-.our-price {
-    background-color: #eff6ff; font-weight: bold; color: var(--accent-color);
-}
-.table-responsive {
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
-}
-
 /* 修理事例（スライダー＆WordPress検索） */
 .cases-section { background-color: var(--bg-color); }
 
@@ -562,110 +547,6 @@ const HTML_ABOUT_PRICE = `
     </div>
 </section>
 
-<section id="price" class="section price-section" style="background-color: #fcfcfc;">
-    <div class="container">
-        <h2 class="section-title">メーカー別 修理料金比較表</h2>
-        <p style="text-align:center; margin-bottom:40px;">
-            メーカー正規修理と同等の品質を、よりリーズナブルな価格でご提供します。<br>
-            <span style="font-size: 0.9em; color: #666;">※価格は全て税込・参考料金（〜）です。状態により変動する場合がございます。</span>
-        </p>
-        
-        <div class="table-responsive" style="overflow-x: auto;">
-            <table style="min-width: 900px;">
-                <thead>
-                    <tr>
-                        <th rowspan="2" style="background-color: var(--primary-color); color: white; vertical-align: middle;">メーカー</th>
-                        <th colspan="2" style="background-color: #e2e8f0; color: #333;">クォーツ（電池式）</th>
-                        <th colspan="2" style="background-color: #cbd5e1; color: #333;">機械式（3針）</th>
-                        <th colspan="2" style="background-color: #94a3b8; color: white;">機械式（クロノ等）</th>
-                        <th rowspan="2" style="background-color: var(--primary-color); color: white; vertical-align: middle; width: 15%;">特記事項</th>
-                    </tr>
-                    <tr>
-                        <th style="font-size: 0.9em; background-color: #f1f5f9;">正規料金</th>
-                        <th class="our-price" style="font-size: 0.9em;">当店価格</th>
-                        <th style="font-size: 0.9em; background-color: #e2e8f0;">正規料金</th>
-                        <th class="our-price" style="font-size: 0.9em;">当店価格</th>
-                        <th style="font-size: 0.9em; background-color: #cbd5e1;">正規料金</th>
-                        <th class="our-price" style="font-size: 0.9em;">当店価格</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="font-weight: bold;">ROLEX</td>
-                        <td>-</td>
-                        <td class="our-price">-</td>
-                        <td>88,000円〜</td>
-                        <td class="our-price">30,000円〜</td>
-                        <td>100,000円〜</td>
-                        <td class="our-price">50,000円〜</td>
-                        <td style="font-size: 0.85em; text-align: left;">モデル・年代で変動あり</td>
-                    </tr>
-                    <tr>
-                        <td style="font-weight: bold;">OMEGA</td>
-                        <td>70,000円〜</td>
-                        <td class="our-price">16,000円〜</td>
-                        <td>90,000円〜</td>
-                        <td class="our-price">25,000円〜</td>
-                        <td>115,000円〜</td>
-                        <td class="our-price">40,000円〜</td>
-                        <td style="font-size: 0.85em; text-align: left;">コーアクシャルは高め</td>
-                    </tr>
-                    <tr>
-                        <td style="font-weight: bold;">TAG Heuer</td>
-                        <td>35,000円〜</td>
-                        <td class="our-price">16,000円〜</td>
-                        <td>55,000円〜</td>
-                        <td class="our-price">25,000円〜</td>
-                        <td>85,000円〜</td>
-                        <td class="our-price">40,000円〜</td>
-                        <td style="font-size: 0.85em; text-align: left;">正規会員価格あり(約3割安)</td>
-                    </tr>
-                    <tr>
-                        <td style="font-weight: bold;">BREITLING</td>
-                        <td>50,000円〜</td>
-                        <td class="our-price">16,000円〜</td>
-                        <td>80,000円〜</td>
-                        <td class="our-price">30,000円〜</td>
-                        <td>120,000円〜</td>
-                        <td class="our-price">40,000円〜</td>
-                        <td style="font-size: 0.85em; text-align: left;">正規会員価格あり(半額)</td>
-                    </tr>
-                    <tr>
-                        <td style="font-weight: bold;">IWC</td>
-                        <td>50,000円〜</td>
-                        <td class="our-price">16,000円〜</td>
-                        <td>70,000円〜</td>
-                        <td class="our-price">30,000円〜</td>
-                        <td>95,000円〜</td>
-                        <td class="our-price">50,000円〜</td>
-                        <td style="font-size: 0.85em; text-align: left;">-</td>
-                    </tr>
-                    <tr>
-                        <td style="font-weight: bold;">Cartier</td>
-                        <td>45,000円〜</td>
-                        <td class="our-price">20,000円〜</td>
-                        <td>55,000円〜</td>
-                        <td class="our-price">30,000円〜</td>
-                        <td>80,000円〜</td>
-                        <td class="our-price">50,000円〜</td>
-                        <td style="font-size: 0.85em; text-align: left;">-</td>
-                    </tr>
-                    <tr>
-                        <td style="font-weight: bold;">Grand Seiko</td>
-                        <td>40,000円〜</td>
-                        <td class="our-price">16,000円〜</td>
-                        <td>55,000円〜</td>
-                        <td class="our-price">25,000円〜</td>
-                        <td>85,000円〜</td>
-                        <td class="our-price">40,000円〜</td>
-                        <td style="font-size: 0.85em; text-align: left;">スプリングドライブは6万円〜</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <p style="margin-top: 20px; font-size: 0.9em; text-align: right;">※上記以外のブランドも修理可能です。お気軽にお問い合わせください。</p>
-    </div>
-</section>
 `;
 
 const HTML_FLOW_FOOTER = `
