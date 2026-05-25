@@ -388,6 +388,75 @@ nav a:hover { color: var(--accent-color); }
     font-weight: 700;
     line-height: 1.55;
 }
+.consultation-safe-section {
+    padding: 0 20px 96px;
+    background: #fff;
+}
+.consultation-safe-panel {
+    max-width: 1000px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 28px 44px;
+    align-items: center;
+    padding: 38px 44px;
+    border: 1px solid #dce5ee;
+    border-radius: 10px;
+    background: #f8fafc;
+    box-shadow: 0 10px 24px rgba(26, 43, 75, 0.04);
+}
+.consultation-safe-copy {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 22px;
+    align-items: start;
+}
+.consultation-safe-mark {
+    width: 56px;
+    height: 56px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #cfd9e4;
+    border-radius: 50%;
+    color: var(--primary-color);
+    font-size: 1.55rem;
+    line-height: 1;
+    background: #fff;
+}
+.consultation-safe-panel h2 {
+    margin: 0 0 16px;
+    color: var(--primary-color);
+    font-size: 1.55rem;
+    line-height: 1.45;
+    letter-spacing: 0.03em;
+}
+.consultation-safe-panel p {
+    margin: 0;
+    color: #405166;
+    font-size: 0.96rem;
+    line-height: 1.9;
+}
+.consultation-safe-panel p + p {
+    margin-top: 12px;
+}
+.consultation-safe-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 220px;
+    padding: 14px 20px;
+    border: 1px solid #1a2b4b;
+    border-radius: 6px;
+    background: #fff;
+    color: var(--primary-color);
+    font-weight: 700;
+}
+.consultation-safe-button:hover {
+    background: #f1f5f9;
+    transform: translateY(-1px);
+}
 /* 修理事例（スライダー＆WordPress検索） */
 .cases-section { background-color: var(--bg-color); }
 
@@ -538,6 +607,22 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
         flex: 0 0 auto;
         margin: 0;
     }
+    .consultation-safe-section { padding: 0 20px 60px; }
+    .consultation-safe-panel {
+        grid-template-columns: 1fr;
+        padding: 28px 22px;
+    }
+    .consultation-safe-copy {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .consultation-safe-mark {
+        width: 48px;
+        height: 48px;
+        font-size: 1.35rem;
+    }
+    .consultation-safe-panel h2 { font-size: 1.35rem; }
+    .consultation-safe-button { width: 100%; box-sizing: border-box; }
     .cases-grid { grid-template-columns: 1fr; }
     .flow-steps { flex-direction: column; gap: 20px; }
     .flow-steps::after { display: none; }
@@ -663,6 +748,20 @@ const HTML_ABOUT_PRICE = `
                 <span class="homepage-flow-label">納品</span>
             </li>
         </ol>
+    </div>
+</section>
+
+<section class="consultation-safe-section">
+    <div class="consultation-safe-panel">
+        <div class="consultation-safe-copy">
+            <span class="consultation-safe-mark" aria-hidden="true">&#10003;</span>
+            <div>
+                <h2>&#23433;&#24515;&#12375;&#12390;&#12372;&#30456;&#35527;&#12356;&#12383;&#12384;&#12367;&#12383;&#12417;&#12395;</h2>
+                <p>&#12372;&#30456;&#35527;&#12384;&#12369;&#12391;&#20462;&#29702;&#21463;&#20184;&#12395;&#12399;&#12394;&#12426;&#12414;&#12379;&#12435;&#12290;<br>LINE&#12391;&#20889;&#30495;&#12539;&#22411;&#30058;&#12539;&#30151;&#29366;&#12434;&#30906;&#35469;&#12375;&#12289;&#21463;&#20184;&#21069;&#12395;&#12391;&#12365;&#12427;&#38480;&#12426;&#29694;&#23455;&#12395;&#36817;&#12356;&#27010;&#31639;&#12434;&#12372;&#26696;&#20869;&#12375;&#12414;&#12377;&#12290;</p>
+                <p>&#27491;&#24335;&#12394;&#20316;&#26989;&#12399;&#12289;&#20869;&#23481;&#12392;&#37329;&#38989;&#12434;&#12372;&#30906;&#35469;&#12356;&#12383;&#12384;&#12356;&#12390;&#12363;&#12425;&#36914;&#12417;&#12414;&#12377;&#12290;<br>&#20195;&#26367;&#37096;&#21697;&#12398;&#20351;&#29992;&#12420;&#36861;&#21152;&#20316;&#26989;&#12364;&#24517;&#35201;&#12394;&#22580;&#21512;&#12418;&#12289;&#20107;&#21069;&#12395;&#12372;&#35500;&#26126;&#12375;&#12414;&#12377;&#12290;</p>
+            </div>
+        </div>
+        <a class="consultation-safe-button" href="#contact">&#30456;&#35527;&#21069;&#12395;&#30906;&#35469;&#12375;&#12383;&#12356;&#12371;&#12392;&#12434;&#35211;&#12427;</a>
     </div>
 </section>
 
