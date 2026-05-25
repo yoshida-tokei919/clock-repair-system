@@ -202,17 +202,58 @@ nav a:hover { color: var(--accent-color); }
 }
 
 /* こだわりセクション */
-.strength-item { display: flex; align-items: center; gap: 50px; margin-bottom: 80px; }
-.strength-item:nth-child(even) { flex-direction: row-reverse; }
-.strength-img { 
-    flex: 1; border-radius: 8px; overflow: hidden; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1); height: 300px; 
-    background-color: #ddd;
+.strengths-section {
+    background: #fff;
 }
-.strength-img img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.strength-text { flex: 1; }
-.strength-text h3 { font-size: 1.8rem; color: var(--primary-color); margin-bottom: 15px; }
-.strength-text p { font-size: 1.05rem; color: #555; line-height: 1.8; }
+.strength-card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+.strength-card {
+    min-height: 210px;
+    display: block;
+    box-sizing: border-box;
+    padding: 30px 28px;
+    border: 1px solid #dce5ee;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--primary-color);
+    box-shadow: 0 8px 22px rgba(26, 43, 75, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.strength-card:hover {
+    transform: translateY(-2px);
+    border-color: #c8d4e1;
+    box-shadow: 0 14px 30px rgba(26, 43, 75, 0.08);
+}
+.strength-card-mark {
+    width: 34px;
+    height: 34px;
+    display: inline-block;
+    margin-bottom: 20px;
+    border: 1.5px solid #1a2b4b;
+    border-radius: 50%;
+    opacity: 0.72;
+}
+.strength-card h3 {
+    margin: 0 0 14px;
+    color: var(--primary-color);
+    font-size: 1.14rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+.strength-card p {
+    margin: 0;
+    color: #405166;
+    font-size: 0.95rem;
+    line-height: 1.85;
+}
+.strength-card-static:hover {
+    transform: none;
+    border-color: #dce5ee;
+    box-shadow: 0 8px 22px rgba(26, 43, 75, 0.04);
+}
 
 /* 料金比較表 */
 .price-section table {
@@ -352,7 +393,8 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     .hero .btn { width: 100%; box-sizing: border-box; }
     .hero-photo-band { height: 240px; margin-top: 36px; border-radius: 8px; }
     .section { padding: 60px 20px; }
-    .strength-item, .strength-item:nth-child(even) { flex-direction: column; gap: 30px; text-align: center; }
+    .strength-card-grid { grid-template-columns: 1fr; }
+    .strength-card { min-height: auto; }
     .cases-grid { grid-template-columns: 1fr; }
     .flow-steps { flex-direction: column; gap: 20px; }
     .flow-steps::after { display: none; }
@@ -389,54 +431,39 @@ const HTML_HEADER = `
 const HTML_ABOUT_PRICE = `
 <section id="about" class="section strengths-section">
     <div class="container">
-        <h2 class="section-title">ヨシダ時計修理工房のこだわり</h2>
-        
-        <div class="strength-item">
-            <div class="strength-img">
-                <img src="/img/work1.jpg" alt="1級時計修理技能士の技術">
+        <h2 class="section-title">&#20462;&#29702;&#12395;&#12388;&#12356;&#12390;</h2>
+        <div class="strength-card-grid">
+            <a class="strength-card" href="https://lin.ee/3C0XfJW">
+                <span class="strength-card-mark" aria-hidden="true"></span>
+                <h3>LINE&#12391;&#27010;&#31639;&#30456;&#35527;</h3>
+                <p>&#20889;&#30495;&#12539;&#22411;&#30058;&#12539;&#30151;&#29366;&#12434;LINE&#12391;&#30906;&#35469;&#12375;&#12394;&#12364;&#12425;&#12289;&#21463;&#20184;&#21069;&#12395;&#12391;&#12365;&#12427;&#38480;&#12426;&#29694;&#23455;&#12395;&#36817;&#12356;&#27010;&#31639;&#12434;&#12372;&#26696;&#20869;&#12375;&#12414;&#12377;&#12290;</p>
+            </a>
+            <a class="strength-card" href="/cases/gallery">
+                <span class="strength-card-mark" aria-hidden="true"></span>
+                <h3>&#20462;&#29702;&#20107;&#20363;&#12434;&#25506;&#12377;</h3>
+                <p>&#12502;&#12521;&#12531;&#12489;&#12539;&#22411;&#30058;&#12539;&#30151;&#29366;&#12539;&#20462;&#29702;&#20869;&#23481;&#12363;&#12425;&#12289;&#20284;&#12383;&#20462;&#29702;&#20107;&#20363;&#12434;&#30906;&#35469;&#12391;&#12365;&#12414;&#12377;&#12290;</p>
+            </a>
+            <div class="strength-card strength-card-static">
+                <span class="strength-card-mark" aria-hidden="true"></span>
+                <h3>&#25216;&#34899;&#32773;&#12395;&#12388;&#12356;&#12390;</h3>
+                <p>&#20462;&#29702;&#27508;20&#24180;&#12290;&#22269;&#20869;&#26178;&#35336;&#12513;&#12540;&#12459;&#12540;&#12398;&#20462;&#29702;&#29694;&#22580;&#12391;&#22521;&#12387;&#12383;&#32076;&#39443;&#12434;&#12418;&#12392;&#12395;&#12289;&#24517;&#35201;&#12394;&#24037;&#31243;&#12434;&#30465;&#30053;&#12375;&#12394;&#12356;&#20462;&#29702;&#12434;&#24515;&#12364;&#12369;&#12390;&#12356;&#12414;&#12377;&#12290;</p>
             </div>
-            <div class="strength-text">
-                <h3>1級時計修理技能士の確かな技術</h3>
-                <p>時計修理歴20年、メーカー下請け会社での豊富な経験を持つ1級時計修理技能士が、一点一点丁寧に診断・修理いたします。複雑な機械式時計も安心してお任せください。</p>
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <img src="/img/work3.jpg" alt="修理風景1" style="width: 48%; border-radius: 4px;">
-                    <img src="/img/work4.jpg" alt="修理風景2" style="width: 48%; border-radius: 4px;">
-                </div>
+            <div class="strength-card strength-card-static">
+                <span class="strength-card-mark" aria-hidden="true"></span>
+                <h3>&#37096;&#21697;&#35519;&#36948;</h3>
+                <p>&#22269;&#20869;&#22806;&#12398;&#20181;&#20837;&#12428;&#20808;&#12363;&#12425;&#12289;&#32020;&#27491;&#37096;&#21697;&#12420;&#36969;&#21512;&#37096;&#21697;&#12434;&#25506;&#12375;&#12414;&#12377;&#12290;</p>
             </div>
-        </div>
-
-        <div class="strength-item">
-            <div class="strength-img">
-                <img src="/img/work2.jpg" alt="独自の部品調達ネットワーク">
+            <div class="strength-card strength-card-static">
+                <span class="strength-card-mark" aria-hidden="true"></span>
+                <h3>&#21152;&#24037;&#12539;&#35069;&#20316;</h3>
+                <p>&#20837;&#25163;&#22256;&#38627;&#12394;&#37096;&#21697;&#12399;&#12289;&#21152;&#24037;&#12420;&#35069;&#20316;&#12418;&#21547;&#12417;&#12390;&#23550;&#24540;&#26041;&#27861;&#12434;&#26908;&#35342;&#12375;&#12414;&#12377;&#12290;</p>
             </div>
-            <div class="strength-text">
-                <h3>独自の部品調達ネットワーク</h3>
-                <p>国内、海外問わず独自のネットワークを生かし調達可能。メーカーで保有期間が終了した部品や、入手困難なパーツもお探しいたします。また純正部品、社外部品もご希望により柔軟に対応いたします。</p>
-            </div>
-        </div>
-
-        <div class="strength-item">
-            <div class="strength-img">
-                <img src="/img/parts-creation.jpg" alt="絶版パーツの復元・作成">
-            </div>
-            <div class="strength-text">
-                <h3>絶版パーツの復元・作成</h3>
-                <p>どうしても部品の調達が難しい場合は、旋盤などを用いて部品をゼロから製作することも可能です。他社で「修理不可」とされた時計も、諦めずにご相談ください。</p>
-                <img src="/img/dial-hands.jpg" alt="分解パーツ" style="width: 100%; margin-top: 15px; border-radius: 4px;">
+            <div class="strength-card strength-card-static">
+                <span class="strength-card-mark" aria-hidden="true"></span>
+                <h3>&#38450;&#27700;&#30906;&#35469;</h3>
+                <p>&#12458;&#12540;&#12496;&#12540;&#12507;&#12540;&#12523;&#24460;&#12399;&#20840;&#25968;&#38450;&#27700;&#26908;&#26619;&#12290;&#35023;&#33995;&#12539;&#12522;&#12517;&#12540;&#12474;&#12539;&#12503;&#12483;&#12471;&#12515;&#12540;&#12539;&#12460;&#12521;&#12473;&#12414;&#12431;&#12426;&#12398;&#12497;&#12483;&#12461;&#12531;&#12414;&#12391;&#30906;&#35469;&#12375;&#12414;&#12377;&#12290;</p>
             </div>
         </div>
-
-        <div class="strength-item">
-            <div class="strength-img">
-                <img src="/img/waterproof.jpg" alt="防水性能を可能な限り復活">
-            </div>
-            <div class="strength-text">
-                <h3>防水性能を可能な限り復活</h3>
-                <p>元々防水性能を持たせた時計でも、経年によるパッキン等の劣化によりその性能は失われていきます。防水性能が落ち湿気が入るだけでもメンテナンスのスパンが大幅に短くなるため、防水性能を維持することはとても大切です。<br>
-                一般的な修理店では交換が簡単な裏蓋パッキンだけの交換で済ませたり、そもそも交換しない場合も多いですが、当店では裏蓋だけでなくリューズのパッキン、クロノグラフの場合プッシュボタンのパッキン、必要であればガラスのパッキンまでも交換し、時計本来の防水性能を発揮できるよう最大限努力しています。</p>
-            </div>
-        </div>
-
     </div>
 </section>
 
