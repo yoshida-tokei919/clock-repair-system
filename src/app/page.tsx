@@ -717,6 +717,13 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     .wp-search-form { flex-direction: column; }
     .wp-search-btn { padding: 15px; width: 100%; }
 }
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: clamp(1.9rem, 8vw, 2.15rem);
+        line-height: 1.28;
+    }
+    .hero-title-line { white-space: nowrap; }
+}
 `;
 
 // --- 2. HTML Blocks (Original) ---
