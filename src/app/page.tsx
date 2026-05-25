@@ -260,6 +260,71 @@ nav a:hover { color: var(--accent-color); }
 }
 
 /* 料金比較表 */
+.case-finder-section {
+    padding: 0 20px 96px;
+    background: #fff;
+}
+.case-finder-panel {
+    max-width: 1000px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 30px 44px;
+    align-items: center;
+    padding: 38px 44px;
+    border: 1px solid #dce5ee;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+    box-shadow: 0 12px 28px rgba(26, 43, 75, 0.05);
+}
+.case-finder-panel h2 {
+    margin: 0 0 14px;
+    color: var(--primary-color);
+    font-size: 1.65rem;
+    line-height: 1.45;
+    letter-spacing: 0.03em;
+}
+.case-finder-panel p {
+    margin: 0;
+    color: #405166;
+    font-size: 0.98rem;
+    line-height: 1.9;
+}
+.case-finder-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 22px;
+}
+.case-finder-tags span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 15px;
+    border: 1px solid #cfd9e4;
+    border-radius: 999px;
+    background: #fff;
+    color: #33445d;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+.case-finder-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 190px;
+    padding: 15px 22px;
+    border-radius: 6px;
+    background: var(--primary-color);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 8px 18px rgba(26, 43, 75, 0.16);
+}
+.case-finder-button:hover {
+    background: #233b66;
+    transform: translateY(-1px);
+}
 .price-section table {
     width: 100%; border-collapse: collapse; border: 1px solid var(--gray);
     background: var(--white); border-radius: 8px; overflow: hidden;
@@ -399,6 +464,13 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     .section { padding: 60px 20px; }
     .strength-card-grid { grid-template-columns: 1fr; }
     .strength-card { min-height: auto; }
+    .case-finder-section { padding: 0 20px 60px; }
+    .case-finder-panel {
+        grid-template-columns: 1fr;
+        padding: 28px 22px;
+    }
+    .case-finder-panel h2 { font-size: 1.35rem; }
+    .case-finder-button { width: 100%; box-sizing: border-box; }
     .cases-grid { grid-template-columns: 1fr; }
     .flow-steps { flex-direction: column; gap: 20px; }
     .flow-steps::after { display: none; }
@@ -468,6 +540,25 @@ const HTML_ABOUT_PRICE = `
                 <p>&#12458;&#12540;&#12496;&#12540;&#12507;&#12540;&#12523;&#24460;&#12399;&#20840;&#25968;&#38450;&#27700;&#26908;&#26619;&#12290;&#35023;&#33995;&#12539;&#12522;&#12517;&#12540;&#12474;&#12539;&#12503;&#12483;&#12471;&#12515;&#12540;&#12539;&#12460;&#12521;&#12473;&#12414;&#12431;&#12426;&#12398;&#12497;&#12483;&#12461;&#12531;&#12414;&#12391;&#30906;&#35469;&#12375;&#12414;&#12377;&#12290;</p>
             </div>
         </div>
+    </div>
+</section>
+
+<section class="case-finder-section">
+    <div class="case-finder-panel">
+        <div>
+            <h2>&#33258;&#20998;&#12398;&#26178;&#35336;&#12395;&#36817;&#12356;&#20462;&#29702;&#20107;&#20363;&#12434;&#25506;&#12377;</h2>
+            <p>&#12502;&#12521;&#12531;&#12489;&#12539;&#22411;&#30058;&#12539;&#30151;&#29366;&#12539;&#20462;&#29702;&#20869;&#23481;&#12363;&#12425;&#12289;&#20284;&#12383;&#20462;&#29702;&#20107;&#20363;&#12434;&#30906;&#35469;&#12391;&#12365;&#12414;&#12377;&#12290;<br>&#12300;&#12371;&#12398;&#26178;&#35336;&#12418;&#30452;&#12379;&#12427;&#12363;&#12301;&#12434;&#30693;&#12426;&#12383;&#12356;&#26041;&#12399;&#12289;&#12414;&#12378;&#36942;&#21435;&#12398;&#20107;&#20363;&#12434;&#12372;&#35239;&#12367;&#12384;&#12373;&#12356;&#12290;</p>
+            <div class="case-finder-tags" aria-label="&#26908;&#32034;&#12391;&#20351;&#12360;&#12427;&#38917;&#30446;">
+                <span>&#12502;&#12521;&#12531;&#12489;</span>
+                <span>&#22411;&#30058;</span>
+                <span>&#12514;&#12487;&#12523;</span>
+                <span>Cal</span>
+                <span>&#30151;&#29366;</span>
+                <span>&#20462;&#29702;&#20869;&#23481;</span>
+                <span>&#20132;&#25563;&#37096;&#21697;</span>
+            </div>
+        </div>
+        <a class="case-finder-button" href="/cases/gallery">&#20462;&#29702;&#20107;&#20363;&#12434;&#26908;&#32034;&#12377;&#12427;</a>
     </div>
 </section>
 
