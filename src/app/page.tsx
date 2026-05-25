@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 /* eslint-disable @next/next/no-img-element */
 
@@ -457,69 +456,6 @@ nav a:hover { color: var(--accent-color); }
     background: #f1f5f9;
     transform: translateY(-1px);
 }
-/* 修理事例（スライダー＆WordPress検索） */
-.cases-section { background-color: var(--bg-color); }
-
-/* 検索フォームのデザイン */
-.case-search-container { 
-    text-align: center; margin-bottom: 40px; 
-    display: flex; justify-content: center;
-}
-.wp-search-form {
-    display: flex; width: 100%; max-width: 500px; gap: 10px;
-}
-.wp-search-input {
-    flex: 1; padding: 15px; 
-    border: 2px solid var(--gray); border-radius: 30px;
-    font-size: 1rem; outline: none; transition: 0.3s;
-}
-.wp-search-input:focus { border-color: var(--accent-color); }
-.wp-search-btn {
-    padding: 0 30px; background-color: var(--primary-color);
-    color: var(--white); border: none; border-radius: 30px;
-    font-weight: bold; cursor: pointer; transition: 0.3s;
-}
-.wp-search-btn:hover { background-color: var(--accent-color); }
-
-/* スライダー */
-.cases-slider-wrapper { position: relative; padding: 0 40px; }
-.cases-slider {
-    display: flex; gap: 30px; overflow-x: auto; scroll-snap-type: x mandatory;
-    padding-bottom: 20px; scrollbar-width: none;
-}
-.cases-slider::-webkit-scrollbar { display: none; }
-
-.case-card {
-    min-width: 320px; flex: 0 0 auto; background: var(--white);
-    border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    scroll-snap-align: center; transition: 0.3s;
-}
-.case-card:hover { transform: translateY(-5px); }
-
-.case-img { height: 220px; background-size: cover; background-position: center; background-color: #eee; }
-.case-body { padding: 25px; }
-.case-meta { font-size: 0.85rem; color: #888; margin-bottom: 10px; display: flex; justify-content: space-between;}
-.case-title { font-size: 1.4rem; color: var(--primary-color); margin-bottom: 10px; }
-.case-details { margin-bottom: 15px; font-size: 0.95rem; }
-.case-details dt { font-weight: bold; color: #555; float: left; clear: left; width: 80px;}
-.case-details dd { margin-left: 80px; margin-bottom: 5px; color: #777;}
-.case-price-row {
-    display: flex; justify-content: space-between; align-items: center;
-    border-top: 1px solid var(--gray); padding-top: 15px; margin-top: 15px;
-}
-.case-price { font-size: 1.5rem; color: var(--gold); font-weight: bold; }
-
-.slider-btn {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    width: 40px; height: 40px; border-radius: 50%;
-    background: var(--white); color: var(--primary-color);
-    border: 1px solid var(--gray); font-size: 1.2rem;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-.slider-btn.prev { left: -10px; }
-.slider-btn.next { right: -10px; }
-
 /* 流れ・保証・FAQ */
 .warranty-section { background-color: var(--bg-color); text-align: center;}
 .warranty-box {
@@ -711,11 +647,6 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     .line-wrapper { padding: 32px 22px; }
     .contact-section h2 { font-size: 1.5rem; }
     .line-btn { width: 100%; box-sizing: border-box; }
-    .cases-grid { grid-template-columns: 1fr; }
-    .slider-btn { display: none; }
-    /* スマホでの検索フォーム調整 */
-    .wp-search-form { flex-direction: column; }
-    .wp-search-btn { padding: 15px; width: 100%; }
 }
 @media (max-width: 480px) {
     .hero-title {
@@ -737,7 +668,7 @@ const HTML_HEADER = `
         <nav>
             <ul>
                 <li><a href="#about">こだわり</a></li>
-                <li><a href="#cases">修理事例</a></li>
+                <li><a href="/cases/gallery">修理事例</a></li>
                 <li><a href="#flow">修理の流れ</a></li>
                 <li><a href="#contact">お問い合わせ</a></li>
                 <li><a href="/cases/biz" style="color:#b59410; font-weight:bold; border:1px solid #b59410; padding:5px 10px; border-radius:4px;">業者様はこちら</a></li>
@@ -934,18 +865,7 @@ const heroImages = [
     },
 ];
 
-export default async function TopPage() {
-    const sliderRepairs = await prisma.repair.findMany({
-        where: { isPublicB2C: true },
-        include: {
-            watch: { include: { brand: true, model: true } },
-            photos: true,
-            estimate: { include: { items: true } }
-        },
-        orderBy: { deliveryDateActual: 'desc' },
-        take: 10
-    });
-
+export default function TopPage() {
     return (
         <>
             <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
@@ -983,60 +903,6 @@ export default async function TopPage() {
             </section>
 
             <div dangerouslySetInnerHTML={{ __html: HTML_ABOUT_PRICE }} />
-
-            {/* Dynamic Repair Cases */}
-            <section id="cases" className="section cases-section">
-                <div className="container">
-                    <h2 className="section-title">修理事例</h2>
-                    <p style={{ textAlign: "center", marginBottom: "20px", fontSize: "0.9rem", color: "#666" }}>
-                        最新の修理事例を公開しています。<br />ブランド名や型番で検索してください。
-                    </p>
-
-                    <div className="case-search-container">
-                        <form action="/cases/gallery" method="get" className="wp-search-form">
-                            <input type="text" name="q" placeholder="ブランド・型番で検索（例：ロレックス）" className="wp-search-input" required />
-                            <button type="submit" className="wp-search-btn">検索</button>
-                        </form>
-                    </div>
-
-                    <div className="cases-slider-wrapper">
-                        <div className="cases-slider" id="cases-slider">
-                            {/* Dynamic Items */}
-                            {sliderRepairs.map((repair) => {
-                                const heroImage = repair.photos.length > 0
-                                    ? `/uploads/${repair.photos[0].storageKey}`
-                                    : "";
-                                const title = repair.publicTitle || `${repair.watch.brand.name} ${repair.watch.model.name}`;
-                                const price = repair.estimate?.technicalFee ? `${repair.estimate.technicalFee.toLocaleString()}円` : "お見積り";
-
-                                return (
-                                    <Link key={repair.id} href="/cases/gallery" className="case-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-                                        <div className="case-img" style={{ backgroundImage: `url('${heroImage}')` }}></div>
-                                        <div className="case-body">
-                                            <div className="case-meta"><span>{repair.watch.brand.name}</span><span>{repair.deliveryDateActual?.toLocaleDateString("ja-JP", { timeZone: 'Asia/Tokyo' })}</span></div>
-                                            <h3 className="case-title">{title}</h3>
-                                            <dl className="case-details">
-                                                <dt>内容:</dt><dd>オーバーホール</dd>
-                                                <dt>納期:</dt><dd>約3週間</dd>
-                                            </dl>
-                                            <div className="case-price-row">
-                                                <span className="case-price-label">参考料金</span>
-                                                <span className="case-price">{price}</span>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                );
-                            })}
-
-                            {sliderRepairs.length === 0 && (
-                                <div style={{ width: '100%', textAlign: 'center', color: '#999', padding: '40px' }}>現在公開中の修理事例はありません。</div>
-                            )}
-
-                        </div>
-                        <div className="slider-btn next" style={{ cursor: 'pointer' }}>&#10095;</div>
-                    </div>
-                </div>
-            </section>
 
             <div dangerouslySetInnerHTML={{ __html: HTML_FLOW_FOOTER }} />
         </>
