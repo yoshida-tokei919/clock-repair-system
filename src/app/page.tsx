@@ -710,7 +710,7 @@ const HTML_ABOUT_PRICE = `
     <div class="container">
         <h2 class="section-title">&#20462;&#29702;&#12395;&#12388;&#12356;&#12390;</h2>
         <div class="strength-card-grid">
-            <a class="strength-card" href="https://lin.ee/3C0XfJW">
+            <a class="strength-card" href="/line-consultation">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 0 1 12.5 3H13a8.5 8.5 0 0 1 8 8v.5Z"/></svg>
                 <h3>LINEで概算相談</h3>
                 <p>時計を送る前に、写真・型番・症状から修理内容と費用感の目安をご案内します。</p>
