@@ -58,42 +58,123 @@ nav a:hover { color: var(--accent-color); }
 
 /* トップページ（スライドショー） */
 .hero {
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: var(--white);
     position: relative;
-    margin-top: 101px; 
+    margin-top: 101px;
     overflow: hidden;
-    background-color: #0f172a;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fafc 72%, #ffffff 100%);
+    color: var(--primary-color);
 }
-.slideshow-container {
-    width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 0;
+.hero-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 72px 24px 64px;
+    text-align: center;
 }
-.mySlides {
-    width: 100%; height: 100%; position: absolute; top: 0; left: 0;
-    background-size: cover; background-position: center;
-    opacity: 0; transition: opacity 1.5s ease-in-out;
+.hero-eyebrow {
+    margin: 0 0 18px;
+    color: #20385d;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
 }
-.mySlides.active { opacity: 1; }
-.hero::before {
-    content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(26, 43, 75, 0.5); z-index: 1;
+.hero-title {
+    margin: 0;
+    color: #101b2c;
+    font-size: clamp(2.7rem, 5vw, 4.5rem);
+    line-height: 1.18;
+    font-weight: 600;
+    letter-spacing: 0;
 }
-.hero-content { position: relative; z-index: 2; max-width: 800px; padding: 0 20px;}
-.hero-content h1 {
-    font-size: 3.5rem; line-height: 1.2; margin-bottom: 20px;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+.hero-title-line {
+    display: block;
 }
-.hero-content p { font-size: 1.5rem; margin-bottom: 40px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+.hero-lead {
+    max-width: 760px;
+    margin: 26px auto 0;
+    color: #405166;
+    font-size: 1rem;
+    line-height: 2;
+    font-weight: 500;
+}
+.hero-actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 34px;
+}
 .btn {
     display: inline-block; padding: 18px 50px;
     background-color: var(--accent-color); color: var(--white);
     border-radius: 4px; font-weight: bold; font-size: 1.1rem;
 }
 .btn:hover { background-color: #1d4ed8; transform: translateY(-2px); }
+
+.hero .btn {
+    min-width: 190px;
+    padding: 15px 26px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    font-size: 0.98rem;
+    box-shadow: none;
+}
+.hero-line-btn {
+    background: var(--primary-color);
+}
+.hero-line-btn:hover {
+    background: #13243f;
+}
+.hero-case-btn {
+    background: #ffffff;
+    color: var(--primary-color);
+    border-color: #b8c5d4 !important;
+}
+.hero-case-btn:hover {
+    background: #f8fafc;
+    color: var(--primary-color);
+}
+.hero-photo-band {
+    position: relative;
+    max-width: 1160px;
+    height: clamp(320px, 34vw, 410px);
+    margin: 54px auto 0;
+    overflow: hidden;
+    border: 1px solid rgba(26, 43, 75, 0.1);
+    border-radius: 10px;
+    background: #e5ebf1;
+    box-shadow: 0 18px 44px rgba(15, 39, 72, 0.1);
+}
+.hero-photo-slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    animation: heroPhotoFade 18s ease-in-out infinite;
+}
+.hero-photo-slide:first-child {
+    opacity: 1;
+}
+.hero-photo-slide img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    filter: brightness(1.06) contrast(1.04);
+    transform: scale(1.03);
+}
+@keyframes heroPhotoFade {
+    0%, 31% { opacity: 1; }
+    39%, 92% { opacity: 0; }
+    100% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .hero-photo-slide {
+        animation: none;
+        opacity: 0;
+    }
+    .hero-photo-slide:first-child {
+        opacity: 1;
+    }
+}
 
 /* スライドナビゲーション */
 .dots-container {
@@ -264,7 +345,12 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     .nav-container { flex-direction: column; padding: 15px; }
     nav ul { gap: 15px; margin-top: 10px; }
     .hero { margin-top: 130px; }
-    .hero-content h1 { font-size: 2.2rem; }
+    .hero-inner { padding: 48px 20px 44px; }
+    .hero-title { font-size: 2.35rem; }
+    .hero-lead { font-size: 0.95rem; line-height: 1.9; }
+    .hero-actions { flex-direction: column; align-items: stretch; }
+    .hero .btn { width: 100%; box-sizing: border-box; }
+    .hero-photo-band { height: 240px; margin-top: 36px; border-radius: 8px; }
     .section { padding: 60px 20px; }
     .strength-item, .strength-item:nth-child(even) { flex-direction: column; gap: 30px; text-align: center; }
     .cases-grid { grid-template-columns: 1fr; }
@@ -536,6 +622,24 @@ const HTML_FLOW_FOOTER = `
 </footer>
 `;
 
+const heroImages = [
+    {
+        src: "/img/DSCN0385.JPG",
+        alt: "\u6642\u8a08\u30e0\u30fc\u30d6\u30e1\u30f3\u30c8\u3092\u8abf\u6574\u3059\u308b\u7cbe\u5bc6\u4f5c\u696d",
+        position: "center 62%",
+    },
+    {
+        src: "/img/DSCN0392.JPG",
+        alt: "\u5206\u89e3\u3057\u305f\u6642\u8a08\u90e8\u54c1\u3092\u6574\u7136\u3068\u4e26\u3079\u305f\u72b6\u614b",
+        position: "center 50%",
+    },
+    {
+        src: "/img/DSCN0382.JPG",
+        alt: "\u56fa\u5b9a\u53f0\u306b\u7f6e\u3044\u305f\u6642\u8a08\u30e0\u30fc\u30d6\u30e1\u30f3\u30c8\u3068\u5468\u8fba\u90e8\u54c1",
+        position: "center 55%",
+    },
+];
+
 export default async function TopPage() {
     const sliderRepairs = await prisma.repair.findMany({
         where: { isPublicB2C: true },
@@ -554,17 +658,33 @@ export default async function TopPage() {
 
             <div dangerouslySetInnerHTML={{ __html: HTML_HEADER }} />
 
-            {/* Hero / Slider */}
+            {/* Hero */}
             <section className="hero">
-                <div className="slideshow-container">
-                    <div className="mySlides active" style={{ backgroundImage: "url('/img/watch-submariner.jpg')" }}></div>
-                    <div className="mySlides" style={{ backgroundImage: "url('/img/watch-sea-dweller.jpg')" }}></div>
-                </div>
-
-                <div className="hero-content">
-                    <h1>再び時を刻む</h1>
-                    <p>1級時計修理技能士による確かなオーバーホール・メンテナンス</p>
-                    <a href="#contact" className="btn">無料相談・見積もり</a>
+                <div className="hero-inner">
+                    <p className="hero-eyebrow">{"\u4fee\u7406\u6b7420\u5e74\u30fb1\u7d1a\u6642\u8a08\u4fee\u7406\u6280\u80fd\u58eb"}</p>
+                    <h1 className="hero-title">
+                        <span className="hero-title-line">{"\u4ed6\u5e97\u3067\u65ad\u3089\u308c\u305f\u6642\u8a08\u3082\u3001"}</span>
+                        <span className="hero-title-line">{"\u307e\u305a\u3054\u76f8\u8ac7\u304f\u3060\u3055\u3044\u3002"}</span>
+                    </h1>
+                    <p className="hero-lead">
+                        {"\u90e8\u54c1\u8abf\u9054\u30fb\u52a0\u5de5\u30fb\u88fd\u4f5c\u307e\u3067\u542b\u3081\u3066\u3001\u4fee\u7406\u306e\u53ef\u80fd\u6027\u3092\u63a2\u308a\u307e\u3059\u3002"}<br />
+                        {"LINE\u3067\u5199\u771f\u30fb\u578b\u756a\u30fb\u75c7\u72b6\u3092\u78ba\u8a8d\u3057\u306a\u304c\u3089\u3001\u53d7\u4ed8\u524d\u306b\u3067\u304d\u308b\u9650\u308a\u73fe\u5b9f\u306b\u8fd1\u3044\u6982\u7b97\u3092\u3054\u6848\u5185\u3057\u307e\u3059\u3002"}
+                    </p>
+                    <div className="hero-actions">
+                        <a href="https://lin.ee/3C0XfJW" className="btn hero-line-btn">{"LINE\u3067\u76f8\u8ac7\u3059\u308b"}</a>
+                        <Link href="/cases/gallery" className="btn hero-case-btn">{"\u4fee\u7406\u4e8b\u4f8b\u3092\u691c\u7d22\u3059\u308b"}</Link>
+                    </div>
+                    <div className="hero-photo-band" aria-label="\u6642\u8a08\u4fee\u7406\u4f5c\u696d\u306e\u5199\u771f">
+                        {heroImages.map((image, index) => (
+                            <div
+                                className="hero-photo-slide"
+                                key={image.src}
+                                style={{ animationDelay: `${index * 6}s` }}
+                            >
+                                <img src={image.src} alt={image.alt} style={{ objectPosition: image.position }} />
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </section>
 
