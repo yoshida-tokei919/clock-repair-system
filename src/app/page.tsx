@@ -740,12 +740,12 @@ const HTML_ABOUT_PRICE = `
                 <p>多数のパッキンを取り揃え、裏蓋・リューズ・プッシャー・ガラスまわりまで確認します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
-            <div class="strength-card strength-card-static">
+            <a class="strength-card" href="/price-quality">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/><path d="M4 20h16"/></svg>
                 <h3>価格と修理品質</h3>
                 <p>費用を抑えながらも、必要な工程を省略しない修理を心がけています。メーカー修理との価格差も確認できます。</p>
                 <span class="strength-card-more">詳しく見る →</span>
-            </div>
+            </a>
         </div>
     </div>
 </section>
