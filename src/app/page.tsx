@@ -722,12 +722,12 @@ const HTML_ABOUT_PRICE = `
                 <p>過去約4,000件の受付実績では、当店判断で修理不可として返却したケースは約3%。部品調達・製作も含めて、ご希望に合わせ柔軟に対応いたします。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
-            <div class="strength-card strength-card-static">
+            <a class="strength-card" href="/about-technician">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
                 <h3>技術者について</h3>
                 <p>近江時計眼鏡宝飾専門学校卒業後、国内時計メーカーの修理を担当。修理歴20年の技術者が、必要な工程を省略しない修理を心がけています。</p>
                 <span class="strength-card-more">詳しく見る →</span>
-            </div>
+            </a>
             <div class="strength-card strength-card-static">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="m7.5 4.3 9 5.1"/><path d="M21 8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                 <h3>部品調達</h3>
