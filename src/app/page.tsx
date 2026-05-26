@@ -728,12 +728,12 @@ const HTML_ABOUT_PRICE = `
                 <p>近江時計眼鏡宝飾専門学校卒業後、国内時計メーカーの修理を担当。修理歴20年の技術者が、必要な工程を省略しない修理を心がけています。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
-            <div class="strength-card strength-card-static">
+            <a class="strength-card" href="/parts-sourcing">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="m7.5 4.3 9 5.1"/><path d="M21 8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                 <h3>部品調達</h3>
                 <p>国内外の材料店や修理仲間のネットワークを活用し、入手困難な部品もできる限り探します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
-            </div>
+            </a>
             <div class="strength-card strength-card-static">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-4.2-4.5-9.1-6.2-10.9a1.1 1.1 0 0 0-1.6 0C9.5 5.9 5 10.8 5 15a7 7 0 0 0 7 7Z"/></svg>
                 <h3>防水確認</h3>
