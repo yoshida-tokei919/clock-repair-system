@@ -395,6 +395,27 @@ nav a:hover { color: var(--accent-color); }
     font-weight: 700;
     line-height: 1.55;
 }
+.homepage-flow-detail {
+    margin-top: 28px;
+    text-align: center;
+}
+.homepage-flow-detail-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 190px;
+    padding: 13px 22px;
+    border: 1px solid #b8c5d4;
+    border-radius: 6px;
+    color: var(--primary-color);
+    font-weight: 700;
+    background: #fff;
+}
+.homepage-flow-detail-link:hover {
+    background: #f8fafc;
+    border-color: #8fa1b7;
+    transform: translateY(-1px);
+}
 .consultation-safe-section {
     padding: 0 20px 96px;
     background: #fff;
@@ -647,6 +668,7 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
         flex: 0 0 auto;
         margin: 0;
     }
+    .homepage-flow-detail-link { width: 100%; box-sizing: border-box; }
     .consultation-safe-section { padding: 0 20px 60px; }
     .consultation-safe-panel {
         grid-template-columns: 1fr;
@@ -803,6 +825,9 @@ const HTML_ABOUT_PRICE = `
                 <span class="homepage-flow-label">納品</span>
             </li>
         </ol>
+        <div class="homepage-flow-detail">
+            <a class="homepage-flow-detail-link" href="/repair-flow">詳しい流れを見る</a>
+        </div>
     </div>
 </section>
 
