@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowRight } from "lucide-react";
@@ -7,6 +9,13 @@ import { ArrowRight } from "lucide-react";
 export const dynamic = 'force-dynamic';
 
 export default async function BizCasePage() {
+    const session = cookies().get("b2b_session");
+    const isAuthenticated = session?.value === "authenticated";
+
+    if (!isAuthenticated) {
+        redirect("/cases/biz/login");
+    }
+
     const repairs = await prisma.repair.findMany({
         where: {
             isPublicB2B: true,
