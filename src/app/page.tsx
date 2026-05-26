@@ -716,12 +716,12 @@ const HTML_ABOUT_PRICE = `
                 <p>時計を送る前に、写真・型番・症状から修理内容と費用感の目安をご案内します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
-            <div class="strength-card strength-card-static">
+            <a class="strength-card" href="/difficult-repair">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3-3a6 6 0 0 1-7.8 7.8l-7.4 7.4a2.1 2.1 0 0 1-3-3l7.4-7.4a6 6 0 0 1 7.8-7.8Z"/></svg>
                 <h3>難修理への対応</h3>
                 <p>過去約4,000件の受付実績では、当店判断で修理不可として返却したケースは約3%。部品調達・製作も含めて、ご希望に合わせ柔軟に対応いたします。</p>
                 <span class="strength-card-more">詳しく見る →</span>
-            </div>
+            </a>
             <div class="strength-card strength-card-static">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
                 <h3>技術者について</h3>
