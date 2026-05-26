@@ -734,12 +734,12 @@ const HTML_ABOUT_PRICE = `
                 <p>国内外の材料店や修理仲間のネットワークを活用し、入手困難な部品もできる限り探します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
-            <div class="strength-card strength-card-static">
+            <a class="strength-card" href="/waterproof-check">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-4.2-4.5-9.1-6.2-10.9a1.1 1.1 0 0 0-1.6 0C9.5 5.9 5 10.8 5 15a7 7 0 0 0 7 7Z"/></svg>
                 <h3>防水確認</h3>
                 <p>多数のパッキンを取り揃え、裏蓋・リューズ・プッシャー・ガラスまわりまで確認します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
-            </div>
+            </a>
             <div class="strength-card strength-card-static">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/><path d="M4 20h16"/></svg>
                 <h3>価格と修理品質</h3>
