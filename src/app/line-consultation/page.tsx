@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "LINEで概算相談 | 吉田時計修理工房",
+  title: "LINEで概算相談 | ヨシダ時計修理工房",
   description:
-    "時計を送る前に、写真・型番・症状から修理内容と費用感の目安をご案内します。",
+    "時計を送る前に、写真や分かる範囲の情報から修理内容と費用感の目安をご案内します。",
 };
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
@@ -30,7 +30,7 @@ export default function LineConsultationPage() {
     <main className="line-consultation-page">
       <header className="consultation-header">
         <Link href="/" className="consultation-brand">
-          吉田時計修理工房
+          ヨシダ時計修理工房
         </Link>
         <nav className="consultation-nav" aria-label="ページナビゲーション">
           <Link href="/">トップへ戻る</Link>
@@ -42,7 +42,7 @@ export default function LineConsultationPage() {
         <p className="consultation-eyebrow">LINEで概算相談</p>
         <h1>時計を送る前に、修理内容と費用感の目安をご案内します。</h1>
         <p className="consultation-lead">
-          写真・型番・症状をLINEで確認しながら、受付前にできる限り現実に近い概算をご案内します。
+          時計の写真や、分かる範囲の情報をLINEで確認しながら、受付前にできる限り現実に近い概算をご案内します。
           <br />
           ご相談だけで修理受付にはなりません。
         </p>
@@ -115,7 +115,7 @@ export default function LineConsultationPage() {
       <section className="consultation-final">
         <h2>まずは写真を送ってご相談ください</h2>
         <p>
-          時計の写真・型番・症状をお送りいただければ、受付前の概算相談が可能です。
+          時計の写真や分かる範囲の情報をお送りいただければ、受付前の概算相談が可能です。
         </p>
         <a href={LINE_URL} className="consultation-primary">
           LINEで相談する

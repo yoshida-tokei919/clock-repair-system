@@ -2,56 +2,67 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "修理の流れ | 吉田時計修理工房",
+  title: "詳しい流れとポイント | ヨシダ時計修理工房",
   description:
-    "LINE相談から正式見積り、修理、納品まで、時計修理の基本的な流れをご案内します。",
+    "LINE相談から納品までの流れと、概算、見積り、梱包、交換部品、保証についてのポイントをご案内します。",
 };
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
 
 const steps = [
   {
-    title: "1. LINE相談",
+    title: "01 LINE相談",
     body:
-      "時計の写真・型番・症状をLINEでお送りください。分かる範囲で大丈夫です。時計全体、裏蓋、リューズまわり、型番や刻印、不具合箇所が分かる写真があると、受付前の判断がしやすくなります。",
+      "時計の写真と、分かる範囲で症状や気になる点をLINEでお送りください。時計の正面、側面（リューズ側）、裏側の写真をご用意いただくとスムーズです。刻印などが読める写真があると、より現実に近い概算をご案内しやすくなります。",
+    point:
+      "ご相談いただいただけで、修理受付や作業開始になることはありません。無理に修理をお勧めすることもございませんので、安心してお問い合わせください。",
   },
   {
-    title: "2. 概算案内",
+    title: "02 概算案内",
     body:
-      "写真と症状から、修理できそうかどうか、必要になりそうな作業、費用感の目安をご案内します。概算は受付前の目安であり、正式な金額は実物確認後のお見積りとなります。",
+      "受付前に、できる限り現実に近い概算をご案内します。写真や症状から、修理の見込み、必要になりそうな作業、費用感の目安を確認します。",
+    point:
+      "概算は受付前の目安であり、正式な金額は実物確認後のお見積りでのご案内となります。",
   },
   {
-    title: "3. 郵送・お持ち込み",
+    title: "03 郵送",
     body:
-      "概算内容をご確認いただいたうえで、修理をご希望の場合は時計をお預かりします。郵送の場合は、時計が動かないように保護し、緩衝材を使って梱包してください。",
-    note:
-      "無料見積りキットは現在ご用意していません。時計ごとに大きさや状態が異なるため、お手元の箱や緩衝材を使い、無理なく安全に送れる方法をご案内しています。",
+      "概算内容をご確認いただいたうえで、修理をご希望の場合は時計をお送りください。時計が動かないように、緩衝材を使って梱包してください。",
+    point:
+      "お手元の箱や緩衝材を使った安全な梱包方法をご案内しています。専用キットの到着を待つ必要がなく、資材費も抑えやすい方法です。当工房へお送りいただく際の送料はお客様にご負担をお願いしております。修理完了後の返送料は、当工房にて負担いたします。",
   },
   {
-    title: "4. 受付",
+    title: "04 受付",
     body:
-      "時計到着後、外装状態・動作状態・付属品などを確認して受付します。受付後は、修理内容や進捗を確認できる共有ページをご案内できる場合があります。",
+      "時計到着後、外装状態・動作状態・付属品などを確認して受付します。受付後は、修理内容や進捗を確認できる共有ページをご案内します。",
   },
   {
-    title: "5. 正式見積り",
+    title: "05 正式見積り",
     body:
-      "実物を確認し、必要な作業や部品交換の有無を整理したうえで正式見積りをご案内します。通常は受付後に確認を進めますが、時計の状態や部品調査の内容によって日数が変わる場合があります。",
-    note:
-      "概算と正式見積りの差が大きくならないよう、受付前にできる限り現実に近い費用感をお伝えするよう心がけています。",
+      "お預かりした時計を拝見し、必要な作業内容や部品交換の有無を確認したうえで、正式見積りと納期の目安をご案内します。正式見積りは、通常、受付後数日〜1週間ほどでご案内します。",
+    point:
+      "部品調査や特殊な修理が必要な場合は、通常よりお時間をいただくことがあります。その場合は、確認に時間がかかる理由や目安をお伝えします。",
   },
   {
-    title: "6. 修理",
+    title: "06 承認・キャンセル",
     body:
-      "お見積り内容をご確認いただいた後、修理を進めます。分解・洗浄・注油・調整・部品交換など、時計の状態に応じて必要な工程を判断します。",
-    note:
-      "修理期間は、部品の入手状況や作業内容によって変わります。部品調達が必要な場合や特殊な修理では、通常よりお時間をいただくことがあります。",
+      "作業内容と金額をご確認いただき、修理を進めるか返却するかをお選びください。作業は、内容にご納得いただいてから進めます。",
+    point:
+      "正式見積り後に金額や修理内容が変わることは基本的にありませんが、万一変更がある場合は事前にお伝えします。内容にご不明点や不安がある場合は、その時点でご相談ください。修理を進めず返却することも可能です。",
   },
   {
-    title: "7. 納品・保証",
+    title: "07 修理",
+    body:
+      "分解・洗浄・注油・調整・部品交換など、時計の状態に応じて必要な修理を行います。部品の在庫状況や作業内容にもよりますが、オーバーホールの場合、作業完了までに通常2週間〜1か月ほどかかります。",
+    point:
+      "時計の状態や想定外の不具合により、予定よりお時間をいただく場合があります。その場合は、分かった時点でご連絡します。",
+  },
+  {
+    title: "08 納品・保証",
     body:
       "修理完了後、動作確認・精度確認・必要に応じた防水確認を行い、納品します。オーバーホールには1年保証をお付けしています。",
-    note:
-      "保証内容は修理内容や時計の状態によって異なる場合があります。対象範囲については納品時にご案内します。",
+    point:
+      "落下・水入り・外装破損・消耗部品・お客様の使用環境による不具合など、保証対象外となる場合があります。部分修理は、修理内容や時計の状態により保証対象外となる場合があります。",
   },
 ];
 
@@ -60,7 +71,7 @@ export default function RepairFlowPage() {
     <main className="repair-flow-page">
       <header className="flow-header">
         <Link href="/" className="flow-brand">
-          吉田時計修理工房
+          ヨシダ時計修理工房
         </Link>
         <nav className="flow-nav" aria-label="ページナビゲーション">
           <Link href="/">トップへ戻る</Link>
@@ -70,11 +81,11 @@ export default function RepairFlowPage() {
 
       <section className="flow-hero">
         <p className="flow-eyebrow">修理の流れ</p>
-        <h1>LINE相談から納品まで、修理の進み方をご確認いただけます。</h1>
+        <h1>詳しい流れとポイント</h1>
         <p className="flow-lead">
-          時計の状態や部品の入手状況によって日数や内容は変わりますが、基本的な流れは共通です。
+          LINE相談から納品までの流れと、受付前に確認しておきたいポイントをまとめました。
           <br />
-          受付前の概算相談から、正式見積り、修理、納品までの流れをご案内します。
+          時計を送る前に、概算、見積り、梱包、交換部品、保証の考え方をご確認いただけます。
         </p>
         <div className="flow-actions">
           <a href={LINE_URL} className="flow-primary">
@@ -88,11 +99,16 @@ export default function RepairFlowPage() {
 
       <section className="flow-section">
         <div className="flow-step-list">
-          {steps.slice(0, 5).map((step) => (
+          {steps.map((step) => (
             <article key={step.title} className="flow-step-card">
               <h2>{step.title}</h2>
               <p>{step.body}</p>
-              {step.note ? <p className="flow-note">{step.note}</p> : null}
+              {step.point ? (
+                <div className="flow-note">
+                  <strong>ポイント：</strong>
+                  <p>{step.point}</p>
+                </div>
+              ) : null}
             </article>
           ))}
         </div>
@@ -109,22 +125,24 @@ export default function RepairFlowPage() {
         </p>
       </section>
 
-      <section className="flow-section">
-        <div className="flow-step-list">
-          {steps.slice(5).map((step) => (
-            <article key={step.title} className="flow-step-card">
-              <h2>{step.title}</h2>
-              <p>{step.body}</p>
-              {step.note ? <p className="flow-note">{step.note}</p> : null}
-            </article>
-          ))}
+      <section className="flow-section flow-panel">
+        <div className="flow-section-heading">
+          <span>部品</span>
+          <h2>交換部品について</h2>
         </div>
+        <p>
+          純正部品が入手できる場合は、まず純正部品での対応を検討します。
+          一方で、純正部品が入手困難な場合や高額な場合、お客様にとってメリットがあると判断した場合には、品質の良い社外部品や、当工房で製作・加工した部品の使用も含めて複数の選択肢をご提案することがあります。
+          <br />
+          <br />
+          代替部品の使用には注意点もあります。お見積り時にご説明しますが、気になる点があれば事前にご相談ください。
+        </p>
       </section>
 
       <section className="flow-final">
         <h2>まずは写真を送ってご相談ください</h2>
         <p>
-          時計の写真・型番・症状をお送りいただければ、受付前の概算相談が可能です。
+          時計の写真や分かる範囲の情報をお送りいただければ、受付前の概算相談が可能です。
         </p>
         <a href={LINE_URL} className="flow-primary">
           LINEで相談する
@@ -284,11 +302,17 @@ export default function RepairFlowPage() {
         }
 
         .flow-note {
-          margin-top: 14px !important;
+          margin-top: 14px;
           padding-top: 14px;
           border-top: 1px solid #e2e8f0;
-          color: #53657b !important;
+          color: #53657b;
           font-size: 0.95rem;
+        }
+
+        .flow-note strong {
+          display: block;
+          margin-bottom: 6px;
+          color: #20385d;
         }
 
         .flow-panel {

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "技術者について | 吉田時計修理工房",
+  title: "技術者について | ヨシダ時計修理工房",
   description:
     "修理歴20年、1級時計修理技能士として、時計の状態を確認しながら必要な作業を判断しています。",
 };
@@ -13,11 +13,11 @@ const careerItems = [
   "時計学校を卒業",
   "国内時計メーカーの修理現場を担当",
   "メーカー修理で培った点検・分解・調整の経験",
-  "現在は吉田時計修理工房として、一般のお客様・業者様の修理に対応",
+  "現在はヨシダ時計修理工房として、一般のお客様・業者様の修理に対応",
 ];
 
 const repairPrinciples = [
-  "必要な工程を省略しないこと",
+  "状態に応じて必要な作業を見極めること",
   "状態に応じて現実的な修理方法を考えること",
   "部品交換だけで終わらせず、原因や周辺状態も確認すること",
   "お客様にとって納得しやすい説明を心がけること",
@@ -28,7 +28,7 @@ export default function AboutTechnicianPage() {
     <main className="technician-page">
       <header className="technician-header">
         <Link href="/" className="technician-brand">
-          吉田時計修理工房
+          ヨシダ時計修理工房
         </Link>
         <nav className="technician-nav" aria-label="ページナビゲーション">
           <Link href="/">トップへ戻る</Link>
@@ -38,9 +38,9 @@ export default function AboutTechnicianPage() {
 
       <section className="technician-hero">
         <p className="technician-eyebrow">技術者について</p>
-        <h1>時計と向き合ってきた経験を、必要な工程を省略しない修理に活かしています。</h1>
+        <h1>時計と向き合ってきた経験を、状態に応じた修理の判断に活かしています。</h1>
         <p className="technician-lead">
-          時計学校卒業後、国内時計メーカーの修理現場で経験を積み、現在は吉田時計修理工房として修理を行っています。
+          時計学校卒業後、国内時計メーカーの修理現場で経験を積み、現在はヨシダ時計修理工房として修理を行っています。
           <br />
           修理歴20年、1級時計修理技能士として、状態を確認しながら一つひとつ必要な作業を判断しています。
         </p>
@@ -89,7 +89,7 @@ export default function AboutTechnicianPage() {
         </div>
         <p>
           修理の内容や金額は、時計の状態によって大きく変わります。
-          そのため、できるだけ受付前に写真・型番・症状を確認し、分かる範囲で現実に近い概算をご案内しています。
+          そのため、できるだけ受付前に時計の写真や分かる範囲の情報を確認し、現実に近い概算をご案内しています。
         </p>
         <p>「まず聞いてみる」だけでも大丈夫です。</p>
       </section>
@@ -97,7 +97,7 @@ export default function AboutTechnicianPage() {
       <section className="technician-final">
         <h2>まずは写真を送ってご相談ください</h2>
         <p>
-          時計の写真・型番・症状をお送りいただければ、受付前の概算相談が可能です。
+          時計の写真や分かる範囲の情報をお送りいただければ、受付前の概算相談が可能です。
         </p>
         <a href={LINE_URL} className="technician-primary">
           LINEで相談する

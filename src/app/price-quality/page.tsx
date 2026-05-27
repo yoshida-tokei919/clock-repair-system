@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "価格と修理品質 | 吉田時計修理工房",
+  title: "価格と修理品質 | ヨシダ時計修理工房",
   description:
-    "費用を抑えながらも、分解・洗浄・注油・調整・確認など必要な工程を省略しない修理を心がけています。",
+    "状態に応じて必要な作業を見極め、費用と仕上がりのバランスを考えた修理をご提案します。",
 };
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
@@ -87,7 +87,7 @@ export default function PriceQualityPage() {
     <main className="price-quality-page">
       <header className="price-header">
         <Link href="/" className="price-brand">
-          吉田時計修理工房
+          ヨシダ時計修理工房
         </Link>
         <nav className="price-nav" aria-label="ページナビゲーション">
           <Link href="/">トップへ戻る</Link>
@@ -97,11 +97,11 @@ export default function PriceQualityPage() {
 
       <section className="price-hero">
         <p className="price-eyebrow">価格と修理品質</p>
-        <h1>費用を抑えながらも、必要な工程を省略しない修理を心がけています。</h1>
+        <h1>必要な作業を見極め、費用とのバランスを考えた修理をご提案します。</h1>
         <p className="price-lead">
           メーカー修理は近年高額化しています。
           <br />
-          当工房では、時計の状態を確認し、必要な工程を省略せずに行いながら、できる限り現実的な費用での修理をご提案します。
+          当工房では、時計の状態を確認し、必要な作業を見極めながら、費用と仕上がりのバランスを考えた修理をご提案します。
         </p>
         <div className="price-actions">
           <a href={LINE_URL} className="price-primary">
@@ -178,10 +178,10 @@ export default function PriceQualityPage() {
           <h2>安いだけの修理にしないために</h2>
         </div>
         <p>
-          費用を抑えることは大切ですが、必要な工程を省略してしまうと、修理後の不具合につながる場合があります。
+          費用を抑えることは大切ですが、必要な作業を省略してしまうと、修理後の不具合につながる場合があります。
         </p>
         <p>
-          当工房では、分解・洗浄・注油・調整・確認など、時計の状態に応じて必要な工程を判断しながら作業します。
+          当工房では、分解・洗浄・注油・調整・確認など、時計の状態に応じて必要な作業を判断しながら作業します。
         </p>
       </section>
 
@@ -191,7 +191,7 @@ export default function PriceQualityPage() {
           <h2>概算と正式見積り</h2>
         </div>
         <p>
-          LINE相談では、写真・型番・症状をもとに受付前の概算をご案内します。
+          LINE相談では、時計の写真や分かる範囲の情報をもとに受付前の概算をご案内します。
           正式な金額は、実物を確認したうえでお見積りします。
         </p>
         <p>
@@ -202,7 +202,7 @@ export default function PriceQualityPage() {
       <section className="price-final">
         <h2>まずは写真を送ってご相談ください</h2>
         <p>
-          時計の写真・型番・症状をお送りいただければ、修理内容と費用感の目安をご案内します。
+          時計の写真や分かる範囲の情報をお送りいただければ、修理内容と費用感の目安をご案内します。
         </p>
         <a href={LINE_URL} className="price-primary">
           LINEで相談する

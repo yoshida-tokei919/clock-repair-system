@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "難修理への対応 | 吉田時計修理工房",
+  title: "修理の可能性を探す | ヨシダ時計修理工房",
   description:
     "他店で断られた時計も、部品調達・製作・代替案を含めて修理の可能性をできる限り探ります。",
 };
@@ -31,7 +31,7 @@ export default function DifficultRepairPage() {
     <main className="difficult-repair-page">
       <header className="repair-header">
         <Link href="/" className="repair-brand">
-          吉田時計修理工房
+          ヨシダ時計修理工房
         </Link>
         <nav className="repair-nav" aria-label="ページナビゲーション">
           <Link href="/">トップへ戻る</Link>
@@ -40,7 +40,7 @@ export default function DifficultRepairPage() {
       </header>
 
       <section className="repair-hero">
-        <p className="repair-eyebrow">難修理への対応</p>
+        <p className="repair-eyebrow">修理の可能性を探す</p>
         <h1>他店で断られた時計も、修理の可能性をできる限り探ります。</h1>
         <p className="repair-lead">
           部品供給終了、古い時計、特殊な外装部品、入手困難な部品など、一般的には修理が難しい時計でも、部品調達・製作・代替案を含めて対応方法を検討します。
@@ -117,7 +117,7 @@ export default function DifficultRepairPage() {
       <section className="repair-final">
         <h2>まずは写真を送ってご相談ください</h2>
         <p>
-          時計の写真・型番・症状をお送りいただければ、修理の可能性や概算の目安をご案内します。
+          時計の写真や分かる範囲の情報をお送りいただければ、修理の可能性や概算の目安をご案内します。
         </p>
         <a href={LINE_URL} className="repair-primary">
           LINEで相談する

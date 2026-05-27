@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "防水確認 | 吉田時計修理工房",
+  title: "防水確認 | ヨシダ時計修理工房",
   description:
     "オーバーホール後の防水検査やパッキン確認について、時計の状態に合わせた確認内容をご案内します。",
 };
@@ -23,7 +23,7 @@ export default function WaterproofCheckPage() {
     <main className="waterproof-page">
       <header className="waterproof-header">
         <Link href="/" className="waterproof-brand">
-          吉田時計修理工房
+          ヨシダ時計修理工房
         </Link>
         <nav className="waterproof-nav" aria-label="ページナビゲーション">
           <Link href="/">トップへ戻る</Link>
@@ -106,7 +106,7 @@ export default function WaterproofCheckPage() {
       <section className="waterproof-final">
         <h2>まずは写真を送ってご相談ください</h2>
         <p>
-          時計の写真・型番・症状をお送りいただければ、防水確認やパッキン交換が必要そうかも含めてご案内します。
+          時計の写真や分かる範囲の情報をお送りいただければ、防水確認やパッキン交換が必要そうかも含めてご案内します。
         </p>
         <a href={LINE_URL} className="waterproof-primary">
           LINEで相談する

@@ -72,7 +72,7 @@ nav a:hover { color: var(--accent-color); }
 .hero-eyebrow {
     margin: 0 0 18px;
     color: #20385d;
-    font-size: 0.95rem;
+    font-size: clamp(1.25rem, 2vw, 1.45rem);
     font-weight: 700;
     letter-spacing: 0.08em;
 }
@@ -358,7 +358,7 @@ nav a:hover { color: var(--accent-color); }
 }
 .homepage-flow-steps {
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
     list-style: none;
     padding: 0;
@@ -414,75 +414,6 @@ nav a:hover { color: var(--accent-color); }
 .homepage-flow-detail-link:hover {
     background: #f8fafc;
     border-color: #8fa1b7;
-    transform: translateY(-1px);
-}
-.consultation-safe-section {
-    padding: 0 20px 96px;
-    background: #fff;
-}
-.consultation-safe-panel {
-    max-width: 1000px;
-    margin: 0 auto;
-    box-sizing: border-box;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 28px 44px;
-    align-items: center;
-    padding: 38px 44px;
-    border: 1px solid #dce5ee;
-    border-radius: 10px;
-    background: #f8fafc;
-    box-shadow: 0 10px 24px rgba(26, 43, 75, 0.04);
-}
-.consultation-safe-copy {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 22px;
-    align-items: start;
-}
-.consultation-safe-mark {
-    width: 56px;
-    height: 56px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #cfd9e4;
-    border-radius: 50%;
-    color: var(--primary-color);
-    font-size: 1.55rem;
-    line-height: 1;
-    background: #fff;
-}
-.consultation-safe-panel h2 {
-    margin: 0 0 16px;
-    color: var(--primary-color);
-    font-size: 1.55rem;
-    line-height: 1.45;
-    letter-spacing: 0.03em;
-}
-.consultation-safe-panel p {
-    margin: 0;
-    color: #405166;
-    font-size: 0.96rem;
-    line-height: 1.9;
-}
-.consultation-safe-panel p + p {
-    margin-top: 12px;
-}
-.consultation-safe-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 220px;
-    padding: 14px 20px;
-    border: 1px solid #1a2b4b;
-    border-radius: 6px;
-    background: #fff;
-    color: var(--primary-color);
-    font-weight: 700;
-}
-.consultation-safe-button:hover {
-    background: #f1f5f9;
     transform: translateY(-1px);
 }
 /* 流れ・保証・FAQ */
@@ -680,22 +611,6 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
         margin: 0;
     }
     .homepage-flow-detail-link { width: 100%; box-sizing: border-box; }
-    .consultation-safe-section { padding: 0 20px 60px; }
-    .consultation-safe-panel {
-        grid-template-columns: 1fr;
-        padding: 28px 22px;
-    }
-    .consultation-safe-copy {
-        grid-template-columns: 1fr;
-        gap: 16px;
-    }
-    .consultation-safe-mark {
-        width: 48px;
-        height: 48px;
-        font-size: 1.35rem;
-    }
-    .consultation-safe-panel h2 { font-size: 1.35rem; }
-    .consultation-safe-button { width: 100%; box-sizing: border-box; }
     .business-guide-section { padding: 0 20px 60px; }
     .business-guide-panel {
         grid-template-columns: 1fr;
@@ -746,19 +661,19 @@ const HTML_ABOUT_PRICE = `
             <a class="strength-card" href="/line-consultation">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 0 1 12.5 3H13a8.5 8.5 0 0 1 8 8v.5Z"/></svg>
                 <h3>LINEで概算相談</h3>
-                <p>時計を送る前に、写真・型番・症状から修理内容と費用感の目安をご案内します。</p>
+                <p>時計を送る前に、写真や分かる範囲の情報から修理内容と費用感の目安をご案内します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
             <a class="strength-card" href="/difficult-repair">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3-3a6 6 0 0 1-7.8 7.8l-7.4 7.4a2.1 2.1 0 0 1-3-3l7.4-7.4a6 6 0 0 1 7.8-7.8Z"/></svg>
-                <h3>難修理への対応</h3>
+                <h3>修理の可能性を探す</h3>
                 <p>過去約4,000件の受付実績では、当店判断で修理不可として返却したケースは約3%。部品調達・製作も含めて、ご希望に合わせ柔軟に対応いたします。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
             <a class="strength-card" href="/about-technician">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
                 <h3>技術者について</h3>
-                <p>近江時計眼鏡宝飾専門学校卒業後、国内時計メーカーの修理を担当。修理歴20年の技術者が、必要な工程を省略しない修理を心がけています。</p>
+                <p>近江時計眼鏡宝飾専門学校卒業後、国内時計メーカーの修理を担当。修理歴20年の技術者が、状態に応じて必要な作業を見極めます。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
             <a class="strength-card" href="/parts-sourcing">
@@ -776,7 +691,7 @@ const HTML_ABOUT_PRICE = `
             <a class="strength-card" href="/price-quality">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/><path d="M4 20h16"/></svg>
                 <h3>価格と修理品質</h3>
-                <p>費用を抑えながらも、必要な工程を省略しない修理を心がけています。メーカー修理との価格差も確認できます。</p>
+                <p>状態に応じて必要な作業を見極め、費用と仕上がりのバランスを考えてご提案します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
         </div>
@@ -804,8 +719,8 @@ const HTML_ABOUT_PRICE = `
 
 <section id="flow" class="homepage-flow-section">
     <div class="homepage-flow-inner">
-        <h2 class="homepage-flow-heading">修理の流れ</h2>
-        <p class="homepage-flow-lead">LINEでのご相談から、正式見積り、修理、精度・防水確認、納品までの流れをご確認いただけます。</p>
+        <h2 class="homepage-flow-heading">修理の流れとポイント</h2>
+        <p class="homepage-flow-lead">LINEでのご相談から、受付・見積り・修理・納品までの流れと、事前に確認しておきたいポイントをご確認いただけます。</p>
         <ol class="homepage-flow-steps">
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">01</span>
@@ -817,42 +732,32 @@ const HTML_ABOUT_PRICE = `
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">03</span>
-                <span class="homepage-flow-label">受付</span>
+                <span class="homepage-flow-label">郵送</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">04</span>
-                <span class="homepage-flow-label">正式見積り</span>
+                <span class="homepage-flow-label">受付</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">05</span>
-                <span class="homepage-flow-label">修理</span>
+                <span class="homepage-flow-label">正式見積り</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">06</span>
-                <span class="homepage-flow-label">精度・防水確認</span>
+                <span class="homepage-flow-label">承認・キャンセル</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">07</span>
-                <span class="homepage-flow-label">納品</span>
+                <span class="homepage-flow-label">修理</span>
+            </li>
+            <li class="homepage-flow-step">
+                <span class="homepage-flow-number">08</span>
+                <span class="homepage-flow-label">納品・保証</span>
             </li>
         </ol>
         <div class="homepage-flow-detail">
-            <a class="homepage-flow-detail-link" href="/repair-flow">詳しい流れを見る</a>
+            <a class="homepage-flow-detail-link" href="/repair-flow">詳しく見る</a>
         </div>
-    </div>
-</section>
-
-<section class="consultation-safe-section">
-    <div class="consultation-safe-panel">
-        <div class="consultation-safe-copy">
-            <span class="consultation-safe-mark" aria-hidden="true">&#10003;</span>
-            <div>
-                <h2>&#23433;&#24515;&#12375;&#12390;&#12372;&#30456;&#35527;&#12356;&#12383;&#12384;&#12367;&#12383;&#12417;&#12395;</h2>
-                <p>&#12372;&#30456;&#35527;&#12384;&#12369;&#12391;&#20462;&#29702;&#21463;&#20184;&#12395;&#12399;&#12394;&#12426;&#12414;&#12379;&#12435;&#12290;<br>LINE&#12391;&#20889;&#30495;&#12539;&#22411;&#30058;&#12539;&#30151;&#29366;&#12434;&#30906;&#35469;&#12375;&#12289;&#21463;&#20184;&#21069;&#12395;&#12391;&#12365;&#12427;&#38480;&#12426;&#29694;&#23455;&#12395;&#36817;&#12356;&#27010;&#31639;&#12434;&#12372;&#26696;&#20869;&#12375;&#12414;&#12377;&#12290;</p>
-                <p>&#27491;&#24335;&#12394;&#20316;&#26989;&#12399;&#12289;&#20869;&#23481;&#12392;&#37329;&#38989;&#12434;&#12372;&#30906;&#35469;&#12356;&#12383;&#12384;&#12356;&#12390;&#12363;&#12425;&#36914;&#12417;&#12414;&#12377;&#12290;<br>&#20195;&#26367;&#37096;&#21697;&#12398;&#20351;&#29992;&#12420;&#36861;&#21152;&#20316;&#26989;&#12364;&#24517;&#35201;&#12394;&#22580;&#21512;&#12418;&#12289;&#20107;&#21069;&#12395;&#12372;&#35500;&#26126;&#12375;&#12414;&#12377;&#12290;</p>
-            </div>
-        </div>
-        <a class="consultation-safe-button" href="/reassurance">&#30456;&#35527;&#21069;&#12395;&#30906;&#35469;&#12375;&#12383;&#12356;&#12371;&#12392;&#12434;&#35211;&#12427;</a>
     </div>
 </section>
 
@@ -881,7 +786,7 @@ const HTML_FLOW_FOOTER = `
             </div>
             <div class="faq-item">
                 <h3 class="faq-question">&#20182;&#24215;&#12391;&#26029;&#12425;&#12428;&#12383;&#26178;&#35336;&#12391;&#12418;&#30456;&#35527;&#12391;&#12365;&#12414;&#12377;&#12363;&#65311;</h3>
-                <p class="faq-answer">&#29366;&#24907;&#12420;&#37096;&#21697;&#20837;&#25163;&#29366;&#27841;&#12395;&#12424;&#12426;&#12414;&#12377;&#12364;&#12289;&#37096;&#21697;&#35519;&#36948;&#12539;&#21152;&#24037;&#12539;&#35069;&#20316;&#12418;&#21547;&#12417;&#12390;&#20462;&#29702;&#12398;&#21487;&#33021;&#24615;&#12434;&#30906;&#35469;&#12375;&#12414;&#12377;&#12290;&#12414;&#12378;&#12399;&#20889;&#30495;&#12392;&#30151;&#29366;&#12434;&#12362;&#36865;&#12426;&#12367;&#12384;&#12373;&#12356;&#12290;<br><a class="faq-detail-link" href="/difficult-repair">難修理への対応を見る →</a></p>
+                <p class="faq-answer">&#29366;&#24907;&#12420;&#37096;&#21697;&#20837;&#25163;&#29366;&#27841;&#12395;&#12424;&#12426;&#12414;&#12377;&#12364;&#12289;&#37096;&#21697;&#35519;&#36948;&#12539;&#21152;&#24037;&#12539;&#35069;&#20316;&#12418;&#21547;&#12417;&#12390;&#20462;&#29702;&#12398;&#21487;&#33021;&#24615;&#12434;&#30906;&#35469;&#12375;&#12414;&#12377;&#12290;&#12414;&#12378;&#12399;&#20889;&#30495;&#12392;&#30151;&#29366;&#12434;&#12362;&#36865;&#12426;&#12367;&#12384;&#12373;&#12356;&#12290;<br><a class="faq-detail-link" href="/difficult-repair">修理の可能性について見る →</a></p>
             </div>
         </div>
     </div>
@@ -951,7 +856,7 @@ export default function TopPage() {
                     </h1>
                     <p className="hero-lead">
                         {"\u90e8\u54c1\u8abf\u9054\u30fb\u52a0\u5de5\u30fb\u88fd\u4f5c\u307e\u3067\u542b\u3081\u3066\u3001\u4fee\u7406\u306e\u53ef\u80fd\u6027\u3092\u63a2\u308a\u307e\u3059\u3002"}<br />
-                        {"LINE\u3067\u5199\u771f\u30fb\u578b\u756a\u30fb\u75c7\u72b6\u3092\u78ba\u8a8d\u3057\u306a\u304c\u3089\u3001\u53d7\u4ed8\u524d\u306b\u3067\u304d\u308b\u9650\u308a\u73fe\u5b9f\u306b\u8fd1\u3044\u6982\u7b97\u3092\u3054\u6848\u5185\u3057\u307e\u3059\u3002"}
+                        {"LINE\u3067\u6642\u8a08\u306e\u5199\u771f\u3084\u3001\u5206\u304b\u308b\u7bc4\u56f2\u306e\u60c5\u5831\u3092\u78ba\u8a8d\u3057\u306a\u304c\u3089\u3001\u53d7\u4ed8\u524d\u306b\u3067\u304d\u308b\u9650\u308a\u73fe\u5b9f\u306b\u8fd1\u3044\u6982\u7b97\u3092\u3054\u6848\u5185\u3057\u307e\u3059\u3002"}
                     </p>
                     <div className="hero-actions">
                         <a href="https://lin.ee/3C0XfJW" className="btn hero-line-btn">{"LINE\u3067\u76f8\u8ac7\u3059\u308b"}</a>
