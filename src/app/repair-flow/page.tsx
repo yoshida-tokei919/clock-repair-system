@@ -109,6 +109,11 @@ export default function RepairFlowPage() {
                   <p>{step.point}</p>
                 </div>
               ) : null}
+              {step.title === "03 郵送" ? (
+                <Link href="/packing-guide" className="flow-pack-link">
+                  梱包方法を見る
+                </Link>
+              ) : null}
             </article>
           ))}
         </div>
@@ -313,6 +318,26 @@ export default function RepairFlowPage() {
           display: block;
           margin-bottom: 6px;
           color: #20385d;
+        }
+
+        .flow-pack-link {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          margin-top: 16px;
+          padding: 11px 18px;
+          border: 1px solid #b8c5d4;
+          border-radius: 4px;
+          color: #1a2b4b;
+          background: #ffffff;
+          font-size: 0.92rem;
+          font-weight: 700;
+          text-decoration: none;
+        }
+
+        .flow-pack-link:hover {
+          background: #f8fafc;
+          border-color: #8fa1b7;
         }
 
         .flow-panel {
