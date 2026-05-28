@@ -173,6 +173,9 @@ nav a:hover { color: var(--accent-color); }
     .hero-photo-slide:first-child {
         opacity: 1;
     }
+    .recent-cases-track-inner {
+        animation: none !important;
+    }
 }
 
 /* スライドナビゲーション */
@@ -264,6 +267,118 @@ nav a:hover { color: var(--accent-color); }
     transform: none;
     border-color: #dce5ee;
     box-shadow: 0 8px 22px rgba(26, 43, 75, 0.04);
+}
+
+.recent-cases-section {
+    padding: 0 20px 88px;
+    background: #fff;
+}
+.recent-cases-inner {
+    max-width: 1120px;
+    margin: 0 auto;
+}
+.recent-cases-heading {
+    margin: 0 0 14px;
+    color: var(--primary-color);
+    font-size: 2rem;
+    line-height: 1.45;
+    letter-spacing: 0.04em;
+    text-align: center;
+}
+.recent-cases-lead {
+    max-width: 720px;
+    margin: 0 auto 34px;
+    color: #405166;
+    font-size: 0.98rem;
+    line-height: 1.9;
+    text-align: center;
+}
+.recent-cases-track {
+    display: flex;
+    gap: 18px;
+    overflow-x: auto;
+    padding: 4px 2px 18px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    scrollbar-color: #c8d4e1 transparent;
+}
+.recent-cases-track-inner {
+    display: flex;
+    width: max-content;
+    animation: recentCasesSlide 42s linear infinite;
+}
+.recent-cases-track:hover .recent-cases-track-inner {
+    animation-play-state: paused;
+}
+.recent-cases-set {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 18px;
+    padding-right: 18px;
+}
+.recent-case-card {
+    flex: 0 0 min(275px, 82vw);
+    overflow: hidden;
+    border: 1px solid #dce5ee;
+    border-radius: 10px;
+    background: #fff;
+    color: var(--primary-color);
+    text-decoration: none;
+    box-shadow: 0 10px 24px rgba(26, 43, 75, 0.045);
+    scroll-snap-align: start;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.recent-case-card:hover {
+    transform: translateY(-2px);
+    border-color: #b8c5d4;
+    box-shadow: 0 14px 30px rgba(26, 43, 75, 0.08);
+}
+.recent-case-image {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: #eef2f6;
+}
+.recent-case-image img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+.recent-case-body {
+    padding: 20px 20px 22px;
+}
+.recent-case-brand {
+    margin: 0 0 6px;
+    color: #53657b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+}
+.recent-case-model {
+    margin: 0;
+    color: var(--primary-color);
+    font-size: 1.15rem;
+    line-height: 1.45;
+}
+.recent-case-repair {
+    margin: 12px 0 18px;
+    color: #405166;
+    font-size: 0.92rem;
+    line-height: 1.7;
+}
+.recent-case-more {
+    color: var(--primary-color);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+@keyframes recentCasesSlide {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(-50%);
+    }
 }
 
 /* 料金比較表 */
@@ -582,8 +697,37 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     .hero .btn { width: 100%; box-sizing: border-box; }
     .hero-photo-band { height: 240px; margin-top: 36px; border-radius: 8px; }
     .section { padding: 60px 20px; }
-    .strength-card-grid { grid-template-columns: 1fr; }
-    .strength-card { min-height: auto; }
+    .strengths-section { padding: 44px 12px 42px; }
+    .strengths-section .section-title {
+        margin-bottom: 34px;
+    }
+    .strengths-section .section-title::after {
+        margin-top: 16px;
+    }
+    .strength-card-grid { grid-template-columns: 1fr; gap: 12px; }
+    .strength-card {
+        min-height: auto;
+        padding: 22px 22px;
+    }
+    .strength-card-mark {
+        margin-bottom: 14px;
+    }
+    .strength-card h3 {
+        margin-bottom: 10px;
+    }
+    .strength-card-more {
+        margin-top: 14px;
+    }
+    .recent-cases-section { padding: 0 20px 60px; }
+    .recent-cases-heading { font-size: 1.6rem; }
+    .recent-cases-lead {
+        margin-bottom: 26px;
+        text-align: left;
+    }
+    .recent-cases-track {
+        margin-right: -20px;
+        padding-right: 20px;
+    }
     .case-finder-section { padding: 0 20px 60px; }
     .case-finder-panel {
         grid-template-columns: 1fr;
@@ -653,6 +797,49 @@ const HTML_HEADER = `
 </header>
 `;
 
+const recentRepairCases = [
+    {
+        brand: "OMEGA",
+        model: "Seamaster",
+        repair: "オーバーホール・防水確認",
+        image: "/img/watch-sea-dweller.jpg",
+        alt: "修理事例イメージ OMEGA Seamaster",
+        href: "/cases/gallery",
+    },
+    {
+        brand: "ROLEX",
+        model: "Submariner",
+        repair: "オーバーホール・外装部品確認",
+        image: "/img/watch-submariner.jpg",
+        alt: "修理事例イメージ ROLEX Submariner",
+        href: "/cases/gallery",
+    },
+    {
+        brand: "SEIKO",
+        model: "Mechanical",
+        repair: "分解掃除・精度調整",
+        image: "/img/watch1.jpg",
+        alt: "修理事例イメージ SEIKO Mechanical",
+        href: "/cases/gallery",
+    },
+    {
+        brand: "CITIZEN",
+        model: "Automatic",
+        repair: "部品交換・動作確認",
+        image: "/img/watch2.jpg",
+        alt: "修理事例イメージ CITIZEN Automatic",
+        href: "/cases/gallery",
+    },
+    {
+        brand: "LONGINES",
+        model: "Vintage",
+        repair: "部品調達・オーバーホール",
+        image: "/img/watch3.jpg",
+        alt: "修理事例イメージ LONGINES Vintage",
+        href: "/cases/gallery",
+    },
+];
+
 const HTML_ABOUT_PRICE = `
 <section id="about" class="section strengths-section">
     <div class="container">
@@ -694,6 +881,40 @@ const HTML_ABOUT_PRICE = `
                 <p>状態に応じて必要な作業を見極め、費用と仕上がりのバランスを考えてご提案します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
+        </div>
+    </div>
+</section>
+
+<section class="recent-cases-section" aria-labelledby="recent-cases-heading">
+    <div class="recent-cases-inner">
+        <h2 id="recent-cases-heading" class="recent-cases-heading">最近の修理事例</h2>
+        <p class="recent-cases-lead">実際にご相談いただいた時計の一部をご紹介しています。時計の状態や部品の入手状況により、対応内容は一つひとつ異なります。</p>
+        <div class="recent-cases-track" aria-label="最近の修理事例">
+            <div class="recent-cases-track-inner">
+            ${[0, 1]
+                .map(
+                    () => `
+                <div class="recent-cases-set">
+                ${recentRepairCases
+                    .map(
+                        (repairCase) => `
+            <a class="recent-case-card" href="${repairCase.href}">
+                <div class="recent-case-image">
+                    <img src="${repairCase.image}" alt="${repairCase.alt}">
+                </div>
+                <div class="recent-case-body">
+                    <p class="recent-case-brand">${repairCase.brand}</p>
+                    <h3 class="recent-case-model">${repairCase.model}</h3>
+                    <p class="recent-case-repair">${repairCase.repair}</p>
+                    <span class="recent-case-more">詳しく見る →</span>
+                </div>
+            </a>`
+                    )
+                    .join("")}
+                </div>`
+                )
+                .join("")}
+            </div>
         </div>
     </div>
 </section>
