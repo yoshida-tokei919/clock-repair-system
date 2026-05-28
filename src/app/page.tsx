@@ -51,53 +51,98 @@ header {
 .logo-img { height: 80px; width: auto; display: block; } 
 .site-name { font-size: 1.5rem; color: var(--primary-color); font-weight: 600; }
 
-nav ul { list-style: none; display: flex; gap: 25px; padding: 0; margin: 0;}
+nav ul { list-style: none; display: flex; gap: 18px; padding: 0; margin: 0;}
 nav a { color: var(--text-color); font-size: 0.9rem; font-weight: 500; }
 nav a:hover { color: var(--accent-color); }
+.header-line-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 13px;
+    border-radius: 6px;
+    background: #06C755;
+    color: #fff !important;
+    font-weight: 700;
+    box-shadow: 0 6px 14px rgba(6, 199, 85, 0.18);
+}
+.header-line-link:hover {
+    background: #05B84F;
+    color: #fff !important;
+    transform: translateY(-1px);
+}
+.header-line-icon {
+    width: 24px;
+    height: 24px;
+    display: inline-block;
+    flex: 0 0 auto;
+}
+.header-line-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.08;
+}
+.header-line-text-small {
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+.header-line-text-main {
+    font-size: 0.84rem;
+    font-weight: 800;
+}
 
-/* トップページ（スライドショー） */
+/* トップページ（背景画像ヒーロー） */
 .hero {
     position: relative;
     margin-top: 101px;
     overflow: hidden;
-    background: linear-gradient(180deg, #ffffff 0%, #f7fafc 72%, #ffffff 100%);
-    color: var(--primary-color);
+    min-height: 680px;
+    display: flex;
+    align-items: center;
+    background-color: #101827;
+    background-position: center;
+    background-size: cover;
+    color: #ffffff;
 }
 .hero-inner {
     max-width: 1180px;
     margin: 0 auto;
-    padding: 72px 24px 64px;
-    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 104px 24px 94px;
+    text-align: left;
 }
 .hero-eyebrow {
     margin: 0 0 18px;
-    color: #20385d;
+    color: rgba(255, 255, 255, 0.88);
     font-size: clamp(1.25rem, 2vw, 1.45rem);
     font-weight: 700;
     letter-spacing: 0.08em;
 }
 .hero-title {
     margin: 0;
-    color: #101b2c;
+    color: #ffffff;
     font-size: clamp(2.7rem, 5vw, 4.5rem);
     line-height: 1.18;
     font-weight: 600;
     letter-spacing: 0;
+    text-shadow: 0 3px 18px rgba(0, 0, 0, 0.36);
 }
 .hero-title-line {
     display: block;
 }
 .hero-lead {
     max-width: 760px;
-    margin: 26px auto 0;
-    color: #405166;
+    margin: 26px 0 0;
+    color: rgba(255, 255, 255, 0.9);
     font-size: 1rem;
     line-height: 2;
     font-weight: 500;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.32);
 }
 .hero-actions {
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     flex-wrap: wrap;
     gap: 14px;
     margin-top: 34px;
@@ -110,69 +155,28 @@ nav a:hover { color: var(--accent-color); }
 .btn:hover { background-color: #1d4ed8; transform: translateY(-2px); }
 
 .hero .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
     min-width: 190px;
     padding: 15px 26px;
-    border-radius: 4px;
+    border-radius: 7px;
     border: 1px solid transparent;
     font-size: 0.98rem;
     box-shadow: none;
 }
-.hero-line-btn {
-    background: var(--primary-color);
-}
-.hero-line-btn:hover {
-    background: #13243f;
-}
 .hero-case-btn {
-    background: #ffffff;
-    color: var(--primary-color);
-    border-color: #b8c5d4 !important;
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.68) !important;
+    backdrop-filter: blur(4px);
 }
 .hero-case-btn:hover {
-    background: #f8fafc;
-    color: var(--primary-color);
-}
-.hero-photo-band {
-    position: relative;
-    max-width: 1160px;
-    height: clamp(320px, 34vw, 410px);
-    margin: 54px auto 0;
-    overflow: hidden;
-    border: 1px solid rgba(26, 43, 75, 0.1);
-    border-radius: 10px;
-    background: #e5ebf1;
-    box-shadow: 0 18px 44px rgba(15, 39, 72, 0.1);
-}
-.hero-photo-slide {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    animation: heroPhotoFade 18s ease-in-out infinite;
-}
-.hero-photo-slide:first-child {
-    opacity: 1;
-}
-.hero-photo-slide img {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: cover;
-    filter: brightness(1.06) contrast(1.04);
-    transform: scale(1.03);
-}
-@keyframes heroPhotoFade {
-    0%, 31% { opacity: 1; }
-    39%, 92% { opacity: 0; }
-    100% { opacity: 1; }
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
 }
 @media (prefers-reduced-motion: reduce) {
-    .hero-photo-slide {
-        animation: none;
-        opacity: 0;
-    }
-    .hero-photo-slide:first-child {
-        opacity: 1;
-    }
     .recent-cases-track-inner {
         animation: none !important;
     }
@@ -205,7 +209,11 @@ nav a:hover { color: var(--accent-color); }
 
 /* こだわりセクション */
 .strengths-section {
-    background: #fff;
+    position: relative;
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 252, 0.92)),
+        url("/img/dial-hands.jpg") center 44% / cover no-repeat;
 }
 .strength-card-grid {
     display: grid;
@@ -219,7 +227,7 @@ nav a:hover { color: var(--accent-color); }
     padding: 30px 28px;
     border: 1px solid #dce5ee;
     border-radius: 8px;
-    background: #fff;
+    background: rgba(255, 255, 255, 0.96);
     color: var(--primary-color);
     box-shadow: 0 8px 22px rgba(26, 43, 75, 0.04);
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -372,6 +380,26 @@ nav a:hover { color: var(--accent-color); }
     font-size: 0.9rem;
     font-weight: 700;
 }
+.recent-cases-action {
+    margin-top: 22px;
+    text-align: center;
+}
+.recent-cases-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 210px;
+    padding: 13px 22px;
+    border: 1px solid #1a2b4b;
+    border-radius: 6px;
+    background: var(--primary-color);
+    color: #fff;
+    font-weight: 700;
+}
+.recent-cases-button:hover {
+    background: #233b66;
+    transform: translateY(-1px);
+}
 @keyframes recentCasesSlide {
     from {
         transform: translateX(0);
@@ -381,77 +409,17 @@ nav a:hover { color: var(--accent-color); }
     }
 }
 
-/* 料金比較表 */
-.case-finder-section {
-    padding: 0 20px 96px;
-    background: #fff;
-}
-.case-finder-panel {
-    max-width: 1000px;
-    margin: 0 auto;
-    box-sizing: border-box;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 30px 44px;
-    align-items: center;
-    padding: 38px 44px;
-    border: 1px solid #dce5ee;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
-    box-shadow: 0 12px 28px rgba(26, 43, 75, 0.05);
-}
-.case-finder-panel h2 {
-    margin: 0 0 14px;
-    color: var(--primary-color);
-    font-size: 1.65rem;
-    line-height: 1.45;
-    letter-spacing: 0.03em;
-}
-.case-finder-panel p {
-    margin: 0;
-    color: #405166;
-    font-size: 0.98rem;
-    line-height: 1.9;
-}
-.case-finder-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 22px;
-}
-.case-finder-tags span {
-    display: inline-flex;
-    align-items: center;
-    min-height: 32px;
-    padding: 0 15px;
-    border: 1px solid #cfd9e4;
-    border-radius: 999px;
-    background: #fff;
-    color: #33445d;
-    font-size: 0.86rem;
-    font-weight: 600;
-}
-.case-finder-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 190px;
-    padding: 15px 22px;
-    border-radius: 6px;
-    background: var(--primary-color);
-    color: #fff;
-    font-weight: 700;
-    box-shadow: 0 8px 18px rgba(26, 43, 75, 0.16);
-}
-.case-finder-button:hover {
-    background: #233b66;
-    transform: translateY(-1px);
-}
 .homepage-flow-section {
+    position: relative;
     padding: 0 20px 96px;
-    background: #fff;
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.87), rgba(247, 250, 253, 0.91)),
+        url("/img/parts-tray.jpg") center 48% / cover no-repeat;
 }
 .homepage-flow-inner {
+    position: relative;
+    z-index: 1;
     max-width: 1000px;
     margin: 0 auto;
 }
@@ -480,12 +448,12 @@ nav a:hover { color: var(--accent-color); }
     margin: 0;
 }
 .homepage-flow-step {
-    min-height: 118px;
+    min-height: 132px;
     box-sizing: border-box;
-    padding: 20px 12px;
+    padding: 18px 14px;
     border: 1px solid #dce5ee;
     border-radius: 8px;
-    background: #fff;
+    background: rgba(255, 255, 255, 0.94);
     text-align: center;
     box-shadow: 0 8px 20px rgba(26, 43, 75, 0.035);
 }
@@ -509,6 +477,14 @@ nav a:hover { color: var(--accent-color); }
     font-size: 0.95rem;
     font-weight: 700;
     line-height: 1.55;
+}
+.homepage-flow-note {
+    display: block;
+    margin-top: 8px;
+    color: #53657b;
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.6;
 }
 .homepage-flow-detail {
     margin-top: 28px;
@@ -620,46 +596,6 @@ nav a:hover { color: var(--accent-color); }
     transform: translateY(-1px);
 }
 
-.contact-section {
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-    color: var(--primary-color);
-    text-align: center;
-    padding: 20px 20px 92px;
-}
-.line-wrapper {
-    max-width: 860px;
-    margin: 0 auto;
-    box-sizing: border-box;
-    padding: 44px 36px;
-    border: 1px solid #dce5ee;
-    border-radius: 10px;
-    background: var(--white);
-    box-shadow: 0 14px 30px rgba(26, 43, 75, 0.06);
-}
-.contact-section h2 {
-    margin: 0 0 16px;
-    color: var(--primary-color);
-    font-size: 1.9rem;
-    line-height: 1.45;
-    letter-spacing: 0.04em;
-}
-.contact-section p {
-    margin: 0 auto 26px;
-    max-width: 620px;
-    color: #405166;
-    font-size: 0.98rem;
-    line-height: 1.9;
-}
-.line-btn {
-    background-color: var(--primary-color);
-    color: #fff;
-    min-width: 190px;
-    padding: 14px 24px;
-    border-radius: 6px;
-    box-shadow: 0 8px 18px rgba(26, 43, 75, 0.16);
-}
-.line-btn:hover { background-color: #233b66;}
-
 /* フッター */
 footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);}
 .footer-logo-img { height: 35px; width: auto; margin-bottom: 15px; opacity: 0.8;} 
@@ -683,21 +619,44 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     nav ul {
         flex-wrap: nowrap;
         align-items: center;
-        gap: 16px;
+        justify-content: space-between;
+        gap: 8px;
         margin-top: 8px;
-        width: max-content;
+        width: 100%;
     }
     nav li { flex: 0 0 auto; }
     nav a { white-space: nowrap; font-size: 0.82rem; }
-    .hero { margin-top: 116px; }
-    .hero-inner { padding: 58px 20px 44px; }
+    .header-line-link {
+        padding: 6px 9px;
+        gap: 6px;
+    }
+    .header-line-icon {
+        width: 22px;
+        height: 22px;
+    }
+    .header-line-text-small {
+        font-size: 0.68rem;
+    }
+    .header-line-text-main {
+        font-size: 0.78rem;
+    }
+    .hero {
+        min-height: 560px;
+        margin-top: 116px;
+        background-position: center;
+    }
+    .hero-inner { padding: 64px 20px 58px; }
     .hero-title { font-size: 2.35rem; }
     .hero-lead { font-size: 0.95rem; line-height: 1.9; }
     .hero-actions { flex-direction: column; align-items: stretch; }
     .hero .btn { width: 100%; box-sizing: border-box; }
-    .hero-photo-band { height: 240px; margin-top: 36px; border-radius: 8px; }
     .section { padding: 60px 20px; }
-    .strengths-section { padding: 44px 12px 42px; }
+    .strengths-section {
+        padding: 44px 12px 42px;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.94)),
+            url("/img/dial-hands.jpg") center 45% / cover no-repeat;
+    }
     .strengths-section .section-title {
         margin-bottom: 34px;
     }
@@ -728,31 +687,34 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
         margin-right: -20px;
         padding-right: 20px;
     }
-    .case-finder-section { padding: 0 20px 60px; }
-    .case-finder-panel {
-        grid-template-columns: 1fr;
-        padding: 28px 22px;
+    .recent-cases-button { width: 100%; box-sizing: border-box; }
+    .homepage-flow-section {
+        padding: 0 20px 60px;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 250, 253, 0.94)),
+            url("/img/parts-tray.jpg") center 50% / cover no-repeat;
     }
-    .case-finder-panel h2 { font-size: 1.35rem; }
-    .case-finder-button { width: 100%; box-sizing: border-box; }
-    .homepage-flow-section { padding: 0 20px 60px; }
     .homepage-flow-heading { font-size: 1.6rem; }
     .homepage-flow-lead {
         margin-bottom: 28px;
         text-align: left;
     }
-    .homepage-flow-steps { grid-template-columns: 1fr; gap: 10px; }
+    .homepage-flow-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .homepage-flow-step {
         min-height: auto;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 16px 18px;
-        text-align: left;
+        padding: 16px 12px;
+        text-align: center;
     }
     .homepage-flow-number {
-        flex: 0 0 auto;
-        margin: 0;
+        margin-bottom: 10px;
+    }
+    .homepage-flow-label {
+        font-size: 0.9rem;
+    }
+    .homepage-flow-note {
+        margin-top: 6px;
+        font-size: 0.78rem;
+        line-height: 1.55;
     }
     .homepage-flow-detail-link { width: 100%; box-sizing: border-box; }
     .business-guide-section { padding: 0 20px 60px; }
@@ -762,10 +724,6 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     }
     .business-guide-panel h2 { font-size: 1.35rem; }
     .business-guide-button { width: 100%; box-sizing: border-box; }
-    .contact-section { padding: 0 20px 60px; }
-    .line-wrapper { padding: 32px 22px; }
-    .contact-section h2 { font-size: 1.5rem; }
-    .line-btn { width: 100%; box-sizing: border-box; }
 }
 @media (max-width: 480px) {
     .hero-title {
@@ -786,10 +744,8 @@ const HTML_HEADER = `
         </a>
         <nav>
             <ul>
-                <li><a href="#about">こだわり</a></li>
-                <li><a href="/cases/gallery">修理事例</a></li>
                 <li><a href="#flow">修理の流れ</a></li>
-                <li><a href="#contact">お問い合わせ</a></li>
+                <li><a href="https://lin.ee/3C0XfJW" class="header-line-link"><img src="/img/line-brand-icon.png" alt="" aria-hidden="true" class="header-line-icon"><span class="header-line-text"><span class="header-line-text-small">LINEで相談</span><span class="header-line-text-main">簡単見積り</span></span></a></li>
                 <li><a href="/cases/biz" style="color:#b59410; font-weight:bold; border:1px solid #b59410; padding:5px 10px; border-radius:4px;">業者様はこちら</a></li>
             </ul>
         </nav>
@@ -843,42 +799,42 @@ const recentRepairCases = [
 const HTML_ABOUT_PRICE = `
 <section id="about" class="section strengths-section">
     <div class="container">
-        <h2 class="section-title">&#20462;&#29702;&#12395;&#12388;&#12356;&#12390;</h2>
+        <h2 class="section-title">ヨシダ時計修理工房の強み</h2>
         <div class="strength-card-grid">
             <a class="strength-card" href="/line-consultation">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 0 1 12.5 3H13a8.5 8.5 0 0 1 8 8v.5Z"/></svg>
                 <h3>LINEで概算相談</h3>
-                <p>時計を送る前に、写真や分かる範囲の情報から修理内容と費用感の目安をご案内します。</p>
+                <p>時計の写真や分かる範囲の情報から、受付前に費用感をご案内します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
             <a class="strength-card" href="/difficult-repair">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3-3a6 6 0 0 1-7.8 7.8l-7.4 7.4a2.1 2.1 0 0 1-3-3l7.4-7.4a6 6 0 0 1 7.8-7.8Z"/></svg>
-                <h3>修理の可能性を探す</h3>
-                <p>過去約4,000件の受付実績では、当店判断で修理不可として返却したケースは約3%。部品調達・製作も含めて、ご希望に合わせ柔軟に対応いたします。</p>
+                <h3>断られた時計もご相談ください</h3>
+                <p>部品入手が難しい時計や、他店で断られた修理も、できる方法を検討します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
             <a class="strength-card" href="/about-technician">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
-                <h3>技術者について</h3>
-                <p>近江時計眼鏡宝飾専門学校卒業後、国内時計メーカーの修理を担当。修理歴20年の技術者が、状態に応じて必要な作業を見極めます。</p>
+                <h3>当工房の技術者</h3>
+                <p>1級時計修理技能士が、状態に合わせて必要な作業を見極めます。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
             <a class="strength-card" href="/parts-sourcing">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="m7.5 4.3 9 5.1"/><path d="M21 8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
-                <h3>部品調達</h3>
-                <p>国内外の材料店や修理仲間のネットワークを活用し、入手困難な部品もできる限り探します。</p>
+                <h3>部品調達のネットワーク</h3>
+                <p>純正部品を基本に、入手困難な場合も複数の調達先や代替案を検討します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
             <a class="strength-card" href="/waterproof-check">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-4.2-4.5-9.1-6.2-10.9a1.1 1.1 0 0 0-1.6 0C9.5 5.9 5 10.8 5 15a7 7 0 0 0 7 7Z"/></svg>
-                <h3>防水確認</h3>
-                <p>多数のパッキンを取り揃え、裏蓋・リューズ・プッシャー・ガラスまわりまで確認します。</p>
+                <h3>防水性を大切にする修理</h3>
+                <p>パッキン交換や防水確認まで、使用環境に合わせて慎重に判断します。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
             <a class="strength-card" href="/price-quality">
                 <svg class="strength-card-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/><path d="M4 20h16"/></svg>
                 <h3>価格と修理品質</h3>
-                <p>状態に応じて必要な作業を見極め、費用と仕上がりのバランスを考えてご提案します。</p>
+                <p>必要な工程を見極め、費用と仕上がりのバランスを考えます。</p>
                 <span class="strength-card-more">詳しく見る →</span>
             </a>
         </div>
@@ -887,8 +843,8 @@ const HTML_ABOUT_PRICE = `
 
 <section class="recent-cases-section" aria-labelledby="recent-cases-heading">
     <div class="recent-cases-inner">
-        <h2 id="recent-cases-heading" class="recent-cases-heading">最近の修理事例</h2>
-        <p class="recent-cases-lead">実際にご相談いただいた時計の一部をご紹介しています。時計の状態や部品の入手状況により、対応内容は一つひとつ異なります。</p>
+        <h2 id="recent-cases-heading" class="recent-cases-heading">修理事例を探す</h2>
+        <p class="recent-cases-lead">ブランドや症状から修理事例をご覧いただけます。</p>
         <div class="recent-cases-track" aria-label="最近の修理事例">
             <div class="recent-cases-track-inner">
             ${[0, 1]
@@ -916,25 +872,9 @@ const HTML_ABOUT_PRICE = `
                 .join("")}
             </div>
         </div>
-    </div>
-</section>
-
-<section class="case-finder-section">
-    <div class="case-finder-panel">
-        <div>
-            <h2>&#33258;&#20998;&#12398;&#26178;&#35336;&#12395;&#36817;&#12356;&#20462;&#29702;&#20107;&#20363;&#12434;&#25506;&#12377;</h2>
-            <p>&#12502;&#12521;&#12531;&#12489;&#12539;&#22411;&#30058;&#12539;&#30151;&#29366;&#12539;&#20462;&#29702;&#20869;&#23481;&#12363;&#12425;&#12289;&#20284;&#12383;&#20462;&#29702;&#20107;&#20363;&#12434;&#30906;&#35469;&#12391;&#12365;&#12414;&#12377;&#12290;<br>&#12300;&#12371;&#12398;&#26178;&#35336;&#12418;&#30452;&#12379;&#12427;&#12363;&#12301;&#12434;&#30693;&#12426;&#12383;&#12356;&#26041;&#12399;&#12289;&#12414;&#12378;&#36942;&#21435;&#12398;&#20107;&#20363;&#12434;&#12372;&#35239;&#12367;&#12384;&#12373;&#12356;&#12290;</p>
-            <div class="case-finder-tags" aria-label="&#26908;&#32034;&#12391;&#20351;&#12360;&#12427;&#38917;&#30446;">
-                <span>&#12502;&#12521;&#12531;&#12489;</span>
-                <span>&#22411;&#30058;</span>
-                <span>&#12514;&#12487;&#12523;</span>
-                <span>Cal</span>
-                <span>&#30151;&#29366;</span>
-                <span>&#20462;&#29702;&#20869;&#23481;</span>
-                <span>&#20132;&#25563;&#37096;&#21697;</span>
-            </div>
+        <div class="recent-cases-action">
+            <a class="recent-cases-button" href="/cases/gallery">修理事例を検索する</a>
         </div>
-        <a class="case-finder-button" href="/cases/gallery">&#20462;&#29702;&#20107;&#20363;&#12434;&#26908;&#32034;&#12377;&#12427;</a>
     </div>
 </section>
 
@@ -946,34 +886,42 @@ const HTML_ABOUT_PRICE = `
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">01</span>
                 <span class="homepage-flow-label">LINE相談</span>
+                <span class="homepage-flow-note">写真と分かる範囲の情報を送信</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">02</span>
                 <span class="homepage-flow-label">概算案内</span>
+                <span class="homepage-flow-note">受付前に費用感を確認</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">03</span>
                 <span class="homepage-flow-label">郵送</span>
+                <span class="homepage-flow-note">梱包して時計を発送</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">04</span>
                 <span class="homepage-flow-label">受付</span>
+                <span class="homepage-flow-note">状態・付属品を確認</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">05</span>
                 <span class="homepage-flow-label">正式見積り</span>
+                <span class="homepage-flow-note">実物確認後にご案内</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">06</span>
                 <span class="homepage-flow-label">承認・キャンセル</span>
+                <span class="homepage-flow-note">納得後に作業開始</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">07</span>
                 <span class="homepage-flow-label">修理</span>
+                <span class="homepage-flow-note">分解・洗浄・調整</span>
             </li>
             <li class="homepage-flow-step">
                 <span class="homepage-flow-number">08</span>
                 <span class="homepage-flow-label">納品・保証</span>
+                <span class="homepage-flow-note">確認後に返送</span>
             </li>
         </ol>
         <div class="homepage-flow-detail">
@@ -1023,16 +971,6 @@ const HTML_FLOW_FOOTER = `
     </div>
 </section>
 
-<section id="contact" class="contact-section section">
-    <div class="container">
-        <div class="line-wrapper">
-            <h2>&#12414;&#12378;&#12399;LINE&#12391;&#12372;&#30456;&#35527;&#12367;&#12384;&#12373;&#12356;</h2>
-            <p>&#20889;&#30495;&#12539;&#22411;&#30058;&#12539;&#30151;&#29366;&#12434;&#12362;&#36865;&#12426;&#12356;&#12383;&#12384;&#12369;&#12428;&#12400;&#12289;&#21463;&#20184;&#21069;&#12398;&#27010;&#31639;&#30456;&#35527;&#12364;&#21487;&#33021;&#12391;&#12377;&#12290;<br>&#12372;&#30456;&#35527;&#12384;&#12369;&#12391;&#20462;&#29702;&#21463;&#20184;&#12395;&#12399;&#12394;&#12426;&#12414;&#12379;&#12435;&#12290;</p>
-            <a href="https://lin.ee/3C0XfJW" class="btn line-btn">LINE&#12391;&#30456;&#35527;&#12377;&#12427;</a>
-        </div>
-    </div>
-</section>
-
 <footer>
     <div class="container">
         <img src="/img/logo.png" alt="ヨシダ時計修理工房 ロゴ" class="footer-logo-img">
@@ -1042,23 +980,7 @@ const HTML_FLOW_FOOTER = `
 </footer>
 `;
 
-const heroImages = [
-    {
-        src: "/img/DSCN0385.JPG",
-        alt: "\u6642\u8a08\u30e0\u30fc\u30d6\u30e1\u30f3\u30c8\u3092\u8abf\u6574\u3059\u308b\u7cbe\u5bc6\u4f5c\u696d",
-        position: "center 62%",
-    },
-    {
-        src: "/img/DSCN0392.JPG",
-        alt: "\u5206\u89e3\u3057\u305f\u6642\u8a08\u90e8\u54c1\u3092\u6574\u7136\u3068\u4e26\u3079\u305f\u72b6\u614b",
-        position: "center 50%",
-    },
-    {
-        src: "/img/DSCN0382.JPG",
-        alt: "\u56fa\u5b9a\u53f0\u306b\u7f6e\u3044\u305f\u6642\u8a08\u30e0\u30fc\u30d6\u30e1\u30f3\u30c8\u3068\u5468\u8fba\u90e8\u54c1",
-        position: "center 55%",
-    },
-];
+const heroImage = "/img/watch-submariner.jpg";
 
 export default function TopPage() {
     return (
@@ -1068,7 +990,12 @@ export default function TopPage() {
             <div dangerouslySetInnerHTML={{ __html: HTML_HEADER }} />
 
             {/* Hero */}
-            <section className="hero">
+            <section
+                className="hero"
+                style={{
+                    backgroundImage: `linear-gradient(90deg, rgba(8, 18, 34, 0.86) 0%, rgba(8, 18, 34, 0.7) 42%, rgba(8, 18, 34, 0.28) 100%), url(${heroImage})`,
+                }}
+            >
                 <div className="hero-inner">
                     <p className="hero-eyebrow">{"\u4fee\u7406\u6b7420\u5e74\u30fb1\u7d1a\u6642\u8a08\u4fee\u7406\u6280\u80fd\u58eb"}</p>
                     <h1 className="hero-title">
@@ -1080,19 +1007,7 @@ export default function TopPage() {
                         {"LINE\u3067\u6642\u8a08\u306e\u5199\u771f\u3084\u3001\u5206\u304b\u308b\u7bc4\u56f2\u306e\u60c5\u5831\u3092\u78ba\u8a8d\u3057\u306a\u304c\u3089\u3001\u53d7\u4ed8\u524d\u306b\u3067\u304d\u308b\u9650\u308a\u73fe\u5b9f\u306b\u8fd1\u3044\u6982\u7b97\u3092\u3054\u6848\u5185\u3057\u307e\u3059\u3002"}
                     </p>
                     <div className="hero-actions">
-                        <a href="https://lin.ee/3C0XfJW" className="btn hero-line-btn">{"LINE\u3067\u76f8\u8ac7\u3059\u308b"}</a>
                         <Link href="/cases/gallery" className="btn hero-case-btn">{"\u4fee\u7406\u4e8b\u4f8b\u3092\u691c\u7d22\u3059\u308b"}</Link>
-                    </div>
-                    <div className="hero-photo-band" aria-label="\u6642\u8a08\u4fee\u7406\u4f5c\u696d\u306e\u5199\u771f">
-                        {heroImages.map((image, index) => (
-                            <div
-                                className="hero-photo-slide"
-                                key={image.src}
-                                style={{ animationDelay: `${index * 6}s` }}
-                            >
-                                <img src={image.src} alt={image.alt} style={{ objectPosition: image.position }} />
-                            </div>
-                        ))}
                     </div>
                 </div>
             </section>
