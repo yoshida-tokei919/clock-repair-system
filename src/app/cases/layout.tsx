@@ -44,9 +44,8 @@ export default function CasesLayout({
                         <div>
                             <h3 className="font-bold text-lg mb-4">ヨシダ時計修理工房</h3>
                             <p className="text-neutral-400 text-sm">
-                                〒651-1213<br />
-                                神戸市北区広陵町1-162-1-401<br />
-                                TEL: 090-2041-8275
+                                所在地の詳細は防犯上の理由により非公開です。<br />
+                                修理依頼時はLINEでの事前相談後に送付先をご案内します。
                             </p>
                         </div>
                         <div>
