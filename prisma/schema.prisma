@@ -195,6 +195,7 @@ model Repair {
   customerMessages RepairCustomerMessage[]
   photos        RepairPhoto[]
   estimate      Estimate?
+  repairLineItems RepairLineItem[]
   orderRequests OrderRequest[]
   publicCases   PublicCase[]
   
@@ -258,6 +259,8 @@ model PricingRule {
   maxPrice          Int
   suggestedWorkName String
   notes             String?
+
+  repairLineItems RepairLineItem[]
 }
 
 model Estimate {
@@ -297,6 +300,61 @@ model EstimateItem {
   createdAt   DateTime @default(now())
 
   estimate   Estimate @relation(fields: [estimateId], references: [id])
+}
+
+enum RepairLineItemType {
+  LABOR
+  PART
+}
+
+model RepairLineItem {
+  id       Int    @id @default(autoincrement())
+  repairId Int
+  repair   Repair @relation(fields: [repairId], references: [id], onDelete: Cascade)
+
+  lineType RepairLineItemType
+
+  partsMasterId Int?
+  partsMaster   PartsMaster? @relation(fields: [partsMasterId], references: [id])
+
+  pricingRuleId Int?
+  pricingRule   PricingRule? @relation(fields: [pricingRuleId], references: [id])
+
+  relatedWorkLineItemId Int?
+  relatedWorkLineItem   RepairLineItem?  @relation("RepairLineItemRelatedWork", fields: [relatedWorkLineItemId], references: [id])
+  relatedPartLineItems  RepairLineItem[] @relation("RepairLineItemRelatedWork")
+
+  itemNameSnapshot            String
+  estimateDisplayNameSnapshot String?
+  b2bDisplayNameSnapshot      String?
+  b2cDisplayNameSnapshot      String?
+
+  gradeNameSnapshot       String?
+  notesForCustomerSnapshot String?
+
+  quantity  Int @default(1)
+  unitPrice Int @default(0)
+  amount    Int @default(0)
+
+  showPriceB2b Boolean @default(false)
+  showPriceB2c Boolean @default(false)
+
+  sortOrder Int @default(0)
+
+  internalMemo String?
+  customerMemo String?
+  publicMemo   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([repairId])
+  @@index([lineType])
+  @@index([partsMasterId])
+  @@index([pricingRuleId])
+  @@index([relatedWorkLineItemId])
+  @@index([repairId, sortOrder])
+  @@index([repairId, lineType])
 }
 
 // 6. Parts
@@ -438,6 +496,7 @@ model PartsMaster {
   gradeMaster      PartGradeMaster? @relation(fields: [gradeId],            references: [id])
   orderRequests OrderRequest[]
   estimateItems EstimateItem[]
+  repairLineItems RepairLineItem[]
 
   @@index([standardPartNameId])
   @@index([gradeId])
