@@ -345,3 +345,40 @@ Task 107-24:
 ```
 
 ただし、保存済みPDFを正とする現行方針を崩す場合は、帳票の過去表示固定方針との整合を先に検討する。
+
+## 16. 最終追記: 復旧結果
+
+追加確認により、最終原因は Supabase project が paused 状態だったことと判明した。
+
+対応:
+
+```txt
+Supabase Dashboard で対象 project を resume した
+npm run dev を再起動した
+```
+
+結果:
+
+```txt
+見積書PDFが表示できるようになった
+請求書PDFが表示できるようになった
+```
+
+結論:
+
+```txt
+見積書・請求書PDF download failed の原因は Supabase project paused による Storage 接続不可。
+RepairLineItem 関連コードとは無関係。
+```
+
+この追記で変更していないもの:
+
+```txt
+schema
+code
+API
+UI
+DB
+Storageファイル
+RepairLineItem関連コード
+```
