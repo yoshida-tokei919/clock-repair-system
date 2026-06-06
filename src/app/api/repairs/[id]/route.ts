@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+import {
+    estimateItemsLikeToRepairLineItemInputs,
+    replaceRepairLineItems,
+} from "@/lib/repair-line-items";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -324,6 +328,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                             }))
                         });
 
+                        const repairLineItemInputs = estimateItemsLikeToRepairLineItemInputs(syncedEstimateItems).map((item) => ({
+                            ...item,
+                            relatedWorkLineItemId: null,
+                        }));
+                        await replaceRepairLineItems(id, repairLineItemInputs, tx);
+
                         const pendingOrderQuantities = new Map<number, number>();
                         for (const item of syncedEstimateItems) {
                             if (item.type !== 'part' || !item.partsMasterId) continue;
@@ -342,6 +352,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                                 data: { quantity },
                             });
                         }
+                    } else {
+                        await replaceRepairLineItems(id, [], tx);
                     }
                     const laborItems = body.estimate.items.filter((i: any) => i.type === 'labor');
 
