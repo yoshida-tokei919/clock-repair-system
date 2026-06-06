@@ -285,9 +285,24 @@ export async function getRepairLineItems(repairId: number, db: DbLike = prisma) 
 export async function createRepairLineItems(
     repairId: number,
     items: RepairLineItemInput[],
-    db: DbLike = prisma
+    db?: Prisma.TransactionClient
 ) {
     assertRepairId(repairId);
+
+    if (db) {
+        return createRepairLineItemsWithClient(db, repairId, items);
+    }
+
+    return prisma.$transaction((tx) =>
+        createRepairLineItemsWithClient(tx, repairId, items)
+    );
+}
+
+async function createRepairLineItemsWithClient(
+    db: DbLike,
+    repairId: number,
+    items: RepairLineItemInput[]
+) {
     if (items.length === 0) return { count: 0 };
 
     const data = items.map((item, index) =>
@@ -299,23 +314,36 @@ export async function createRepairLineItems(
 
 export async function replaceRepairLineItems(
     repairId: number,
-    items: RepairLineItemInput[]
+    items: RepairLineItemInput[],
+    db?: Prisma.TransactionClient
 ) {
     assertRepairId(repairId);
 
-    return prisma.$transaction(async (tx) => {
-        await tx.repairLineItem.deleteMany({ where: { repairId } });
+    if (db) {
+        return replaceRepairLineItemsWithClient(db, repairId, items);
+    }
 
-        if (items.length === 0) {
-            return { count: 0 };
-        }
+    return prisma.$transaction((tx) =>
+        replaceRepairLineItemsWithClient(tx, repairId, items)
+    );
+}
 
-        const data = items.map((item, index) =>
-            toCreateInput(repairId, normalizeRepairLineItemInput(item, index))
-        );
+async function replaceRepairLineItemsWithClient(
+    db: DbLike,
+    repairId: number,
+    items: RepairLineItemInput[]
+) {
+    await db.repairLineItem.deleteMany({ where: { repairId } });
 
-        // replace方式ではidが再採番されるため、同一replace内で新規作成される
-        // LABOR行へのrelatedWorkLineItemId紐づけはまだ扱わない。
-        return tx.repairLineItem.createMany({ data });
-    });
+    if (items.length === 0) {
+        return { count: 0 };
+    }
+
+    const data = items.map((item, index) =>
+        toCreateInput(repairId, normalizeRepairLineItemInput(item, index))
+    );
+
+    // replace方式ではidが再採番されるため、同一replace内で新規作成される
+    // LABOR行へのrelatedWorkLineItemId紐づけはまだ扱わない。
+    return db.repairLineItem.createMany({ data });
 }
