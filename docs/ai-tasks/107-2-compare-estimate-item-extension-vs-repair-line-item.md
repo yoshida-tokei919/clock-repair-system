@@ -1,5 +1,10 @@
 # AI Task 107-2: EstimateItem拡張案 vs RepairLineItem新設案の比較設計
 
+> 注記:
+> 本ファイルは、Task 107-6-resetで作成された正本3ファイルを前提に読む。
+> 作業マスタ・部品マスタ・PricingRule・PublicCaseは、Repair明細 / EstimateItem / RepairLineItem のスナップショット設計を経由して接続する。
+> PublicCaseをRepairやEstimateItemの直表示にはしない。
+
 ## 目的
 
 作業マスタ新設前に、帳票・共有ページ・PublicCaseの元になる明細の受け皿を決める。
