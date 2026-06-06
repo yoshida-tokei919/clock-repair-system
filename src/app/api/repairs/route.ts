@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+import {
+    estimateItemsLikeToRepairLineItemInputs,
+    replaceRepairLineItems,
+} from "@/lib/repair-line-items";
 
 function extractInquirySequence(inquiryNumber: string | null, prefix: string) {
     if (!inquiryNumber) return 0;
@@ -464,6 +468,13 @@ export async function POST(req: Request) {
                         }
                     }
                 });
+
+                const repairLineItemInputs = estimateItemsLikeToRepairLineItemInputs(estimateItems).map((item) => ({
+                    ...item,
+                    relatedWorkLineItemId: null,
+                }));
+                await replaceRepairLineItems(repair.id, repairLineItemInputs, tx);
+
                 const laborItems = estimateItems.filter((i: any) => i.type === 'labor');
 
                 if (laborItems.length > 0) {
