@@ -1,0 +1,71 @@
+{
+  "generatedAt": "2026-06-04T20:53:32.797Z",
+  "inputPath": "docs/data/fmp/generated/public-case-candidates.json",
+  "inputCaseCount": 2914,
+  "publishCandidateCaseCount": 2914,
+  "publicCasePayloadCount": 2914,
+  "workItemPayloadCount": 3705,
+  "partItemPayloadCount": 1468,
+  "warningPayloadCount": 1349,
+  "criticalWarningCount": 0,
+  "reviewWarningCount": 487,
+  "infoWarningCount": 862,
+  "unlinkedPartItemCount": 465,
+  "showPriceB2bTrueCount": 7238,
+  "showPriceB2bFalseCount": 849,
+  "showPriceB2cTrueCount": 0,
+  "showPriceB2cFalseCount": 8087,
+  "importBlocked": false,
+  "errors": [],
+  "expectedCounts": {
+    "publicCasePayloadCount": 2914,
+    "publishCandidateCaseCount": 2914,
+    "internalPublishableWorkItemCount": 2616,
+    "externalPublishableWorkItemCount": 709,
+    "warningPayloadCount": 1349,
+    "partWithoutPublishableWorkWarningCount": 465,
+    "sourceTextNormalizedWarningCount": 6,
+    "criticalWarningCount": 0,
+    "showPriceB2cTrueCount": 0
+  },
+  "actualChecks": {
+    "publicCasePayloadCountMatches": true,
+    "publishCandidateCaseCountMatches": true,
+    "internalPublishableWorkItemCount": 2616,
+    "internalPublishableWorkItemCountMatches": true,
+    "externalPublishableWorkItemCount": 709,
+    "externalPublishableWorkItemCountMatches": true,
+    "partWithoutPublishableWorkWarningCount": 465,
+    "partWithoutPublishableWorkWarningCountMatches": true,
+    "sourceTextNormalizedWarningCount": 6,
+    "sourceTextNormalizedWarningCountMatches": true,
+    "criticalWarningCountMatches": true
+  },
+  "priceFlagBreakdown": {
+    "publicCase": {
+      "showPriceB2bTrueCount": 2914,
+      "showPriceB2bFalseCount": 0,
+      "showPriceB2cTrueCount": 0,
+      "showPriceB2cFalseCount": 2914
+    },
+    "workItem": {
+      "showPriceB2bTrueCount": 3321,
+      "showPriceB2bFalseCount": 384,
+      "showPriceB2cTrueCount": 0,
+      "showPriceB2cFalseCount": 3705
+    },
+    "partItem": {
+      "showPriceB2bTrueCount": 1003,
+      "showPriceB2bFalseCount": 465,
+      "showPriceB2cTrueCount": 0,
+      "showPriceB2cFalseCount": 1468
+    }
+  },
+  "outputFiles": [
+    "docs/data/fmp/generated/import-dry-run/import-summary.json",
+    "docs/data/fmp/generated/import-dry-run/public-case-payload.sample.json",
+    "docs/data/fmp/generated/import-dry-run/work-item-payload.sample.json",
+    "docs/data/fmp/generated/import-dry-run/part-item-payload.sample.json",
+    "docs/data/fmp/generated/import-dry-run/warning-payload.sample.json"
+  ]
+}

@@ -1,0 +1,136 @@
+{
+  "autoRemovedReadingKanaCount": 647,
+  "autoRemovedReadingKanaUnique": [
+    {
+      "value": "コウカンギジュツリョウ",
+      "count": 277
+    },
+    {
+      "value": "ボウスイケンサ",
+      "count": 66
+    },
+    {
+      "value": "レイトツ",
+      "count": 45
+    },
+    {
+      "value": "ハリトリツケ",
+      "count": 44
+    },
+    {
+      "value": "オコマキシンジョキョ",
+      "count": 38
+    },
+    {
+      "value": "シュウリ",
+      "count": 31
+    },
+    {
+      "value": "トリツケ",
+      "count": 24
+    },
+    {
+      "value": "モジバンセッチャク",
+      "count": 20
+    },
+    {
+      "value": "ベルトゼンスウ",
+      "count": 17
+    },
+    {
+      "value": "カシメ",
+      "count": 15
+    },
+    {
+      "value": "シュウセイ",
+      "count": 14
+    },
+    {
+      "value": "セイサク",
+      "count": 13
+    },
+    {
+      "value": "ブヒンメイギジュツリョウ",
+      "count": 13
+    },
+    {
+      "value": "フウボウケンマ",
+      "count": 11
+    },
+    {
+      "value": "ハリチッコウトソウ",
+      "count": 7
+    },
+    {
+      "value": "メッキ",
+      "count": 3
+    },
+    {
+      "value": "ケンマ",
+      "count": 2
+    },
+    {
+      "value": "ビョウシンギジュツリョウ",
+      "count": 2
+    },
+    {
+      "value": "イチバン",
+      "count": 1
+    },
+    {
+      "value": "カコウギジュツリョウ",
+      "count": 1
+    },
+    {
+      "value": "チクコウトソウ",
+      "count": 1
+    },
+    {
+      "value": "チョウシンギジュツリョウ",
+      "count": 1
+    },
+    {
+      "value": "ヨウセツギジュツリョウ",
+      "count": 1
+    }
+  ],
+  "unknownKatakanaSuffixCandidates": [
+    {
+      "value": "リダン",
+      "count": 2,
+      "examples": [
+        "文字盤リダン"
+      ]
+    }
+  ],
+  "reviewKatakanaSuffixCount": 2,
+  "emptyDisplayNameCount": 0,
+  "suspiciousRemainingTerms": [],
+  "suspiciousRemainingB2bSuffixes": [
+    {
+      "value": "リダン",
+      "count": 2
+    }
+  ],
+  "suspiciousRemainingB2cSuffixes": [
+    {
+      "value": "リダン",
+      "count": 2
+    }
+  ],
+  "protectedKatakanaWords": [
+    "ガラス",
+    "リューズ",
+    "パッキン",
+    "ブレス",
+    "ケース",
+    "ベゼル",
+    "インデックス",
+    "コイル",
+    "ローター",
+    "クロノグラフ",
+    "カレンダー",
+    "ムーブメント",
+    "オーバーホール"
+  ]
+}

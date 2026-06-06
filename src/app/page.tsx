@@ -1,4 +1,8 @@
 import Link from "next/link";
+import {
+    getLatestB2CPublicCasesForHome,
+    type B2CPublicCaseForGallery,
+} from "@/lib/public-cases";
 /* eslint-disable @next/next/no-img-element */
 
 export const dynamic = 'force-dynamic';
@@ -353,6 +357,11 @@ nav a:hover { color: var(--accent-color); }
     display: block;
     object-fit: cover;
 }
+.recent-case-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #eef2f6, #e5e7eb);
+}
 .recent-case-body {
     padding: 20px 20px 22px;
 }
@@ -368,6 +377,13 @@ nav a:hover { color: var(--accent-color); }
     color: var(--primary-color);
     font-size: 1.15rem;
     line-height: 1.45;
+}
+.recent-case-meta {
+    margin: 7px 0 0;
+    color: #53657b;
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.55;
 }
 .recent-case-repair {
     margin: 12px 0 18px;
@@ -753,50 +769,82 @@ const HTML_HEADER = `
 </header>
 `;
 
-const recentRepairCases = [
-    {
-        brand: "OMEGA",
-        model: "Seamaster",
-        repair: "オーバーホール・防水確認",
-        image: "/img/watch-sea-dweller.jpg",
-        alt: "修理事例イメージ OMEGA Seamaster",
-        href: "/cases/gallery",
-    },
-    {
-        brand: "ROLEX",
-        model: "Submariner",
-        repair: "オーバーホール・外装部品確認",
-        image: "/img/watch-submariner.jpg",
-        alt: "修理事例イメージ ROLEX Submariner",
-        href: "/cases/gallery",
-    },
-    {
-        brand: "SEIKO",
-        model: "Mechanical",
-        repair: "分解掃除・精度調整",
-        image: "/img/watch1.jpg",
-        alt: "修理事例イメージ SEIKO Mechanical",
-        href: "/cases/gallery",
-    },
-    {
-        brand: "CITIZEN",
-        model: "Automatic",
-        repair: "部品交換・動作確認",
-        image: "/img/watch2.jpg",
-        alt: "修理事例イメージ CITIZEN Automatic",
-        href: "/cases/gallery",
-    },
-    {
-        brand: "LONGINES",
-        model: "Vintage",
-        repair: "部品調達・オーバーホール",
-        image: "/img/watch3.jpg",
-        alt: "修理事例イメージ LONGINES Vintage",
-        href: "/cases/gallery",
-    },
-];
+type HomeRecentCase = {
+    id: number;
+    brand: string;
+    model: string;
+    meta: string;
+    repair: string;
+    image?: string;
+    alt: string;
+    href: string;
+};
 
-const HTML_ABOUT_PRICE = `
+function text(value?: string | null): string {
+    return (value ?? "").trim();
+}
+
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function getBrandDisplayName(publicCase: B2CPublicCaseForGallery): string {
+    return text(publicCase.brandDisplayName) || text(publicCase.brandName);
+}
+
+function getWorkDisplayName(publicCase: B2CPublicCaseForGallery): string {
+    const work = publicCase.workItems
+        .filter((workItem) => workItem.isPublishable)
+        .map((workItem) => text(workItem.b2cDisplayName) || text(workItem.b2bDisplayName))
+        .find(Boolean);
+
+    return work || "修理内容確認中";
+}
+
+function getCaseTitle(publicCase: B2CPublicCaseForGallery, workName: string): string {
+    return (
+        text(publicCase.modelName) ||
+        (text(publicCase.ref) ? `Ref. ${text(publicCase.ref)}` : "") ||
+        (text(publicCase.caliber) ? `Cal. ${text(publicCase.caliber)}` : "") ||
+        workName ||
+        "修理事例"
+    );
+}
+
+function getCaseMeta(publicCase: B2CPublicCaseForGallery): string {
+    return [
+        text(publicCase.ref) ? `Ref. ${text(publicCase.ref)}` : "",
+        text(publicCase.caliber) ? `Cal. ${text(publicCase.caliber)}` : "",
+    ]
+        .filter(Boolean)
+        .join(" / ");
+}
+
+function toHomeRecentCase(publicCase: B2CPublicCaseForGallery): HomeRecentCase {
+    const repair = getWorkDisplayName(publicCase);
+    const brand = getBrandDisplayName(publicCase);
+    const model = getCaseTitle(publicCase, repair);
+    const image = text(publicCase.images[0]?.url);
+
+    return {
+        id: publicCase.id,
+        brand,
+        model,
+        meta: getCaseMeta(publicCase),
+        repair,
+        image: image || undefined,
+        alt: `${brand ? `${brand} ` : ""}${model}`,
+        href: `/cases/gallery/${publicCase.id}`,
+    };
+}
+
+function buildAboutPriceHtml(recentRepairCases: HomeRecentCase[]): string {
+    return `
 <section id="about" class="section strengths-section">
     <div class="container">
         <h2 class="section-title">ヨシダ時計修理工房の強み</h2>
@@ -854,14 +902,17 @@ const HTML_ABOUT_PRICE = `
                 ${recentRepairCases
                     .map(
                         (repairCase) => `
-            <a class="recent-case-card" href="${repairCase.href}">
+            <a class="recent-case-card" href="${escapeHtml(repairCase.href)}">
                 <div class="recent-case-image">
-                    <img src="${repairCase.image}" alt="${repairCase.alt}">
+                    ${repairCase.image
+                        ? `<img src="${escapeHtml(repairCase.image)}" alt="${escapeHtml(repairCase.alt)}">`
+                        : `<div class="recent-case-placeholder" aria-hidden="true"></div>`}
                 </div>
                 <div class="recent-case-body">
-                    <p class="recent-case-brand">${repairCase.brand}</p>
-                    <h3 class="recent-case-model">${repairCase.model}</h3>
-                    <p class="recent-case-repair">${repairCase.repair}</p>
+                    ${repairCase.brand ? `<p class="recent-case-brand">${escapeHtml(repairCase.brand)}</p>` : ""}
+                    <h3 class="recent-case-model">${escapeHtml(repairCase.model)}</h3>
+                    ${repairCase.meta ? `<p class="recent-case-meta">${escapeHtml(repairCase.meta)}</p>` : ""}
+                    <p class="recent-case-repair">${escapeHtml(repairCase.repair)}</p>
                     <span class="recent-case-more">詳しく見る →</span>
                 </div>
             </a>`
@@ -931,6 +982,7 @@ const HTML_ABOUT_PRICE = `
 </section>
 
 `;
+}
 
 const HTML_FLOW_FOOTER = `
 <section id="faq" class="section faq-section" style="background-color: white;">
@@ -982,7 +1034,9 @@ const HTML_FLOW_FOOTER = `
 
 const heroImage = "/img/watch-submariner.jpg";
 
-export default function TopPage() {
+export default async function TopPage() {
+    const recentRepairCases = (await getLatestB2CPublicCasesForHome(10)).map(toHomeRecentCase);
+
     return (
         <>
             <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
@@ -1012,7 +1066,7 @@ export default function TopPage() {
                 </div>
             </section>
 
-            <div dangerouslySetInnerHTML={{ __html: HTML_ABOUT_PRICE }} />
+            <div dangerouslySetInnerHTML={{ __html: buildAboutPriceHtml(recentRepairCases) }} />
 
             <div dangerouslySetInnerHTML={{ __html: HTML_FLOW_FOOTER }} />
         </>

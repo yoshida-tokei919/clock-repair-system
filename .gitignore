@@ -55,5 +55,15 @@ local_build*.bat
 gen_key.bat
 deploy_to_server.bat
 MANUAL_UPLOAD_KEY.txt
+
+# FMP source files and full generated data
+/docs/data/fmp/source/
+/docs/data/fmp/internal-repair/
+/docs/data/fmp/external-repair/
+/docs/data/fmp/generated/public-case-candidates.json
+/docs/data/fmp/generated/public-case-candidates.csv
+/docs/data/fmp/generated/import-dry-run/*.json
+!/docs/data/fmp/generated/import-dry-run/import-summary.json
+!/docs/data/fmp/generated/import-dry-run/*.sample.json
 .next-dev.log
 WEBページ写真素材/

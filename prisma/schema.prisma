@@ -196,6 +196,7 @@ model Repair {
   photos        RepairPhoto[]
   estimate      Estimate?
   orderRequests OrderRequest[]
+  publicCases   PublicCase[]
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
@@ -612,4 +613,203 @@ model OrderRequest {
   receivedAt    DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+enum PublicCaseSourceType {
+  FMP
+  WEB_APP
+}
+
+enum PublicCasePublishStatus {
+  HIDDEN
+  READY
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PublicCaseReviewStatus {
+  DRAFT
+  NEEDS_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum PublicCaseWarningSeverity {
+  CRITICAL
+  REVIEW
+  INFO
+}
+
+model PublicCase {
+  id             Int                  @id @default(autoincrement())
+  sourceType     PublicCaseSourceType
+  sourceRepairId String?
+  repairId       Int?
+
+  receivedDate DateTime?
+  brandName    String?
+  brandNameKana String?
+  brandDisplayName String?
+  modelName    String?
+  ref          String?
+  caliber      String?
+  searchText   String?
+
+  reviewStatus     PublicCaseReviewStatus @default(DRAFT)
+  b2bPublishStatus PublicCasePublishStatus @default(HIDDEN)
+  b2cPublishStatus PublicCasePublishStatus @default(HIDDEN)
+  b2bPublishedAt   DateTime?
+  b2cPublishedAt   DateTime?
+
+  b2bTitle   String?
+  b2cTitle   String?
+  b2bSummary Json?
+  b2cSummary Json?
+  publicTags Json?
+
+  showPriceB2b       Boolean @default(true)
+  showPriceB2c       Boolean @default(false)
+  internalLaborTotal Int?
+  externalLaborTotal Int?
+  outsourcedTotal    Int?
+  partsTotal         Int?
+  totalAmount        Int?
+
+  warnings       Json?
+  excludeReasons Json?
+  sourceSnapshot Json?
+
+  repair       Repair?              @relation(fields: [repairId], references: [id], onDelete: SetNull)
+  workItems    PublicCaseWorkItem[]
+  partItems    PublicCasePartItem[]
+  images       PublicCaseImage[]
+  warningItems PublicCaseWarning[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sourceType, sourceRepairId])
+  @@index([repairId])
+  @@index([brandName])
+  @@index([brandNameKana])
+  @@index([modelName])
+  @@index([ref])
+  @@index([caliber])
+  @@index([b2bPublishStatus])
+  @@index([b2cPublishStatus])
+  @@index([reviewStatus])
+}
+
+model PublicCaseWorkItem {
+  id           Int @id @default(autoincrement())
+  publicCaseId Int
+
+  sourceArea           String
+  sourceSlot           Int?
+  sourceText           String
+  normalizedSourceText String
+
+  isRuleMatched Boolean                @default(false)
+  isPublishable Boolean                @default(false)
+  reviewStatus  PublicCaseReviewStatus @default(DRAFT)
+  excludeReason String?
+
+  normalizedWorkName String?
+  b2bDisplayName     String?
+  b2cDisplayName     String?
+  laborPrice         Int?
+  showPriceB2b       Boolean @default(true)
+  showPriceB2c       Boolean @default(false)
+
+  category     String?
+  partName     String?
+  action       String?
+  actionDetail String?
+  attributes   Json?
+  ruleSnapshot Json?
+
+  sortOrder Int @default(0)
+
+  publicCase PublicCase           @relation(fields: [publicCaseId], references: [id], onDelete: Cascade)
+  partItems  PublicCasePartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([publicCaseId])
+  @@index([sourceArea])
+  @@index([normalizedSourceText])
+  @@index([isPublishable])
+}
+
+model PublicCasePartItem {
+  id                Int  @id @default(autoincrement())
+  publicCaseId      Int
+  relatedWorkItemId Int?
+
+  sourceArea           String
+  sourceSlot           Int?
+  sourceText           String
+  normalizedSourceText String
+  displayName          String?
+  price                Int?
+
+  showPriceB2b   Boolean                @default(true)
+  showPriceB2c   Boolean                @default(false)
+  relationStatus String                 @default("UNLINKED")
+  reviewStatus   PublicCaseReviewStatus @default(DRAFT)
+  excludeReason  String?
+  metadata       Json?
+
+  sortOrder Int @default(0)
+
+  publicCase      PublicCase          @relation(fields: [publicCaseId], references: [id], onDelete: Cascade)
+  relatedWorkItem PublicCaseWorkItem? @relation(fields: [relatedWorkItemId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([publicCaseId])
+  @@index([relatedWorkItemId])
+  @@index([sourceArea])
+}
+
+model PublicCaseImage {
+  id           Int @id @default(autoincrement())
+  publicCaseId Int
+
+  storagePath  String?
+  url          String?
+  altText      String?
+  caption      String?
+  imageRole    String?
+  isPrimary    Boolean                @default(false)
+  reviewStatus PublicCaseReviewStatus @default(DRAFT)
+  sortOrder    Int                    @default(0)
+
+  publicCase PublicCase @relation(fields: [publicCaseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([publicCaseId])
+}
+
+model PublicCaseWarning {
+  id           Int @id @default(autoincrement())
+  publicCaseId Int
+
+  code     String
+  severity PublicCaseWarningSeverity
+  message  String?
+  target   String?
+  metadata Json?
+
+  publicCase PublicCase @relation(fields: [publicCaseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([publicCaseId])
+  @@index([code])
+  @@index([severity])
 }

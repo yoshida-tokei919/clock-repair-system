@@ -1,0 +1,3052 @@
+[
+  {
+    "sourceBrandName": "ROLEX",
+    "approvedBrandName": "ROLEX",
+    "approvedBrandNameKana": "ロレックス",
+    "approvedDisplayName": "ロレックス（ROLEX）",
+    "hasKana": true,
+    "sourceCount": 435,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: ROLEX(コピー） / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "SEIKO",
+    "approvedBrandName": "SEIKO",
+    "approvedBrandNameKana": "セイコー",
+    "approvedDisplayName": "セイコー（SEIKO）",
+    "hasKana": true,
+    "sourceCount": 328,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: SEIKO 懐中時計 / SEIKO 掛時計 / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "Tag Heuer",
+    "approvedBrandName": "Tag Heuer",
+    "approvedBrandNameKana": "タグ・ホイヤー",
+    "approvedDisplayName": "タグ・ホイヤー（Tag Heuer）",
+    "hasKana": true,
+    "sourceCount": 119,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: tag Heuer / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "CITIZEN",
+    "approvedBrandName": "CITIZEN",
+    "approvedBrandNameKana": "シチズン",
+    "approvedDisplayName": "シチズン（CITIZEN）",
+    "hasKana": true,
+    "sourceCount": 68,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: CITIZEN 置時計 / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "CHANEL",
+    "approvedBrandName": "CHANEL",
+    "approvedBrandNameKana": "シャネル",
+    "approvedDisplayName": "シャネル（CHANEL）",
+    "hasKana": true,
+    "sourceCount": 46,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: CHANEL(コピー） / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "BREITLING",
+    "approvedBrandName": "BREITLING",
+    "approvedBrandNameKana": "ブライトリング",
+    "approvedDisplayName": "ブライトリング（BREITLING）",
+    "hasKana": true,
+    "sourceCount": 40,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: BREITLING(コピー） / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "HUBLOT",
+    "approvedBrandName": "HUBLOT",
+    "approvedBrandNameKana": "ウブロ",
+    "approvedDisplayName": "ウブロ（HUBLOT）",
+    "hasKana": true,
+    "sourceCount": 17,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: HUBLOTタイプ / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "PATEK  PHILIPPE",
+    "approvedBrandName": "PATEK  PHILIPPE",
+    "approvedBrandNameKana": "パテック・フィリップ",
+    "approvedDisplayName": "パテック・フィリップ（PATEK  PHILIPPE）",
+    "hasKana": true,
+    "sourceCount": 11,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / スペース違い疑い / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "LOUIS VUITON",
+    "approvedBrandName": "LOUIS VUITON",
+    "approvedBrandNameKana": "ルイ・ヴィトン",
+    "approvedDisplayName": "ルイ・ヴィトン（LOUIS VUITON）",
+    "hasKana": true,
+    "sourceCount": 10,
+    "reviewStatus": "pending",
+    "note": "スペルミス疑い: LOUIS VUITTON"
+  },
+  {
+    "sourceBrandName": "JAEGER  LECOULTRE",
+    "approvedBrandName": "JAEGER  LECOULTRE",
+    "approvedBrandNameKana": "ジャガー・ルクルト",
+    "approvedDisplayName": "ジャガー・ルクルト（JAEGER  LECOULTRE）",
+    "hasKana": true,
+    "sourceCount": 9,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / スペース違い疑い / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "agnis b",
+    "approvedBrandName": "agnis b",
+    "approvedBrandNameKana": "アニエスベー",
+    "approvedDisplayName": "アニエスベー（agnis b）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "スペル揺れ/スペルミス疑い: agnes b / 表記ゆれ疑い: agnis b 懐中時計 / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "BULOVA",
+    "approvedBrandName": "BULOVA",
+    "approvedBrandNameKana": "ブローバ",
+    "approvedDisplayName": "ブローバ（BULOVA）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "CHARRIOL",
+    "approvedBrandName": "CHARRIOL",
+    "approvedBrandNameKana": "シャリオール",
+    "approvedDisplayName": "シャリオール（CHARRIOL）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記候補。確認推奨"
+  },
+  {
+    "sourceBrandName": "CORUM",
+    "approvedBrandName": "CORUM",
+    "approvedBrandNameKana": "コルム",
+    "approvedDisplayName": "コルム（CORUM）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "LOCMAN",
+    "approvedBrandName": "LOCMAN",
+    "approvedBrandNameKana": "ロックマン",
+    "approvedDisplayName": "ロックマン（LOCMAN）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / 読み方確認推奨 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "MARC JACOBS",
+    "approvedBrandName": "MARC JACOBS",
+    "approvedBrandNameKana": "マーク・ジェイコブス",
+    "approvedDisplayName": "マーク・ジェイコブス（MARC JACOBS）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "Rosemont",
+    "approvedBrandName": "Rosemont",
+    "approvedBrandNameKana": "ロゼモン",
+    "approvedDisplayName": "ロゼモン（Rosemont）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "BREGUET",
+    "approvedBrandName": "BREGUET",
+    "approvedBrandNameKana": "ブレゲ",
+    "approvedDisplayName": "ブレゲ（BREGUET）",
+    "hasKana": true,
+    "sourceCount": 6,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "GRAHAM",
+    "approvedBrandName": "GRAHAM",
+    "approvedBrandNameKana": "グラハム",
+    "approvedDisplayName": "グラハム（GRAHAM）",
+    "hasKana": true,
+    "sourceCount": 6,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "JUNGHANS",
+    "approvedBrandName": "JUNGHANS",
+    "approvedBrandNameKana": "ユンハンス",
+    "approvedDisplayName": "ユンハンス（JUNGHANS）",
+    "hasKana": true,
+    "sourceCount": 6,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "marie claire",
+    "approvedBrandName": "marie claire",
+    "approvedBrandNameKana": "マリ・クレール",
+    "approvedDisplayName": "マリ・クレール（marie claire）",
+    "hasKana": true,
+    "sourceCount": 6,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "mila schon",
+    "approvedBrandName": "mila schon",
+    "approvedBrandNameKana": "ミラ・ショーン",
+    "approvedDisplayName": "ミラ・ショーン（mila schon）",
+    "hasKana": true,
+    "sourceCount": 6,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "ORIENT",
+    "approvedBrandName": "ORIENT",
+    "approvedBrandNameKana": "オリエント",
+    "approvedDisplayName": "オリエント（ORIENT）",
+    "hasKana": true,
+    "sourceCount": 6,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "PAUL SMITH",
+    "approvedBrandName": "PAUL SMITH",
+    "approvedBrandNameKana": "ポール・スミス",
+    "approvedDisplayName": "ポール・スミス（PAUL SMITH）",
+    "hasKana": true,
+    "sourceCount": 6,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "PIAGET",
+    "approvedBrandName": "PIAGET",
+    "approvedBrandNameKana": "ピアジェ",
+    "approvedDisplayName": "ピアジェ（PIAGET）",
+    "hasKana": true,
+    "sourceCount": 6,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "christian dior",
+    "approvedBrandName": "christian dior",
+    "approvedBrandNameKana": "クリスチャン・ディオール",
+    "approvedDisplayName": "クリスチャン・ディオール（christian dior）",
+    "hasKana": true,
+    "sourceCount": 5,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "CYMA",
+    "approvedBrandName": "CYMA",
+    "approvedBrandNameKana": "シーマ",
+    "approvedDisplayName": "シーマ（CYMA）",
+    "hasKana": true,
+    "sourceCount": 5,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "DW",
+    "approvedBrandName": "DW",
+    "approvedBrandNameKana": "ダニエル・ウェリントン",
+    "approvedDisplayName": "ダニエル・ウェリントン（DW）",
+    "hasKana": true,
+    "sourceCount": 5,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / 略称の可能性。確認推奨 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "ebel",
+    "approvedBrandName": "ebel",
+    "approvedBrandNameKana": "エベル",
+    "approvedDisplayName": "エベル（ebel）",
+    "hasKana": true,
+    "sourceCount": 5,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "G-SHOCK",
+    "approvedBrandName": "G-SHOCK",
+    "approvedBrandNameKana": "ジーショック",
+    "approvedDisplayName": "ジーショック（G-SHOCK）",
+    "hasKana": true,
+    "sourceCount": 5,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / 表記ゆれ疑い: GーSHOCK / suggestedKana補完 / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "JUVENIA",
+    "approvedBrandName": "JUVENIA",
+    "approvedBrandNameKana": "ジュベニア",
+    "approvedDisplayName": "ジュベニア（JUVENIA）",
+    "hasKana": true,
+    "sourceCount": 5,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "MOVADO",
+    "approvedBrandName": "MOVADO",
+    "approvedBrandNameKana": "モバード",
+    "approvedDisplayName": "モバード（MOVADO）",
+    "hasKana": true,
+    "sourceCount": 5,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "RAYMOND WEIL",
+    "approvedBrandName": "RAYMOND WEIL",
+    "approvedBrandNameKana": "レイモンド・ウェイル",
+    "approvedDisplayName": "レイモンド・ウェイル（RAYMOND WEIL）",
+    "hasKana": true,
+    "sourceCount": 5,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "TECHNOS",
+    "approvedBrandName": "TECHNOS",
+    "approvedBrandNameKana": "テクノス",
+    "approvedDisplayName": "テクノス（TECHNOS）",
+    "hasKana": true,
+    "sourceCount": 5,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "UNIVERSAL",
+    "approvedBrandName": "UNIVERSAL",
+    "approvedBrandNameKana": "ユニバーサル",
+    "approvedDisplayName": "ユニバーサル（UNIVERSAL）",
+    "hasKana": true,
+    "sourceCount": 5,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / ブランド特定確認推奨 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "BUCHERER",
+    "approvedBrandName": "BUCHERER",
+    "approvedBrandNameKana": "ブッフェラー",
+    "approvedDisplayName": "ブッフェラー（BUCHERER）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Calvin Klein",
+    "approvedBrandName": "Calvin Klein",
+    "approvedBrandNameKana": "カルバン・クライン",
+    "approvedDisplayName": "カルバン・クライン（Calvin Klein）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "COACH",
+    "approvedBrandName": "COACH",
+    "approvedBrandNameKana": "コーチ",
+    "approvedDisplayName": "コーチ（COACH）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "DIESEL",
+    "approvedBrandName": "DIESEL",
+    "approvedBrandNameKana": "ディーゼル",
+    "approvedDisplayName": "ディーゼル（DIESEL）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "dunhill",
+    "approvedBrandName": "dunhill",
+    "approvedBrandNameKana": "ダンヒル",
+    "approvedDisplayName": "ダンヒル（dunhill）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "FOSSIL",
+    "approvedBrandName": "FOSSIL",
+    "approvedBrandNameKana": "フォッシル",
+    "approvedDisplayName": "フォッシル（FOSSIL）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "Frederique Constant",
+    "approvedBrandName": "Frederique Constant",
+    "approvedBrandNameKana": "フレデリック・コンスタント",
+    "approvedDisplayName": "フレデリック・コンスタント（Frederique Constant）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "GーSHOCK",
+    "approvedBrandName": "GーSHOCK",
+    "approvedBrandNameKana": "ジーショック",
+    "approvedDisplayName": "ジーショック（GーSHOCK）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / 表記ゆれ疑い: G-SHOCK / suggestedKana補完 / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "GIRARD PERREGAUX",
+    "approvedBrandName": "GIRARD PERREGAUX",
+    "approvedBrandNameKana": "ジラール・ペルゴ",
+    "approvedDisplayName": "ジラール・ペルゴ（GIRARD PERREGAUX）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "Heuer",
+    "approvedBrandName": "Heuer",
+    "approvedBrandNameKana": "ホイヤー",
+    "approvedDisplayName": "ホイヤー（Heuer）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "JACOB ＆ CO",
+    "approvedBrandName": "JACOB ＆ CO",
+    "approvedBrandNameKana": "ジェイコブ",
+    "approvedDisplayName": "ジェイコブ（JACOB ＆ CO）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "LUMINOX",
+    "approvedBrandName": "LUMINOX",
+    "approvedBrandNameKana": "ルミノックス",
+    "approvedDisplayName": "ルミノックス（LUMINOX）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "NIKE",
+    "approvedBrandName": "NIKE",
+    "approvedBrandNameKana": "ナイキ",
+    "approvedDisplayName": "ナイキ（NIKE）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "ROLEX(コピー）",
+    "approvedBrandName": "ROLEX(コピー）",
+    "approvedBrandNameKana": "ロレックス",
+    "approvedDisplayName": "ロレックス（ROLEX(コピー））",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: ROLEX / 表記ゆれ確認 / ブランド名ではない可能性 / 掲載対象外: コピー表記"
+  },
+  {
+    "sourceBrandName": "TIFFANY&CO",
+    "approvedBrandName": "TIFFANY&CO",
+    "approvedBrandNameKana": "ティファニー",
+    "approvedDisplayName": "ティファニー（TIFFANY&CO）",
+    "hasKana": true,
+    "sourceCount": 4,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "CARLO FERRARA",
+    "approvedBrandName": "CARLO FERRARA",
+    "approvedBrandNameKana": "カルロ・フェラーラ",
+    "approvedDisplayName": "カルロ・フェラーラ（CARLO FERRARA）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "CHANEL(コピー）",
+    "approvedBrandName": "CHANEL(コピー）",
+    "approvedBrandNameKana": "シャネル",
+    "approvedDisplayName": "シャネル（CHANEL(コピー））",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: CHANEL / 表記ゆれ確認 / ブランド名ではない可能性 / 掲載対象外: コピー表記"
+  },
+  {
+    "sourceBrandName": "Charles Vogele",
+    "approvedBrandName": "Charles Vogele",
+    "approvedBrandNameKana": "シャルルホーゲル",
+    "approvedDisplayName": "シャルルホーゲル（Charles Vogele）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Disney",
+    "approvedBrandName": "Disney",
+    "approvedBrandNameKana": "ディズニー",
+    "approvedDisplayName": "ディズニー（Disney）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "ETERNA",
+    "approvedBrandName": "ETERNA",
+    "approvedBrandNameKana": "エテルナ",
+    "approvedDisplayName": "エテルナ（ETERNA）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "ice watch",
+    "approvedBrandName": "ice watch",
+    "approvedBrandNameKana": "アイスウォッチ",
+    "approvedDisplayName": "アイスウォッチ（ice watch）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "MICHEL KLEIN",
+    "approvedBrandName": "MICHEL KLEIN",
+    "approvedBrandNameKana": "ミッシェル・クラン",
+    "approvedDisplayName": "ミッシェル・クラン（MICHEL KLEIN）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "PORSCHE DESIGN",
+    "approvedBrandName": "PORSCHE DESIGN",
+    "approvedBrandNameKana": "ポルシェデザイン",
+    "approvedDisplayName": "ポルシェデザイン（PORSCHE DESIGN）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "RICOH",
+    "approvedBrandName": "RICOH",
+    "approvedBrandNameKana": "リコー",
+    "approvedDisplayName": "リコー（RICOH）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "SEIKO 懐中時計",
+    "approvedBrandName": "SEIKO 懐中時計",
+    "approvedBrandNameKana": "セイコー",
+    "approvedDisplayName": "セイコー（SEIKO 懐中時計）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: SEIKO / SEIKO 掛時計 / 表記ゆれ確認 / ブランド名ではない可能性"
+  },
+  {
+    "sourceBrandName": "TIMEX",
+    "approvedBrandName": "TIMEX",
+    "approvedBrandNameKana": "タイメックス",
+    "approvedDisplayName": "タイメックス（TIMEX）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "VERSACE",
+    "approvedBrandName": "VERSACE",
+    "approvedBrandNameKana": "ヴェルサーチ",
+    "approvedDisplayName": "ヴェルサーチ（VERSACE）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "ZENITH",
+    "approvedBrandName": "ZENITH",
+    "approvedBrandNameKana": "ゼニス",
+    "approvedDisplayName": "ゼニス（ZENITH）",
+    "hasKana": true,
+    "sourceCount": 3,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "AIGNER",
+    "approvedBrandName": "AIGNER",
+    "approvedBrandNameKana": "アイグナー",
+    "approvedDisplayName": "アイグナー（AIGNER）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "Baccarat",
+    "approvedBrandName": "Baccarat",
+    "approvedBrandNameKana": "バカラ",
+    "approvedDisplayName": "バカラ（Baccarat）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BALLY",
+    "approvedBrandName": "BALLY",
+    "approvedBrandNameKana": "バリー",
+    "approvedDisplayName": "バリー（BALLY）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "BAPEX",
+    "approvedBrandName": "BAPEX",
+    "approvedBrandNameKana": "ベイペックス",
+    "approvedDisplayName": "ベイペックス（BAPEX）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / 読み方確認推奨 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "BORBONESE",
+    "approvedBrandName": "BORBONESE",
+    "approvedBrandNameKana": "ボルボネーゼ",
+    "approvedDisplayName": "ボルボネーゼ（BORBONESE）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "CHARLES JOURDAN",
+    "approvedBrandName": "CHARLES JOURDAN",
+    "approvedBrandNameKana": "シャルル・ジョルダン",
+    "approvedDisplayName": "シャルル・ジョルダン（CHARLES JOURDAN）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "CURTIS&CO",
+    "approvedBrandName": "CURTIS&CO",
+    "approvedBrandNameKana": "カーティス",
+    "approvedDisplayName": "カーティス（CURTIS&CO）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "DAKS",
+    "approvedBrandName": "DAKS",
+    "approvedBrandNameKana": "ダックス",
+    "approvedDisplayName": "ダックス（DAKS）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "Folli Follie",
+    "approvedBrandName": "Folli Follie",
+    "approvedBrandNameKana": "フォリフォリ",
+    "approvedDisplayName": "フォリフォリ（Folli Follie）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "Forever",
+    "approvedBrandName": "Forever",
+    "approvedBrandNameKana": "フォーエバー",
+    "approvedDisplayName": "フォーエバー（Forever）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Gianni Accardi",
+    "approvedBrandName": "Gianni Accardi",
+    "approvedBrandNameKana": "ジャンニアッカルディ",
+    "approvedDisplayName": "ジャンニアッカルディ（Gianni Accardi）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Gianni Versace",
+    "approvedBrandName": "Gianni Versace",
+    "approvedBrandNameKana": "ジャンニ・ヴェルサーチ",
+    "approvedDisplayName": "ジャンニ・ヴェルサーチ（Gianni Versace）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "GRANDEUR",
+    "approvedBrandName": "GRANDEUR",
+    "approvedBrandNameKana": "グランドール",
+    "approvedDisplayName": "グランドール（GRANDEUR）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "GUESS",
+    "approvedBrandName": "GUESS",
+    "approvedBrandNameKana": "ゲス",
+    "approvedDisplayName": "ゲス（GUESS）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "Kentex",
+    "approvedBrandName": "Kentex",
+    "approvedBrandNameKana": "ケンテックス",
+    "approvedDisplayName": "ケンテックス（Kentex）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "MAURICE LACROIX",
+    "approvedBrandName": "MAURICE LACROIX",
+    "approvedBrandNameKana": "モーリス・ラクロア",
+    "approvedDisplayName": "モーリス・ラクロア（MAURICE LACROIX）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "MHR",
+    "approvedBrandName": "MHR",
+    "approvedBrandNameKana": "マハラ",
+    "approvedDisplayName": "マハラ（MHR）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MONDAINE",
+    "approvedBrandName": "MONDAINE",
+    "approvedBrandNameKana": "モンディーン",
+    "approvedDisplayName": "モンディーン（MONDAINE）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "MONTBLANC",
+    "approvedBrandName": "MONTBLANC",
+    "approvedBrandNameKana": "モンブラン",
+    "approvedDisplayName": "モンブラン（MONTBLANC）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "Obrey",
+    "approvedBrandName": "Obrey",
+    "approvedBrandNameKana": "オブレイ",
+    "approvedDisplayName": "オブレイ（Obrey）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / 読み方確認推奨 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "OHARA",
+    "approvedBrandName": "OHARA",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "OHARA",
+    "hasKana": false,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Peace",
+    "approvedBrandName": "Peace",
+    "approvedBrandNameKana": "ピース",
+    "approvedDisplayName": "ピース（Peace）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "PEQUIGNET",
+    "approvedBrandName": "PEQUIGNET",
+    "approvedBrandNameKana": "ペキネ",
+    "approvedDisplayName": "ペキネ（PEQUIGNET）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "ROOTS",
+    "approvedBrandName": "ROOTS",
+    "approvedBrandNameKana": "ルーツ",
+    "approvedDisplayName": "ルーツ（ROOTS）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Roy King",
+    "approvedBrandName": "Roy King",
+    "approvedBrandNameKana": "ロイキング",
+    "approvedDisplayName": "ロイキング（Roy King）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SINN",
+    "approvedBrandName": "SINN",
+    "approvedBrandNameKana": "ジン",
+    "approvedDisplayName": "ジン（SINN）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "TENSE",
+    "approvedBrandName": "TENSE",
+    "approvedBrandNameKana": "テンス",
+    "approvedDisplayName": "テンス（TENSE）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "TRUSSARDI",
+    "approvedBrandName": "TRUSSARDI",
+    "approvedBrandNameKana": "トラサルディ",
+    "approvedDisplayName": "トラサルディ（TRUSSARDI）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "ULYSSE NARDIN",
+    "approvedBrandName": "ULYSSE NARDIN",
+    "approvedBrandNameKana": "ユリス・ナルダン",
+    "approvedDisplayName": "ユリス・ナルダン（ULYSSE NARDIN）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "VAN CLEEF＆ARPELS",
+    "approvedBrandName": "VAN CLEEF＆ARPELS",
+    "approvedBrandNameKana": "ヴァン クリーフ＆アーペル",
+    "approvedDisplayName": "ヴァン クリーフ＆アーペル（VAN CLEEF＆ARPELS）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "Vendome Aoyama",
+    "approvedBrandName": "Vendome Aoyama",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Vendome Aoyama",
+    "hasKana": false,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "WENGER",
+    "approvedBrandName": "WENGER",
+    "approvedBrandNameKana": "ウェンガー",
+    "approvedDisplayName": "ウェンガー（WENGER）",
+    "hasKana": true,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "掛時計",
+    "approvedBrandName": "掛時計",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "掛時計",
+    "hasKana": false,
+    "sourceCount": 2,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / ブランド名ではない可能性"
+  },
+  {
+    "sourceBrandName": "AB AETERNO",
+    "approvedBrandName": "AB AETERNO",
+    "approvedBrandNameKana": "アバテルノ",
+    "approvedDisplayName": "アバテルノ（AB AETERNO）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ABISTE",
+    "approvedBrandName": "ABISTE",
+    "approvedBrandNameKana": "アビステ",
+    "approvedDisplayName": "アビステ（ABISTE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "agnis b 懐中時計",
+    "approvedBrandName": "agnis b 懐中時計",
+    "approvedBrandNameKana": "アニエスベー",
+    "approvedDisplayName": "アニエスベー（agnis b 懐中時計）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "スペル揺れ/スペルミス疑い: agnes b / 表記ゆれ疑い: agnis b / 表記ゆれ確認 / ブランド名ではない可能性"
+  },
+  {
+    "sourceBrandName": "AICHI",
+    "approvedBrandName": "AICHI",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "AICHI",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "AIKOSHA",
+    "approvedBrandName": "AIKOSHA",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "AIKOSHA",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "alain silberstein",
+    "approvedBrandName": "alain silberstein",
+    "approvedBrandNameKana": "アラン・シルベスタイン",
+    "approvedDisplayName": "アラン・シルベスタイン（alain silberstein）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / 表記ゆれ疑い: ALAIN SILBERSTEIN / suggestedKana補完 / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "ALAIN SILBERSTEIN",
+    "approvedBrandName": "ALAIN SILBERSTEIN",
+    "approvedBrandNameKana": "アラン・シルベスタイン",
+    "approvedDisplayName": "アラン・シルベスタイン（ALAIN SILBERSTEIN）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / 表記ゆれ疑い: alain silberstein / suggestedKana補完 / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "ALAX",
+    "approvedBrandName": "ALAX",
+    "approvedBrandNameKana": "325",
+    "approvedDisplayName": "325（ALAX）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ALESSI",
+    "approvedBrandName": "ALESSI",
+    "approvedBrandNameKana": "アレッシィ",
+    "approvedDisplayName": "アレッシィ（ALESSI）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ALETTE",
+    "approvedBrandName": "ALETTE",
+    "approvedBrandNameKana": "アレットブラン",
+    "approvedDisplayName": "アレットブラン（ALETTE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ALETTE BLANC",
+    "approvedBrandName": "ALETTE BLANC",
+    "approvedBrandNameKana": "アレットブラン",
+    "approvedDisplayName": "アレットブラン（ALETTE BLANC）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ALLY DENOVO",
+    "approvedBrandName": "ALLY DENOVO",
+    "approvedBrandNameKana": "アリーデノヴォ",
+    "approvedDisplayName": "アリーデノヴォ（ALLY DENOVO）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Angel Heart",
+    "approvedBrandName": "Angel Heart",
+    "approvedBrandNameKana": "エンジェルハート",
+    "approvedDisplayName": "エンジェルハート（Angel Heart）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ANNE KLEIN",
+    "approvedBrandName": "ANNE KLEIN",
+    "approvedBrandNameKana": "アンクライン",
+    "approvedDisplayName": "アンクライン（ANNE KLEIN）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "AQUANAUTIC",
+    "approvedBrandName": "AQUANAUTIC",
+    "approvedBrandNameKana": "アクアノウティック",
+    "approvedDisplayName": "アクアノウティック（AQUANAUTIC）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ASTRODEA",
+    "approvedBrandName": "ASTRODEA",
+    "approvedBrandNameKana": "アストロデア",
+    "approvedDisplayName": "アストロデア（ASTRODEA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Auguste Reymond",
+    "approvedBrandName": "Auguste Reymond",
+    "approvedBrandNameKana": "オーガスト・レイモンド",
+    "approvedDisplayName": "オーガスト・レイモンド（Auguste Reymond）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "AUREOLE",
+    "approvedBrandName": "AUREOLE",
+    "approvedBrandNameKana": "オレオール",
+    "approvedDisplayName": "オレオール（AUREOLE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "baby-G",
+    "approvedBrandName": "baby-G",
+    "approvedBrandNameKana": "ベビージー",
+    "approvedDisplayName": "ベビージー（baby-G）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BALL WATCH",
+    "approvedBrandName": "BALL WATCH",
+    "approvedBrandNameKana": "ボールウォッチ",
+    "approvedDisplayName": "ボールウォッチ（BALL WATCH）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / suggestedKana補完"
+  },
+  {
+    "sourceBrandName": "Bando",
+    "approvedBrandName": "Bando",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Bando",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BEDAT&Co",
+    "approvedBrandName": "BEDAT&Co",
+    "approvedBrandNameKana": "ベダ&カンパニー",
+    "approvedDisplayName": "ベダ&カンパニー（BEDAT&Co）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BELL＆ROSS",
+    "approvedBrandName": "BELL＆ROSS",
+    "approvedBrandNameKana": "ベル&ロス",
+    "approvedDisplayName": "ベル&ロス（BELL＆ROSS）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BENRUS",
+    "approvedBrandName": "BENRUS",
+    "approvedBrandNameKana": "ベンラス",
+    "approvedDisplayName": "ベンラス（BENRUS）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Bleu Bleuet",
+    "approvedBrandName": "Bleu Bleuet",
+    "approvedBrandNameKana": "ブルーブルーエ",
+    "approvedDisplayName": "ブルーブルーエ（Bleu Bleuet）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Blue Blue TOKYO",
+    "approvedBrandName": "Blue Blue TOKYO",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Blue Blue TOKYO",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BMW",
+    "approvedBrandName": "BMW",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "BMW",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BOMBERG",
+    "approvedBrandName": "BOMBERG",
+    "approvedBrandNameKana": "ボンバーグ",
+    "approvedDisplayName": "ボンバーグ（BOMBERG）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "bon bon watch",
+    "approvedBrandName": "bon bon watch",
+    "approvedBrandNameKana": "ボンボンウォッチ",
+    "approvedDisplayName": "ボンボンウォッチ（bon bon watch）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BOSS",
+    "approvedBrandName": "BOSS",
+    "approvedBrandNameKana": "ボス",
+    "approvedDisplayName": "ボス（BOSS）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BOUCHERON",
+    "approvedBrandName": "BOUCHERON",
+    "approvedBrandNameKana": "ブシュロン",
+    "approvedDisplayName": "ブシュロン（BOUCHERON）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BREITLING(コピー）",
+    "approvedBrandName": "BREITLING(コピー）",
+    "approvedBrandNameKana": "ブライトリング",
+    "approvedDisplayName": "ブライトリング（BREITLING(コピー））",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: BREITLING / 表記ゆれ確認 / ブランド名ではない可能性 / 掲載対象外: コピー表記"
+  },
+  {
+    "sourceBrandName": "BRERA",
+    "approvedBrandName": "BRERA",
+    "approvedBrandNameKana": "ブレラ",
+    "approvedDisplayName": "ブレラ（BRERA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BRIDGESTONE",
+    "approvedBrandName": "BRIDGESTONE",
+    "approvedBrandNameKana": "ブリジストン",
+    "approvedDisplayName": "ブリジストン（BRIDGESTONE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BRILLAMICO",
+    "approvedBrandName": "BRILLAMICO",
+    "approvedBrandNameKana": "ブリラミコ",
+    "approvedDisplayName": "ブリラミコ（BRILLAMICO）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "BUTI",
+    "approvedBrandName": "BUTI",
+    "approvedBrandNameKana": "ブティ",
+    "approvedDisplayName": "ブティ（BUTI）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "CAPRI WATCH",
+    "approvedBrandName": "CAPRI WATCH",
+    "approvedBrandNameKana": "カプリウォッチ",
+    "approvedDisplayName": "カプリウォッチ（CAPRI WATCH）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Carl von Zeyten",
+    "approvedBrandName": "Carl von Zeyten",
+    "approvedBrandNameKana": "カールフォンツォイテン",
+    "approvedDisplayName": "カールフォンツォイテン（Carl von Zeyten）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "CATREX",
+    "approvedBrandName": "CATREX",
+    "approvedBrandNameKana": "カトレックス",
+    "approvedDisplayName": "カトレックス（CATREX）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認　誤CATREX　正CATOREXゴセイ"
+  },
+  {
+    "sourceBrandName": "CENTURY",
+    "approvedBrandName": "CENTURY",
+    "approvedBrandNameKana": "センチュリー",
+    "approvedDisplayName": "センチュリー（CENTURY）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "CERTUS",
+    "approvedBrandName": "CERTUS",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "CERTUS",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "CITIZEN 置時計",
+    "approvedBrandName": "CITIZEN 置時計",
+    "approvedBrandNameKana": "シチズン",
+    "approvedDisplayName": "シチズン（CITIZEN 置時計）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: CITIZEN / 表記ゆれ確認 / ブランド名ではない可能性"
+  },
+  {
+    "sourceBrandName": "CITRON",
+    "approvedBrandName": "CITRON",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "CITRON",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "CK",
+    "approvedBrandName": "CK",
+    "approvedBrandNameKana": "カルバンクライン",
+    "approvedDisplayName": "カルバンクライン（CK）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "CLUSE",
+    "approvedBrandName": "CLUSE",
+    "approvedBrandNameKana": "クルース",
+    "approvedDisplayName": "クルース（CLUSE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "courreges",
+    "approvedBrandName": "courreges",
+    "approvedBrandNameKana": "クレージュ",
+    "approvedDisplayName": "クレージュ（courreges）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "CP5",
+    "approvedBrandName": "CP5",
+    "approvedBrandNameKana": "シーピーファイブ",
+    "approvedDisplayName": "シーピーファイブ（CP5）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "CWC",
+    "approvedBrandName": "CWC",
+    "approvedBrandNameKana": "シーダブルシー",
+    "approvedDisplayName": "シーダブルシー（CWC）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "D.JEANRICHARD",
+    "approvedBrandName": "D.JEANRICHARD",
+    "approvedBrandNameKana": "ジャンリシャール",
+    "approvedDisplayName": "ジャンリシャール（D.JEANRICHARD）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "DC",
+    "approvedBrandName": "DC",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "DC",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "DEKATHLON",
+    "approvedBrandName": "DEKATHLON",
+    "approvedBrandNameKana": "デカトロン",
+    "approvedDisplayName": "デカトロン（DEKATHLON）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "DELMA",
+    "approvedBrandName": "DELMA",
+    "approvedBrandNameKana": "デルマ",
+    "approvedDisplayName": "デルマ（DELMA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "DOLCE GEAR",
+    "approvedBrandName": "DOLCE GEAR",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "DOLCE GEAR",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Dreamlight",
+    "approvedBrandName": "Dreamlight",
+    "approvedBrandNameKana": "ドリームライト",
+    "approvedDisplayName": "ドリームライト（Dreamlight）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "EDOX",
+    "approvedBrandName": "EDOX",
+    "approvedBrandNameKana": "エドックス",
+    "approvedDisplayName": "エドックス（EDOX）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ELGIN",
+    "approvedBrandName": "ELGIN",
+    "approvedBrandNameKana": "エルジン",
+    "approvedDisplayName": "エルジン（ELGIN）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "EMERICH MEERSON",
+    "approvedBrandName": "EMERICH MEERSON",
+    "approvedBrandNameKana": "エルリック・メールソン",
+    "approvedDisplayName": "エルリック・メールソン（EMERICH MEERSON）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ENICAR",
+    "approvedBrandName": "ENICAR",
+    "approvedBrandNameKana": "エニカー",
+    "approvedDisplayName": "エニカー（ENICAR）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Ferragamo",
+    "approvedBrandName": "Ferragamo",
+    "approvedBrandNameKana": "フェラガモ",
+    "approvedDisplayName": "フェラガモ（Ferragamo）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "FORTIS",
+    "approvedBrandName": "FORTIS",
+    "approvedBrandNameKana": "フォルティス",
+    "approvedDisplayName": "フォルティス（FORTIS）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "FREE MEN",
+    "approvedBrandName": "FREE MEN",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "FREE MEN",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "FURLA",
+    "approvedBrandName": "FURLA",
+    "approvedBrandNameKana": "フルラ",
+    "approvedDisplayName": "フルラ（FURLA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Future Club",
+    "approvedBrandName": "Future Club",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Future Club",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "GALLUCCI",
+    "approvedBrandName": "GALLUCCI",
+    "approvedBrandNameKana": "ガルーチ",
+    "approvedDisplayName": "ガルーチ（GALLUCCI）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "GC",
+    "approvedBrandName": "GC",
+    "approvedBrandNameKana": "ジーシー",
+    "approvedDisplayName": "ジーシー（GC）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "georg jensen",
+    "approvedBrandName": "georg jensen",
+    "approvedBrandNameKana": "ジョージジェンセン",
+    "approvedDisplayName": "ジョージジェンセン（georg jensen）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "GERALD GENTA",
+    "approvedBrandName": "GERALD GENTA",
+    "approvedBrandNameKana": "ジェラルド・ジェンタ",
+    "approvedDisplayName": "ジェラルド・ジェンタ（GERALD GENTA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "givenchy",
+    "approvedBrandName": "givenchy",
+    "approvedBrandNameKana": "ジバンシィ",
+    "approvedDisplayName": "ジバンシィ（givenchy）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "GLASHUTTE",
+    "approvedBrandName": "GLASHUTTE",
+    "approvedBrandNameKana": "グラスヒュッテ",
+    "approvedDisplayName": "グラスヒュッテ（GLASHUTTE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "H&Co",
+    "approvedBrandName": "H&Co",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "H&Co",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "HIS MASTERS VOICE",
+    "approvedBrandName": "HIS MASTERS VOICE",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "HIS MASTERS VOICE",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "HUBLOTタイプ",
+    "approvedBrandName": "HUBLOTタイプ",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "HUBLOTタイプ",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: HUBLOT / 表記ゆれ確認 / ブランド名ではない可能性"
+  },
+  {
+    "sourceBrandName": "HUNTING WORLD",
+    "approvedBrandName": "HUNTING WORLD",
+    "approvedBrandNameKana": "ハンティング・ワールド",
+    "approvedDisplayName": "ハンティング・ワールド（HUNTING WORLD）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "INVICTA",
+    "approvedBrandName": "INVICTA",
+    "approvedBrandNameKana": "インビクタ",
+    "approvedDisplayName": "インビクタ（INVICTA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "J-AXIS",
+    "approvedBrandName": "J-AXIS",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "J-AXIS",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "JACQUES LEMANS",
+    "approvedBrandName": "JACQUES LEMANS",
+    "approvedBrandNameKana": "ジャックルマン",
+    "approvedDisplayName": "ジャックルマン（JACQUES LEMANS）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "JARDUR",
+    "approvedBrandName": "JARDUR",
+    "approvedBrandNameKana": "ジャードゥー",
+    "approvedDisplayName": "ジャードゥー（JARDUR）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "JEMIS",
+    "approvedBrandName": "JEMIS",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "JEMIS",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "JENNIFER LOPEZ",
+    "approvedBrandName": "JENNIFER LOPEZ",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "JENNIFER LOPEZ",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Johnny",
+    "approvedBrandName": "Johnny",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Johnny",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "jun ashida",
+    "approvedBrandName": "jun ashida",
+    "approvedBrandNameKana": "ジュンアシダ",
+    "approvedDisplayName": "ジュンアシダ（jun ashida）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "JUNKERS",
+    "approvedBrandName": "JUNKERS",
+    "approvedBrandNameKana": "ユンカース",
+    "approvedDisplayName": "ユンカース（JUNKERS）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "K.UNO",
+    "approvedBrandName": "K.UNO",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "K.UNO",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "kate  spade",
+    "approvedBrandName": "kate  spade",
+    "approvedBrandNameKana": "ケイト・スペード",
+    "approvedDisplayName": "ケイト・スペード（kate  spade）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / スペース違い疑い / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "KATHARINE HAMNETT",
+    "approvedBrandName": "KATHARINE HAMNETT",
+    "approvedBrandNameKana": "キャサリンハムネット",
+    "approvedDisplayName": "キャサリンハムネット（KATHARINE HAMNETT）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "KCB",
+    "approvedBrandName": "KCB",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "KCB",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Kiina",
+    "approvedBrandName": "Kiina",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Kiina",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "KILA",
+    "approvedBrandName": "KILA",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "KILA",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Klaeuse",
+    "approvedBrandName": "Klaeuse",
+    "approvedBrandNameKana": "クロイゼ",
+    "approvedDisplayName": "クロイゼ（Klaeuse）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "knot",
+    "approvedBrandName": "knot",
+    "approvedBrandNameKana": "ノット",
+    "approvedDisplayName": "ノット（knot）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "KOVA",
+    "approvedBrandName": "KOVA",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "KOVA",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "L.L.bean",
+    "approvedBrandName": "L.L.bean",
+    "approvedBrandNameKana": "エルエルビーン",
+    "approvedDisplayName": "エルエルビーン（L.L.bean）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "LADITTE",
+    "approvedBrandName": "LADITTE",
+    "approvedBrandNameKana": "レディット",
+    "approvedDisplayName": "レディット（LADITTE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "lasserre",
+    "approvedBrandName": "lasserre",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "lasserre",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "LOOGER",
+    "approvedBrandName": "LOOGER",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "LOOGER",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "LORD KING",
+    "approvedBrandName": "LORD KING",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "LORD KING",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Lunage",
+    "approvedBrandName": "Lunage",
+    "approvedBrandNameKana": "ルナージュ",
+    "approvedDisplayName": "ルナージュ（Lunage）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MARES",
+    "approvedBrandName": "MARES",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "MARES",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "margaret howell",
+    "approvedBrandName": "margaret howell",
+    "approvedBrandNameKana": "マーガレット・ハウエル",
+    "approvedDisplayName": "マーガレット・ハウエル（margaret howell）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Marina B",
+    "approvedBrandName": "Marina B",
+    "approvedBrandNameKana": "マリナB",
+    "approvedDisplayName": "マリナB（Marina B）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MARTIN BRAUN",
+    "approvedBrandName": "MARTIN BRAUN",
+    "approvedBrandNameKana": "マーティン・ブラウン",
+    "approvedDisplayName": "マーティン・ブラウン（MARTIN BRAUN）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MASERATI",
+    "approvedBrandName": "MASERATI",
+    "approvedBrandNameKana": "マセラッティ",
+    "approvedDisplayName": "マセラッティ（MASERATI）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MAURICE RENOMA",
+    "approvedBrandName": "MAURICE RENOMA",
+    "approvedBrandNameKana": "モーリス・レノマ",
+    "approvedDisplayName": "モーリス・レノマ（MAURICE RENOMA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Mercedes Benz",
+    "approvedBrandName": "Mercedes Benz",
+    "approvedBrandNameKana": "メルセデス・ベンツ",
+    "approvedDisplayName": "メルセデス・ベンツ（Mercedes Benz）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "METAL.CH",
+    "approvedBrandName": "METAL.CH",
+    "approvedBrandNameKana": "メタル.CH",
+    "approvedDisplayName": "メタル.CH（METAL.CH）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MICKEY MOUSE",
+    "approvedBrandName": "MICKEY MOUSE",
+    "approvedBrandNameKana": "ミッキーマウス",
+    "approvedDisplayName": "ミッキーマウス（MICKEY MOUSE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MIKIMOTO",
+    "approvedBrandName": "MIKIMOTO",
+    "approvedBrandNameKana": "ミキモト",
+    "approvedDisplayName": "ミキモト（MIKIMOTO）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MILUS",
+    "approvedBrandName": "MILUS",
+    "approvedBrandNameKana": "ミルス",
+    "approvedDisplayName": "ミルス（MILUS）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MINI",
+    "approvedBrandName": "MINI",
+    "approvedBrandNameKana": "ミニ",
+    "approvedDisplayName": "ミニ（MINI）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Misaki",
+    "approvedBrandName": "Misaki",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Misaki",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MISANI",
+    "approvedBrandName": "MISANI",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "MISANI",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "MTY NETWORKS",
+    "approvedBrandName": "MTY NETWORKS",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "MTY NETWORKS",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Nibada",
+    "approvedBrandName": "Nibada",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Nibada",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Nivada",
+    "approvedBrandName": "Nivada",
+    "approvedBrandNameKana": "ニバダ",
+    "approvedDisplayName": "ニバダ（Nivada）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "NIXON",
+    "approvedBrandName": "NIXON",
+    "approvedBrandNameKana": "ニクソン",
+    "approvedDisplayName": "ニクソン（NIXON）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Ole Mathiesen",
+    "approvedBrandName": "Ole Mathiesen",
+    "approvedBrandNameKana": "オーレ・マティーセン",
+    "approvedDisplayName": "オーレ・マティーセン（Ole Mathiesen）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "OWARITOKEI",
+    "approvedBrandName": "OWARITOKEI",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "OWARITOKEI",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "PF",
+    "approvedBrandName": "PF",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "PF",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "PHILIPPE SHARIOL",
+    "approvedBrandName": "PHILIPPE SHARIOL",
+    "approvedBrandNameKana": "シャリオール",
+    "approvedDisplayName": "シャリオール（PHILIPPE SHARIOL）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認　誤PHILIPPE SHARIOL 正 PHILIPPE CHARRIOLゴセイ"
+  },
+  {
+    "sourceBrandName": "PHILIPPE VENET",
+    "approvedBrandName": "PHILIPPE VENET",
+    "approvedBrandNameKana": "フィリップヴネ",
+    "approvedDisplayName": "フィリップヴネ（PHILIPPE VENET）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "pierre cardin",
+    "approvedBrandName": "pierre cardin",
+    "approvedBrandNameKana": "ピエール・カルダン",
+    "approvedDisplayName": "ピエール・カルダン（pierre cardin）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Pierre Lannier",
+    "approvedBrandName": "Pierre Lannier",
+    "approvedBrandNameKana": "ピエールラニエ",
+    "approvedDisplayName": "ピエールラニエ（Pierre Lannier）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "PLAYBOY",
+    "approvedBrandName": "PLAYBOY",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "PLAYBOY",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "POLICE",
+    "approvedBrandName": "POLICE",
+    "approvedBrandNameKana": "ポリス",
+    "approvedDisplayName": "ポリス（POLICE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "RALPH LAUREN",
+    "approvedBrandName": "RALPH LAUREN",
+    "approvedBrandNameKana": "ラルフ・ローレン",
+    "approvedDisplayName": "ラルフ・ローレン（RALPH LAUREN）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "REVUE THOMMEN",
+    "approvedBrandName": "REVUE THOMMEN",
+    "approvedBrandNameKana": "レビュートーメン",
+    "approvedDisplayName": "レビュートーメン（REVUE THOMMEN）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Ritmo Latino",
+    "approvedBrandName": "Ritmo Latino",
+    "approvedBrandNameKana": "リトモラティーノ",
+    "approvedDisplayName": "リトモラティーノ（Ritmo Latino）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "RODANIA",
+    "approvedBrandName": "RODANIA",
+    "approvedBrandNameKana": "ロダニア",
+    "approvedDisplayName": "ロダニア（RODANIA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ROMAGO",
+    "approvedBrandName": "ROMAGO",
+    "approvedBrandNameKana": "ロマゴ",
+    "approvedDisplayName": "ロマゴ（ROMAGO）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ROYAL MONTRESS",
+    "approvedBrandName": "ROYAL MONTRESS",
+    "approvedBrandNameKana": "ロイヤルモントレス",
+    "approvedDisplayName": "ロイヤルモントレス（ROYAL MONTRESS）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認　誤　ROYAL MONTRESS  正 ROYAL MONTRESゴセイ"
+  },
+  {
+    "sourceBrandName": "ROYAL NATURE",
+    "approvedBrandName": "ROYAL NATURE",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "ROYAL NATURE",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ROYAL TSCA",
+    "approvedBrandName": "ROYAL TSCA",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "ROYAL TSCA",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "RSW",
+    "approvedBrandName": "RSW",
+    "approvedBrandNameKana": "アールエスダブリュ",
+    "approvedDisplayName": "アールエスダブリュ（RSW）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SAMOA",
+    "approvedBrandName": "SAMOA",
+    "approvedBrandNameKana": "サモア",
+    "approvedDisplayName": "サモア（SAMOA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SATO",
+    "approvedBrandName": "SATO",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "SATO",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "sazare",
+    "approvedBrandName": "sazare",
+    "approvedBrandNameKana": "サザレ",
+    "approvedDisplayName": "サザレ（sazare）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SECTOR",
+    "approvedBrandName": "SECTOR",
+    "approvedBrandNameKana": "セクター",
+    "approvedDisplayName": "セクター（SECTOR）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SEIKO 掛時計",
+    "approvedBrandName": "SEIKO 掛時計",
+    "approvedBrandNameKana": "セイコー",
+    "approvedDisplayName": "セイコー（SEIKO 掛時計）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: SEIKO / SEIKO 懐中時計 / 表記ゆれ確認 / ブランド名ではない可能性"
+  },
+  {
+    "sourceBrandName": "Shinnnyo",
+    "approvedBrandName": "Shinnnyo",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Shinnnyo",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Shinnyo",
+    "approvedBrandName": "Shinnyo",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Shinnyo",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SONIA RYKEL",
+    "approvedBrandName": "SONIA RYKEL",
+    "approvedBrandNameKana": "ソニア・リキエル",
+    "approvedDisplayName": "ソニア・リキエル（SONIA RYKEL）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SONNE HAORI PRODUDED",
+    "approvedBrandName": "SONNE HAORI PRODUDED",
+    "approvedBrandNameKana": "ゾンネ",
+    "approvedDisplayName": "ゾンネ（SONNE HAORI PRODUDED）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SORNA",
+    "approvedBrandName": "SORNA",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "SORNA",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Sturmanskie",
+    "approvedBrandName": "Sturmanskie",
+    "approvedBrandNameKana": "シュトゥルマンスキー",
+    "approvedDisplayName": "シュトゥルマンスキー（Sturmanskie）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SWAROVSKI",
+    "approvedBrandName": "SWAROVSKI",
+    "approvedBrandNameKana": "スワロフスキー",
+    "approvedDisplayName": "スワロフスキー（SWAROVSKI）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "swatch",
+    "approvedBrandName": "swatch",
+    "approvedBrandNameKana": "スウォッチ",
+    "approvedDisplayName": "スウォッチ（swatch）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SWISS ARMY",
+    "approvedBrandName": "SWISS ARMY",
+    "approvedBrandNameKana": "スイスアーミー",
+    "approvedDisplayName": "スイスアーミー（SWISS ARMY）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SWISS HAWAIIAN",
+    "approvedBrandName": "SWISS HAWAIIAN",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "SWISS HAWAIIAN",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SWISS MILITARY",
+    "approvedBrandName": "SWISS MILITARY",
+    "approvedBrandNameKana": "スイスミリタリー",
+    "approvedDisplayName": "スイスミリタリー（SWISS MILITARY）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "SWIZA",
+    "approvedBrandName": "SWIZA",
+    "approvedBrandNameKana": "スウィザ",
+    "approvedDisplayName": "スウィザ（SWIZA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "tag Heuer",
+    "approvedBrandName": "tag Heuer",
+    "approvedBrandNameKana": "タグ・ホイヤー",
+    "approvedDisplayName": "タグ・ホイヤー（tag Heuer）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: Tag Heuer / 表記ゆれ確認"
+  },
+  {
+    "sourceBrandName": "Tendence",
+    "approvedBrandName": "Tendence",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "Tendence",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "TENSHOUDO",
+    "approvedBrandName": "TENSHOUDO",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "TENSHOUDO",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認　天賞堂"
+  },
+  {
+    "sourceBrandName": "THE GINZA",
+    "approvedBrandName": "THE GINZA",
+    "approvedBrandNameKana": "ザ・ギンザ",
+    "approvedDisplayName": "ザ・ギンザ（THE GINZA）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "TIDE WAY",
+    "approvedBrandName": "TIDE WAY",
+    "approvedBrandNameKana": "タイドウェイ",
+    "approvedDisplayName": "タイドウェイ（TIDE WAY）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "TIME WILL TELL",
+    "approvedBrandName": "TIME WILL TELL",
+    "approvedBrandNameKana": "タイムウィルテル",
+    "approvedDisplayName": "タイムウィルテル（TIME WILL TELL）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "town&country",
+    "approvedBrandName": "town&country",
+    "approvedBrandNameKana": "タウン&カントリー",
+    "approvedDisplayName": "タウン&カントリー（town&country）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "TRUSTY",
+    "approvedBrandName": "TRUSTY",
+    "approvedBrandNameKana": "トラスティ",
+    "approvedDisplayName": "トラスティ（TRUSTY）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "TUSENO",
+    "approvedBrandName": "TUSENO",
+    "approvedBrandNameKana": "トゥセノー",
+    "approvedDisplayName": "トゥセノー（TUSENO）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "U.S.POLO",
+    "approvedBrandName": "U.S.POLO",
+    "approvedBrandNameKana": "ユーエスポロ",
+    "approvedDisplayName": "ユーエスポロ（U.S.POLO）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "UNDONE",
+    "approvedBrandName": "UNDONE",
+    "approvedBrandNameKana": "アンダーン",
+    "approvedDisplayName": "アンダーン（UNDONE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ungaro",
+    "approvedBrandName": "ungaro",
+    "approvedBrandNameKana": "ウンガロ",
+    "approvedDisplayName": "ウンガロ（ungaro）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "UNITED SERVICE",
+    "approvedBrandName": "UNITED SERVICE",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "UNITED SERVICE",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "URBAN",
+    "approvedBrandName": "URBAN",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "URBAN",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "Valentino Rudy",
+    "approvedBrandName": "Valentino Rudy",
+    "approvedBrandNameKana": "ヴァレンティノ・ルディー",
+    "approvedDisplayName": "ヴァレンティノ・ルディー（Valentino Rudy）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "VICTORINOX",
+    "approvedBrandName": "VICTORINOX",
+    "approvedBrandNameKana": "ビクトリノックス",
+    "approvedDisplayName": "ビクトリノックス（VICTORINOX）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "VIVAYOU",
+    "approvedBrandName": "VIVAYOU",
+    "approvedBrandNameKana": "ビバユー",
+    "approvedDisplayName": "ビバユー（VIVAYOU）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "WEMPE",
+    "approvedBrandName": "WEMPE",
+    "approvedBrandNameKana": "ヴェンペ",
+    "approvedDisplayName": "ヴェンペ（WEMPE）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "WIRED",
+    "approvedBrandName": "WIRED",
+    "approvedBrandNameKana": "ワイアード",
+    "approvedDisplayName": "ワイアード（WIRED）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "WITTNAUER",
+    "approvedBrandName": "WITTNAUER",
+    "approvedBrandNameKana": "ウィットナー",
+    "approvedDisplayName": "ウィットナー（WITTNAUER）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "YALE CLUB 懐中時計",
+    "approvedBrandName": "YALE CLUB 懐中時計",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "YALE CLUB 懐中時計",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / ブランド名ではない可能性"
+  },
+  {
+    "sourceBrandName": "yukiko kimijima",
+    "approvedBrandName": "yukiko kimijima",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "yukiko kimijima",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ZANNETTI",
+    "approvedBrandName": "ZANNETTI",
+    "approvedBrandNameKana": "ザネッティ",
+    "approvedDisplayName": "ザネッティ（ZANNETTI）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ZEPPELIN",
+    "approvedBrandName": "ZEPPELIN",
+    "approvedBrandNameKana": "ツェッペリン",
+    "approvedDisplayName": "ツェッペリン（ZEPPELIN）",
+    "hasKana": true,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "アトム",
+    "approvedBrandName": "アトム",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "アトム",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ドイツ掛時計",
+    "approvedBrandName": "ドイツ掛時計",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "ドイツ掛時計",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / ブランド名ではない可能性"
+  },
+  {
+    "sourceBrandName": "バンド",
+    "approvedBrandName": "バンド",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "バンド",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "ハンドメイド時計",
+    "approvedBrandName": "ハンドメイド時計",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "ハンドメイド時計",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "フランク三浦",
+    "approvedBrandName": "フランク三浦",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "フランク三浦",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "懐中時計",
+    "approvedBrandName": "懐中時計",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "懐中時計",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認 / ブランド名ではない可能性"
+  },
+  {
+    "sourceBrandName": "無印",
+    "approvedBrandName": "無印",
+    "approvedBrandNameKana": "",
+    "approvedDisplayName": "無印",
+    "hasKana": false,
+    "sourceCount": 1,
+    "reviewStatus": "pending",
+    "note": "読み方要確認"
+  },
+  {
+    "sourceBrandName": "OMEGA",
+    "approvedBrandName": "OMEGA",
+    "approvedBrandNameKana": "オメガ",
+    "approvedDisplayName": "オメガ（OMEGA）",
+    "hasKana": true,
+    "sourceCount": 418,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "GAGAMILANO",
+    "approvedBrandName": "GAGAMILANO",
+    "approvedBrandNameKana": "ガガミラノ",
+    "approvedDisplayName": "ガガミラノ（GAGAMILANO）",
+    "hasKana": true,
+    "sourceCount": 176,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "CARTIER",
+    "approvedBrandName": "CARTIER",
+    "approvedBrandNameKana": "カルティエ",
+    "approvedDisplayName": "カルティエ（CARTIER）",
+    "hasKana": true,
+    "sourceCount": 116,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "GUCCI",
+    "approvedBrandName": "GUCCI",
+    "approvedBrandNameKana": "グッチ",
+    "approvedDisplayName": "グッチ（GUCCI）",
+    "hasKana": true,
+    "sourceCount": 74,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "BVLGARI",
+    "approvedBrandName": "BVLGARI",
+    "approvedBrandNameKana": "ブルガリ",
+    "approvedDisplayName": "ブルガリ（BVLGARI）",
+    "hasKana": true,
+    "sourceCount": 70,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "LONGINES",
+    "approvedBrandName": "LONGINES",
+    "approvedBrandNameKana": "ロンジン",
+    "approvedDisplayName": "ロンジン（LONGINES）",
+    "hasKana": true,
+    "sourceCount": 69,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "HERMES",
+    "approvedBrandName": "HERMES",
+    "approvedBrandNameKana": "エルメス",
+    "approvedDisplayName": "エルメス（HERMES）",
+    "hasKana": true,
+    "sourceCount": 68,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "TUDOR",
+    "approvedBrandName": "TUDOR",
+    "approvedBrandNameKana": "チューダー",
+    "approvedDisplayName": "チューダー（TUDOR）",
+    "hasKana": true,
+    "sourceCount": 37,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記　「チュードル」とも言うイ"
+  },
+  {
+    "sourceBrandName": "IWC",
+    "approvedBrandName": "IWC",
+    "approvedBrandNameKana": "アイ・ダブリュー・シー",
+    "approvedDisplayName": "アイ・ダブリュー・シー（IWC）",
+    "hasKana": true,
+    "sourceCount": 35,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "chopard",
+    "approvedBrandName": "chopard",
+    "approvedBrandNameKana": "ショパール",
+    "approvedDisplayName": "ショパール（chopard）",
+    "hasKana": true,
+    "sourceCount": 25,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "CASIO",
+    "approvedBrandName": "CASIO",
+    "approvedBrandNameKana": "カシオ",
+    "approvedDisplayName": "カシオ（CASIO）",
+    "hasKana": true,
+    "sourceCount": 24,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "FRANCK MULLER",
+    "approvedBrandName": "FRANCK MULLER",
+    "approvedBrandNameKana": "フランク・ミュラー",
+    "approvedDisplayName": "フランク・ミュラー（FRANCK MULLER）",
+    "hasKana": true,
+    "sourceCount": 24,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "HAMILTON",
+    "approvedBrandName": "HAMILTON",
+    "approvedBrandNameKana": "ハミルトン",
+    "approvedDisplayName": "ハミルトン（HAMILTON）",
+    "hasKana": true,
+    "sourceCount": 23,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "AUDEMARS PIGUET",
+    "approvedBrandName": "AUDEMARS PIGUET",
+    "approvedBrandNameKana": "オーデマ・ピゲ",
+    "approvedDisplayName": "オーデマ・ピゲ（AUDEMARS PIGUET）",
+    "hasKana": true,
+    "sourceCount": 20,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "RADO",
+    "approvedBrandName": "RADO",
+    "approvedBrandNameKana": "ラドー",
+    "approvedDisplayName": "ラドー（RADO）",
+    "hasKana": true,
+    "sourceCount": 18,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "Dior",
+    "approvedBrandName": "Dior",
+    "approvedBrandNameKana": "ディオール",
+    "approvedDisplayName": "ディオール（Dior）",
+    "hasKana": true,
+    "sourceCount": 17,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "FENDI",
+    "approvedBrandName": "FENDI",
+    "approvedBrandNameKana": "フェンディ",
+    "approvedDisplayName": "フェンディ（FENDI）",
+    "hasKana": true,
+    "sourceCount": 17,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "SKAGEN",
+    "approvedBrandName": "SKAGEN",
+    "approvedBrandNameKana": "スカーゲン",
+    "approvedDisplayName": "スカーゲン（SKAGEN）",
+    "hasKana": true,
+    "sourceCount": 16,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "Baume&Mercier",
+    "approvedBrandName": "Baume&Mercier",
+    "approvedBrandNameKana": "ボーム＆メルシエ",
+    "approvedDisplayName": "ボーム＆メルシエ（Baume&Mercier）",
+    "hasKana": true,
+    "sourceCount": 15,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "VACHERON CONSTANTIN",
+    "approvedBrandName": "VACHERON CONSTANTIN",
+    "approvedBrandNameKana": "ヴァシュロン・コンスタンタン",
+    "approvedDisplayName": "ヴァシュロン・コンスタンタン（VACHERON CONSTANTIN）",
+    "hasKana": true,
+    "sourceCount": 11,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "BURBERRY",
+    "approvedBrandName": "BURBERRY",
+    "approvedBrandNameKana": "バーバリー",
+    "approvedDisplayName": "バーバリー（BURBERRY）",
+    "hasKana": true,
+    "sourceCount": 9,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "PANERAI",
+    "approvedBrandName": "PANERAI",
+    "approvedBrandNameKana": "パネライ",
+    "approvedDisplayName": "パネライ（PANERAI）",
+    "hasKana": true,
+    "sourceCount": 9,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "TIFFANY",
+    "approvedBrandName": "TIFFANY",
+    "approvedBrandNameKana": "ティファニー",
+    "approvedDisplayName": "ティファニー（TIFFANY）",
+    "hasKana": true,
+    "sourceCount": 8,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "TISSOT",
+    "approvedBrandName": "TISSOT",
+    "approvedBrandNameKana": "ティソ",
+    "approvedDisplayName": "ティソ（TISSOT）",
+    "hasKana": true,
+    "sourceCount": 8,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "ALBA",
+    "approvedBrandName": "ALBA",
+    "approvedBrandNameKana": "アルバ",
+    "approvedDisplayName": "アルバ（ALBA）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "ORIS",
+    "approvedBrandName": "ORIS",
+    "approvedBrandNameKana": "オリス",
+    "approvedDisplayName": "オリス（ORIS）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "WALTHAM",
+    "approvedBrandName": "WALTHAM",
+    "approvedBrandNameKana": "ウォルサム",
+    "approvedDisplayName": "ウォルサム（WALTHAM）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  },
+  {
+    "sourceBrandName": "Yves Saint Laurent",
+    "approvedBrandName": "Yves Saint Laurent",
+    "approvedBrandNameKana": "イヴ・サンローラン",
+    "approvedDisplayName": "イヴ・サンローラン（Yves Saint Laurent）",
+    "hasKana": true,
+    "sourceCount": 7,
+    "reviewStatus": "pending",
+    "note": "一般的な日本語表記"
+  }
+]

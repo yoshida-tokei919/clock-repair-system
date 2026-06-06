@@ -1,0 +1,369 @@
+[
+  {
+    "tempPublicCaseKey": "FMP:12023",
+    "relatedWorkItemTempKey": "FMP:12023:internal-1",
+    "sourceArea": "internal",
+    "sourceSlot": 1,
+    "sourceText": "回路",
+    "normalizedSourceText": "回路",
+    "displayName": "回路",
+    "price": 3000,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "internal-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12029",
+    "relatedWorkItemTempKey": null,
+    "sourceArea": "external",
+    "sourceSlot": 1,
+    "sourceText": "ベゼルバネ",
+    "normalizedSourceText": "ベゼルバネ",
+    "displayName": "ベゼルバネ",
+    "price": 2000,
+    "showPriceB2b": false,
+    "showPriceB2c": false,
+    "relationStatus": "UNLINKED",
+    "reviewStatus": "NEEDS_REVIEW",
+    "excludeReason": "part_without_publishable_work",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": null
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12029",
+    "relatedWorkItemTempKey": null,
+    "sourceArea": "external",
+    "sourceSlot": 2,
+    "sourceText": "ベゼルクリックバネ",
+    "normalizedSourceText": "ベゼルクリックバネ",
+    "displayName": "ベゼルクリックバネ",
+    "price": 2000,
+    "showPriceB2b": false,
+    "showPriceB2c": false,
+    "relationStatus": "UNLINKED",
+    "reviewStatus": "NEEDS_REVIEW",
+    "excludeReason": "part_without_publishable_work",
+    "sortOrder": 1,
+    "metadata": {
+      "relatedWorkItemKey": null
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12032",
+    "relatedWorkItemTempKey": "FMP:12032:external-1",
+    "sourceArea": "external",
+    "sourceSlot": 1,
+    "sourceText": "ガラス",
+    "normalizedSourceText": "ガラス",
+    "displayName": "ガラス",
+    "price": 1500,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12037",
+    "relatedWorkItemTempKey": "FMP:12037:external-1",
+    "sourceArea": "external",
+    "sourceSlot": 1,
+    "sourceText": "ガラス",
+    "normalizedSourceText": "ガラス",
+    "displayName": "ガラス",
+    "price": 2000,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12038",
+    "relatedWorkItemTempKey": "FMP:12038:external-1",
+    "sourceArea": "external",
+    "sourceSlot": 1,
+    "sourceText": "ガラス",
+    "normalizedSourceText": "ガラス",
+    "displayName": "ガラス",
+    "price": 2000,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12039",
+    "relatedWorkItemTempKey": "FMP:12039:external-1",
+    "sourceArea": "external",
+    "sourceSlot": 1,
+    "sourceText": "ガラス",
+    "normalizedSourceText": "ガラス",
+    "displayName": "ガラス",
+    "price": 2500,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12041",
+    "relatedWorkItemTempKey": "FMP:12041:internal-1",
+    "sourceArea": "internal",
+    "sourceSlot": 1,
+    "sourceText": "ムーブメント",
+    "normalizedSourceText": "ムーブメント",
+    "displayName": "ムーブメント",
+    "price": 3300,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "internal-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12045",
+    "relatedWorkItemTempKey": "FMP:12045:internal-1",
+    "sourceArea": "internal",
+    "sourceSlot": 1,
+    "sourceText": "回路",
+    "normalizedSourceText": "回路",
+    "displayName": "回路",
+    "price": 4000,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "internal-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12048",
+    "relatedWorkItemTempKey": "FMP:12048:internal-1",
+    "sourceArea": "internal",
+    "sourceSlot": 1,
+    "sourceText": "ゼンマイ",
+    "normalizedSourceText": "ゼンマイ",
+    "displayName": "ゼンマイ",
+    "price": 3000,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "internal-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12050",
+    "relatedWorkItemTempKey": "FMP:12050:internal-1",
+    "sourceArea": "internal",
+    "sourceSlot": 1,
+    "sourceText": "2番受け交換",
+    "normalizedSourceText": "2番受け交換",
+    "displayName": "2番受け交換",
+    "price": 8000,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "internal-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12050",
+    "relatedWorkItemTempKey": null,
+    "sourceArea": "internal",
+    "sourceSlot": 2,
+    "sourceText": "3番車",
+    "normalizedSourceText": "3番車",
+    "displayName": "3番車",
+    "price": 2000,
+    "showPriceB2b": false,
+    "showPriceB2c": false,
+    "relationStatus": "UNLINKED",
+    "reviewStatus": "NEEDS_REVIEW",
+    "excludeReason": "part_without_publishable_work",
+    "sortOrder": 1,
+    "metadata": {
+      "relatedWorkItemKey": null
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12051",
+    "relatedWorkItemTempKey": "FMP:12051:internal-1",
+    "sourceArea": "internal",
+    "sourceSlot": 1,
+    "sourceText": "ゼンマイ",
+    "normalizedSourceText": "ゼンマイ",
+    "displayName": "ゼンマイ",
+    "price": 2000,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "internal-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12051",
+    "relatedWorkItemTempKey": null,
+    "sourceArea": "internal",
+    "sourceSlot": 2,
+    "sourceText": "自動巻き受けねじ",
+    "normalizedSourceText": "自動巻き受けねじ",
+    "displayName": "自動巻き受けねじ",
+    "price": 5000,
+    "showPriceB2b": false,
+    "showPriceB2c": false,
+    "relationStatus": "UNLINKED",
+    "reviewStatus": "NEEDS_REVIEW",
+    "excludeReason": "part_without_publishable_work",
+    "sortOrder": 1,
+    "metadata": {
+      "relatedWorkItemKey": null
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12052",
+    "relatedWorkItemTempKey": "FMP:12052:internal-1",
+    "sourceArea": "internal",
+    "sourceSlot": 1,
+    "sourceText": "キチ車（社外品）",
+    "normalizedSourceText": "キチ車（社外品）",
+    "displayName": "キチ車（社外品）",
+    "price": 5000,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "internal-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12052",
+    "relatedWorkItemTempKey": null,
+    "sourceArea": "internal",
+    "sourceSlot": 2,
+    "sourceText": "巻芯（社外品）",
+    "normalizedSourceText": "巻芯（社外品）",
+    "displayName": "巻芯（社外品）",
+    "price": 1200,
+    "showPriceB2b": false,
+    "showPriceB2c": false,
+    "relationStatus": "UNLINKED",
+    "reviewStatus": "NEEDS_REVIEW",
+    "excludeReason": "part_without_publishable_work",
+    "sortOrder": 1,
+    "metadata": {
+      "relatedWorkItemKey": null
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12055",
+    "relatedWorkItemTempKey": null,
+    "sourceArea": "internal",
+    "sourceSlot": 1,
+    "sourceText": "ローター芯（社外パーツ）",
+    "normalizedSourceText": "ローター芯（社外パーツ）",
+    "displayName": "ローター芯（社外パーツ）",
+    "price": 5000,
+    "showPriceB2b": false,
+    "showPriceB2c": false,
+    "relationStatus": "UNLINKED",
+    "reviewStatus": "NEEDS_REVIEW",
+    "excludeReason": "part_without_publishable_work",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": null
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12057",
+    "relatedWorkItemTempKey": "FMP:12057:internal-1",
+    "sourceArea": "internal",
+    "sourceSlot": 1,
+    "sourceText": "積算車軸",
+    "normalizedSourceText": "積算車軸",
+    "displayName": "積算車軸",
+    "price": 5000,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "internal-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12059",
+    "relatedWorkItemTempKey": null,
+    "sourceArea": "external",
+    "sourceSlot": 1,
+    "sourceText": "リューズ",
+    "normalizedSourceText": "リューズ",
+    "displayName": "リューズ",
+    "price": 30000,
+    "showPriceB2b": false,
+    "showPriceB2c": false,
+    "relationStatus": "UNLINKED",
+    "reviewStatus": "NEEDS_REVIEW",
+    "excludeReason": "part_without_publishable_work",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": null
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12062",
+    "relatedWorkItemTempKey": "FMP:12062:internal-1",
+    "sourceArea": "internal",
+    "sourceSlot": 1,
+    "sourceText": "多数",
+    "normalizedSourceText": "多数",
+    "displayName": "多数",
+    "price": 6000,
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "relationStatus": "LINKED",
+    "reviewStatus": "APPROVED",
+    "sortOrder": 0,
+    "metadata": {
+      "relatedWorkItemKey": "internal-1"
+    }
+  }
+]

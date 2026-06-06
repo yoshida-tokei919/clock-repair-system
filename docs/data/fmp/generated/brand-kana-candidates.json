@@ -1,0 +1,2747 @@
+[
+  {
+    "brandName": "ROLEX",
+    "brandNameKanaCandidate": "ロレックス",
+    "displayNameCandidate": "ロレックス（ROLEX）",
+    "confidence": "high",
+    "sourceCount": 435,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: ROLEX(コピー）"
+  },
+  {
+    "brandName": "OMEGA",
+    "brandNameKanaCandidate": "オメガ",
+    "displayNameCandidate": "オメガ（OMEGA）",
+    "confidence": "high",
+    "sourceCount": 418,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "SEIKO",
+    "brandNameKanaCandidate": "セイコー",
+    "displayNameCandidate": "セイコー（SEIKO）",
+    "confidence": "high",
+    "sourceCount": 328,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: SEIKO 懐中時計 / SEIKO 掛時計"
+  },
+  {
+    "brandName": "GAGAMILANO",
+    "brandNameKanaCandidate": "ガガミラノ",
+    "displayNameCandidate": "ガガミラノ（GAGAMILANO）",
+    "confidence": "high",
+    "sourceCount": 176,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "Tag Heuer",
+    "brandNameKanaCandidate": "タグ・ホイヤー",
+    "displayNameCandidate": "タグ・ホイヤー（Tag Heuer）",
+    "confidence": "high",
+    "sourceCount": 119,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: tag Heuer"
+  },
+  {
+    "brandName": "CARTIER",
+    "brandNameKanaCandidate": "カルティエ",
+    "displayNameCandidate": "カルティエ（CARTIER）",
+    "confidence": "high",
+    "sourceCount": 116,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "GUCCI",
+    "brandNameKanaCandidate": "グッチ",
+    "displayNameCandidate": "グッチ（GUCCI）",
+    "confidence": "high",
+    "sourceCount": 74,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "BVLGARI",
+    "brandNameKanaCandidate": "ブルガリ",
+    "displayNameCandidate": "ブルガリ（BVLGARI）",
+    "confidence": "high",
+    "sourceCount": 70,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "LONGINES",
+    "brandNameKanaCandidate": "ロンジン",
+    "displayNameCandidate": "ロンジン（LONGINES）",
+    "confidence": "high",
+    "sourceCount": 69,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "CITIZEN",
+    "brandNameKanaCandidate": "シチズン",
+    "displayNameCandidate": "シチズン（CITIZEN）",
+    "confidence": "high",
+    "sourceCount": 68,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: CITIZEN 置時計"
+  },
+  {
+    "brandName": "HERMES",
+    "brandNameKanaCandidate": "エルメス",
+    "displayNameCandidate": "エルメス（HERMES）",
+    "confidence": "high",
+    "sourceCount": 68,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "CHANEL",
+    "brandNameKanaCandidate": "シャネル",
+    "displayNameCandidate": "シャネル（CHANEL）",
+    "confidence": "high",
+    "sourceCount": 46,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: CHANEL(コピー）"
+  },
+  {
+    "brandName": "BREITLING",
+    "brandNameKanaCandidate": "ブライトリング",
+    "displayNameCandidate": "ブライトリング（BREITLING）",
+    "confidence": "high",
+    "sourceCount": 40,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: BREITLING(コピー）"
+  },
+  {
+    "brandName": "TUDOR",
+    "brandNameKanaCandidate": "チューダー",
+    "displayNameCandidate": "チューダー（TUDOR）",
+    "confidence": "high",
+    "sourceCount": 37,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "IWC",
+    "brandNameKanaCandidate": "アイ・ダブリュー・シー",
+    "displayNameCandidate": "アイ・ダブリュー・シー（IWC）",
+    "confidence": "high",
+    "sourceCount": 35,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "chopard",
+    "brandNameKanaCandidate": "ショパール",
+    "displayNameCandidate": "ショパール（chopard）",
+    "confidence": "high",
+    "sourceCount": 25,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "CASIO",
+    "brandNameKanaCandidate": "カシオ",
+    "displayNameCandidate": "カシオ（CASIO）",
+    "confidence": "high",
+    "sourceCount": 24,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "FRANCK MULLER",
+    "brandNameKanaCandidate": "フランク・ミュラー",
+    "displayNameCandidate": "フランク・ミュラー（FRANCK MULLER）",
+    "confidence": "high",
+    "sourceCount": 24,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "HAMILTON",
+    "brandNameKanaCandidate": "ハミルトン",
+    "displayNameCandidate": "ハミルトン（HAMILTON）",
+    "confidence": "high",
+    "sourceCount": 23,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "AUDEMARS PIGUET",
+    "brandNameKanaCandidate": "オーデマ・ピゲ",
+    "displayNameCandidate": "オーデマ・ピゲ（AUDEMARS PIGUET）",
+    "confidence": "high",
+    "sourceCount": 20,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "RADO",
+    "brandNameKanaCandidate": "ラドー",
+    "displayNameCandidate": "ラドー（RADO）",
+    "confidence": "high",
+    "sourceCount": 18,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "Dior",
+    "brandNameKanaCandidate": "ディオール",
+    "displayNameCandidate": "ディオール（Dior）",
+    "confidence": "high",
+    "sourceCount": 17,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "FENDI",
+    "brandNameKanaCandidate": "フェンディ",
+    "displayNameCandidate": "フェンディ（FENDI）",
+    "confidence": "high",
+    "sourceCount": 17,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "HUBLOT",
+    "brandNameKanaCandidate": "ウブロ",
+    "displayNameCandidate": "ウブロ（HUBLOT）",
+    "confidence": "high",
+    "sourceCount": 17,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: HUBLOTタイプ"
+  },
+  {
+    "brandName": "SKAGEN",
+    "brandNameKanaCandidate": "スカーゲン",
+    "displayNameCandidate": "スカーゲン（SKAGEN）",
+    "confidence": "high",
+    "sourceCount": 16,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "Baume&Mercier",
+    "brandNameKanaCandidate": "ボーム＆メルシエ",
+    "displayNameCandidate": "ボーム＆メルシエ（Baume&Mercier）",
+    "confidence": "high",
+    "sourceCount": 15,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "PATEK  PHILIPPE",
+    "brandNameKanaCandidate": "パテック・フィリップ",
+    "displayNameCandidate": "パテック・フィリップ（PATEK  PHILIPPE）",
+    "confidence": "high",
+    "sourceCount": 11,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / スペース違い疑い"
+  },
+  {
+    "brandName": "VACHERON CONSTANTIN",
+    "brandNameKanaCandidate": "ヴァシュロン・コンスタンタン",
+    "displayNameCandidate": "ヴァシュロン・コンスタンタン（VACHERON CONSTANTIN）",
+    "confidence": "high",
+    "sourceCount": 11,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "LOUIS VUITON",
+    "brandNameKanaCandidate": "ルイ・ヴィトン",
+    "displayNameCandidate": "ルイ・ヴィトン（LOUIS VUITON）",
+    "confidence": "low",
+    "sourceCount": 10,
+    "needsReview": true,
+    "note": "スペルミス疑い: LOUIS VUITTON"
+  },
+  {
+    "brandName": "BURBERRY",
+    "brandNameKanaCandidate": "バーバリー",
+    "displayNameCandidate": "バーバリー（BURBERRY）",
+    "confidence": "high",
+    "sourceCount": 9,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "JAEGER  LECOULTRE",
+    "brandNameKanaCandidate": "ジャガー・ルクルト",
+    "displayNameCandidate": "ジャガー・ルクルト（JAEGER  LECOULTRE）",
+    "confidence": "high",
+    "sourceCount": 9,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / スペース違い疑い"
+  },
+  {
+    "brandName": "PANERAI",
+    "brandNameKanaCandidate": "パネライ",
+    "displayNameCandidate": "パネライ（PANERAI）",
+    "confidence": "high",
+    "sourceCount": 9,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "TIFFANY",
+    "brandNameKanaCandidate": "ティファニー",
+    "displayNameCandidate": "ティファニー（TIFFANY）",
+    "confidence": "high",
+    "sourceCount": 8,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "TISSOT",
+    "brandNameKanaCandidate": "ティソ",
+    "displayNameCandidate": "ティソ（TISSOT）",
+    "confidence": "high",
+    "sourceCount": 8,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "agnis b",
+    "brandNameKanaCandidate": "アニエスベー",
+    "displayNameCandidate": "アニエスベー（agnis b）",
+    "confidence": "low",
+    "sourceCount": 7,
+    "needsReview": true,
+    "note": "スペル揺れ/スペルミス疑い: agnes b / 表記ゆれ疑い: agnis b 懐中時計"
+  },
+  {
+    "brandName": "ALBA",
+    "brandNameKanaCandidate": "アルバ",
+    "displayNameCandidate": "アルバ（ALBA）",
+    "confidence": "high",
+    "sourceCount": 7,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "BULOVA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BULOVA）",
+    "confidence": "unknown",
+    "sourceCount": 7,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CHARRIOL",
+    "brandNameKanaCandidate": "シャリオール",
+    "displayNameCandidate": "シャリオール（CHARRIOL）",
+    "confidence": "medium",
+    "sourceCount": 7,
+    "needsReview": true,
+    "note": "一般的な日本語表記候補。確認推奨"
+  },
+  {
+    "brandName": "CORUM",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CORUM）",
+    "confidence": "unknown",
+    "sourceCount": 7,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "LOCMAN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（LOCMAN）",
+    "confidence": "unknown",
+    "sourceCount": 7,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MARC JACOBS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MARC JACOBS）",
+    "confidence": "unknown",
+    "sourceCount": 7,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ORIS",
+    "brandNameKanaCandidate": "オリス",
+    "displayNameCandidate": "オリス（ORIS）",
+    "confidence": "high",
+    "sourceCount": 7,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "Rosemont",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Rosemont）",
+    "confidence": "unknown",
+    "sourceCount": 7,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "WALTHAM",
+    "brandNameKanaCandidate": "ウォルサム",
+    "displayNameCandidate": "ウォルサム（WALTHAM）",
+    "confidence": "high",
+    "sourceCount": 7,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "Yves Saint Laurent",
+    "brandNameKanaCandidate": "イヴ・サンローラン",
+    "displayNameCandidate": "イヴ・サンローラン（Yves Saint Laurent）",
+    "confidence": "high",
+    "sourceCount": 7,
+    "needsReview": false,
+    "note": "一般的な日本語表記"
+  },
+  {
+    "brandName": "BREGUET",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BREGUET）",
+    "confidence": "unknown",
+    "sourceCount": 6,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "GRAHAM",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（GRAHAM）",
+    "confidence": "unknown",
+    "sourceCount": 6,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "JUNGHANS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（JUNGHANS）",
+    "confidence": "unknown",
+    "sourceCount": 6,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "marie claire",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（marie claire）",
+    "confidence": "unknown",
+    "sourceCount": 6,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "mila schon",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（mila schon）",
+    "confidence": "unknown",
+    "sourceCount": 6,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ORIENT",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ORIENT）",
+    "confidence": "unknown",
+    "sourceCount": 6,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "PAUL SMITH",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（PAUL SMITH）",
+    "confidence": "unknown",
+    "sourceCount": 6,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "PIAGET",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（PIAGET）",
+    "confidence": "unknown",
+    "sourceCount": 6,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "christian dior",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（christian dior）",
+    "confidence": "unknown",
+    "sourceCount": 5,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CYMA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CYMA）",
+    "confidence": "unknown",
+    "sourceCount": 5,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "DW",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（DW）",
+    "confidence": "unknown",
+    "sourceCount": 5,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ebel",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ebel）",
+    "confidence": "unknown",
+    "sourceCount": 5,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "G-SHOCK",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（G-SHOCK）",
+    "confidence": "unknown",
+    "sourceCount": 5,
+    "needsReview": true,
+    "note": "読み方要確認 / 表記ゆれ疑い: GーSHOCK"
+  },
+  {
+    "brandName": "JUVENIA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（JUVENIA）",
+    "confidence": "unknown",
+    "sourceCount": 5,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MOVADO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MOVADO）",
+    "confidence": "unknown",
+    "sourceCount": 5,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "RAYMOND WEIL",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（RAYMOND WEIL）",
+    "confidence": "unknown",
+    "sourceCount": 5,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "TECHNOS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（TECHNOS）",
+    "confidence": "unknown",
+    "sourceCount": 5,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "UNIVERSAL",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（UNIVERSAL）",
+    "confidence": "unknown",
+    "sourceCount": 5,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BUCHERER",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BUCHERER）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Calvin Klein",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Calvin Klein）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "COACH",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（COACH）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "DIESEL",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（DIESEL）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "dunhill",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（dunhill）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "FOSSIL",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（FOSSIL）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Frederique Constant",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Frederique Constant）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "GーSHOCK",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（GーSHOCK）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認 / 表記ゆれ疑い: G-SHOCK"
+  },
+  {
+    "brandName": "GIRARD PERREGAUX",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（GIRARD PERREGAUX）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Heuer",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Heuer）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "JACOB ＆ CO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（JACOB ＆ CO）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "LUMINOX",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（LUMINOX）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "NIKE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（NIKE）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ROLEX(コピー）",
+    "brandNameKanaCandidate": "ロレックス",
+    "displayNameCandidate": "ロレックス（ROLEX(コピー））",
+    "confidence": "high",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: ROLEX"
+  },
+  {
+    "brandName": "TIFFANY&CO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（TIFFANY&CO）",
+    "confidence": "unknown",
+    "sourceCount": 4,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CARLO FERRARA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CARLO FERRARA）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CHANEL(コピー）",
+    "brandNameKanaCandidate": "シャネル",
+    "displayNameCandidate": "シャネル（CHANEL(コピー））",
+    "confidence": "high",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: CHANEL"
+  },
+  {
+    "brandName": "Charles Vogele",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Charles Vogele）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Disney",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Disney）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ETERNA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ETERNA）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ice watch",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ice watch）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MICHEL KLEIN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MICHEL KLEIN）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "PORSCHE DESIGN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（PORSCHE DESIGN）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "RICOH",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（RICOH）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SEIKO 懐中時計",
+    "brandNameKanaCandidate": "セイコー",
+    "displayNameCandidate": "セイコー（SEIKO 懐中時計）",
+    "confidence": "high",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: SEIKO / SEIKO 掛時計"
+  },
+  {
+    "brandName": "TIMEX",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（TIMEX）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "VERSACE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（VERSACE）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ZENITH",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ZENITH）",
+    "confidence": "unknown",
+    "sourceCount": 3,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "AIGNER",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（AIGNER）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Baccarat",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Baccarat）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BALLY",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BALLY）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BAPEX",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BAPEX）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BORBONESE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BORBONESE）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CHARLES JOURDAN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CHARLES JOURDAN）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CURTIS&CO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CURTIS&CO）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "DAKS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（DAKS）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Folli Follie",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Folli Follie）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Forever",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Forever）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Gianni Accardi",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Gianni Accardi）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Gianni Versace",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Gianni Versace）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "GRANDEUR",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（GRANDEUR）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "GUESS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（GUESS）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Kentex",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Kentex）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MAURICE LACROIX",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MAURICE LACROIX）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MHR",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MHR）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MONDAINE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MONDAINE）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MONTBLANC",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MONTBLANC）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Obrey",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Obrey）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "OHARA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（OHARA）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Peace",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Peace）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "PEQUIGNET",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（PEQUIGNET）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ROOTS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ROOTS）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Roy King",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Roy King）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SINN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SINN）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "TENSE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（TENSE）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "TRUSSARDI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（TRUSSARDI）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ULYSSE NARDIN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ULYSSE NARDIN）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "VAN CLEEF＆ARPELS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（VAN CLEEF＆ARPELS）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Vendome Aoyama",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Vendome Aoyama）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "WENGER",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（WENGER）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "掛時計",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（掛時計）",
+    "confidence": "unknown",
+    "sourceCount": 2,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "AB AETERNO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（AB AETERNO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ABISTE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ABISTE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "agnis b 懐中時計",
+    "brandNameKanaCandidate": "アニエスベー",
+    "displayNameCandidate": "アニエスベー（agnis b 懐中時計）",
+    "confidence": "low",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "スペル揺れ/スペルミス疑い: agnes b / 表記ゆれ疑い: agnis b"
+  },
+  {
+    "brandName": "AICHI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（AICHI）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "AIKOSHA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（AIKOSHA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "alain silberstein",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（alain silberstein）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認 / 表記ゆれ疑い: ALAIN SILBERSTEIN"
+  },
+  {
+    "brandName": "ALAIN SILBERSTEIN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ALAIN SILBERSTEIN）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認 / 表記ゆれ疑い: alain silberstein"
+  },
+  {
+    "brandName": "ALAX",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ALAX）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ALESSI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ALESSI）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ALETTE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ALETTE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ALETTE BLANC",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ALETTE BLANC）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ALLY DENOVO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ALLY DENOVO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Angel Heart",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Angel Heart）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ANNE KLEIN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ANNE KLEIN）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "AQUANAUTIC",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（AQUANAUTIC）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ASTRODEA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ASTRODEA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Auguste Reymond",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Auguste Reymond）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "AUREOLE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（AUREOLE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "baby-G",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（baby-G）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BALL WATCH",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BALL WATCH）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Bando",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Bando）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BEDAT&Co",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BEDAT&Co）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BELL＆ROSS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BELL＆ROSS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BENRUS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BENRUS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Bleu Bleuet",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Bleu Bleuet）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Blue Blue TOKYO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Blue Blue TOKYO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BMW",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BMW）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BOMBERG",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BOMBERG）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "bon bon watch",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（bon bon watch）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BOSS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BOSS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BOUCHERON",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BOUCHERON）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BREITLING(コピー）",
+    "brandNameKanaCandidate": "ブライトリング",
+    "displayNameCandidate": "ブライトリング（BREITLING(コピー））",
+    "confidence": "high",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: BREITLING"
+  },
+  {
+    "brandName": "BRERA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BRERA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BRIDGESTONE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BRIDGESTONE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BRILLAMICO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BRILLAMICO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "BUTI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（BUTI）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CAPRI WATCH",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CAPRI WATCH）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Carl von Zeyten",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Carl von Zeyten）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CATREX",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CATREX）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CENTURY",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CENTURY）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CERTUS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CERTUS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CITIZEN 置時計",
+    "brandNameKanaCandidate": "シチズン",
+    "displayNameCandidate": "シチズン（CITIZEN 置時計）",
+    "confidence": "high",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: CITIZEN"
+  },
+  {
+    "brandName": "CITRON",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CITRON）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CK",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CK）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CLUSE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CLUSE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "courreges",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（courreges）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CP5",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CP5）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "CWC",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（CWC）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "D.JEANRICHARD",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（D.JEANRICHARD）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "DC",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（DC）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "DEKATHLON",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（DEKATHLON）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "DELMA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（DELMA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "DOLCE GEAR",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（DOLCE GEAR）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Dreamlight",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Dreamlight）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "EDOX",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（EDOX）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ELGIN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ELGIN）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "EMERICH MEERSON",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（EMERICH MEERSON）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ENICAR",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ENICAR）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Ferragamo",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Ferragamo）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "FORTIS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（FORTIS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "FREE MEN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（FREE MEN）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "FURLA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（FURLA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Future Club",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Future Club）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "GALLUCCI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（GALLUCCI）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "GC",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（GC）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "georg jensen",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（georg jensen）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "GERALD GENTA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（GERALD GENTA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "givenchy",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（givenchy）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "GLASHUTTE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（GLASHUTTE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "H&Co",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（H&Co）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "HIS MASTERS VOICE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（HIS MASTERS VOICE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "HUBLOTタイプ",
+    "brandNameKanaCandidate": "ウブロ",
+    "displayNameCandidate": "ウブロ（HUBLOTタイプ）",
+    "confidence": "high",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: HUBLOT"
+  },
+  {
+    "brandName": "HUNTING WORLD",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（HUNTING WORLD）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "INVICTA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（INVICTA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "J-AXIS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（J-AXIS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "JACQUES LEMANS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（JACQUES LEMANS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "JARDUR",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（JARDUR）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "JEMIS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（JEMIS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "JENNIFER LOPEZ",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（JENNIFER LOPEZ）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Johnny",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Johnny）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "jun ashida",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（jun ashida）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "JUNKERS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（JUNKERS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "K.UNO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（K.UNO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "kate  spade",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（kate  spade）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認 / スペース違い疑い"
+  },
+  {
+    "brandName": "KATHARINE HAMNETT",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（KATHARINE HAMNETT）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "KCB",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（KCB）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Kiina",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Kiina）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "KILA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（KILA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Klaeuse",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Klaeuse）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "knot",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（knot）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "KOVA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（KOVA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "L.L.bean",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（L.L.bean）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "LADITTE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（LADITTE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "lasserre",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（lasserre）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "LOOGER",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（LOOGER）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "LORD KING",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（LORD KING）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Lunage",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Lunage）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MARES",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MARES）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "margaret howell",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（margaret howell）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Marina B",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Marina B）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MARTIN BRAUN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MARTIN BRAUN）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MASERATI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MASERATI）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MAURICE RENOMA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MAURICE RENOMA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Mercedes Benz",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Mercedes Benz）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "METAL.CH",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（METAL.CH）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MICKEY MOUSE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MICKEY MOUSE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MIKIMOTO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MIKIMOTO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MILUS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MILUS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MINI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MINI）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Misaki",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Misaki）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MISANI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MISANI）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "MTY NETWORKS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（MTY NETWORKS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Nibada",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Nibada）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Nivada",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Nivada）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "NIXON",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（NIXON）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Ole Mathiesen",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Ole Mathiesen）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "OWARITOKEI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（OWARITOKEI）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "PF",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（PF）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "PHILIPPE SHARIOL",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（PHILIPPE SHARIOL）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "PHILIPPE VENET",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（PHILIPPE VENET）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "pierre cardin",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（pierre cardin）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Pierre Lannier",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Pierre Lannier）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "PLAYBOY",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（PLAYBOY）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "POLICE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（POLICE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "RALPH LAUREN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（RALPH LAUREN）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "REVUE THOMMEN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（REVUE THOMMEN）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Ritmo Latino",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Ritmo Latino）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "RODANIA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（RODANIA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ROMAGO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ROMAGO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ROYAL MONTRESS",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ROYAL MONTRESS）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ROYAL NATURE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ROYAL NATURE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ROYAL TSCA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ROYAL TSCA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "RSW",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（RSW）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SAMOA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SAMOA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SATO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SATO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "sazare",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（sazare）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SECTOR",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SECTOR）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SEIKO 掛時計",
+    "brandNameKanaCandidate": "セイコー",
+    "displayNameCandidate": "セイコー（SEIKO 掛時計）",
+    "confidence": "high",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: SEIKO / SEIKO 懐中時計"
+  },
+  {
+    "brandName": "Shinnnyo",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Shinnnyo）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Shinnyo",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Shinnyo）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SONIA RYKEL",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SONIA RYKEL）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SONNE HAORI PRODUDED",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SONNE HAORI PRODUDED）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SORNA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SORNA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Sturmanskie",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Sturmanskie）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SWAROVSKI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SWAROVSKI）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "swatch",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（swatch）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SWISS ARMY",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SWISS ARMY）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SWISS HAWAIIAN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SWISS HAWAIIAN）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SWISS MILITARY",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SWISS MILITARY）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "SWIZA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（SWIZA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "tag Heuer",
+    "brandNameKanaCandidate": "タグ・ホイヤー",
+    "displayNameCandidate": "タグ・ホイヤー（tag Heuer）",
+    "confidence": "high",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "一般的な日本語表記 / 表記ゆれ疑い: Tag Heuer"
+  },
+  {
+    "brandName": "Tendence",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Tendence）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "TENSHOUDO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（TENSHOUDO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "THE GINZA",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（THE GINZA）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "TIDE WAY",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（TIDE WAY）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "TIME WILL TELL",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（TIME WILL TELL）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "town&country",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（town&country）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "TRUSTY",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（TRUSTY）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "TUSENO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（TUSENO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "U.S.POLO",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（U.S.POLO）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "UNDONE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（UNDONE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ungaro",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ungaro）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "UNITED SERVICE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（UNITED SERVICE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "URBAN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（URBAN）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "Valentino Rudy",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（Valentino Rudy）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "VICTORINOX",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（VICTORINOX）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "VIVAYOU",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（VIVAYOU）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "WEMPE",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（WEMPE）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "WIRED",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（WIRED）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "WITTNAUER",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（WITTNAUER）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "YALE CLUB 懐中時計",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（YALE CLUB 懐中時計）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "yukiko kimijima",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（yukiko kimijima）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ZANNETTI",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ZANNETTI）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ZEPPELIN",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ZEPPELIN）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "アトム",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（アトム）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ドイツ掛時計",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ドイツ掛時計）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "バンド",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（バンド）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "ハンドメイド時計",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（ハンドメイド時計）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "フランク三浦",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（フランク三浦）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "懐中時計",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（懐中時計）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  },
+  {
+    "brandName": "無印",
+    "brandNameKanaCandidate": "",
+    "displayNameCandidate": "未確認（無印）",
+    "confidence": "unknown",
+    "sourceCount": 1,
+    "needsReview": true,
+    "note": "読み方要確認"
+  }
+]

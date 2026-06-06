@@ -1,0 +1,1074 @@
+[
+  {
+    "tempPublicCaseKey": "FMP:12022",
+    "sourceType": "FMP",
+    "sourceRepairId": "12022",
+    "repairId": null,
+    "receivedDate": "2019-10-06T00:00:00.000Z",
+    "brandName": "CASIO",
+    "brandNameKana": "カシオ",
+    "brandDisplayName": "カシオ（CASIO）",
+    "modelName": "BabyG",
+    "searchText": "CASIO casio カシオ カシオ（CASIO） BabyG 電池交換",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "カシオ（CASIO） 修理事例",
+    "b2cTitle": "カシオ（CASIO） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "カシオ（CASIO）",
+      "CASIO",
+      "カシオ",
+      "BabyG"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "warnings": [],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12022",
+      "sourceBrandName": "CASIO",
+      "receivedDate": "2019/10/06",
+      "brandName": "CASIO",
+      "brandNameKana": "カシオ",
+      "brandDisplayName": "カシオ（CASIO）",
+      "modelName": "BabyG",
+      "searchText": "CASIO casio カシオ カシオ（CASIO） BabyG 電池交換",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12023",
+    "sourceType": "FMP",
+    "sourceRepairId": "12023",
+    "repairId": null,
+    "receivedDate": "2019-09-19T00:00:00.000Z",
+    "brandName": "SEIKO",
+    "brandNameKana": "セイコー",
+    "brandDisplayName": "セイコー（SEIKO）",
+    "ref": "1400-5050",
+    "searchText": "SEIKO seiko セイコー セイコー（SEIKO） 1400-5050 オーバーホール 回路",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "セイコー（SEIKO） 修理事例",
+    "b2cTitle": "セイコー（SEIKO） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "セイコー（SEIKO）",
+      "SEIKO",
+      "セイコー",
+      "1400-5050"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 5000,
+    "partsTotal": 3000,
+    "totalAmount": 8000,
+    "warnings": [],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12023",
+      "sourceBrandName": "SEIKO",
+      "receivedDate": "2019/09/19",
+      "brandName": "SEIKO",
+      "brandNameKana": "セイコー",
+      "brandDisplayName": "セイコー（SEIKO）",
+      "ref": "1400-5050",
+      "searchText": "SEIKO seiko セイコー セイコー（SEIKO） 1400-5050 オーバーホール 回路",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12024",
+    "sourceType": "FMP",
+    "sourceRepairId": "12024",
+    "repairId": null,
+    "receivedDate": "2019-09-19T00:00:00.000Z",
+    "brandName": "ALBA",
+    "brandNameKana": "アルバ",
+    "brandDisplayName": "アルバ（ALBA）",
+    "ref": "Y136-6C20",
+    "caliber": "Ｙ１３６",
+    "searchText": "ALBA alba アルバ アルバ（ALBA） Y136-6C20 Ｙ１３６ ムーブメント交換技術料 ムーブメント交換",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "アルバ（ALBA） 修理事例",
+    "b2cTitle": "アルバ（ALBA） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "アルバ（ALBA）",
+      "ALBA",
+      "アルバ",
+      "Y136-6C20",
+      "Ｙ１３６"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 3500,
+    "totalAmount": 3500,
+    "warnings": [],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12024",
+      "sourceBrandName": "ALBA",
+      "receivedDate": "2019/09/19",
+      "brandName": "ALBA",
+      "brandNameKana": "アルバ",
+      "brandDisplayName": "アルバ（ALBA）",
+      "ref": "Y136-6C20",
+      "caliber": "Ｙ１３６",
+      "searchText": "ALBA alba アルバ アルバ（ALBA） Y136-6C20 Ｙ１３６ ムーブメント交換技術料 ムーブメント交換",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12027",
+    "sourceType": "FMP",
+    "sourceRepairId": "12027",
+    "repairId": null,
+    "receivedDate": "2019-10-07T00:00:00.000Z",
+    "brandName": "DOLCE GEAR",
+    "brandNameKana": null,
+    "brandDisplayName": "DOLCE GEAR",
+    "ref": "DG2501",
+    "searchText": "DOLCE GEAR dolce gear DG2501 電池交換",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "DOLCE GEAR 修理事例",
+    "b2cTitle": "DOLCE GEAR 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "DOLCE GEAR",
+      "DOLCE GEAR",
+      "DG2501"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 500,
+    "totalAmount": 500,
+    "warnings": [],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12027",
+      "sourceBrandName": "DOLCE GEAR",
+      "receivedDate": "2019/10/07",
+      "brandName": "DOLCE GEAR",
+      "brandNameKana": null,
+      "brandDisplayName": "DOLCE GEAR",
+      "ref": "DG2501",
+      "searchText": "DOLCE GEAR dolce gear DG2501 電池交換",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12029",
+    "sourceType": "FMP",
+    "sourceRepairId": "12029",
+    "repairId": null,
+    "receivedDate": "2019-09-24T00:00:00.000Z",
+    "brandName": "ROLEX",
+    "brandNameKana": "ロレックス",
+    "brandDisplayName": "ロレックス（ROLEX）",
+    "modelName": "サブマリーナ",
+    "ref": "16610",
+    "caliber": "3135",
+    "searchText": "ROLEX rolex ロレックス ロレックス（ROLEX） サブマリーナ 16610 3135 動作修理 ベゼルバネ ベゼルクリックバネ",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ロレックス（ROLEX） 修理事例",
+    "b2cTitle": "ロレックス（ROLEX） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "ロレックス（ROLEX）",
+      "ROLEX",
+      "ロレックス",
+      "サブマリーナ",
+      "16610",
+      "3135"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 7500,
+    "externalLaborTotal": 3000,
+    "partsTotal": 4000,
+    "totalAmount": 14500,
+    "warnings": [
+      "part_without_publishable_work:external-1",
+      "part_without_publishable_work:external-2"
+    ],
+    "excludeReasons": [
+      "external_rule_unmatched_or_unreviewed"
+    ],
+    "sourceSnapshot": {
+      "sourceRepairId": "12029",
+      "sourceBrandName": "ROLEX",
+      "receivedDate": "2019/09/24",
+      "brandName": "ROLEX",
+      "brandNameKana": "ロレックス",
+      "brandDisplayName": "ロレックス（ROLEX）",
+      "modelName": "サブマリーナ",
+      "ref": "16610",
+      "caliber": "3135",
+      "searchText": "ROLEX rolex ロレックス ロレックス（ROLEX） サブマリーナ 16610 3135 動作修理 ベゼルバネ ベゼルクリックバネ",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12031",
+    "sourceType": "FMP",
+    "sourceRepairId": "12031",
+    "repairId": null,
+    "receivedDate": "2019-10-07T00:00:00.000Z",
+    "brandName": "GAGAMILANO",
+    "brandNameKana": "ガガミラノ",
+    "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+    "ref": "5020",
+    "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） 5020 針取付（3H） 針取付",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2cTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": false,
+      "hasPublishableExternalWork": true
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": false,
+      "hasPublishableExternalWork": true
+    },
+    "publicTags": [
+      "ガガミラノ（GAGAMILANO）",
+      "GAGAMILANO",
+      "ガガミラノ",
+      "5020"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "externalLaborTotal": 1000,
+    "totalAmount": 1000,
+    "warnings": [
+      "reading_kana_removed:external-1"
+    ],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12031",
+      "sourceBrandName": "GAGAMILANO",
+      "receivedDate": "2019/10/07",
+      "brandName": "GAGAMILANO",
+      "brandNameKana": "ガガミラノ",
+      "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+      "ref": "5020",
+      "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） 5020 針取付（3H） 針取付",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12032",
+    "sourceType": "FMP",
+    "sourceRepairId": "12032",
+    "repairId": null,
+    "receivedDate": "2019-10-07T00:00:00.000Z",
+    "brandName": "GAGAMILANO",
+    "brandNameKana": "ガガミラノ",
+    "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+    "ref": "5081-5",
+    "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） 5081-5 ガラス交換技術料 ガラス交換 ガラス",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2cTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": false,
+      "hasPublishableExternalWork": true
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": false,
+      "hasPublishableExternalWork": true
+    },
+    "publicTags": [
+      "ガガミラノ（GAGAMILANO）",
+      "GAGAMILANO",
+      "ガガミラノ",
+      "5081-5"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "externalLaborTotal": 2000,
+    "partsTotal": 1500,
+    "totalAmount": 3500,
+    "warnings": [
+      "reading_kana_removed:external-1",
+      "placeholder_resolved_with_part:external-1"
+    ],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12032",
+      "sourceBrandName": "GAGAMILANO",
+      "receivedDate": "2019/10/07",
+      "brandName": "GAGAMILANO",
+      "brandNameKana": "ガガミラノ",
+      "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+      "ref": "5081-5",
+      "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） 5081-5 ガラス交換技術料 ガラス交換 ガラス",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12037",
+    "sourceType": "FMP",
+    "sourceRepairId": "12037",
+    "repairId": null,
+    "receivedDate": "2019-10-07T00:00:00.000Z",
+    "brandName": "GAGAMILANO",
+    "brandNameKana": "ガガミラノ",
+    "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+    "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） オーバーホール 例インデックス取付（3H） 例インデックス取付 ガラス",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2cTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": true
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": true
+    },
+    "publicTags": [
+      "ガガミラノ（GAGAMILANO）",
+      "GAGAMILANO",
+      "ガガミラノ"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 12000,
+    "externalLaborTotal": 0,
+    "partsTotal": 2000,
+    "totalAmount": 14000,
+    "warnings": [
+      "reading_kana_removed:external-1"
+    ],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12037",
+      "sourceBrandName": "GAGAMILANO",
+      "receivedDate": "2019/10/07",
+      "brandName": "GAGAMILANO",
+      "brandNameKana": "ガガミラノ",
+      "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+      "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） オーバーホール 例インデックス取付（3H） 例インデックス取付 ガラス",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12038",
+    "sourceType": "FMP",
+    "sourceRepairId": "12038",
+    "repairId": null,
+    "receivedDate": "2019-10-07T00:00:00.000Z",
+    "brandName": "GAGAMILANO",
+    "brandNameKana": "ガガミラノ",
+    "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+    "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） ガラス交換技術料 ガラス交換 ガラス",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2cTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": false,
+      "hasPublishableExternalWork": true
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": false,
+      "hasPublishableExternalWork": true
+    },
+    "publicTags": [
+      "ガガミラノ（GAGAMILANO）",
+      "GAGAMILANO",
+      "ガガミラノ"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "externalLaborTotal": 1500,
+    "partsTotal": 2000,
+    "totalAmount": 3500,
+    "warnings": [
+      "reading_kana_removed:external-1",
+      "placeholder_resolved_with_part:external-1"
+    ],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12038",
+      "sourceBrandName": "GAGAMILANO",
+      "receivedDate": "2019/10/07",
+      "brandName": "GAGAMILANO",
+      "brandNameKana": "ガガミラノ",
+      "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+      "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） ガラス交換技術料 ガラス交換 ガラス",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12039",
+    "sourceType": "FMP",
+    "sourceRepairId": "12039",
+    "repairId": null,
+    "receivedDate": "2019-10-07T00:00:00.000Z",
+    "brandName": "GAGAMILANO",
+    "brandNameKana": "ガガミラノ",
+    "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+    "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） ガラス交換技術料 ガラス交換 ガラス",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2cTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": false,
+      "hasPublishableExternalWork": true
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": false,
+      "hasPublishableExternalWork": true
+    },
+    "publicTags": [
+      "ガガミラノ（GAGAMILANO）",
+      "GAGAMILANO",
+      "ガガミラノ"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "externalLaborTotal": 2500,
+    "partsTotal": 2500,
+    "totalAmount": 5000,
+    "warnings": [
+      "reading_kana_removed:external-1",
+      "placeholder_resolved_with_part:external-1"
+    ],
+    "excludeReasons": [
+      "external_rule_unmatched_or_unreviewed"
+    ],
+    "sourceSnapshot": {
+      "sourceRepairId": "12039",
+      "sourceBrandName": "GAGAMILANO",
+      "receivedDate": "2019/10/07",
+      "brandName": "GAGAMILANO",
+      "brandNameKana": "ガガミラノ",
+      "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+      "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） ガラス交換技術料 ガラス交換 ガラス",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12041",
+    "sourceType": "FMP",
+    "sourceRepairId": "12041",
+    "repairId": null,
+    "receivedDate": "2019-10-07T00:00:00.000Z",
+    "brandName": "GAGAMILANO",
+    "brandNameKana": "ガガミラノ",
+    "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+    "caliber": "0S1A",
+    "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） 0S1A ムーブメント交換技術料 ムーブメント交換 針蓄光塗装 ムーブメント",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2cTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": true
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": true
+    },
+    "publicTags": [
+      "ガガミラノ（GAGAMILANO）",
+      "GAGAMILANO",
+      "ガガミラノ",
+      "0S1A"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 2000,
+    "externalLaborTotal": 6000,
+    "partsTotal": 3300,
+    "totalAmount": 11300,
+    "warnings": [
+      "reading_kana_removed:external-2"
+    ],
+    "excludeReasons": [
+      "external_rule_unmatched_or_unreviewed"
+    ],
+    "sourceSnapshot": {
+      "sourceRepairId": "12041",
+      "sourceBrandName": "GAGAMILANO",
+      "receivedDate": "2019/10/07",
+      "brandName": "GAGAMILANO",
+      "brandNameKana": "ガガミラノ",
+      "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+      "caliber": "0S1A",
+      "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） 0S1A ムーブメント交換技術料 ムーブメント交換 針蓄光塗装 ムーブメント",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12042",
+    "sourceType": "FMP",
+    "sourceRepairId": "12042",
+    "repairId": null,
+    "receivedDate": "2019-10-12T00:00:00.000Z",
+    "brandName": "HUBLOT",
+    "brandNameKana": "ウブロ",
+    "brandDisplayName": "ウブロ（HUBLOT）",
+    "caliber": "955.422",
+    "searchText": "HUBLOT hublot ウブロ ウブロ（HUBLOT） 955.422 オーバーホール",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ウブロ（HUBLOT） 修理事例",
+    "b2cTitle": "ウブロ（HUBLOT） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "ウブロ（HUBLOT）",
+      "HUBLOT",
+      "ウブロ",
+      "955.422"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 10000,
+    "totalAmount": 10000,
+    "warnings": [],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12042",
+      "sourceBrandName": "HUBLOT",
+      "receivedDate": "2019/10/12",
+      "brandName": "HUBLOT",
+      "brandNameKana": "ウブロ",
+      "brandDisplayName": "ウブロ（HUBLOT）",
+      "caliber": "955.422",
+      "searchText": "HUBLOT hublot ウブロ ウブロ（HUBLOT） 955.422 オーバーホール",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12043",
+    "sourceType": "FMP",
+    "sourceRepairId": "12043",
+    "repairId": null,
+    "receivedDate": "2019-10-19T00:00:00.000Z",
+    "brandName": "OMEGA",
+    "brandNameKana": "オメガ",
+    "brandDisplayName": "オメガ（OMEGA）",
+    "modelName": "シーマスター",
+    "ref": "196.1114",
+    "caliber": "1538",
+    "searchText": "OMEGA omega オメガ オメガ（OMEGA） シーマスター 196.1114 1538 オーバーホール",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "オメガ（OMEGA） 修理事例",
+    "b2cTitle": "オメガ（OMEGA） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "オメガ（OMEGA）",
+      "OMEGA",
+      "オメガ",
+      "シーマスター",
+      "196.1114",
+      "1538"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 8000,
+    "totalAmount": 8000,
+    "warnings": [],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12043",
+      "sourceBrandName": "OMEGA",
+      "receivedDate": "2019/10/19",
+      "brandName": "OMEGA",
+      "brandNameKana": "オメガ",
+      "brandDisplayName": "オメガ（OMEGA）",
+      "modelName": "シーマスター",
+      "ref": "196.1114",
+      "caliber": "1538",
+      "searchText": "OMEGA omega オメガ オメガ（OMEGA） シーマスター 196.1114 1538 オーバーホール",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12044",
+    "sourceType": "FMP",
+    "sourceRepairId": "12044",
+    "repairId": null,
+    "receivedDate": "2019-10-19T00:00:00.000Z",
+    "brandName": "GAGAMILANO",
+    "brandNameKana": "ガガミラノ",
+    "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+    "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） 針取付（8H） 針取付",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2cTitle": "ガガミラノ（GAGAMILANO） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": false,
+      "hasPublishableExternalWork": true
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": false,
+      "hasPublishableExternalWork": true
+    },
+    "publicTags": [
+      "ガガミラノ（GAGAMILANO）",
+      "GAGAMILANO",
+      "ガガミラノ"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "externalLaborTotal": 1000,
+    "totalAmount": 1000,
+    "warnings": [
+      "reading_kana_removed:external-2"
+    ],
+    "excludeReasons": [
+      "external_rule_unmatched_or_unreviewed"
+    ],
+    "sourceSnapshot": {
+      "sourceRepairId": "12044",
+      "sourceBrandName": "GAGAMILANO",
+      "receivedDate": "2019/10/19",
+      "brandName": "GAGAMILANO",
+      "brandNameKana": "ガガミラノ",
+      "brandDisplayName": "ガガミラノ（GAGAMILANO）",
+      "searchText": "GAGAMILANO gagamilano ガガミラノ ガガミラノ（GAGAMILANO） 針取付（8H） 針取付",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12045",
+    "sourceType": "FMP",
+    "sourceRepairId": "12045",
+    "repairId": null,
+    "receivedDate": "2019-10-19T00:00:00.000Z",
+    "brandName": "SEIKO",
+    "brandNameKana": "セイコー",
+    "brandDisplayName": "セイコー（SEIKO）",
+    "modelName": "パーペチュアルカレンダー",
+    "ref": "8F56-00D0",
+    "searchText": "SEIKO seiko セイコー セイコー（SEIKO） パーペチュアルカレンダー 8F56-00D0 オーバーホール 回路",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "セイコー（SEIKO） 修理事例",
+    "b2cTitle": "セイコー（SEIKO） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "セイコー（SEIKO）",
+      "SEIKO",
+      "セイコー",
+      "パーペチュアルカレンダー",
+      "8F56-00D0"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 6000,
+    "partsTotal": 4000,
+    "totalAmount": 10000,
+    "warnings": [],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12045",
+      "sourceBrandName": "SEIKO",
+      "receivedDate": "2019/10/19",
+      "brandName": "SEIKO",
+      "brandNameKana": "セイコー",
+      "brandDisplayName": "セイコー（SEIKO）",
+      "modelName": "パーペチュアルカレンダー",
+      "ref": "8F56-00D0",
+      "searchText": "SEIKO seiko セイコー セイコー（SEIKO） パーペチュアルカレンダー 8F56-00D0 オーバーホール 回路",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12047",
+    "sourceType": "FMP",
+    "sourceRepairId": "12047",
+    "repairId": null,
+    "receivedDate": "2019-09-29T00:00:00.000Z",
+    "brandName": "GUCCI",
+    "brandNameKana": "グッチ",
+    "brandDisplayName": "グッチ（GUCCI）",
+    "ref": "7400M",
+    "searchText": "GUCCI gucci グッチ グッチ（GUCCI） 7400M 電池交換",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "グッチ（GUCCI） 修理事例",
+    "b2cTitle": "グッチ（GUCCI） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "グッチ（GUCCI）",
+      "GUCCI",
+      "グッチ",
+      "7400M"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 500,
+    "totalAmount": 500,
+    "warnings": [],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12047",
+      "sourceBrandName": "GUCCI",
+      "receivedDate": "2019/09/29",
+      "brandName": "GUCCI",
+      "brandNameKana": "グッチ",
+      "brandDisplayName": "グッチ（GUCCI）",
+      "ref": "7400M",
+      "searchText": "GUCCI gucci グッチ グッチ（GUCCI） 7400M 電池交換",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12048",
+    "sourceType": "FMP",
+    "sourceRepairId": "12048",
+    "repairId": null,
+    "receivedDate": "2019-08-31T00:00:00.000Z",
+    "brandName": "OMEGA",
+    "brandNameKana": "オメガ",
+    "brandDisplayName": "オメガ（OMEGA）",
+    "modelName": "スピードマスター",
+    "ref": "3590.50　145.022",
+    "searchText": "OMEGA omega オメガ オメガ（OMEGA） スピードマスター 3590.50　145.022 動作修理 ゼンマイ",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "オメガ（OMEGA） 修理事例",
+    "b2cTitle": "オメガ（OMEGA） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "オメガ（OMEGA）",
+      "OMEGA",
+      "オメガ",
+      "スピードマスター",
+      "3590.50　145.022"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 10000,
+    "partsTotal": 3000,
+    "totalAmount": 13000,
+    "warnings": [],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12048",
+      "sourceBrandName": "OMEGA",
+      "receivedDate": "2019/08/31",
+      "brandName": "OMEGA",
+      "brandNameKana": "オメガ",
+      "brandDisplayName": "オメガ（OMEGA）",
+      "modelName": "スピードマスター",
+      "ref": "3590.50　145.022",
+      "searchText": "OMEGA omega オメガ オメガ（OMEGA） スピードマスター 3590.50　145.022 動作修理 ゼンマイ",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12050",
+    "sourceType": "FMP",
+    "sourceRepairId": "12050",
+    "repairId": null,
+    "receivedDate": "2019-10-02T00:00:00.000Z",
+    "brandName": "OMEGA",
+    "brandNameKana": "オメガ",
+    "brandDisplayName": "オメガ（OMEGA）",
+    "modelName": "コンステレーション",
+    "ref": "1502.30　368.1201",
+    "caliber": "1120",
+    "searchText": "OMEGA omega オメガ オメガ（OMEGA） コンステレーション 1502.30　368.1201 1120 動作修理 2番受け交換 3番車",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "オメガ（OMEGA） 修理事例",
+    "b2cTitle": "オメガ（OMEGA） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "オメガ（OMEGA）",
+      "OMEGA",
+      "オメガ",
+      "コンステレーション",
+      "1502.30　368.1201",
+      "1120"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 6000,
+    "partsTotal": 10000,
+    "totalAmount": 16000,
+    "warnings": [
+      "part_without_publishable_work:internal-2"
+    ],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12050",
+      "sourceBrandName": "OMEGA",
+      "receivedDate": "2019/10/02",
+      "brandName": "OMEGA",
+      "brandNameKana": "オメガ",
+      "brandDisplayName": "オメガ（OMEGA）",
+      "modelName": "コンステレーション",
+      "ref": "1502.30　368.1201",
+      "caliber": "1120",
+      "searchText": "OMEGA omega オメガ オメガ（OMEGA） コンステレーション 1502.30　368.1201 1120 動作修理 2番受け交換 3番車",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12051",
+    "sourceType": "FMP",
+    "sourceRepairId": "12051",
+    "repairId": null,
+    "receivedDate": "2019-09-21T00:00:00.000Z",
+    "brandName": "ROLEX",
+    "brandNameKana": "ロレックス",
+    "brandDisplayName": "ロレックス（ROLEX）",
+    "modelName": "エアキング",
+    "ref": "14000",
+    "searchText": "ROLEX rolex ロレックス ロレックス（ROLEX） エアキング 14000 動作修理 ゼンマイ 自動巻き受けねじ",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ロレックス（ROLEX） 修理事例",
+    "b2cTitle": "ロレックス（ROLEX） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "ロレックス（ROLEX）",
+      "ROLEX",
+      "ロレックス",
+      "エアキング",
+      "14000"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 7500,
+    "partsTotal": 7000,
+    "totalAmount": 14500,
+    "warnings": [
+      "part_without_publishable_work:internal-2"
+    ],
+    "excludeReasons": [],
+    "sourceSnapshot": {
+      "sourceRepairId": "12051",
+      "sourceBrandName": "ROLEX",
+      "receivedDate": "2019/09/21",
+      "brandName": "ROLEX",
+      "brandNameKana": "ロレックス",
+      "brandDisplayName": "ロレックス（ROLEX）",
+      "modelName": "エアキング",
+      "ref": "14000",
+      "searchText": "ROLEX rolex ロレックス ロレックス（ROLEX） エアキング 14000 動作修理 ゼンマイ 自動巻き受けねじ",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12052",
+    "sourceType": "FMP",
+    "sourceRepairId": "12052",
+    "repairId": null,
+    "receivedDate": "2019-10-20T00:00:00.000Z",
+    "brandName": "ROLEX",
+    "brandNameKana": "ロレックス",
+    "brandDisplayName": "ロレックス（ROLEX）",
+    "modelName": "デイトジャスト",
+    "ref": "16233",
+    "caliber": "3135",
+    "searchText": "ROLEX rolex ロレックス ロレックス（ROLEX） デイトジャスト 16233 3135 オーバーホール キチ車（社外品） 巻芯（社外品）",
+    "reviewStatus": "NEEDS_REVIEW",
+    "b2bPublishStatus": "HIDDEN",
+    "b2cPublishStatus": "HIDDEN",
+    "b2bTitle": "ロレックス（ROLEX） 修理事例",
+    "b2cTitle": "ロレックス（ROLEX） 修理事例",
+    "b2bSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "b2cSummary": {
+      "hasPublishableInternalWork": true,
+      "hasPublishableExternalWork": false
+    },
+    "publicTags": [
+      "ロレックス（ROLEX）",
+      "ROLEX",
+      "ロレックス",
+      "デイトジャスト",
+      "16233",
+      "3135"
+    ],
+    "showPriceB2b": true,
+    "showPriceB2c": false,
+    "internalLaborTotal": 27000,
+    "partsTotal": 6200,
+    "totalAmount": 33200,
+    "warnings": [
+      "part_without_publishable_work:internal-2"
+    ],
+    "excludeReasons": [
+      "internal_work_unreviewed"
+    ],
+    "sourceSnapshot": {
+      "sourceRepairId": "12052",
+      "sourceBrandName": "ROLEX",
+      "receivedDate": "2019/10/20",
+      "brandName": "ROLEX",
+      "brandNameKana": "ロレックス",
+      "brandDisplayName": "ロレックス（ROLEX）",
+      "modelName": "デイトジャスト",
+      "ref": "16233",
+      "caliber": "3135",
+      "searchText": "ROLEX rolex ロレックス ロレックス（ROLEX） デイトジャスト 16233 3135 オーバーホール キチ車（社外品） 巻芯（社外品）",
+      "isPublishCandidate": true,
+      "b2bCandidate": true,
+      "b2cCandidate": true
+    }
+  }
+]

@@ -1,0 +1,347 @@
+[
+  {
+    "sourceRepairId": "12321",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "ロレックス（ROLEX(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "12911",
+    "matchedFields": [
+      {
+        "field": "modelName",
+        "value": "(コピー）"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "13419",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "ロレックス（ROLEX(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "13438",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "PATEK  PHILIPPE（コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "PATEK  PHILIPPE（コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "PATEK  PHILIPPE（コピー）"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "14005",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "ロレックス（ROLEX(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "14136",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "CHANEL(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "CHANEL(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "シャネル（CHANEL(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "14137",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "CHANEL(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "CHANEL(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "シャネル（CHANEL(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "14360",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "OMEGA(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "OMEGA(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "OMEGA(コピー）"
+      },
+      {
+        "field": "modelName",
+        "value": "スピードマスター（コピー）"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15158",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "ロレックス（ROLEX(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15176",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "ロレックス（ROLEX(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15291",
+    "matchedFields": [
+      {
+        "field": "modelName",
+        "value": "コピー"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15330",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "ロレックス（ROLEX(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15566",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "ロレックス（ROLEX(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15640",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "OMEGA(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "OMEGA(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "OMEGA(コピー）"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15668",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "FRANCK MULLER(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "FRANCK MULLER(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "FRANCK MULLER(コピー）"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15764",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "ロレックス（ROLEX(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15877",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "ROLEX(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "ロレックス（ROLEX(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15913",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "HUBLOT(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "HUBLOT(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "HUBLOT(コピー）"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15914",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "BREITLING(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "BREITLING(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "ブライトリング（BREITLING(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "15916",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "CHANEL(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "CHANEL(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "シャネル（CHANEL(コピー））"
+      }
+    ]
+  },
+  {
+    "sourceRepairId": "16113",
+    "matchedFields": [
+      {
+        "field": "sourceBrandName",
+        "value": "CHANEL(コピー）"
+      },
+      {
+        "field": "brandName",
+        "value": "CHANEL(コピー）"
+      },
+      {
+        "field": "brandDisplayName",
+        "value": "シャネル（CHANEL(コピー））"
+      }
+    ]
+  }
+]

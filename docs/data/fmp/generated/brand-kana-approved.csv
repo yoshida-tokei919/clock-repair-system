@@ -1,0 +1,306 @@
+﻿sourceBrandName,approvedBrandName,approvedBrandNameKana,approvedDisplayName,hasKana,sourceCount,reviewStatus,note
+ROLEX,ROLEX,ロレックス,ロレックス（ROLEX）,true,435,pending,一般的な日本語表記 / 表記ゆれ疑い: ROLEX(コピー） / 表記ゆれ確認
+SEIKO,SEIKO,セイコー,セイコー（SEIKO）,true,328,pending,一般的な日本語表記 / 表記ゆれ疑い: SEIKO 懐中時計 / SEIKO 掛時計 / 表記ゆれ確認
+Tag Heuer,Tag Heuer,タグ・ホイヤー,タグ・ホイヤー（Tag Heuer）,true,119,pending,一般的な日本語表記 / 表記ゆれ疑い: tag Heuer / 表記ゆれ確認
+CITIZEN,CITIZEN,シチズン,シチズン（CITIZEN）,true,68,pending,一般的な日本語表記 / 表記ゆれ疑い: CITIZEN 置時計 / 表記ゆれ確認
+CHANEL,CHANEL,シャネル,シャネル（CHANEL）,true,46,pending,一般的な日本語表記 / 表記ゆれ疑い: CHANEL(コピー） / 表記ゆれ確認
+BREITLING,BREITLING,ブライトリング,ブライトリング（BREITLING）,true,40,pending,一般的な日本語表記 / 表記ゆれ疑い: BREITLING(コピー） / 表記ゆれ確認
+HUBLOT,HUBLOT,ウブロ,ウブロ（HUBLOT）,true,17,pending,一般的な日本語表記 / 表記ゆれ疑い: HUBLOTタイプ / 表記ゆれ確認
+PATEK  PHILIPPE,PATEK  PHILIPPE,パテック・フィリップ,パテック・フィリップ（PATEK  PHILIPPE）,true,11,pending,一般的な日本語表記 / スペース違い疑い / 表記ゆれ確認
+LOUIS VUITON,LOUIS VUITON,ルイ・ヴィトン,ルイ・ヴィトン（LOUIS VUITON）,true,10,pending,スペルミス疑い: LOUIS VUITTON
+JAEGER  LECOULTRE,JAEGER  LECOULTRE,ジャガー・ルクルト,ジャガー・ルクルト（JAEGER  LECOULTRE）,true,9,pending,一般的な日本語表記 / スペース違い疑い / 表記ゆれ確認
+agnis b,agnis b,アニエスベー,アニエスベー（agnis b）,true,7,pending,スペル揺れ/スペルミス疑い: agnes b / 表記ゆれ疑い: agnis b 懐中時計 / 表記ゆれ確認
+BULOVA,BULOVA,ブローバ,ブローバ（BULOVA）,true,7,pending,読み方要確認 / suggestedKana補完
+CHARRIOL,CHARRIOL,シャリオール,シャリオール（CHARRIOL）,true,7,pending,一般的な日本語表記候補。確認推奨
+CORUM,CORUM,コルム,コルム（CORUM）,true,7,pending,読み方要確認 / suggestedKana補完
+LOCMAN,LOCMAN,ロックマン,ロックマン（LOCMAN）,true,7,pending,読み方要確認 / 読み方確認推奨 / suggestedKana補完
+MARC JACOBS,MARC JACOBS,マーク・ジェイコブス,マーク・ジェイコブス（MARC JACOBS）,true,7,pending,読み方要確認 / suggestedKana補完
+Rosemont,Rosemont,ロゼモン,ロゼモン（Rosemont）,true,7,pending,読み方要確認 / suggestedKana補完
+BREGUET,BREGUET,ブレゲ,ブレゲ（BREGUET）,true,6,pending,読み方要確認 / suggestedKana補完
+GRAHAM,GRAHAM,グラハム,グラハム（GRAHAM）,true,6,pending,読み方要確認 / suggestedKana補完
+JUNGHANS,JUNGHANS,ユンハンス,ユンハンス（JUNGHANS）,true,6,pending,読み方要確認 / suggestedKana補完
+marie claire,marie claire,マリ・クレール,マリ・クレール（marie claire）,true,6,pending,読み方要確認 / suggestedKana補完
+mila schon,mila schon,ミラ・ショーン,ミラ・ショーン（mila schon）,true,6,pending,読み方要確認 / suggestedKana補完
+ORIENT,ORIENT,オリエント,オリエント（ORIENT）,true,6,pending,読み方要確認 / suggestedKana補完
+PAUL SMITH,PAUL SMITH,ポール・スミス,ポール・スミス（PAUL SMITH）,true,6,pending,読み方要確認 / suggestedKana補完
+PIAGET,PIAGET,ピアジェ,ピアジェ（PIAGET）,true,6,pending,読み方要確認 / suggestedKana補完
+christian dior,christian dior,クリスチャン・ディオール,クリスチャン・ディオール（christian dior）,true,5,pending,読み方要確認 / suggestedKana補完
+CYMA,CYMA,シーマ,シーマ（CYMA）,true,5,pending,読み方要確認 / suggestedKana補完
+DW,DW,ダニエル・ウェリントン,ダニエル・ウェリントン（DW）,true,5,pending,読み方要確認 / 略称の可能性。確認推奨 / suggestedKana補完
+ebel,ebel,エベル,エベル（ebel）,true,5,pending,読み方要確認 / suggestedKana補完
+G-SHOCK,G-SHOCK,ジーショック,ジーショック（G-SHOCK）,true,5,pending,読み方要確認 / 表記ゆれ疑い: GーSHOCK / suggestedKana補完 / 表記ゆれ確認
+JUVENIA,JUVENIA,ジュベニア,ジュベニア（JUVENIA）,true,5,pending,読み方要確認 / suggestedKana補完
+MOVADO,MOVADO,モバード,モバード（MOVADO）,true,5,pending,読み方要確認 / suggestedKana補完
+RAYMOND WEIL,RAYMOND WEIL,レイモンド・ウェイル,レイモンド・ウェイル（RAYMOND WEIL）,true,5,pending,読み方要確認 / suggestedKana補完
+TECHNOS,TECHNOS,テクノス,テクノス（TECHNOS）,true,5,pending,読み方要確認 / suggestedKana補完
+UNIVERSAL,UNIVERSAL,ユニバーサル,ユニバーサル（UNIVERSAL）,true,5,pending,読み方要確認 / ブランド特定確認推奨 / suggestedKana補完
+BUCHERER,BUCHERER,ブッフェラー,ブッフェラー（BUCHERER）,true,4,pending,読み方要確認
+Calvin Klein,Calvin Klein,カルバン・クライン,カルバン・クライン（Calvin Klein）,true,4,pending,読み方要確認 / suggestedKana補完
+COACH,COACH,コーチ,コーチ（COACH）,true,4,pending,読み方要確認 / suggestedKana補完
+DIESEL,DIESEL,ディーゼル,ディーゼル（DIESEL）,true,4,pending,読み方要確認 / suggestedKana補完
+dunhill,dunhill,ダンヒル,ダンヒル（dunhill）,true,4,pending,読み方要確認 / suggestedKana補完
+FOSSIL,FOSSIL,フォッシル,フォッシル（FOSSIL）,true,4,pending,読み方要確認 / suggestedKana補完
+Frederique Constant,Frederique Constant,フレデリック・コンスタント,フレデリック・コンスタント（Frederique Constant）,true,4,pending,読み方要確認 / suggestedKana補完
+GーSHOCK,GーSHOCK,ジーショック,ジーショック（GーSHOCK）,true,4,pending,読み方要確認 / 表記ゆれ疑い: G-SHOCK / suggestedKana補完 / 表記ゆれ確認
+GIRARD PERREGAUX,GIRARD PERREGAUX,ジラール・ペルゴ,ジラール・ペルゴ（GIRARD PERREGAUX）,true,4,pending,読み方要確認 / suggestedKana補完
+Heuer,Heuer,ホイヤー,ホイヤー（Heuer）,true,4,pending,読み方要確認 / suggestedKana補完
+JACOB ＆ CO,JACOB ＆ CO,ジェイコブ,ジェイコブ（JACOB ＆ CO）,true,4,pending,読み方要確認 / suggestedKana補完
+LUMINOX,LUMINOX,ルミノックス,ルミノックス（LUMINOX）,true,4,pending,読み方要確認 / suggestedKana補完
+NIKE,NIKE,ナイキ,ナイキ（NIKE）,true,4,pending,読み方要確認 / suggestedKana補完
+ROLEX(コピー）,ROLEX(コピー）,ロレックス,ロレックス（ROLEX(コピー））,true,4,pending,一般的な日本語表記 / 表記ゆれ疑い: ROLEX / 表記ゆれ確認 / ブランド名ではない可能性 / 掲載対象外: コピー表記
+TIFFANY&CO,TIFFANY&CO,ティファニー,ティファニー（TIFFANY&CO）,true,4,pending,読み方要確認 / suggestedKana補完
+CARLO FERRARA,CARLO FERRARA,カルロ・フェラーラ,カルロ・フェラーラ（CARLO FERRARA）,true,3,pending,読み方要確認 / suggestedKana補完
+CHANEL(コピー）,CHANEL(コピー）,シャネル,シャネル（CHANEL(コピー））,true,3,pending,一般的な日本語表記 / 表記ゆれ疑い: CHANEL / 表記ゆれ確認 / ブランド名ではない可能性 / 掲載対象外: コピー表記
+Charles Vogele,Charles Vogele,シャルルホーゲル,シャルルホーゲル（Charles Vogele）,true,3,pending,読み方要確認
+Disney,Disney,ディズニー,ディズニー（Disney）,true,3,pending,読み方要確認 / suggestedKana補完
+ETERNA,ETERNA,エテルナ,エテルナ（ETERNA）,true,3,pending,読み方要確認 / suggestedKana補完
+ice watch,ice watch,アイスウォッチ,アイスウォッチ（ice watch）,true,3,pending,読み方要確認 / suggestedKana補完
+MICHEL KLEIN,MICHEL KLEIN,ミッシェル・クラン,ミッシェル・クラン（MICHEL KLEIN）,true,3,pending,読み方要確認 / suggestedKana補完
+PORSCHE DESIGN,PORSCHE DESIGN,ポルシェデザイン,ポルシェデザイン（PORSCHE DESIGN）,true,3,pending,読み方要確認 / suggestedKana補完
+RICOH,RICOH,リコー,リコー（RICOH）,true,3,pending,読み方要確認 / suggestedKana補完
+SEIKO 懐中時計,SEIKO 懐中時計,セイコー,セイコー（SEIKO 懐中時計）,true,3,pending,一般的な日本語表記 / 表記ゆれ疑い: SEIKO / SEIKO 掛時計 / 表記ゆれ確認 / ブランド名ではない可能性
+TIMEX,TIMEX,タイメックス,タイメックス（TIMEX）,true,3,pending,読み方要確認 / suggestedKana補完
+VERSACE,VERSACE,ヴェルサーチ,ヴェルサーチ（VERSACE）,true,3,pending,読み方要確認 / suggestedKana補完
+ZENITH,ZENITH,ゼニス,ゼニス（ZENITH）,true,3,pending,読み方要確認 / suggestedKana補完
+AIGNER,AIGNER,アイグナー,アイグナー（AIGNER）,true,2,pending,読み方要確認 / suggestedKana補完
+Baccarat,Baccarat,バカラ,バカラ（Baccarat）,true,2,pending,読み方要確認
+BALLY,BALLY,バリー,バリー（BALLY）,true,2,pending,読み方要確認 / suggestedKana補完
+BAPEX,BAPEX,ベイペックス,ベイペックス（BAPEX）,true,2,pending,読み方要確認 / 読み方確認推奨 / suggestedKana補完
+BORBONESE,BORBONESE,ボルボネーゼ,ボルボネーゼ（BORBONESE）,true,2,pending,読み方要確認
+CHARLES JOURDAN,CHARLES JOURDAN,シャルル・ジョルダン,シャルル・ジョルダン（CHARLES JOURDAN）,true,2,pending,読み方要確認 / suggestedKana補完
+CURTIS&CO,CURTIS&CO,カーティス,カーティス（CURTIS&CO）,true,2,pending,読み方要確認 / suggestedKana補完
+DAKS,DAKS,ダックス,ダックス（DAKS）,true,2,pending,読み方要確認 / suggestedKana補完
+Folli Follie,Folli Follie,フォリフォリ,フォリフォリ（Folli Follie）,true,2,pending,読み方要確認 / suggestedKana補完
+Forever,Forever,フォーエバー,フォーエバー（Forever）,true,2,pending,読み方要確認
+Gianni Accardi,Gianni Accardi,ジャンニアッカルディ,ジャンニアッカルディ（Gianni Accardi）,true,2,pending,読み方要確認
+Gianni Versace,Gianni Versace,ジャンニ・ヴェルサーチ,ジャンニ・ヴェルサーチ（Gianni Versace）,true,2,pending,読み方要確認 / suggestedKana補完
+GRANDEUR,GRANDEUR,グランドール,グランドール（GRANDEUR）,true,2,pending,読み方要確認 / suggestedKana補完
+GUESS,GUESS,ゲス,ゲス（GUESS）,true,2,pending,読み方要確認 / suggestedKana補完
+Kentex,Kentex,ケンテックス,ケンテックス（Kentex）,true,2,pending,読み方要確認 / suggestedKana補完
+MAURICE LACROIX,MAURICE LACROIX,モーリス・ラクロア,モーリス・ラクロア（MAURICE LACROIX）,true,2,pending,読み方要確認 / suggestedKana補完
+MHR,MHR,マハラ,マハラ（MHR）,true,2,pending,読み方要確認
+MONDAINE,MONDAINE,モンディーン,モンディーン（MONDAINE）,true,2,pending,読み方要確認 / suggestedKana補完
+MONTBLANC,MONTBLANC,モンブラン,モンブラン（MONTBLANC）,true,2,pending,読み方要確認 / suggestedKana補完
+Obrey,Obrey,オブレイ,オブレイ（Obrey）,true,2,pending,読み方要確認 / 読み方確認推奨 / suggestedKana補完
+OHARA,OHARA,,OHARA,false,2,pending,読み方要確認
+Peace,Peace,ピース,ピース（Peace）,true,2,pending,読み方要確認
+PEQUIGNET,PEQUIGNET,ペキネ,ペキネ（PEQUIGNET）,true,2,pending,読み方要確認 / suggestedKana補完
+ROOTS,ROOTS,ルーツ,ルーツ（ROOTS）,true,2,pending,読み方要確認
+Roy King,Roy King,ロイキング,ロイキング（Roy King）,true,2,pending,読み方要確認
+SINN,SINN,ジン,ジン（SINN）,true,2,pending,読み方要確認 / suggestedKana補完
+TENSE,TENSE,テンス,テンス（TENSE）,true,2,pending,読み方要確認
+TRUSSARDI,TRUSSARDI,トラサルディ,トラサルディ（TRUSSARDI）,true,2,pending,読み方要確認 / suggestedKana補完
+ULYSSE NARDIN,ULYSSE NARDIN,ユリス・ナルダン,ユリス・ナルダン（ULYSSE NARDIN）,true,2,pending,読み方要確認 / suggestedKana補完
+VAN CLEEF＆ARPELS,VAN CLEEF＆ARPELS,ヴァン クリーフ＆アーペル,ヴァン クリーフ＆アーペル（VAN CLEEF＆ARPELS）,true,2,pending,読み方要確認 / suggestedKana補完
+Vendome Aoyama,Vendome Aoyama,,Vendome Aoyama,false,2,pending,読み方要確認
+WENGER,WENGER,ウェンガー,ウェンガー（WENGER）,true,2,pending,読み方要確認 / suggestedKana補完
+掛時計,掛時計,,掛時計,false,2,pending,読み方要確認 / ブランド名ではない可能性
+AB AETERNO,AB AETERNO,アバテルノ,アバテルノ（AB AETERNO）,true,1,pending,読み方要確認
+ABISTE,ABISTE,アビステ,アビステ（ABISTE）,true,1,pending,読み方要確認
+agnis b 懐中時計,agnis b 懐中時計,アニエスベー,アニエスベー（agnis b 懐中時計）,true,1,pending,スペル揺れ/スペルミス疑い: agnes b / 表記ゆれ疑い: agnis b / 表記ゆれ確認 / ブランド名ではない可能性
+AICHI,AICHI,,AICHI,false,1,pending,読み方要確認
+AIKOSHA,AIKOSHA,,AIKOSHA,false,1,pending,読み方要確認
+alain silberstein,alain silberstein,アラン・シルベスタイン,アラン・シルベスタイン（alain silberstein）,true,1,pending,読み方要確認 / 表記ゆれ疑い: ALAIN SILBERSTEIN / suggestedKana補完 / 表記ゆれ確認
+ALAIN SILBERSTEIN,ALAIN SILBERSTEIN,アラン・シルベスタイン,アラン・シルベスタイン（ALAIN SILBERSTEIN）,true,1,pending,読み方要確認 / 表記ゆれ疑い: alain silberstein / suggestedKana補完 / 表記ゆれ確認
+ALAX,ALAX,325,325（ALAX）,true,1,pending,読み方要確認
+ALESSI,ALESSI,アレッシィ,アレッシィ（ALESSI）,true,1,pending,読み方要確認
+ALETTE,ALETTE,アレットブラン,アレットブラン（ALETTE）,true,1,pending,読み方要確認
+ALETTE BLANC,ALETTE BLANC,アレットブラン,アレットブラン（ALETTE BLANC）,true,1,pending,読み方要確認
+ALLY DENOVO,ALLY DENOVO,アリーデノヴォ,アリーデノヴォ（ALLY DENOVO）,true,1,pending,読み方要確認
+Angel Heart,Angel Heart,エンジェルハート,エンジェルハート（Angel Heart）,true,1,pending,読み方要確認
+ANNE KLEIN,ANNE KLEIN,アンクライン,アンクライン（ANNE KLEIN）,true,1,pending,読み方要確認
+AQUANAUTIC,AQUANAUTIC,アクアノウティック,アクアノウティック（AQUANAUTIC）,true,1,pending,読み方要確認
+ASTRODEA,ASTRODEA,アストロデア,アストロデア（ASTRODEA）,true,1,pending,読み方要確認
+Auguste Reymond,Auguste Reymond,オーガスト・レイモンド,オーガスト・レイモンド（Auguste Reymond）,true,1,pending,読み方要確認
+AUREOLE,AUREOLE,オレオール,オレオール（AUREOLE）,true,1,pending,読み方要確認
+baby-G,baby-G,ベビージー,ベビージー（baby-G）,true,1,pending,読み方要確認
+BALL WATCH,BALL WATCH,ボールウォッチ,ボールウォッチ（BALL WATCH）,true,1,pending,読み方要確認 / suggestedKana補完
+Bando,Bando,,Bando,false,1,pending,読み方要確認
+BEDAT&Co,BEDAT&Co,ベダ&カンパニー,ベダ&カンパニー（BEDAT&Co）,true,1,pending,読み方要確認
+BELL＆ROSS,BELL＆ROSS,ベル&ロス,ベル&ロス（BELL＆ROSS）,true,1,pending,読み方要確認
+BENRUS,BENRUS,ベンラス,ベンラス（BENRUS）,true,1,pending,読み方要確認
+Bleu Bleuet,Bleu Bleuet,ブルーブルーエ,ブルーブルーエ（Bleu Bleuet）,true,1,pending,読み方要確認
+Blue Blue TOKYO,Blue Blue TOKYO,,Blue Blue TOKYO,false,1,pending,読み方要確認
+BMW,BMW,,BMW,false,1,pending,読み方要確認
+BOMBERG,BOMBERG,ボンバーグ,ボンバーグ（BOMBERG）,true,1,pending,読み方要確認
+bon bon watch,bon bon watch,ボンボンウォッチ,ボンボンウォッチ（bon bon watch）,true,1,pending,読み方要確認
+BOSS,BOSS,ボス,ボス（BOSS）,true,1,pending,読み方要確認
+BOUCHERON,BOUCHERON,ブシュロン,ブシュロン（BOUCHERON）,true,1,pending,読み方要確認
+BREITLING(コピー）,BREITLING(コピー）,ブライトリング,ブライトリング（BREITLING(コピー））,true,1,pending,一般的な日本語表記 / 表記ゆれ疑い: BREITLING / 表記ゆれ確認 / ブランド名ではない可能性 / 掲載対象外: コピー表記
+BRERA,BRERA,ブレラ,ブレラ（BRERA）,true,1,pending,読み方要確認
+BRIDGESTONE,BRIDGESTONE,ブリジストン,ブリジストン（BRIDGESTONE）,true,1,pending,読み方要確認
+BRILLAMICO,BRILLAMICO,ブリラミコ,ブリラミコ（BRILLAMICO）,true,1,pending,読み方要確認
+BUTI,BUTI,ブティ,ブティ（BUTI）,true,1,pending,読み方要確認
+CAPRI WATCH,CAPRI WATCH,カプリウォッチ,カプリウォッチ（CAPRI WATCH）,true,1,pending,読み方要確認
+Carl von Zeyten,Carl von Zeyten,カールフォンツォイテン,カールフォンツォイテン（Carl von Zeyten）,true,1,pending,読み方要確認
+CATREX,CATREX,カトレックス,カトレックス（CATREX）,true,1,pending,読み方要確認　誤CATREX　正CATOREXゴセイ
+CENTURY,CENTURY,センチュリー,センチュリー（CENTURY）,true,1,pending,読み方要確認
+CERTUS,CERTUS,,CERTUS,false,1,pending,読み方要確認
+CITIZEN 置時計,CITIZEN 置時計,シチズン,シチズン（CITIZEN 置時計）,true,1,pending,一般的な日本語表記 / 表記ゆれ疑い: CITIZEN / 表記ゆれ確認 / ブランド名ではない可能性
+CITRON,CITRON,,CITRON,false,1,pending,読み方要確認
+CK,CK,カルバンクライン,カルバンクライン（CK）,true,1,pending,読み方要確認
+CLUSE,CLUSE,クルース,クルース（CLUSE）,true,1,pending,読み方要確認
+courreges,courreges,クレージュ,クレージュ（courreges）,true,1,pending,読み方要確認
+CP5,CP5,シーピーファイブ,シーピーファイブ（CP5）,true,1,pending,読み方要確認
+CWC,CWC,シーダブルシー,シーダブルシー（CWC）,true,1,pending,読み方要確認
+D.JEANRICHARD,D.JEANRICHARD,ジャンリシャール,ジャンリシャール（D.JEANRICHARD）,true,1,pending,読み方要確認
+DC,DC,,DC,false,1,pending,読み方要確認
+DEKATHLON,DEKATHLON,デカトロン,デカトロン（DEKATHLON）,true,1,pending,読み方要確認
+DELMA,DELMA,デルマ,デルマ（DELMA）,true,1,pending,読み方要確認
+DOLCE GEAR,DOLCE GEAR,,DOLCE GEAR,false,1,pending,読み方要確認
+Dreamlight,Dreamlight,ドリームライト,ドリームライト（Dreamlight）,true,1,pending,読み方要確認
+EDOX,EDOX,エドックス,エドックス（EDOX）,true,1,pending,読み方要確認
+ELGIN,ELGIN,エルジン,エルジン（ELGIN）,true,1,pending,読み方要確認
+EMERICH MEERSON,EMERICH MEERSON,エルリック・メールソン,エルリック・メールソン（EMERICH MEERSON）,true,1,pending,読み方要確認
+ENICAR,ENICAR,エニカー,エニカー（ENICAR）,true,1,pending,読み方要確認
+Ferragamo,Ferragamo,フェラガモ,フェラガモ（Ferragamo）,true,1,pending,読み方要確認
+FORTIS,FORTIS,フォルティス,フォルティス（FORTIS）,true,1,pending,読み方要確認
+FREE MEN,FREE MEN,,FREE MEN,false,1,pending,読み方要確認
+FURLA,FURLA,フルラ,フルラ（FURLA）,true,1,pending,読み方要確認
+Future Club,Future Club,,Future Club,false,1,pending,読み方要確認
+GALLUCCI,GALLUCCI,ガルーチ,ガルーチ（GALLUCCI）,true,1,pending,読み方要確認
+GC,GC,ジーシー,ジーシー（GC）,true,1,pending,読み方要確認
+georg jensen,georg jensen,ジョージジェンセン,ジョージジェンセン（georg jensen）,true,1,pending,読み方要確認
+GERALD GENTA,GERALD GENTA,ジェラルド・ジェンタ,ジェラルド・ジェンタ（GERALD GENTA）,true,1,pending,読み方要確認
+givenchy,givenchy,ジバンシィ,ジバンシィ（givenchy）,true,1,pending,読み方要確認
+GLASHUTTE,GLASHUTTE,グラスヒュッテ,グラスヒュッテ（GLASHUTTE）,true,1,pending,読み方要確認
+H&Co,H&Co,,H&Co,false,1,pending,読み方要確認
+HIS MASTERS VOICE,HIS MASTERS VOICE,,HIS MASTERS VOICE,false,1,pending,読み方要確認
+HUBLOTタイプ,HUBLOTタイプ,,HUBLOTタイプ,false,1,pending,一般的な日本語表記 / 表記ゆれ疑い: HUBLOT / 表記ゆれ確認 / ブランド名ではない可能性
+HUNTING WORLD,HUNTING WORLD,ハンティング・ワールド,ハンティング・ワールド（HUNTING WORLD）,true,1,pending,読み方要確認
+INVICTA,INVICTA,インビクタ,インビクタ（INVICTA）,true,1,pending,読み方要確認
+J-AXIS,J-AXIS,,J-AXIS,false,1,pending,読み方要確認
+JACQUES LEMANS,JACQUES LEMANS,ジャックルマン,ジャックルマン（JACQUES LEMANS）,true,1,pending,読み方要確認
+JARDUR,JARDUR,ジャードゥー,ジャードゥー（JARDUR）,true,1,pending,読み方要確認
+JEMIS,JEMIS,,JEMIS,false,1,pending,読み方要確認
+JENNIFER LOPEZ,JENNIFER LOPEZ,,JENNIFER LOPEZ,false,1,pending,読み方要確認
+Johnny,Johnny,,Johnny,false,1,pending,読み方要確認
+jun ashida,jun ashida,ジュンアシダ,ジュンアシダ（jun ashida）,true,1,pending,読み方要確認
+JUNKERS,JUNKERS,ユンカース,ユンカース（JUNKERS）,true,1,pending,読み方要確認
+K.UNO,K.UNO,,K.UNO,false,1,pending,読み方要確認
+kate  spade,kate  spade,ケイト・スペード,ケイト・スペード（kate  spade）,true,1,pending,読み方要確認 / スペース違い疑い / 表記ゆれ確認
+KATHARINE HAMNETT,KATHARINE HAMNETT,キャサリンハムネット,キャサリンハムネット（KATHARINE HAMNETT）,true,1,pending,読み方要確認
+KCB,KCB,,KCB,false,1,pending,読み方要確認
+Kiina,Kiina,,Kiina,false,1,pending,読み方要確認
+KILA,KILA,,KILA,false,1,pending,読み方要確認
+Klaeuse,Klaeuse,クロイゼ,クロイゼ（Klaeuse）,true,1,pending,読み方要確認
+knot,knot,ノット,ノット（knot）,true,1,pending,読み方要確認
+KOVA,KOVA,,KOVA,false,1,pending,読み方要確認
+L.L.bean,L.L.bean,エルエルビーン,エルエルビーン（L.L.bean）,true,1,pending,読み方要確認
+LADITTE,LADITTE,レディット,レディット（LADITTE）,true,1,pending,読み方要確認
+lasserre,lasserre,,lasserre,false,1,pending,読み方要確認
+LOOGER,LOOGER,,LOOGER,false,1,pending,読み方要確認
+LORD KING,LORD KING,,LORD KING,false,1,pending,読み方要確認
+Lunage,Lunage,ルナージュ,ルナージュ（Lunage）,true,1,pending,読み方要確認
+MARES,MARES,,MARES,false,1,pending,読み方要確認
+margaret howell,margaret howell,マーガレット・ハウエル,マーガレット・ハウエル（margaret howell）,true,1,pending,読み方要確認
+Marina B,Marina B,マリナB,マリナB（Marina B）,true,1,pending,読み方要確認
+MARTIN BRAUN,MARTIN BRAUN,マーティン・ブラウン,マーティン・ブラウン（MARTIN BRAUN）,true,1,pending,読み方要確認
+MASERATI,MASERATI,マセラッティ,マセラッティ（MASERATI）,true,1,pending,読み方要確認
+MAURICE RENOMA,MAURICE RENOMA,モーリス・レノマ,モーリス・レノマ（MAURICE RENOMA）,true,1,pending,読み方要確認
+Mercedes Benz,Mercedes Benz,メルセデス・ベンツ,メルセデス・ベンツ（Mercedes Benz）,true,1,pending,読み方要確認
+METAL.CH,METAL.CH,メタル.CH,メタル.CH（METAL.CH）,true,1,pending,読み方要確認
+MICKEY MOUSE,MICKEY MOUSE,ミッキーマウス,ミッキーマウス（MICKEY MOUSE）,true,1,pending,読み方要確認
+MIKIMOTO,MIKIMOTO,ミキモト,ミキモト（MIKIMOTO）,true,1,pending,読み方要確認
+MILUS,MILUS,ミルス,ミルス（MILUS）,true,1,pending,読み方要確認
+MINI,MINI,ミニ,ミニ（MINI）,true,1,pending,読み方要確認
+Misaki,Misaki,,Misaki,false,1,pending,読み方要確認
+MISANI,MISANI,,MISANI,false,1,pending,読み方要確認
+MTY NETWORKS,MTY NETWORKS,,MTY NETWORKS,false,1,pending,読み方要確認
+Nibada,Nibada,,Nibada,false,1,pending,読み方要確認
+Nivada,Nivada,ニバダ,ニバダ（Nivada）,true,1,pending,読み方要確認
+NIXON,NIXON,ニクソン,ニクソン（NIXON）,true,1,pending,読み方要確認
+Ole Mathiesen,Ole Mathiesen,オーレ・マティーセン,オーレ・マティーセン（Ole Mathiesen）,true,1,pending,読み方要確認
+OWARITOKEI,OWARITOKEI,,OWARITOKEI,false,1,pending,読み方要確認
+PF,PF,,PF,false,1,pending,読み方要確認
+PHILIPPE SHARIOL,PHILIPPE SHARIOL,シャリオール,シャリオール（PHILIPPE SHARIOL）,true,1,pending,読み方要確認　誤PHILIPPE SHARIOL 正 PHILIPPE CHARRIOLゴセイ
+PHILIPPE VENET,PHILIPPE VENET,フィリップヴネ,フィリップヴネ（PHILIPPE VENET）,true,1,pending,読み方要確認
+pierre cardin,pierre cardin,ピエール・カルダン,ピエール・カルダン（pierre cardin）,true,1,pending,読み方要確認
+Pierre Lannier,Pierre Lannier,ピエールラニエ,ピエールラニエ（Pierre Lannier）,true,1,pending,読み方要確認
+PLAYBOY,PLAYBOY,,PLAYBOY,false,1,pending,読み方要確認
+POLICE,POLICE,ポリス,ポリス（POLICE）,true,1,pending,読み方要確認
+RALPH LAUREN,RALPH LAUREN,ラルフ・ローレン,ラルフ・ローレン（RALPH LAUREN）,true,1,pending,読み方要確認
+REVUE THOMMEN,REVUE THOMMEN,レビュートーメン,レビュートーメン（REVUE THOMMEN）,true,1,pending,読み方要確認
+Ritmo Latino,Ritmo Latino,リトモラティーノ,リトモラティーノ（Ritmo Latino）,true,1,pending,読み方要確認
+RODANIA,RODANIA,ロダニア,ロダニア（RODANIA）,true,1,pending,読み方要確認
+ROMAGO,ROMAGO,ロマゴ,ロマゴ（ROMAGO）,true,1,pending,読み方要確認
+ROYAL MONTRESS,ROYAL MONTRESS,ロイヤルモントレス,ロイヤルモントレス（ROYAL MONTRESS）,true,1,pending,読み方要確認　誤　ROYAL MONTRESS  正 ROYAL MONTRESゴセイ
+ROYAL NATURE,ROYAL NATURE,,ROYAL NATURE,false,1,pending,読み方要確認
+ROYAL TSCA,ROYAL TSCA,,ROYAL TSCA,false,1,pending,読み方要確認
+RSW,RSW,アールエスダブリュ,アールエスダブリュ（RSW）,true,1,pending,読み方要確認
+SAMOA,SAMOA,サモア,サモア（SAMOA）,true,1,pending,読み方要確認
+SATO,SATO,,SATO,false,1,pending,読み方要確認
+sazare,sazare,サザレ,サザレ（sazare）,true,1,pending,読み方要確認
+SECTOR,SECTOR,セクター,セクター（SECTOR）,true,1,pending,読み方要確認
+SEIKO 掛時計,SEIKO 掛時計,セイコー,セイコー（SEIKO 掛時計）,true,1,pending,一般的な日本語表記 / 表記ゆれ疑い: SEIKO / SEIKO 懐中時計 / 表記ゆれ確認 / ブランド名ではない可能性
+Shinnnyo,Shinnnyo,,Shinnnyo,false,1,pending,読み方要確認
+Shinnyo,Shinnyo,,Shinnyo,false,1,pending,読み方要確認
+SONIA RYKEL,SONIA RYKEL,ソニア・リキエル,ソニア・リキエル（SONIA RYKEL）,true,1,pending,読み方要確認
+SONNE HAORI PRODUDED,SONNE HAORI PRODUDED,ゾンネ,ゾンネ（SONNE HAORI PRODUDED）,true,1,pending,読み方要確認
+SORNA,SORNA,,SORNA,false,1,pending,読み方要確認
+Sturmanskie,Sturmanskie,シュトゥルマンスキー,シュトゥルマンスキー（Sturmanskie）,true,1,pending,読み方要確認
+SWAROVSKI,SWAROVSKI,スワロフスキー,スワロフスキー（SWAROVSKI）,true,1,pending,読み方要確認
+swatch,swatch,スウォッチ,スウォッチ（swatch）,true,1,pending,読み方要確認
+SWISS ARMY,SWISS ARMY,スイスアーミー,スイスアーミー（SWISS ARMY）,true,1,pending,読み方要確認
+SWISS HAWAIIAN,SWISS HAWAIIAN,,SWISS HAWAIIAN,false,1,pending,読み方要確認
+SWISS MILITARY,SWISS MILITARY,スイスミリタリー,スイスミリタリー（SWISS MILITARY）,true,1,pending,読み方要確認
+SWIZA,SWIZA,スウィザ,スウィザ（SWIZA）,true,1,pending,読み方要確認
+tag Heuer,tag Heuer,タグ・ホイヤー,タグ・ホイヤー（tag Heuer）,true,1,pending,一般的な日本語表記 / 表記ゆれ疑い: Tag Heuer / 表記ゆれ確認
+Tendence,Tendence,,Tendence,false,1,pending,読み方要確認
+TENSHOUDO,TENSHOUDO,,TENSHOUDO,false,1,pending,読み方要確認　天賞堂
+THE GINZA,THE GINZA,ザ・ギンザ,ザ・ギンザ（THE GINZA）,true,1,pending,読み方要確認
+TIDE WAY,TIDE WAY,タイドウェイ,タイドウェイ（TIDE WAY）,true,1,pending,読み方要確認
+TIME WILL TELL,TIME WILL TELL,タイムウィルテル,タイムウィルテル（TIME WILL TELL）,true,1,pending,読み方要確認
+town&country,town&country,タウン&カントリー,タウン&カントリー（town&country）,true,1,pending,読み方要確認
+TRUSTY,TRUSTY,トラスティ,トラスティ（TRUSTY）,true,1,pending,読み方要確認
+TUSENO,TUSENO,トゥセノー,トゥセノー（TUSENO）,true,1,pending,読み方要確認
+U.S.POLO,U.S.POLO,ユーエスポロ,ユーエスポロ（U.S.POLO）,true,1,pending,読み方要確認
+UNDONE,UNDONE,アンダーン,アンダーン（UNDONE）,true,1,pending,読み方要確認
+ungaro,ungaro,ウンガロ,ウンガロ（ungaro）,true,1,pending,読み方要確認
+UNITED SERVICE,UNITED SERVICE,,UNITED SERVICE,false,1,pending,読み方要確認
+URBAN,URBAN,,URBAN,false,1,pending,読み方要確認
+Valentino Rudy,Valentino Rudy,ヴァレンティノ・ルディー,ヴァレンティノ・ルディー（Valentino Rudy）,true,1,pending,読み方要確認
+VICTORINOX,VICTORINOX,ビクトリノックス,ビクトリノックス（VICTORINOX）,true,1,pending,読み方要確認
+VIVAYOU,VIVAYOU,ビバユー,ビバユー（VIVAYOU）,true,1,pending,読み方要確認
+WEMPE,WEMPE,ヴェンペ,ヴェンペ（WEMPE）,true,1,pending,読み方要確認
+WIRED,WIRED,ワイアード,ワイアード（WIRED）,true,1,pending,読み方要確認
+WITTNAUER,WITTNAUER,ウィットナー,ウィットナー（WITTNAUER）,true,1,pending,読み方要確認
+YALE CLUB 懐中時計,YALE CLUB 懐中時計,,YALE CLUB 懐中時計,false,1,pending,読み方要確認 / ブランド名ではない可能性
+yukiko kimijima,yukiko kimijima,,yukiko kimijima,false,1,pending,読み方要確認
+ZANNETTI,ZANNETTI,ザネッティ,ザネッティ（ZANNETTI）,true,1,pending,読み方要確認
+ZEPPELIN,ZEPPELIN,ツェッペリン,ツェッペリン（ZEPPELIN）,true,1,pending,読み方要確認
+アトム,アトム,,アトム,false,1,pending,読み方要確認
+ドイツ掛時計,ドイツ掛時計,,ドイツ掛時計,false,1,pending,読み方要確認 / ブランド名ではない可能性
+バンド,バンド,,バンド,false,1,pending,読み方要確認
+ハンドメイド時計,ハンドメイド時計,,ハンドメイド時計,false,1,pending,読み方要確認
+フランク三浦,フランク三浦,,フランク三浦,false,1,pending,読み方要確認
+懐中時計,懐中時計,,懐中時計,false,1,pending,読み方要確認 / ブランド名ではない可能性
+無印,無印,,無印,false,1,pending,読み方要確認
+OMEGA,OMEGA,オメガ,オメガ（OMEGA）,true,418,pending,一般的な日本語表記
+GAGAMILANO,GAGAMILANO,ガガミラノ,ガガミラノ（GAGAMILANO）,true,176,pending,一般的な日本語表記
+CARTIER,CARTIER,カルティエ,カルティエ（CARTIER）,true,116,pending,一般的な日本語表記
+GUCCI,GUCCI,グッチ,グッチ（GUCCI）,true,74,pending,一般的な日本語表記
+BVLGARI,BVLGARI,ブルガリ,ブルガリ（BVLGARI）,true,70,pending,一般的な日本語表記
+LONGINES,LONGINES,ロンジン,ロンジン（LONGINES）,true,69,pending,一般的な日本語表記
+HERMES,HERMES,エルメス,エルメス（HERMES）,true,68,pending,一般的な日本語表記
+TUDOR,TUDOR,チューダー,チューダー（TUDOR）,true,37,pending,一般的な日本語表記　「チュードル」とも言うイ
+IWC,IWC,アイ・ダブリュー・シー,アイ・ダブリュー・シー（IWC）,true,35,pending,一般的な日本語表記
+chopard,chopard,ショパール,ショパール（chopard）,true,25,pending,一般的な日本語表記
+CASIO,CASIO,カシオ,カシオ（CASIO）,true,24,pending,一般的な日本語表記
+FRANCK MULLER,FRANCK MULLER,フランク・ミュラー,フランク・ミュラー（FRANCK MULLER）,true,24,pending,一般的な日本語表記
+HAMILTON,HAMILTON,ハミルトン,ハミルトン（HAMILTON）,true,23,pending,一般的な日本語表記
+AUDEMARS PIGUET,AUDEMARS PIGUET,オーデマ・ピゲ,オーデマ・ピゲ（AUDEMARS PIGUET）,true,20,pending,一般的な日本語表記
+RADO,RADO,ラドー,ラドー（RADO）,true,18,pending,一般的な日本語表記
+Dior,Dior,ディオール,ディオール（Dior）,true,17,pending,一般的な日本語表記
+FENDI,FENDI,フェンディ,フェンディ（FENDI）,true,17,pending,一般的な日本語表記
+SKAGEN,SKAGEN,スカーゲン,スカーゲン（SKAGEN）,true,16,pending,一般的な日本語表記
+Baume&Mercier,Baume&Mercier,ボーム＆メルシエ,ボーム＆メルシエ（Baume&Mercier）,true,15,pending,一般的な日本語表記
+VACHERON CONSTANTIN,VACHERON CONSTANTIN,ヴァシュロン・コンスタンタン,ヴァシュロン・コンスタンタン（VACHERON CONSTANTIN）,true,11,pending,一般的な日本語表記
+BURBERRY,BURBERRY,バーバリー,バーバリー（BURBERRY）,true,9,pending,一般的な日本語表記
+PANERAI,PANERAI,パネライ,パネライ（PANERAI）,true,9,pending,一般的な日本語表記
+TIFFANY,TIFFANY,ティファニー,ティファニー（TIFFANY）,true,8,pending,一般的な日本語表記
+TISSOT,TISSOT,ティソ,ティソ（TISSOT）,true,8,pending,一般的な日本語表記
+ALBA,ALBA,アルバ,アルバ（ALBA）,true,7,pending,一般的な日本語表記
+ORIS,ORIS,オリス,オリス（ORIS）,true,7,pending,一般的な日本語表記
+WALTHAM,WALTHAM,ウォルサム,ウォルサム（WALTHAM）,true,7,pending,一般的な日本語表記
+Yves Saint Laurent,Yves Saint Laurent,イヴ・サンローラン,イヴ・サンローラン（Yves Saint Laurent）,true,7,pending,一般的な日本語表記

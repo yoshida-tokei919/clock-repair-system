@@ -1,0 +1,202 @@
+[
+  {
+    "tempPublicCaseKey": "FMP:12029",
+    "code": "part_without_publishable_work",
+    "severity": "REVIEW",
+    "message": "部品欄はあるが、同slotに公開候補WorkItemがない",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "part_without_publishable_work:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12029",
+    "code": "part_without_publishable_work",
+    "severity": "REVIEW",
+    "message": "部品欄はあるが、同slotに公開候補WorkItemがない",
+    "target": "external-2",
+    "metadata": {
+      "rawWarning": "part_without_publishable_work:external-2"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12031",
+    "code": "reading_kana_removed",
+    "severity": "INFO",
+    "message": "表示名から読み仮名を除去した",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "reading_kana_removed:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12032",
+    "code": "reading_kana_removed",
+    "severity": "INFO",
+    "message": "表示名から読み仮名を除去した",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "reading_kana_removed:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12032",
+    "code": "placeholder_resolved_with_part",
+    "severity": "INFO",
+    "message": "表示名の○○を同slotの部品名で置換した",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "placeholder_resolved_with_part:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12037",
+    "code": "reading_kana_removed",
+    "severity": "INFO",
+    "message": "表示名から読み仮名を除去した",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "reading_kana_removed:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12038",
+    "code": "reading_kana_removed",
+    "severity": "INFO",
+    "message": "表示名から読み仮名を除去した",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "reading_kana_removed:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12038",
+    "code": "placeholder_resolved_with_part",
+    "severity": "INFO",
+    "message": "表示名の○○を同slotの部品名で置換した",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "placeholder_resolved_with_part:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12039",
+    "code": "reading_kana_removed",
+    "severity": "INFO",
+    "message": "表示名から読み仮名を除去した",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "reading_kana_removed:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12039",
+    "code": "placeholder_resolved_with_part",
+    "severity": "INFO",
+    "message": "表示名の○○を同slotの部品名で置換した",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "placeholder_resolved_with_part:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12041",
+    "code": "reading_kana_removed",
+    "severity": "INFO",
+    "message": "表示名から読み仮名を除去した",
+    "target": "external-2",
+    "metadata": {
+      "rawWarning": "reading_kana_removed:external-2"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12044",
+    "code": "reading_kana_removed",
+    "severity": "INFO",
+    "message": "表示名から読み仮名を除去した",
+    "target": "external-2",
+    "metadata": {
+      "rawWarning": "reading_kana_removed:external-2"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12050",
+    "code": "part_without_publishable_work",
+    "severity": "REVIEW",
+    "message": "部品欄はあるが、同slotに公開候補WorkItemがない",
+    "target": "internal-2",
+    "metadata": {
+      "rawWarning": "part_without_publishable_work:internal-2"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12051",
+    "code": "part_without_publishable_work",
+    "severity": "REVIEW",
+    "message": "部品欄はあるが、同slotに公開候補WorkItemがない",
+    "target": "internal-2",
+    "metadata": {
+      "rawWarning": "part_without_publishable_work:internal-2"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12052",
+    "code": "part_without_publishable_work",
+    "severity": "REVIEW",
+    "message": "部品欄はあるが、同slotに公開候補WorkItemがない",
+    "target": "internal-2",
+    "metadata": {
+      "rawWarning": "part_without_publishable_work:internal-2"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12055",
+    "code": "part_without_publishable_work",
+    "severity": "REVIEW",
+    "message": "部品欄はあるが、同slotに公開候補WorkItemがない",
+    "target": "internal-1",
+    "metadata": {
+      "rawWarning": "part_without_publishable_work:internal-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12059",
+    "code": "part_without_publishable_work",
+    "severity": "REVIEW",
+    "message": "部品欄はあるが、同slotに公開候補WorkItemがない",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "part_without_publishable_work:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12061",
+    "code": "reading_kana_removed",
+    "severity": "INFO",
+    "message": "表示名から読み仮名を除去した",
+    "target": "external-2",
+    "metadata": {
+      "rawWarning": "reading_kana_removed:external-2"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12087",
+    "code": "reading_kana_removed",
+    "severity": "INFO",
+    "message": "表示名から読み仮名を除去した",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "reading_kana_removed:external-1"
+    }
+  },
+  {
+    "tempPublicCaseKey": "FMP:12087",
+    "code": "placeholder_resolved_with_part",
+    "severity": "INFO",
+    "message": "表示名の○○を同slotの部品名で置換した",
+    "target": "external-1",
+    "metadata": {
+      "rawWarning": "placeholder_resolved_with_part:external-1"
+    }
+  }
+]
