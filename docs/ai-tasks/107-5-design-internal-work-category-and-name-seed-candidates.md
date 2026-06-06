@@ -1,3 +1,8 @@
+> 注意:
+> 本ファイルは大量seed方式の検討履歴であり、最新版の内装作業マスタ設計方針では本線として採用しない。
+> 旧Excel由来候補や一般的な作業名を、そのまま正式マスタ化しない。
+> 今後は `docs/masters/internal-work-master-design-notes.md`、`docs/masters/external-work-master-design-notes.md`、`docs/masters/public-case-design-notes.md` を正本として扱う。
+
 # AI Task 107-5: 内装作業カテゴリ・作業名の初期seed案作成
 
 ## 調査概要
