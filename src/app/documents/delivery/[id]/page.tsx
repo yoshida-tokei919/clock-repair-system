@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { DeliveryPDFClient } from "@/components/pdf/DeliveryPDFClient";
+import { DeliveryPDFClientLoader } from "@/components/pdf/DeliveryPDFClientLoader";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 
 export const dynamic = "force-dynamic";
@@ -67,5 +67,5 @@ export default async function DeliveryDocumentPage({ params }: { params: { id: s
         shippingFee: note.repairs[0]?.estimate?.shipping || 0
     };
 
-    return <DeliveryPDFClient data={pdfData} />;
+    return <DeliveryPDFClientLoader data={pdfData} />;
 }
