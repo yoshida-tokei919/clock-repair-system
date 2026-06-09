@@ -1,5 +1,5 @@
 // prisma/seed.ts
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, RepairWorkType } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -36,6 +36,50 @@ async function main() {
         })
     }
     console.log(`Repair work actions seeded: ${repairWorkActions.length}件`)
+
+    // 0. Repair work category master
+    const repairWorkCategories = [
+        { repairType: RepairWorkType.INTERNAL, name: 'movement',          displayName: 'ムーブメント',             sortOrder: 10  },
+        { repairType: RepairWorkType.INTERNAL, name: 'quartz',            displayName: 'クォーツ',                 sortOrder: 20  },
+        { repairType: RepairWorkType.INTERNAL, name: 'power_winding',     displayName: '動力・巻上',               sortOrder: 30  },
+        { repairType: RepairWorkType.INTERNAL, name: 'train_wheel',       displayName: '輪列',                     sortOrder: 40  },
+        { repairType: RepairWorkType.INTERNAL, name: 'escapement',        displayName: '脱進機',                   sortOrder: 50  },
+        { repairType: RepairWorkType.INTERNAL, name: 'regulator',         displayName: '調速機',                   sortOrder: 60  },
+        { repairType: RepairWorkType.INTERNAL, name: 'hand_setting',      displayName: '針回し',                   sortOrder: 70  },
+        { repairType: RepairWorkType.INTERNAL, name: 'calendar',          displayName: 'カレンダー',               sortOrder: 80  },
+        { repairType: RepairWorkType.INTERNAL, name: 'automatic_winding', displayName: '自動巻',                   sortOrder: 90  },
+        { repairType: RepairWorkType.INTERNAL, name: 'chronograph',       displayName: 'クロノグラフ',             sortOrder: 100 },
+        { repairType: RepairWorkType.INTERNAL, name: 'main_plate',        displayName: '地板',                     sortOrder: 110 },
+    ]
+    for (const category of repairWorkCategories) {
+        const existing = await prisma.repairWorkCategory.findFirst({
+            where: {
+                repairType: category.repairType,
+                parentId: null,
+                name: category.name,
+            },
+        })
+
+        if (existing) {
+            await prisma.repairWorkCategory.update({
+                where: { id: existing.id },
+                data: {
+                    displayName: category.displayName,
+                    sortOrder: category.sortOrder,
+                    isActive: true,
+                },
+            })
+        } else {
+            await prisma.repairWorkCategory.create({
+                data: {
+                    ...category,
+                    parentId: null,
+                    isActive: true,
+                },
+            })
+        }
+    }
+    console.log(`Repair work categories seeded: ${repairWorkCategories.length}件`)
 
     // 0. Supplier（購入店マスタ）初期データ
     const suppliers = [
