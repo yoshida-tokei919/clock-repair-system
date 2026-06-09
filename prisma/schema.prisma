@@ -307,6 +307,24 @@ enum RepairLineItemType {
   PART
 }
 
+enum RepairWorkType {
+  INTERNAL
+  EXTERNAL
+}
+
+enum RepairWorkReviewStatus {
+  APPROVED
+  REVIEW
+  REJECTED
+}
+
+enum RepairWorkSource {
+  MANUAL
+  USER_INPUT
+  FMP
+  SEED
+}
+
 model RepairLineItem {
   id       Int    @id @default(autoincrement())
   repairId Int
@@ -355,6 +373,68 @@ model RepairLineItem {
   @@index([relatedWorkLineItemId])
   @@index([repairId, sortOrder])
   @@index([repairId, lineType])
+}
+
+model RepairWorkAction {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  displayName String
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workNames   RepairWorkName[]
+}
+
+model RepairWorkCategory {
+  id          Int            @id @default(autoincrement())
+  repairType  RepairWorkType
+  parentId    Int?
+  name        String
+  displayName String
+  description String?
+  sortOrder   Int            @default(0)
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  parent    RepairWorkCategory?  @relation("RepairWorkCategoryTree", fields: [parentId], references: [id])
+  children  RepairWorkCategory[] @relation("RepairWorkCategoryTree")
+  workNames RepairWorkName[]
+
+  @@unique([repairType, parentId, name])
+  @@index([repairType])
+  @@index([parentId])
+}
+
+model RepairWorkName {
+  id               Int                    @id @default(autoincrement())
+  repairType       RepairWorkType
+  categoryId       Int
+  targetPartNameId String?
+  actionId         Int?
+  detailLabel      String?
+  standardName     String
+  b2bDisplayName   String?
+  b2cDisplayName   String?
+  description      String?
+  sortOrder        Int                    @default(0)
+  isActive         Boolean                @default(true)
+  source           RepairWorkSource       @default(MANUAL)
+  reviewStatus     RepairWorkReviewStatus @default(APPROVED)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  category       RepairWorkCategory @relation(fields: [categoryId], references: [id])
+  targetPartName PartNameMaster?    @relation(fields: [targetPartNameId], references: [id])
+  action         RepairWorkAction?   @relation(fields: [actionId], references: [id])
+
+  @@index([repairType])
+  @@index([categoryId])
+  @@index([targetPartNameId])
+  @@index([actionId])
+  @@index([reviewStatus])
 }
 
 // 6. Parts
@@ -408,6 +488,7 @@ model PartNameMaster {
 
   category   PartCategoryMaster @relation(fields: [categoryId], references: [id])
   parts      PartsMaster[]
+  repairWorkNames RepairWorkName[]
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
