@@ -6,6 +6,37 @@ const prisma = new PrismaClient()
 async function main() {
     console.log('Seeding data...')
 
+    // 0. Repair work action master
+    const repairWorkActions = [
+        { name: 'exchange',        displayName: '交換',   sortOrder: 10  },
+        { name: 'repair',          displayName: '修理',   sortOrder: 20  },
+        { name: 'adjust',          displayName: '調整',   sortOrder: 30  },
+        { name: 'correction',      displayName: '修正',   sortOrder: 40  },
+        { name: 'polish',          displayName: '研磨',   sortOrder: 50  },
+        { name: 'clean',           displayName: '洗浄',   sortOrder: 60  },
+        { name: 'oil',             displayName: '注油',   sortOrder: 70  },
+        { name: 'make',            displayName: '製作',   sortOrder: 80  },
+        { name: 'install',         displayName: '取付',   sortOrder: 90  },
+        { name: 'remove',          displayName: '除去',   sortOrder: 100 },
+        { name: 'hole_tightening', displayName: '穴締め', sortOrder: 110 },
+        { name: 'staking',         displayName: 'かしめ', sortOrder: 120 },
+    ]
+    for (const action of repairWorkActions) {
+        await prisma.repairWorkAction.upsert({
+            where: { name: action.name },
+            update: {
+                displayName: action.displayName,
+                sortOrder: action.sortOrder,
+                isActive: true,
+            },
+            create: {
+                ...action,
+                isActive: true,
+            },
+        })
+    }
+    console.log(`Repair work actions seeded: ${repairWorkActions.length}件`)
+
     // 0. Supplier（購入店マスタ）初期データ
     const suppliers = [
         { name: 'Cousins UK',     url: 'https://www.cousinsuk.com', isOnline: true  },
