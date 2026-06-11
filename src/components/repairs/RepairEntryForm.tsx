@@ -51,7 +51,7 @@ import { toast } from "@/components/ui/use-toast";
 import {
     getBrands, getModels, getCalibers, getCalibersForModel, getCalibersForRef,
     getPricingRules, getPartsMatched, upsertBrand, upsertModel, upsertCaliber,
-    getRefsByModel, upsertRef
+    getRefsByModel, upsertRef, getRepairWorkCategories, getRepairWorkActions
 } from "@/actions/master-actions";
 import { getCustomers } from "@/actions/customer-actions";
 
@@ -62,6 +62,12 @@ import PartsSearchPanel from "@/components/parts/PartsSearchPanel";
 
 // Dynamically import PDF Dialog (Client only)
 const PDFPreviewDialog = dynamic(() => import("@/components/repairs/PDFPreviewDialog"), { ssr: false });
+type RepairWorkSelectOption = {
+    id: number;
+    name: string;
+    key?: string | null;
+    sortOrder?: number | null;
+};
 
 // §12 確定ステータス定義（2026/04/22）
 const STATUS_STEPS: { id: string; label: string }[] = [
@@ -412,8 +418,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [newItemSpec, setNewItemSpec] = useState("");
     const [selectedWorkOption, setSelectedWorkOption] = useState<any | null>(null);
     const [structuredWorkOpen, setStructuredWorkOpen] = useState(false);
+    const [repairWorkCategoryOptions, setRepairWorkCategoryOptions] = useState<RepairWorkSelectOption[]>([]);
+    const [repairWorkActionOptions, setRepairWorkActionOptions] = useState<RepairWorkSelectOption[]>([]);
+    const [newWorkCategoryId, setNewWorkCategoryId] = useState("");
     const [newWorkCategorySnapshot, setNewWorkCategorySnapshot] = useState("");
     const [newTargetPartNameSnapshot, setNewTargetPartNameSnapshot] = useState("");
+    const [newWorkActionId, setNewWorkActionId] = useState("");
     const [newWorkActionSnapshot, setNewWorkActionSnapshot] = useState("");
     const [newWorkDetailLabel, setNewWorkDetailLabel] = useState("");
     const [selectedPartInputType, setSelectedPartInputType] = useState<PartInputType>("part_external");
@@ -426,8 +436,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         return normalized || null;
     }, []);
     const resetStructuredWorkInputs = useCallback(() => {
+        setNewWorkCategoryId("");
         setNewWorkCategorySnapshot("");
         setNewTargetPartNameSnapshot("");
+        setNewWorkActionId("");
         setNewWorkActionSnapshot("");
         setNewWorkDetailLabel("");
     }, []);
@@ -443,6 +455,16 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         () => selectedPartNameKey ? getPartNameOptionByKey(selectedPartNameKey) : undefined,
         [selectedPartNameKey]
     );
+    const handleRepairWorkCategoryChange = useCallback((nextId: string) => {
+        setNewWorkCategoryId(nextId);
+        const selected = repairWorkCategoryOptions.find((option) => String(option.id) === nextId);
+        setNewWorkCategorySnapshot(selected?.name ?? "");
+    }, [repairWorkCategoryOptions]);
+    const handleRepairWorkActionChange = useCallback((nextId: string) => {
+        setNewWorkActionId(nextId);
+        const selected = repairWorkActionOptions.find((option) => String(option.id) === nextId);
+        setNewWorkActionSnapshot(selected?.name ?? "");
+    }, [repairWorkActionOptions]);
 
     const handlePartInputTypeChange = useCallback((nextType: PartInputType) => {
         setSelectedPartInputType(nextType);
@@ -1071,6 +1093,27 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         const r = refOpts.find(o => o.value === refName);
         if (r && r.caliber) setCaliber(r.caliber);
     }, [refName, refOpts]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        Promise.all([getRepairWorkCategories(), getRepairWorkActions()])
+            .then(([categories, actions]) => {
+                if (cancelled) return;
+                setRepairWorkCategoryOptions(Array.isArray(categories) ? categories : []);
+                setRepairWorkActionOptions(Array.isArray(actions) ? actions : []);
+            })
+            .catch((error) => {
+                console.error("Failed to fetch repair work masters:", error);
+                if (cancelled) return;
+                setRepairWorkCategoryOptions([]);
+                setRepairWorkActionOptions([]);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     // 4. Intelligence Cache (Pricing Rules & Parts Master)
     useEffect(() => {
@@ -2129,24 +2172,36 @@ ${shopName}
                                             </button>
                                             {structuredWorkOpen && (
                                                 <div className="grid gap-1 border-t border-zinc-100 p-2 md:grid-cols-4">
-                                                    <Input
-                                                        className="h-7 text-xs"
-                                                        placeholder="作業カテゴリ"
-                                                        value={newWorkCategorySnapshot}
-                                                        onChange={(e) => setNewWorkCategorySnapshot(e.target.value)}
-                                                    />
+                                                    <select
+                                                        className="h-7 rounded border border-zinc-300 bg-white px-2 text-xs"
+                                                        value={newWorkCategoryId}
+                                                        onChange={(e) => handleRepairWorkCategoryChange(e.target.value)}
+                                                    >
+                                                        <option value="">作業カテゴリ</option>
+                                                        {repairWorkCategoryOptions.map((option) => (
+                                                            <option key={option.id} value={option.id}>
+                                                                {option.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                     <Input
                                                         className="h-7 text-xs"
                                                         placeholder="対象部品"
                                                         value={newTargetPartNameSnapshot}
                                                         onChange={(e) => setNewTargetPartNameSnapshot(e.target.value)}
                                                     />
-                                                    <Input
-                                                        className="h-7 text-xs"
-                                                        placeholder="処置"
-                                                        value={newWorkActionSnapshot}
-                                                        onChange={(e) => setNewWorkActionSnapshot(e.target.value)}
-                                                    />
+                                                    <select
+                                                        className="h-7 rounded border border-zinc-300 bg-white px-2 text-xs"
+                                                        value={newWorkActionId}
+                                                        onChange={(e) => handleRepairWorkActionChange(e.target.value)}
+                                                    >
+                                                        <option value="">処置</option>
+                                                        {repairWorkActionOptions.map((option) => (
+                                                            <option key={option.id} value={option.id}>
+                                                                {option.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                     <Input
                                                         className="h-7 text-xs"
                                                         placeholder="detail: ブッシュ / ピン / 穴"
@@ -2185,8 +2240,8 @@ ${shopName}
                                                 quantity: parseInt(newItemQty) || 1,
                                                 spec: newItemSpec,
                                                 ...(addItemCategory === 'internal' ? {
-                                                    repairWorkCategoryId: null,
-                                                    repairWorkActionId: null,
+                                                    repairWorkCategoryId: newWorkCategoryId ? Number(newWorkCategoryId) : null,
+                                                    repairWorkActionId: newWorkActionId ? Number(newWorkActionId) : null,
                                                     targetPartNameId: null,
                                                     detailLabelSnapshot: cleanOptionalText(newWorkDetailLabel),
                                                     categoryNameSnapshot: cleanOptionalText(newWorkCategorySnapshot),

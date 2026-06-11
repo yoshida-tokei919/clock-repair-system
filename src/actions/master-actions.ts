@@ -1,5 +1,6 @@
 "use server";
 
+import { RepairWorkType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
@@ -100,6 +101,57 @@ export async function getCalibers(brandId?: number) {
 
 export async function upsertCaliber(name: string, brandId?: number) {
     return await findOrCreateCaliber(prisma, name, brandId);
+}
+
+export async function getRepairWorkCategories() {
+    const categories = await prisma.repairWorkCategory.findMany({
+        where: {
+            repairType: RepairWorkType.INTERNAL,
+            isActive: true,
+        },
+        orderBy: [
+            { sortOrder: 'asc' },
+            { displayName: 'asc' },
+            { name: 'asc' },
+        ],
+        select: {
+            id: true,
+            name: true,
+            displayName: true,
+            sortOrder: true,
+        },
+    });
+
+    return categories.map((category) => ({
+        id: category.id,
+        name: category.displayName || category.name,
+        key: category.name,
+        sortOrder: category.sortOrder,
+    }));
+}
+
+export async function getRepairWorkActions() {
+    const actions = await prisma.repairWorkAction.findMany({
+        where: { isActive: true },
+        orderBy: [
+            { sortOrder: 'asc' },
+            { displayName: 'asc' },
+            { name: 'asc' },
+        ],
+        select: {
+            id: true,
+            name: true,
+            displayName: true,
+            sortOrder: true,
+        },
+    });
+
+    return actions.map((action) => ({
+        id: action.id,
+        name: action.displayName || action.name,
+        key: action.name,
+        sortOrder: action.sortOrder,
+    }));
 }
 
 /**
