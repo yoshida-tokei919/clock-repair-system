@@ -7,6 +7,9 @@ export type RepairLineItemInput = {
     lineType: "LABOR" | "PART";
     partsMasterId?: number | null;
     pricingRuleId?: number | null;
+    repairWorkCategoryId?: number | null;
+    repairWorkActionId?: number | null;
+    targetPartNameId?: string | null;
     relatedWorkLineItemId?: number | null;
     itemNameSnapshot: string;
     estimateDisplayNameSnapshot?: string | null;
@@ -14,6 +17,10 @@ export type RepairLineItemInput = {
     b2cDisplayNameSnapshot?: string | null;
     gradeNameSnapshot?: string | null;
     notesForCustomerSnapshot?: string | null;
+    detailLabelSnapshot?: string | null;
+    categoryNameSnapshot?: string | null;
+    targetPartNameSnapshot?: string | null;
+    actionNameSnapshot?: string | null;
     quantity?: number | null;
     unitPrice?: number | null;
     showPriceB2b?: boolean;
@@ -33,6 +40,9 @@ export type EstimateItemLikeInput = {
     quantity?: number | string | null;
     partsMasterId?: number | string | null;
     pricingRuleId?: number | string | null;
+    repairWorkCategoryId?: number | string | null;
+    repairWorkActionId?: number | string | null;
+    targetPartNameId?: string | null;
     relatedWorkLineItemId?: number | string | null;
     sortOrder?: number | string | null;
     estimateDisplayNameSnapshot?: string | null;
@@ -43,6 +53,10 @@ export type EstimateItemLikeInput = {
     notesForCustomerSnapshot?: string | null;
     note2?: string | null;
     notes2?: string | null;
+    detailLabelSnapshot?: string | null;
+    categoryNameSnapshot?: string | null;
+    targetPartNameSnapshot?: string | null;
+    actionNameSnapshot?: string | null;
     showPriceB2b?: boolean | null;
     showPriceB2c?: boolean | null;
     internalMemo?: string | null;
@@ -54,6 +68,9 @@ export type NormalizedRepairLineItemInput = {
     lineType: RepairLineItemType;
     partsMasterId: number | null;
     pricingRuleId: number | null;
+    repairWorkCategoryId: number | null;
+    repairWorkActionId: number | null;
+    targetPartNameId: string | null;
     relatedWorkLineItemId: number | null;
     itemNameSnapshot: string;
     estimateDisplayNameSnapshot: string;
@@ -61,6 +78,10 @@ export type NormalizedRepairLineItemInput = {
     b2cDisplayNameSnapshot: string;
     gradeNameSnapshot: string | null;
     notesForCustomerSnapshot: string | null;
+    detailLabelSnapshot: string | null;
+    categoryNameSnapshot: string | null;
+    targetPartNameSnapshot: string | null;
+    actionNameSnapshot: string | null;
     quantity: number;
     unitPrice: number;
     amount: number;
@@ -151,6 +172,9 @@ export function normalizeRepairLineItemInput(
         lineType: input.lineType,
         partsMasterId: normalizeNullablePositiveInt(input.partsMasterId),
         pricingRuleId: normalizeNullablePositiveInt(input.pricingRuleId),
+        repairWorkCategoryId: normalizeNullablePositiveInt(input.repairWorkCategoryId),
+        repairWorkActionId: normalizeNullablePositiveInt(input.repairWorkActionId),
+        targetPartNameId: cleanText(input.targetPartNameId),
         relatedWorkLineItemId: normalizeNullablePositiveInt(input.relatedWorkLineItemId),
         itemNameSnapshot,
         estimateDisplayNameSnapshot,
@@ -158,6 +182,10 @@ export function normalizeRepairLineItemInput(
         b2cDisplayNameSnapshot,
         gradeNameSnapshot: cleanText(input.gradeNameSnapshot),
         notesForCustomerSnapshot: cleanText(input.notesForCustomerSnapshot),
+        detailLabelSnapshot: cleanText(input.detailLabelSnapshot),
+        categoryNameSnapshot: cleanText(input.categoryNameSnapshot),
+        targetPartNameSnapshot: cleanText(input.targetPartNameSnapshot),
+        actionNameSnapshot: cleanText(input.actionNameSnapshot),
         quantity,
         unitPrice,
         amount: calculateLineAmount(quantity, unitPrice),
@@ -185,6 +213,9 @@ export function estimateItemLikeToRepairLineItemInput(
         lineType: toRepairLineItemType(item.type),
         partsMasterId: parseNullableNumber(item.partsMasterId),
         pricingRuleId: parseNullableNumber(item.pricingRuleId),
+        repairWorkCategoryId: parseNullableNumber(item.repairWorkCategoryId),
+        repairWorkActionId: parseNullableNumber(item.repairWorkActionId),
+        targetPartNameId: cleanText(item.targetPartNameId),
         relatedWorkLineItemId: parseNullableNumber(item.relatedWorkLineItemId),
         itemNameSnapshot,
         estimateDisplayNameSnapshot:
@@ -198,6 +229,10 @@ export function estimateItemLikeToRepairLineItemInput(
             cleanText(item.notesForCustomerSnapshot) ??
             cleanText(item.note2) ??
             cleanText(item.notes2),
+        detailLabelSnapshot: cleanText(item.detailLabelSnapshot),
+        categoryNameSnapshot: cleanText(item.categoryNameSnapshot),
+        targetPartNameSnapshot: cleanText(item.targetPartNameSnapshot),
+        actionNameSnapshot: cleanText(item.actionNameSnapshot),
         quantity: parseNullableNumber(item.quantity),
         unitPrice,
         showPriceB2b: item.showPriceB2b ?? false,
@@ -228,6 +263,9 @@ function toCreateInput(
         lineType: input.lineType,
         partsMasterId: input.partsMasterId,
         pricingRuleId: input.pricingRuleId,
+        repairWorkCategoryId: input.repairWorkCategoryId,
+        repairWorkActionId: input.repairWorkActionId,
+        targetPartNameId: input.targetPartNameId,
         relatedWorkLineItemId: input.relatedWorkLineItemId,
         itemNameSnapshot: input.itemNameSnapshot,
         estimateDisplayNameSnapshot: input.estimateDisplayNameSnapshot,
@@ -235,6 +273,10 @@ function toCreateInput(
         b2cDisplayNameSnapshot: input.b2cDisplayNameSnapshot,
         gradeNameSnapshot: input.gradeNameSnapshot,
         notesForCustomerSnapshot: input.notesForCustomerSnapshot,
+        detailLabelSnapshot: input.detailLabelSnapshot,
+        categoryNameSnapshot: input.categoryNameSnapshot,
+        targetPartNameSnapshot: input.targetPartNameSnapshot,
+        actionNameSnapshot: input.actionNameSnapshot,
         quantity: input.quantity,
         unitPrice: input.unitPrice,
         amount: input.amount,
