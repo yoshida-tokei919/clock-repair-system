@@ -260,7 +260,23 @@ model PricingRule {
   suggestedWorkName String
   notes             String?
 
+  repairWorkCategoryId Int?
+  repairWorkCategory   RepairWorkCategory? @relation("PricingRuleWorkCategory", fields: [repairWorkCategoryId], references: [id])
+
+  repairWorkActionId Int?
+  repairWorkAction   RepairWorkAction? @relation("PricingRuleWorkAction", fields: [repairWorkActionId], references: [id])
+
+  targetPartNameId String?
+  targetPartName   PartNameMaster? @relation("PricingRuleTargetPartName", fields: [targetPartNameId], references: [id])
+
+  detailLabel String?
+
   repairLineItems RepairLineItem[]
+
+  @@index([repairWorkCategoryId])
+  @@index([repairWorkActionId])
+  @@index([targetPartNameId])
+  @@index([repairWorkCategoryId, repairWorkActionId, targetPartNameId])
 }
 
 model Estimate {
@@ -338,6 +354,15 @@ model RepairLineItem {
   pricingRuleId Int?
   pricingRule   PricingRule? @relation(fields: [pricingRuleId], references: [id])
 
+  repairWorkCategoryId Int?
+  repairWorkCategory   RepairWorkCategory? @relation("RepairLineItemWorkCategory", fields: [repairWorkCategoryId], references: [id])
+
+  repairWorkActionId Int?
+  repairWorkAction   RepairWorkAction? @relation("RepairLineItemWorkAction", fields: [repairWorkActionId], references: [id])
+
+  targetPartNameId String?
+  targetPartName   PartNameMaster? @relation("RepairLineItemTargetPartName", fields: [targetPartNameId], references: [id])
+
   relatedWorkLineItemId Int?
   relatedWorkLineItem   RepairLineItem?  @relation("RepairLineItemRelatedWork", fields: [relatedWorkLineItemId], references: [id])
   relatedPartLineItems  RepairLineItem[] @relation("RepairLineItemRelatedWork")
@@ -349,6 +374,11 @@ model RepairLineItem {
 
   gradeNameSnapshot       String?
   notesForCustomerSnapshot String?
+
+  detailLabelSnapshot    String?
+  categoryNameSnapshot   String?
+  targetPartNameSnapshot String?
+  actionNameSnapshot     String?
 
   quantity  Int @default(1)
   unitPrice Int @default(0)
@@ -370,6 +400,10 @@ model RepairLineItem {
   @@index([lineType])
   @@index([partsMasterId])
   @@index([pricingRuleId])
+  @@index([repairWorkCategoryId])
+  @@index([repairWorkActionId])
+  @@index([targetPartNameId])
+  @@index([repairWorkCategoryId, repairWorkActionId, targetPartNameId])
   @@index([relatedWorkLineItemId])
   @@index([repairId, sortOrder])
   @@index([repairId, lineType])
@@ -385,6 +419,8 @@ model RepairWorkAction {
   updatedAt   DateTime @updatedAt
 
   workNames   RepairWorkName[]
+  repairLineItems RepairLineItem[] @relation("RepairLineItemWorkAction")
+  pricingRules PricingRule[] @relation("PricingRuleWorkAction")
 }
 
 model RepairWorkCategory {
@@ -402,6 +438,8 @@ model RepairWorkCategory {
   parent    RepairWorkCategory?  @relation("RepairWorkCategoryTree", fields: [parentId], references: [id])
   children  RepairWorkCategory[] @relation("RepairWorkCategoryTree")
   workNames RepairWorkName[]
+  repairLineItems RepairLineItem[] @relation("RepairLineItemWorkCategory")
+  pricingRules PricingRule[] @relation("PricingRuleWorkCategory")
 
   @@unique([repairType, parentId, name])
   @@index([repairType])
@@ -489,6 +527,8 @@ model PartNameMaster {
   category   PartCategoryMaster @relation(fields: [categoryId], references: [id])
   parts      PartsMaster[]
   repairWorkNames RepairWorkName[]
+  repairLineItems RepairLineItem[] @relation("RepairLineItemTargetPartName")
+  pricingRules PricingRule[] @relation("PricingRuleTargetPartName")
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
