@@ -154,6 +154,45 @@ export async function getRepairWorkActions() {
     }));
 }
 
+export async function getInternalPartNameMasters() {
+    const internalPartTypes = ['part_internal', 'internal', 'interior'];
+    const partNames = await prisma.partNameMaster.findMany({
+        where: {
+            isActive: true,
+            OR: [
+                { partType: { in: internalPartTypes } },
+                { category: { partType: { in: internalPartTypes } } },
+            ],
+        },
+        orderBy: [
+            { sortOrder: 'asc' },
+            { displayJa: 'asc' },
+            { nameJa: 'asc' },
+        ],
+        select: {
+            id: true,
+            key: true,
+            nameJa: true,
+            displayJa: true,
+            sortOrder: true,
+            category: {
+                select: {
+                    key: true,
+                    nameJa: true,
+                },
+            },
+        },
+    });
+
+    return partNames.map((partName) => ({
+        id: partName.id,
+        name: partName.displayJa || partName.nameJa,
+        key: partName.key,
+        sortOrder: partName.sortOrder,
+        categoryName: partName.category?.nameJa || partName.category?.key || null,
+    }));
+}
+
 /**
  * Fetches calibers associated with a specific Brand and Model based on existing records.
  */

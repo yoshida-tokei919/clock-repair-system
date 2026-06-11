@@ -51,7 +51,7 @@ import { toast } from "@/components/ui/use-toast";
 import {
     getBrands, getModels, getCalibers, getCalibersForModel, getCalibersForRef,
     getPricingRules, getPartsMatched, upsertBrand, upsertModel, upsertCaliber,
-    getRefsByModel, upsertRef, getRepairWorkCategories, getRepairWorkActions
+    getRefsByModel, upsertRef, getRepairWorkCategories, getRepairWorkActions, getInternalPartNameMasters
 } from "@/actions/master-actions";
 import { getCustomers } from "@/actions/customer-actions";
 
@@ -67,6 +67,13 @@ type RepairWorkSelectOption = {
     name: string;
     key?: string | null;
     sortOrder?: number | null;
+};
+type WorkTargetPartOption = {
+    id: string;
+    name: string;
+    key?: string | null;
+    sortOrder?: number | null;
+    categoryName?: string | null;
 };
 
 // §12 確定ステータス定義（2026/04/22）
@@ -420,8 +427,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [structuredWorkOpen, setStructuredWorkOpen] = useState(false);
     const [repairWorkCategoryOptions, setRepairWorkCategoryOptions] = useState<RepairWorkSelectOption[]>([]);
     const [repairWorkActionOptions, setRepairWorkActionOptions] = useState<RepairWorkSelectOption[]>([]);
+    const [workTargetPartOptions, setWorkTargetPartOptions] = useState<WorkTargetPartOption[]>([]);
     const [newWorkCategoryId, setNewWorkCategoryId] = useState("");
     const [newWorkCategorySnapshot, setNewWorkCategorySnapshot] = useState("");
+    const [newTargetPartNameId, setNewTargetPartNameId] = useState("");
     const [newTargetPartNameSnapshot, setNewTargetPartNameSnapshot] = useState("");
     const [newWorkActionId, setNewWorkActionId] = useState("");
     const [newWorkActionSnapshot, setNewWorkActionSnapshot] = useState("");
@@ -438,6 +447,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const resetStructuredWorkInputs = useCallback(() => {
         setNewWorkCategoryId("");
         setNewWorkCategorySnapshot("");
+        setNewTargetPartNameId("");
         setNewTargetPartNameSnapshot("");
         setNewWorkActionId("");
         setNewWorkActionSnapshot("");
@@ -465,6 +475,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         const selected = repairWorkActionOptions.find((option) => String(option.id) === nextId);
         setNewWorkActionSnapshot(selected?.name ?? "");
     }, [repairWorkActionOptions]);
+    const handleTargetPartNameChange = useCallback((nextId: string) => {
+        setNewTargetPartNameId(nextId);
+        const selected = workTargetPartOptions.find((option) => option.id === nextId);
+        setNewTargetPartNameSnapshot(selected?.name ?? "");
+    }, [workTargetPartOptions]);
 
     const handlePartInputTypeChange = useCallback((nextType: PartInputType) => {
         setSelectedPartInputType(nextType);
@@ -1097,17 +1112,19 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     useEffect(() => {
         let cancelled = false;
 
-        Promise.all([getRepairWorkCategories(), getRepairWorkActions()])
-            .then(([categories, actions]) => {
+        Promise.all([getRepairWorkCategories(), getRepairWorkActions(), getInternalPartNameMasters()])
+            .then(([categories, actions, targetParts]) => {
                 if (cancelled) return;
                 setRepairWorkCategoryOptions(Array.isArray(categories) ? categories : []);
                 setRepairWorkActionOptions(Array.isArray(actions) ? actions : []);
+                setWorkTargetPartOptions(Array.isArray(targetParts) ? targetParts : []);
             })
             .catch((error) => {
                 console.error("Failed to fetch repair work masters:", error);
                 if (cancelled) return;
                 setRepairWorkCategoryOptions([]);
                 setRepairWorkActionOptions([]);
+                setWorkTargetPartOptions([]);
             });
 
         return () => {
@@ -2184,12 +2201,18 @@ ${shopName}
                                                             </option>
                                                         ))}
                                                     </select>
-                                                    <Input
-                                                        className="h-7 text-xs"
-                                                        placeholder="対象部品"
-                                                        value={newTargetPartNameSnapshot}
-                                                        onChange={(e) => setNewTargetPartNameSnapshot(e.target.value)}
-                                                    />
+                                                    <select
+                                                        className="h-7 rounded border border-zinc-300 bg-white px-2 text-xs"
+                                                        value={newTargetPartNameId}
+                                                        onChange={(e) => handleTargetPartNameChange(e.target.value)}
+                                                    >
+                                                        <option value="">対象部品</option>
+                                                        {workTargetPartOptions.map((option) => (
+                                                            <option key={option.id} value={option.id}>
+                                                                {option.categoryName ? `${option.name}（${option.categoryName}）` : option.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                     <select
                                                         className="h-7 rounded border border-zinc-300 bg-white px-2 text-xs"
                                                         value={newWorkActionId}
@@ -2242,7 +2265,7 @@ ${shopName}
                                                 ...(addItemCategory === 'internal' ? {
                                                     repairWorkCategoryId: newWorkCategoryId ? Number(newWorkCategoryId) : null,
                                                     repairWorkActionId: newWorkActionId ? Number(newWorkActionId) : null,
-                                                    targetPartNameId: null,
+                                                    targetPartNameId: newTargetPartNameId || null,
                                                     detailLabelSnapshot: cleanOptionalText(newWorkDetailLabel),
                                                     categoryNameSnapshot: cleanOptionalText(newWorkCategorySnapshot),
                                                     targetPartNameSnapshot: cleanOptionalText(newTargetPartNameSnapshot),
