@@ -362,6 +362,13 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         supplierName?: string;
         status?: 'pending' | 'ordered' | 'arrived';
         partsMasterId?: number | null;
+        repairWorkCategoryId?: number | null;
+        repairWorkActionId?: number | null;
+        targetPartNameId?: string | null;
+        detailLabelSnapshot?: string | null;
+        categoryNameSnapshot?: string | null;
+        targetPartNameSnapshot?: string | null;
+        actionNameSnapshot?: string | null;
     }
     type OrderListItem = { id?: number; partId: number; quantity: number; status: 'pending' | 'ordered' | 'received' };
     const [lineItems, setLineItems] = useState<LineItem[]>(() => {
@@ -404,11 +411,26 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [newItemQty, setNewItemQty] = useState("1");
     const [newItemSpec, setNewItemSpec] = useState("");
     const [selectedWorkOption, setSelectedWorkOption] = useState<any | null>(null);
+    const [structuredWorkOpen, setStructuredWorkOpen] = useState(false);
+    const [newWorkCategorySnapshot, setNewWorkCategorySnapshot] = useState("");
+    const [newTargetPartNameSnapshot, setNewTargetPartNameSnapshot] = useState("");
+    const [newWorkActionSnapshot, setNewWorkActionSnapshot] = useState("");
+    const [newWorkDetailLabel, setNewWorkDetailLabel] = useState("");
     const [selectedPartInputType, setSelectedPartInputType] = useState<PartInputType>("part_external");
     const [selectedPartCategoryKey, setSelectedPartCategoryKey] = useState("");
     const [selectedPartNameKey, setSelectedPartNameKey] = useState("");
 
     const isAddingPartItem = addItemCategory.includes("part");
+    const cleanOptionalText = useCallback((value: string) => {
+        const normalized = value.replace(/\s+/g, " ").trim();
+        return normalized || null;
+    }, []);
+    const resetStructuredWorkInputs = useCallback(() => {
+        setNewWorkCategorySnapshot("");
+        setNewTargetPartNameSnapshot("");
+        setNewWorkActionSnapshot("");
+        setNewWorkDetailLabel("");
+    }, []);
     const partCategoryOptions = useMemo(
         () => getPartCategoriesByType(selectedPartInputType),
         [selectedPartInputType]
@@ -1215,6 +1237,13 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         stockQuantity: i.stockQuantity ?? null,
                         partsMasterId: i.partsMasterId ?? null,
                         quantity: i.quantity ?? 1,
+                        repairWorkCategoryId: i.category.includes('part') ? null : i.repairWorkCategoryId ?? null,
+                        repairWorkActionId: i.category.includes('part') ? null : i.repairWorkActionId ?? null,
+                        targetPartNameId: i.category.includes('part') ? null : i.targetPartNameId ?? null,
+                        detailLabelSnapshot: i.category.includes('part') ? null : i.detailLabelSnapshot ?? null,
+                        categoryNameSnapshot: i.category.includes('part') ? null : i.categoryNameSnapshot ?? null,
+                        targetPartNameSnapshot: i.category.includes('part') ? null : i.targetPartNameSnapshot ?? null,
+                        actionNameSnapshot: i.category.includes('part') ? null : i.actionNameSnapshot ?? null,
                     }))
                 },
                 status: nextStatus,
@@ -2018,6 +2047,9 @@ ${shopName}
                                                 if (!nextCategory.includes("part")) {
                                                     setSelectedPartCategoryKey("");
                                                     setSelectedPartNameKey("");
+                                                } else {
+                                                    setStructuredWorkOpen(false);
+                                                    resetStructuredWorkInputs();
                                                 }
                                             }}
                                         >
@@ -2085,6 +2117,46 @@ ${shopName}
                                             </select>
                                         </div>
                                     )}
+                                    {!isAddingPartItem && (
+                                        <div className="mb-1 rounded border border-dashed border-zinc-200 bg-white">
+                                            <button
+                                                type="button"
+                                                className="flex h-7 w-full items-center justify-between px-2 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50"
+                                                onClick={() => setStructuredWorkOpen((open) => !open)}
+                                            >
+                                                <span>詳細な作業分類を入力する</span>
+                                                <ChevronDown className={cn("h-3 w-3 transition-transform", structuredWorkOpen && "rotate-180")} />
+                                            </button>
+                                            {structuredWorkOpen && (
+                                                <div className="grid gap-1 border-t border-zinc-100 p-2 md:grid-cols-4">
+                                                    <Input
+                                                        className="h-7 text-xs"
+                                                        placeholder="作業カテゴリ"
+                                                        value={newWorkCategorySnapshot}
+                                                        onChange={(e) => setNewWorkCategorySnapshot(e.target.value)}
+                                                    />
+                                                    <Input
+                                                        className="h-7 text-xs"
+                                                        placeholder="対象部品"
+                                                        value={newTargetPartNameSnapshot}
+                                                        onChange={(e) => setNewTargetPartNameSnapshot(e.target.value)}
+                                                    />
+                                                    <Input
+                                                        className="h-7 text-xs"
+                                                        placeholder="処置"
+                                                        value={newWorkActionSnapshot}
+                                                        onChange={(e) => setNewWorkActionSnapshot(e.target.value)}
+                                                    />
+                                                    <Input
+                                                        className="h-7 text-xs"
+                                                        placeholder="detail: ブッシュ / ピン / 穴"
+                                                        value={newWorkDetailLabel}
+                                                        onChange={(e) => setNewWorkDetailLabel(e.target.value)}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                     <div className="flex gap-1">
                                         <Input className="h-7 text-xs flex-1" placeholder="備考/仕様" value={newItemSpec} onChange={e => setNewItemSpec(e.target.value)} />
                                         <div className="relative w-16">
@@ -2111,7 +2183,16 @@ ${shopName}
                                                 cost: parseInt(newItemCost) || undefined,
                                                 price: parseInt(newItemPrice) || 0,
                                                 quantity: parseInt(newItemQty) || 1,
-                                                spec: newItemSpec
+                                                spec: newItemSpec,
+                                                ...(addItemCategory === 'internal' ? {
+                                                    repairWorkCategoryId: null,
+                                                    repairWorkActionId: null,
+                                                    targetPartNameId: null,
+                                                    detailLabelSnapshot: cleanOptionalText(newWorkDetailLabel),
+                                                    categoryNameSnapshot: cleanOptionalText(newWorkCategorySnapshot),
+                                                    targetPartNameSnapshot: cleanOptionalText(newTargetPartNameSnapshot),
+                                                    actionNameSnapshot: cleanOptionalText(newWorkActionSnapshot),
+                                                } : {})
                                             };
                                             const nextItem = match
                                                 ? finalizePartLineItem(buildPartLineItem(baseItem, match), true)
@@ -2131,6 +2212,7 @@ ${shopName}
                                             setNewItemSpec("");
                                             setSelectedWorkOption(null);
                                             setSelectedPartNameKey("");
+                                            resetStructuredWorkInputs();
                                         }}>
                                             <Plus className="w-4 h-4" />
                                         </Button>
