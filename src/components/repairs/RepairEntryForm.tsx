@@ -76,6 +76,23 @@ type WorkTargetPartOption = {
     categoryName?: string | null;
 };
 
+function FormRow({
+    label,
+    children,
+    className,
+}: {
+    label: string;
+    children: React.ReactNode;
+    className?: string;
+}) {
+    return (
+        <div className={cn("grid grid-cols-1 gap-1 sm:grid-cols-[104px_1fr] sm:items-center", className)}>
+            <Label className="text-xs font-semibold text-zinc-500">{label}</Label>
+            {children}
+        </div>
+    );
+}
+
 // §12 確定ステータス定義（2026/04/22）
 const STATUS_STEPS: { id: string; label: string }[] = [
     { id: "受付",             label: "受付" },
@@ -95,6 +112,14 @@ const STATUS_STEPS: { id: string; label: string }[] = [
 // ステータスバーに横並び表示するメインフロー（保留・キャンセルは除外）
 const MAIN_STATUS_STEPS = STATUS_STEPS.filter(s => s.id !== 'キャンセル' && s.id !== '保留');
 const PART_SEARCH_SITES_STORAGE_KEY = "repair-part-search-sites:v1";
+const REPAIR_PHOTO_PUBLIC_BASE_URL = "https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev";
+
+function getRepairPhotoSrc(photo?: { storageKey?: string | null } | null): string | null {
+    const storageKey = photo?.storageKey?.trim();
+    if (!storageKey) return null;
+    if (/^(https?:|data:|blob:)/i.test(storageKey)) return storageKey;
+    return `${REPAIR_PHOTO_PUBLIC_BASE_URL}/${storageKey.replace(/^\/+/, "")}`;
+}
 
 // "YYYY/M/D" ↔ "YYYY-MM-DD" 変換ヘルパー
 function toInputDate(localeDate: string): string {
@@ -395,6 +420,13 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     price: i.unitPrice,
                     quantity: i.quantity || 1,
                     spec: i.notes,
+                    repairWorkCategoryId: i.repairWorkCategoryId ?? null,
+                    repairWorkActionId: i.repairWorkActionId ?? null,
+                    targetPartNameId: i.targetPartNameId ?? null,
+                    detailLabelSnapshot: i.detailLabelSnapshot ?? null,
+                    categoryNameSnapshot: i.categoryNameSnapshot ?? null,
+                    targetPartNameSnapshot: i.targetPartNameSnapshot ?? null,
+                    actionNameSnapshot: i.actionNameSnapshot ?? null,
                 }
                 : createEstimateItemFromPart(i.partsMaster ?? {}, {
                     id: String(i.id),
@@ -404,6 +436,13 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     quantity: i.quantity || 1,
                     spec: i.notes,
                     partsMasterId: i.partsMasterId ?? null,
+                    repairWorkCategoryId: null,
+                    repairWorkActionId: null,
+                    targetPartNameId: null,
+                    detailLabelSnapshot: null,
+                    categoryNameSnapshot: null,
+                    targetPartNameSnapshot: null,
+                    actionNameSnapshot: null,
                 }) as LineItem
         ));
     });
@@ -792,9 +831,18 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [customerNote, setCustomerNote] = useState(initialData?.customerNote || "");
     const [staffReply, setStaffReply] = useState("");
     const [isSendingStaffReply, setIsSendingStaffReply] = useState(false);
+    const [showCustomerComments, setShowCustomerComments] = useState(false);
+    const customerMessages = initialData?.customerMessages || [];
+    const unreadCustomerMessageCount = customerMessages.filter((message: any) => !message.readAt).length;
 
     // --- 4. PHOTOS ---
     const [photos, setPhotos] = useState<any[]>(initialData?.photos || []);
+    const primaryPhoto = photos[0];
+    const primaryPhotoUrl = getRepairPhotoSrc(primaryPhoto);
+    const [frontImageFailed, setFrontImageFailed] = useState(false);
+    useEffect(() => {
+        setFrontImageFailed(false);
+    }, [primaryPhotoUrl]);
     const [isUploading, setIsUploading] = useState(false);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isCameraReady, setIsCameraReady] = useState(false);
@@ -1756,47 +1804,73 @@ ${shopName}
             </div>
 
             {initialData?.id && (
-                <div className="bg-white border-b border-zinc-200 px-4 py-3">
-                    <div className="text-xs font-bold text-zinc-700 mb-2">共有ページコメント</div>
-                    {(initialData?.customerMessages || []).length > 0 ? (
-                        <div className="space-y-2 max-h-32 overflow-y-auto">
-                            {(initialData?.customerMessages || []).map((message: any) => (
-                                <div
-                                    key={message.id}
-                                    className="rounded border border-blue-100 bg-blue-50 px-3 py-2 text-xs"
-                                >
-                                    <div className="flex items-center justify-between text-[10px] text-zinc-500">
-                                        <span className="font-bold text-zinc-600">共有ページコメント</span>
-                                        <span>{new Date(message.createdAt).toLocaleString('ja-JP')}</span>
-                                        {!message.readAt && <span className="font-bold text-blue-600">未読</span>}
-                                    </div>
-                                    <div className="mt-1 whitespace-pre-wrap text-zinc-700">{message.body}</div>
-                                </div>
-                            ))}
+                <div className="bg-white border-b border-zinc-200 px-4 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span className="font-bold text-zinc-700">共有ページコメント</span>
+                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">
+                                {customerMessages.length}件
+                            </span>
+                            {unreadCustomerMessageCount > 0 && (
+                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                    未読 {unreadCustomerMessageCount}件
+                                </span>
+                            )}
                         </div>
-                    ) : (
-                        <div className="rounded border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
-                            共有ページからのコメントはまだありません。
-                        </div>
-                    )}
-                    <div className="mt-3 flex gap-2">
-                        <Textarea
-                            value={staffReply}
-                            onChange={(event) => setStaffReply(event.target.value.slice(0, 500))}
-                            placeholder="共有ページへ返信する内容を入力..."
-                            className="min-h-16 text-xs"
-                            maxLength={500}
-                        />
                         <Button
                             type="button"
-                            onClick={handleStaffReply}
-                            disabled={isSendingStaffReply || !staffReply.trim()}
-                            className="h-auto shrink-0 bg-blue-600 hover:bg-blue-700"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => setShowCustomerComments((open) => !open)}
                         >
-                            返信する
+                            {showCustomerComments ? "閉じる" : "開く"}
+                            <ChevronDown className={cn("ml-1 h-3.5 w-3.5 transition-transform", showCustomerComments && "rotate-180")} />
                         </Button>
                     </div>
-                    <div className="mt-1 text-right text-[10px] text-zinc-400">{staffReply.length}/500</div>
+                    {showCustomerComments && (
+                        <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                            {customerMessages.length > 0 ? (
+                                <div className="space-y-2 max-h-32 overflow-y-auto">
+                                    {customerMessages.map((message: any) => (
+                                        <div
+                                            key={message.id}
+                                            className="rounded border border-blue-100 bg-blue-50 px-3 py-2 text-sm"
+                                        >
+                                            <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
+                                                <span className="font-bold text-zinc-600">共有ページコメント</span>
+                                                <span>{new Date(message.createdAt).toLocaleString('ja-JP')}</span>
+                                                {!message.readAt && <span className="font-bold text-blue-600">未読</span>}
+                                            </div>
+                                            <div className="mt-1 whitespace-pre-wrap text-zinc-700">{message.body}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="rounded border border-zinc-100 bg-white px-3 py-2 text-sm text-zinc-500">
+                                    共有ページからのコメントはまだありません。
+                                </div>
+                            )}
+                            <div className="mt-3 flex gap-2">
+                                <Textarea
+                                    value={staffReply}
+                                    onChange={(event) => setStaffReply(event.target.value.slice(0, 500))}
+                                    placeholder="共有ページへ返信する内容を入力..."
+                                    className="min-h-16 text-sm"
+                                    maxLength={500}
+                                />
+                                <Button
+                                    type="button"
+                                    onClick={handleStaffReply}
+                                    disabled={isSendingStaffReply || !staffReply.trim()}
+                                    className="h-auto shrink-0 bg-blue-600 hover:bg-blue-700"
+                                >
+                                    返信する
+                                </Button>
+                            </div>
+                            <div className="mt-1 text-right text-xs text-zinc-400">{staffReply.length}/500</div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -1829,10 +1903,10 @@ ${shopName}
 
                 {/* メインタブ */}
                 {activeTab === 'main' && (
-                <div className="p-3 flex flex-col gap-3">
+                <div className="grid gap-3 p-3 xl:grid-cols-[minmax(360px,0.85fr)_minmax(640px,1.4fr)]">
 
-                    {/* 上段：3カラム均等幅 */}
-                    <div className="grid grid-cols-3 gap-3">
+                    {/* 左カラム：案件確認情報 */}
+                    <div className="space-y-3">
 
                         {/* ①顧客情報 */}
                         <Card className="p-3 shadow-sm border-t-4 border-t-zinc-500 bg-white">
@@ -1845,37 +1919,46 @@ ${shopName}
                                     <button onClick={() => setIsB2B(false)} className={cn("px-2 py-0.5 text-[10px] rounded-sm font-bold", !isB2B ? "bg-white shadow text-green-600" : "text-zinc-400")}>一般</button>
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <div className="flex gap-1">
-                                    <AdvancedCombobox
-                                        placeholder="名前検索 / 新規入力..."
-                                        value={customerName}
-                                        onChange={setCustomerName}
-                                        onSearchChange={async (s) => {
-                                            const res = await getCustomers(s);
-                                            setCustomerOpts(res.map(c => ({ label: c.name, value: c.name, sub: c.phone || "No phone" })));
-                                        }}
-                                        options={customerOpts}
-                                    />
-                                    <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={() => setQuickRegOpen(true)}><Plus className="w-4 h-4" /></Button>
+                            <div className="grid gap-2 md:grid-cols-3">
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-semibold text-zinc-500">顧客</Label>
+                                    <div className="flex gap-1">
+                                        <AdvancedCombobox
+                                            placeholder="名前検索 / 新規入力..."
+                                            value={customerName}
+                                            onChange={setCustomerName}
+                                            onSearchChange={async (s) => {
+                                                const res = await getCustomers(s);
+                                                setCustomerOpts(res.map(c => ({ label: c.name, value: c.name, sub: c.phone || "No phone" })));
+                                            }}
+                                            options={customerOpts}
+                                        />
+                                        <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={() => setQuickRegOpen(true)}><Plus className="w-4 h-4" /></Button>
+                                    </div>
                                 </div>
                                 {isB2B && (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <Label className="text-[9px] text-zinc-400 uppercase">エンドユーザー</Label>
-                                            <Input className="h-7 text-xs" value={endUserName} onChange={e => setEndUserName(e.target.value)} />
+                                    <>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs font-semibold text-zinc-500">エンドユーザー</Label>
+                                            <Input className="h-8 text-sm" value={endUserName} onChange={e => setEndUserName(e.target.value)} />
                                         </div>
-                                        <div>
-                                            <Label className="text-[9px] text-zinc-400 uppercase">パートナー管理番号</Label>
-                                            <Input className="h-7 text-xs font-mono" value={partnerRef} onChange={e => setPartnerRef(e.target.value)} />
+                                        <div className="space-y-1">
+                                            <Label className="text-xs font-semibold text-zinc-500">管理番号</Label>
+                                            <Input className="h-8 text-sm font-mono" value={partnerRef} onChange={e => setPartnerRef(e.target.value)} />
                                         </div>
-                                    </div>
+                                    </>
                                 )}
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div><Label className="text-[9px] text-zinc-400">TEL</Label><Input className="h-7 text-xs" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} /></div>
-                                    <div><Label className="text-[9px] text-zinc-400">LINE ID</Label><Input className="h-7 text-xs" value={lineId} onChange={e => setLineId(e.target.value)} /></div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-semibold text-zinc-500">LINE ID</Label>
+                                    <Input className="h-8 text-sm" value={lineId} onChange={e => setLineId(e.target.value)} />
                                 </div>
-                                <div><Label className="text-[9px] text-zinc-400">住所</Label><Input className="h-7 text-xs" value={address} onChange={e => setAddress(e.target.value)} /></div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-semibold text-zinc-500">TEL</Label>
+                                    <Input className="h-8 text-sm" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                                </div>
+                                <FormRow label="住所" className="md:col-span-3">
+                                    <Input className="h-8 text-sm" value={address} onChange={e => setAddress(e.target.value)} />
+                                </FormRow>
                             </div>
                         </Card>
 
@@ -1884,87 +1967,88 @@ ${shopName}
                             <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase tracking-wider mb-2">
                                 <Watch className="w-3.5 h-3.5" /> 時計情報
                             </h3>
-                            <div className="space-y-2">
-                                <div>
-                                    <Label className="text-[9px] text-zinc-400">ブランド</Label>
-                                    <AdvancedCombobox value={brand} onChange={setBrand} options={brandOpts} placeholder="ブランド名..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
-                                </div>
-                                <div>
-                                    <Label className="text-[9px] text-zinc-400">モデル</Label>
-                                    <AdvancedCombobox value={model} onChange={setModel} options={modelOpts} placeholder="モデル名..." />
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <Label className="text-[9px] text-zinc-400">リファレンス</Label>
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+                                <div className="space-y-2">
+                                    <FormRow label="ブランド">
+                                        <AdvancedCombobox value={brand} onChange={setBrand} options={brandOpts} placeholder="ブランド名..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
+                                    </FormRow>
+                                    <FormRow label="モデル">
+                                        <AdvancedCombobox value={model} onChange={setModel} options={modelOpts} placeholder="モデル名..." />
+                                    </FormRow>
+                                    <FormRow label="Ref">
                                         <AdvancedCombobox value={refName} onChange={setRefName} options={refOpts} placeholder="Ref.No..." />
-                                    </div>
-                                    <div>
-                                        <Label className="text-[9px] text-zinc-400">キャリバー</Label>
+                                    </FormRow>
+                                    <FormRow label="Cal">
                                         <AdvancedCombobox value={caliber} onChange={setCaliber} options={calOpts} placeholder="機械番号..." />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <Label className="text-[9px] text-zinc-400">ムーブメント製造元</Label>
+                                    </FormRow>
+                                    <FormRow label="ムーブ製造元">
                                         <AdvancedCombobox value={movementMaker} onChange={setMovementMaker} options={brandOpts} placeholder="OMEGA / ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
-                                    </div>
-                                    <div>
-                                        <Label className="text-[9px] text-zinc-400">ムーブメントCal</Label>
+                                    </FormRow>
+                                    <FormRow label="ムーブCal">
                                         <AdvancedCombobox value={movementCaliber} onChange={setMovementCaliber} options={masterCalOpts} placeholder="1120..." />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <Label className="text-[9px] text-zinc-400">ベースムーブメント製造元</Label>
+                                    </FormRow>
+                                    <FormRow label="ベース製造元">
                                         <AdvancedCombobox value={baseMovementMaker} onChange={setBaseMovementMaker} options={brandOpts} placeholder="ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
-                                    </div>
-                                    <div>
-                                        <Label className="text-[9px] text-zinc-400">ベースムーブメントCal</Label>
+                                    </FormRow>
+                                    <FormRow label="ベースCal">
                                         <AdvancedCombobox value={baseMovementCaliber} onChange={setBaseMovementCaliber} options={masterCalOpts} placeholder="2892.A2..." />
-                                    </div>
+                                    </FormRow>
+                                    <FormRow label="シリアル">
+                                        <Input className="h-8 text-sm font-mono" value={serial} onChange={e => setSerial(e.target.value)} placeholder="X123456" />
+                                    </FormRow>
+                                    <FormRow label="付属品">
+                                        <Input className="h-8 text-sm" value={accessories} onChange={e => setAccessories(e.target.value)} placeholder="箱、保証書等..." />
+                                    </FormRow>
                                 </div>
-                                <div>
-                                    <Label className="text-[9px] text-zinc-400">シリアル番号</Label>
-                                    <Input className="h-7 text-xs font-mono" value={serial} onChange={e => setSerial(e.target.value)} placeholder="X123456" />
-                                </div>
-                                <div>
-                                    <Label className="text-[9px] text-zinc-400">付属品</Label>
-                                    <Input className="h-7 text-xs" value={accessories} onChange={e => setAccessories(e.target.value)} placeholder="箱、保証書等..." />
+                                <div className="lg:pt-1">
+                                    <div className="mb-1 text-xs font-semibold text-zinc-500">正面写真</div>
+                                    {primaryPhotoUrl && !frontImageFailed ? (
+                                        <div className="flex h-96 items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 p-2">
+                                            <img
+                                                src={primaryPhotoUrl}
+                                                alt="時計正面写真"
+                                                className="h-full w-full rounded object-contain"
+                                                onError={() => setFrontImageFailed(true)}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="flex h-72 items-center justify-center rounded-md border border-dashed border-zinc-300 bg-zinc-50 text-xs font-medium text-zinc-400">
+                                            正面写真なし
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </Card>
 
                         {/* ③依頼内容・社内メモ・連絡事項 */}
                         <Card className="p-3 shadow-sm bg-white flex flex-col gap-2">
-                            <div>
-                                <Label className="text-[9px] text-zinc-400">依頼内容 / 症状</Label>
-                                <Textarea className="min-h-[70px] text-xs resize-none bg-yellow-50/50" value={diagnosis} onChange={e => setDiagnosis(e.target.value)} />
-                            </div>
-                            <div>
-                                <Label className="text-[9px] text-zinc-400">社内メモ</Label>
-                                <Textarea className="min-h-[50px] text-xs resize-none bg-zinc-50" value={internalNotes} onChange={e => setInternalNotes(e.target.value)} />
-                            </div>
-                            <div>
-                                <Label className="text-[9px] text-blue-500 font-semibold">お客様連絡事項（見積書に記載）</Label>
-                                <Textarea className="min-h-[50px] text-xs resize-none bg-blue-50/40 border-blue-200" value={customerNote} onChange={e => setCustomerNote(e.target.value)} placeholder="お客様へお伝えする事項を入力（見積書のご連絡事項欄に印字されます）" />
-                            </div>
+                            <FormRow label="依頼内容" className="sm:items-start">
+                                <Textarea className="min-h-[64px] text-sm resize-none bg-yellow-50/50" value={diagnosis} onChange={e => setDiagnosis(e.target.value)} />
+                            </FormRow>
+                            <FormRow label="社内メモ" className="sm:items-start">
+                                <Textarea className="min-h-[52px] text-sm resize-none bg-zinc-50" value={internalNotes} onChange={e => setInternalNotes(e.target.value)} />
+                            </FormRow>
+                            <FormRow label="お客様連絡" className="sm:items-start">
+                                <Textarea className="min-h-[52px] text-sm resize-none bg-blue-50/40 border-blue-200" value={customerNote} onChange={e => setCustomerNote(e.target.value)} placeholder="お客様へお伝えする事項を入力（見積書のご連絡事項欄に印字されます）" />
+                            </FormRow>
                         </Card>
                     </div>
 
-                    {/* 下段：左右 50:50 */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* 右カラム：作業判断・明細入力 */}
+                    <div className="space-y-3">
+                        <div className="grid gap-3">
 
                         {/* ④見積・修理明細テーブル */}
                         <Card className="p-0 shadow-sm border-t-4 border-t-emerald-600 bg-white flex flex-col overflow-visible">
                             <div className="p-2 border-b bg-zinc-50 flex justify-between items-center">
-                                <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase">
+                                <h3 className="text-sm font-bold flex items-center gap-1.5 text-zinc-700 uppercase">
                                     <Settings className="w-3.5 h-3.5" /> 見積・修理明細
                                 </h3>
-                                <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold text-[10px]">合計: ¥{grandTotal.toLocaleString()}</span>
+                                <span className="bg-red-100 text-red-600 px-2 py-1 rounded font-bold text-xs">合計: ¥{grandTotal.toLocaleString()}</span>
                             </div>
                             <div className="overflow-visible p-2 space-y-2">
                                 {/* ヘッダー */}
-                                <div className="grid grid-cols-12 text-[9px] text-zinc-400 font-bold border-b pb-1 px-1">
+                                <div className="grid grid-cols-12 text-xs text-zinc-500 font-bold border-b pb-1 px-1">
                                     <div className="col-span-6">項目 / 部品</div>
                                     <div className="col-span-1 text-right">仕入値</div>
                                     <div className="col-span-2 text-right">上代（税抜）</div>
@@ -1978,15 +2062,15 @@ ${shopName}
                                     const isSearchablePartItem = ((item as { type?: 'labor' | 'part' }).type ?? (isPartItem ? 'part' : 'labor')) === 'part';
                                     const statusLabel = isPartItem ? getStatusLabelForLineItem(item, idx) : null;
                                     return (
-                                    <div key={item.id} className="grid grid-cols-12 items-center text-xs p-1.5 hover:bg-zinc-50 border-b border-zinc-100 last:border-0 group">
-                                        <div className="col-span-6 flex flex-col gap-0.5">
-                                            <div className="flex items-start gap-1">
+                                    <div key={item.id} className="grid grid-cols-12 items-center text-sm p-2 hover:bg-zinc-50 border-b border-zinc-100 last:border-0 group">
+                                        <div className="col-span-6 flex flex-col gap-1">
+                                            <div className="flex items-start gap-1.5">
                                                 <button
                                                     type="button"
                                                     onClick={() => setLineItems(lineItems.map((li, i) =>
                                                         i === idx ? { ...li, category: li.category.includes('part') ? 'internal' : 'part_external' } : li
                                                     ))}
-                                                    className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${item.category.includes('part') ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-zinc-100 text-zinc-500 border-zinc-200'}`}
+                                                    className={`text-xs px-1.5 py-1 rounded border shrink-0 ${item.category.includes('part') ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-zinc-100 text-zinc-500 border-zinc-200'}`}
                                                 >
                                                     {item.category.includes('part') ? '交換部品' : '技術料'}
                                                 </button>
@@ -1997,12 +2081,12 @@ ${shopName}
                                                             : item.name}
                                                     </span>
                                                     {isPartItem && (
-                                                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] text-zinc-500">
+                                                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-500">
                                                             {item.partRef && <span>Ref: {item.partRef}</span>}
                                                             {item.cousinsNumber && <span>Cousins: {item.cousinsNumber}</span>}
                                                             {statusLabel && (
                                                                 <span className={cn(
-                                                                    "rounded border px-1 py-0.5 text-[9px]",
+                                                                    "rounded border px-1.5 py-0.5 text-xs",
                                                                     statusLabel === '在庫あり'
                                                                         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                                                                         : statusLabel === '入荷済み'
@@ -2018,12 +2102,12 @@ ${shopName}
                                                     )}
                                                 </div>
                                             </div>
-                                            {item.spec && <span className="text-[9px] text-zinc-400 pl-0.5">{item.spec}</span>}
+                                            {item.spec && <span className="text-xs text-zinc-400 pl-0.5">{item.spec}</span>}
                                         </div>
                                         <div className="col-span-1">
                                             <input
                                                 type="number"
-                                                className="w-full text-right text-[10px] bg-zinc-50 border border-zinc-200 rounded px-1 py-0.5 font-mono"
+                                                className="h-8 w-full text-right text-sm bg-zinc-50 border border-zinc-200 rounded px-1.5 font-mono"
                                                 value={item.cost ?? ""}
                                                 placeholder="―"
                                                 onChange={e => setLineItems(lineItems.map((li, i) =>
@@ -2034,20 +2118,20 @@ ${shopName}
                                         <div className="col-span-2">
                                             <input
                                                 type="number"
-                                                className="w-full text-right text-[10px] border border-zinc-200 rounded px-1 py-0.5 font-mono"
+                                                className="h-8 w-full text-right text-sm border border-zinc-200 rounded px-1.5 font-mono"
                                                 value={item.price}
                                                 onChange={e => setLineItems(lineItems.map((li, i) =>
                                                     i === idx ? { ...li, price: parseInt(e.target.value) || 0 } : li
                                                 ))}
                                             />
-                                            <div className="mt-0.5 text-right text-[9px] text-zinc-400">
+                                            <div className="mt-0.5 text-right text-xs text-zinc-400">
                                                 税抜小計 ¥{(item.price * (item.quantity || 1)).toLocaleString()}
                                             </div>
                                         </div>
                                         <div className="col-span-1">
                                             <input
                                                 type="number"
-                                                className="w-full text-center text-[10px] border border-zinc-200 rounded px-1 py-0.5"
+                                                className="h-8 w-full text-center text-sm border border-zinc-200 rounded px-1.5"
                                                 value={item.quantity}
                                                 min={1}
                                                 onChange={e => setLineItems(lineItems.map((li, i) =>
@@ -2097,9 +2181,9 @@ ${shopName}
                                 )})}
                                 {/* 入力行 */}
                                 <div className="bg-zinc-50 p-2 rounded border border-zinc-200 mt-2">
-                                    <div className="flex gap-1 mb-1">
+                                    <div className="flex gap-2 mb-2">
                                         <select
-                                            className="h-7 text-[10px] rounded border-zinc-300 bg-white"
+                                            className="h-9 rounded border border-zinc-300 bg-white px-2 text-sm"
                                             value={addItemCategory}
                                             onChange={(e) => {
                                                 const nextCategory = e.target.value as typeof addItemCategory;
@@ -2138,9 +2222,9 @@ ${shopName}
                                         />
                                     </div>
                                     {isAddingPartItem && (
-                                        <div className="mb-1 grid gap-1 md:grid-cols-[120px_1fr_1.2fr]">
+                                        <div className="mb-2 grid gap-2 md:grid-cols-[140px_1fr_1.2fr]">
                                             <select
-                                                className="h-7 rounded border border-zinc-300 bg-white px-2 text-[10px]"
+                                                className="h-9 rounded border border-zinc-300 bg-white px-2 text-sm"
                                                 value={selectedPartInputType}
                                                 onChange={(e) => handlePartInputTypeChange(e.target.value as PartInputType)}
                                             >
@@ -2151,7 +2235,7 @@ ${shopName}
                                                 ))}
                                             </select>
                                             <select
-                                                className="h-7 rounded border border-zinc-300 bg-white px-2 text-[10px]"
+                                                className="h-9 rounded border border-zinc-300 bg-white px-2 text-sm"
                                                 value={selectedPartCategoryKey}
                                                 onChange={(e) => handlePartCategoryChange(e.target.value)}
                                             >
@@ -2163,7 +2247,7 @@ ${shopName}
                                                 ))}
                                             </select>
                                             <select
-                                                className="h-7 rounded border border-zinc-300 bg-white px-2 text-[10px]"
+                                                className="h-9 rounded border border-zinc-300 bg-white px-2 text-sm"
                                                 value={selectedPartNameKey}
                                                 onChange={(e) => handlePartNameChange(e.target.value)}
                                                 disabled={!selectedPartCategoryKey}
@@ -2178,75 +2262,87 @@ ${shopName}
                                         </div>
                                     )}
                                     {!isAddingPartItem && (
-                                        <div className="mb-1 rounded border border-dashed border-zinc-200 bg-white">
+                                        <div className="mb-2 rounded border border-dashed border-zinc-200 bg-white">
                                             <button
                                                 type="button"
-                                                className="flex h-7 w-full items-center justify-between px-2 text-[10px] font-medium text-zinc-600 hover:bg-zinc-50"
+                                                className="flex h-8 w-full items-center justify-between px-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
                                                 onClick={() => setStructuredWorkOpen((open) => !open)}
                                             >
                                                 <span>詳細な作業分類を入力する</span>
                                                 <ChevronDown className={cn("h-3 w-3 transition-transform", structuredWorkOpen && "rotate-180")} />
                                             </button>
                                             {structuredWorkOpen && (
-                                                <div className="grid gap-1 border-t border-zinc-100 p-2 md:grid-cols-4">
-                                                    <select
-                                                        className="h-7 rounded border border-zinc-300 bg-white px-2 text-xs"
-                                                        value={newWorkCategoryId}
-                                                        onChange={(e) => handleRepairWorkCategoryChange(e.target.value)}
-                                                    >
-                                                        <option value="">作業カテゴリ</option>
-                                                        {repairWorkCategoryOptions.map((option) => (
-                                                            <option key={option.id} value={option.id}>
-                                                                {option.name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    <select
-                                                        className="h-7 rounded border border-zinc-300 bg-white px-2 text-xs"
-                                                        value={newTargetPartNameId}
-                                                        onChange={(e) => handleTargetPartNameChange(e.target.value)}
-                                                    >
-                                                        <option value="">対象部品</option>
-                                                        {workTargetPartOptions.map((option) => (
-                                                            <option key={option.id} value={option.id}>
-                                                                {option.categoryName ? `${option.name}（${option.categoryName}）` : option.name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    <select
-                                                        className="h-7 rounded border border-zinc-300 bg-white px-2 text-xs"
-                                                        value={newWorkActionId}
-                                                        onChange={(e) => handleRepairWorkActionChange(e.target.value)}
-                                                    >
-                                                        <option value="">処置</option>
-                                                        {repairWorkActionOptions.map((option) => (
-                                                            <option key={option.id} value={option.id}>
-                                                                {option.name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    <Input
-                                                        className="h-7 text-xs"
-                                                        placeholder="detail: ブッシュ / ピン / 穴"
-                                                        value={newWorkDetailLabel}
-                                                        onChange={(e) => setNewWorkDetailLabel(e.target.value)}
-                                                    />
+                                                <div className="grid gap-2 border-t border-zinc-100 p-3 md:grid-cols-3">
+                                                    <label className="space-y-1">
+                                                        <span className="text-xs font-semibold text-zinc-500">作業カテゴリ</span>
+                                                        <select
+                                                            className="h-9 w-full rounded border border-zinc-300 bg-white px-2 text-sm"
+                                                            value={newWorkCategoryId}
+                                                            onChange={(e) => handleRepairWorkCategoryChange(e.target.value)}
+                                                        >
+                                                            <option value="">選択なし</option>
+                                                            {repairWorkCategoryOptions.map((option) => (
+                                                                <option key={option.id} value={option.id}>
+                                                                    {option.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </label>
+                                                    <label className="space-y-1">
+                                                        <span className="text-xs font-semibold text-zinc-500">対象部品</span>
+                                                        <select
+                                                            className="h-9 w-full rounded border border-zinc-300 bg-white px-2 text-sm"
+                                                            value={newTargetPartNameId}
+                                                            onChange={(e) => handleTargetPartNameChange(e.target.value)}
+                                                        >
+                                                            <option value="">選択なし</option>
+                                                            {workTargetPartOptions.map((option) => (
+                                                                <option key={option.id} value={option.id}>
+                                                                    {option.categoryName ? `${option.name}（${option.categoryName}）` : option.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </label>
+                                                    <label className="space-y-1">
+                                                        <span className="text-xs font-semibold text-zinc-500">処置</span>
+                                                        <select
+                                                            className="h-9 w-full rounded border border-zinc-300 bg-white px-2 text-sm"
+                                                            value={newWorkActionId}
+                                                            onChange={(e) => handleRepairWorkActionChange(e.target.value)}
+                                                        >
+                                                            <option value="">選択なし</option>
+                                                            {repairWorkActionOptions.map((option) => (
+                                                                <option key={option.id} value={option.id}>
+                                                                    {option.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </label>
+                                                    <label className="space-y-1 md:col-span-3">
+                                                        <span className="text-xs font-semibold text-zinc-500">detail</span>
+                                                        <Input
+                                                            className="h-9 text-sm"
+                                                            placeholder="ブッシュ / ピン / 穴"
+                                                            value={newWorkDetailLabel}
+                                                            onChange={(e) => setNewWorkDetailLabel(e.target.value)}
+                                                        />
+                                                    </label>
                                                 </div>
                                             )}
                                         </div>
                                     )}
-                                    <div className="flex gap-1">
-                                        <Input className="h-7 text-xs flex-1" placeholder="備考/仕様" value={newItemSpec} onChange={e => setNewItemSpec(e.target.value)} />
-                                        <div className="relative w-16">
-                                            <span className="absolute left-1.5 top-1.5 text-[9px] text-zinc-400">仕入</span>
-                                            <Input className="h-7 text-xs pl-6 font-mono text-right" placeholder="0" value={newItemCost} onChange={e => setNewItemCost(e.target.value)} />
-                                        </div>
+                                    <div className="flex gap-2">
+                                        <Input className="h-9 text-sm flex-1" placeholder="備考/仕様" value={newItemSpec} onChange={e => setNewItemSpec(e.target.value)} />
                                         <div className="relative w-20">
-                                            <span className="absolute left-1.5 top-1.5 text-[9px]">¥</span>
-                                            <Input className="h-7 text-xs pl-4 font-mono text-right" placeholder="0" value={newItemPrice} onChange={e => setNewItemPrice(e.target.value)} />
+                                            <span className="absolute left-2 top-2.5 text-xs text-zinc-400">仕入</span>
+                                            <Input className="h-9 text-sm pl-8 font-mono text-right" placeholder="0" value={newItemCost} onChange={e => setNewItemCost(e.target.value)} />
                                         </div>
-                                        <Input className="h-7 text-xs w-12 text-center font-mono" placeholder="1" value={newItemQty} onChange={e => setNewItemQty(e.target.value)} type="number" min={1} />
-                                        <Button size="sm" className="h-7 w-8 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
+                                        <div className="relative w-24">
+                                            <span className="absolute left-2 top-2.5 text-xs">¥</span>
+                                            <Input className="h-9 text-sm pl-5 font-mono text-right" placeholder="0" value={newItemPrice} onChange={e => setNewItemPrice(e.target.value)} />
+                                        </div>
+                                        <Input className="h-9 text-sm w-14 text-center font-mono" placeholder="1" value={newItemQty} onChange={e => setNewItemQty(e.target.value)} type="number" min={1} />
+                                        <Button size="sm" className="h-9 w-10 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
                                             if (!newItemName) return;
                                             const fallbackMatch = addItemCategory === 'part_external'
                                                 ? workOpts.find(w => w.value === newItemName && w.partId)
@@ -2296,6 +2392,10 @@ ${shopName}
                                         </Button>
                                     </div>
                                 </div>
+                            </div>
+                            <div className="border-t bg-emerald-50/70 px-3 py-2 text-right">
+                                <span className="mr-2 text-sm font-semibold text-emerald-800">合計金額</span>
+                                <span className="text-xl font-bold text-emerald-900">¥{grandTotal.toLocaleString()}</span>
                             </div>
                         </Card>
 
@@ -2357,8 +2457,10 @@ ${shopName}
                                 )}
                             </div>
                         </div>
+                        {/* future action buttons area */}
                     </div>
 
+                    </div>
                 </div>
                 )}
 

@@ -27,6 +27,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
             estimate: {
                 include: {
                     items: {
+                        orderBy: { id: "asc" },
                         include: {
                             partsMaster: {
                                 select: {
@@ -43,6 +44,19 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                             }
                         }
                     }
+                }
+            },
+            repairLineItems: {
+                orderBy: { id: "asc" },
+                select: {
+                    lineType: true,
+                    repairWorkCategoryId: true,
+                    repairWorkActionId: true,
+                    targetPartNameId: true,
+                    detailLabelSnapshot: true,
+                    categoryNameSnapshot: true,
+                    targetPartNameSnapshot: true,
+                    actionNameSnapshot: true,
                 }
             },
             orderRequests: {
@@ -83,8 +97,42 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
     });
 
     // JSON.parse(JSON.stringify(...)) で Date オブジェクトを文字列化してクライアントへ渡す
+    const laborRepairLineItems = repair.repairLineItems.filter((item) => item.lineType === "LABOR");
+    let laborLineIndex = 0;
+    const estimateItemsWithStructuredFields = repair.estimate?.items.map((item) => {
+        const repairLineItem = item.type === "labor"
+            ? laborRepairLineItems[laborLineIndex++]
+            : null;
+        if (!repairLineItem) {
+            return {
+                ...item,
+                repairWorkCategoryId: null,
+                repairWorkActionId: null,
+                targetPartNameId: null,
+                detailLabelSnapshot: null,
+                categoryNameSnapshot: null,
+                targetPartNameSnapshot: null,
+                actionNameSnapshot: null,
+            };
+        }
+
+        return {
+            ...item,
+            repairWorkCategoryId: repairLineItem.repairWorkCategoryId,
+            repairWorkActionId: repairLineItem.repairWorkActionId,
+            targetPartNameId: repairLineItem.targetPartNameId,
+            detailLabelSnapshot: repairLineItem.detailLabelSnapshot,
+            categoryNameSnapshot: repairLineItem.categoryNameSnapshot,
+            targetPartNameSnapshot: repairLineItem.targetPartNameSnapshot,
+            actionNameSnapshot: repairLineItem.actionNameSnapshot,
+        };
+    });
+
     const initialData = JSON.parse(JSON.stringify({
         ...repair,
+        estimate: repair.estimate
+            ? { ...repair.estimate, items: estimateItemsWithStructuredFields }
+            : null,
         statusLog,
         // 帳票情報をフラットに渡す
         issuedEstimate: repair.estimateDocument
