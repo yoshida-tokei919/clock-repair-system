@@ -20,6 +20,9 @@ async function main() {
         { name: 'remove',          displayName: '除去',   sortOrder: 100 },
         { name: 'hole_tightening', displayName: '穴締め', sortOrder: 110 },
         { name: 'staking',         displayName: 'かしめ', sortOrder: 120 },
+        { name: 'overhaul',        displayName: 'オーバーホール', sortOrder: 130 },
+        { name: 'inspection',      displayName: '検査',           sortOrder: 140 },
+        { name: 'other',           displayName: 'その他',         sortOrder: 150 },
     ]
     for (const action of repairWorkActions) {
         await prisma.repairWorkAction.upsert({
