@@ -487,6 +487,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         const normalized = value.replace(/\s+/g, " ").trim();
         return normalized || null;
     }, []);
+    const displayValueOrDash = useCallback((value?: string | null) => {
+        const normalized = (value ?? "").trim();
+        return normalized || "-";
+    }, []);
+    const displayCalMaker = movementMaker || (!movementCaliber && caliber ? brand : "");
+    const displayCalName = movementCaliber || caliber;
     const resetStructuredWorkInputs = useCallback(() => {
         setNewWorkCategoryId("");
         setNewWorkCategorySnapshot("");
@@ -2019,21 +2025,56 @@ ${shopName}
                                     <FormRow label="Ref">
                                         <AdvancedCombobox value={refName} onChange={setRefName} options={refOpts} placeholder="Ref.No..." />
                                     </FormRow>
-                                    <FormRow label="Cal">
-                                        <AdvancedCombobox value={caliber} onChange={setCaliber} options={calOpts} placeholder="機械番号..." />
-                                    </FormRow>
-                                    <FormRow label="ムーブ製造元">
-                                        <AdvancedCombobox value={movementMaker} onChange={setMovementMaker} options={brandOpts} placeholder="OMEGA / ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
-                                    </FormRow>
-                                    <FormRow label="ムーブCal">
-                                        <AdvancedCombobox value={movementCaliber} onChange={setMovementCaliber} options={masterCalOpts} placeholder="1120..." />
-                                    </FormRow>
-                                    <FormRow label="ベース製造元">
-                                        <AdvancedCombobox value={baseMovementMaker} onChange={setBaseMovementMaker} options={brandOpts} placeholder="ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
-                                    </FormRow>
-                                    <FormRow label="ベースCal">
-                                        <AdvancedCombobox value={baseMovementCaliber} onChange={setBaseMovementCaliber} options={masterCalOpts} placeholder="2892.A2..." />
-                                    </FormRow>
+                                    <div className="grid gap-2 rounded-md border border-zinc-200 bg-zinc-50/70 p-2 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <div className="text-xs font-bold text-zinc-700">Cal</div>
+                                            {isReadOnly ? (
+                                                <div className="space-y-1 text-sm">
+                                                    <div className="grid grid-cols-[72px_1fr] gap-2">
+                                                        <span className="text-xs font-semibold text-zinc-500">メーカー</span>
+                                                        <span className="font-medium text-zinc-800">{displayValueOrDash(displayCalMaker)}</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-[72px_1fr] gap-2">
+                                                        <span className="text-xs font-semibold text-zinc-500">Cal</span>
+                                                        <span className="font-medium text-zinc-800">{displayValueOrDash(displayCalName)}</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-1">
+                                                    <FormRow label="メーカー">
+                                                        <AdvancedCombobox value={movementMaker} onChange={setMovementMaker} options={brandOpts} placeholder="OMEGA / ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
+                                                    </FormRow>
+                                                    <FormRow label="Cal">
+                                                        <AdvancedCombobox value={movementCaliber} onChange={setMovementCaliber} options={masterCalOpts} placeholder="1120..." />
+                                                    </FormRow>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="text-xs font-bold text-zinc-700">Base Cal</div>
+                                            {isReadOnly ? (
+                                                <div className="space-y-1 text-sm">
+                                                    <div className="grid grid-cols-[72px_1fr] gap-2">
+                                                        <span className="text-xs font-semibold text-zinc-500">メーカー</span>
+                                                        <span className="font-medium text-zinc-800">{displayValueOrDash(baseMovementMaker)}</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-[72px_1fr] gap-2">
+                                                        <span className="text-xs font-semibold text-zinc-500">Cal</span>
+                                                        <span className="font-medium text-zinc-800">{displayValueOrDash(baseMovementCaliber)}</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-1">
+                                                    <FormRow label="メーカー">
+                                                        <AdvancedCombobox value={baseMovementMaker} onChange={setBaseMovementMaker} options={brandOpts} placeholder="ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
+                                                    </FormRow>
+                                                    <FormRow label="Cal">
+                                                        <AdvancedCombobox value={baseMovementCaliber} onChange={setBaseMovementCaliber} options={masterCalOpts} placeholder="2892.A2..." />
+                                                    </FormRow>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                     <FormRow label="シリアル">
                                         <Input className="h-8 text-sm font-mono" value={serial} onChange={e => setSerial(e.target.value)} placeholder="X123456" />
                                     </FormRow>
