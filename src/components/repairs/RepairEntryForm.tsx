@@ -44,6 +44,10 @@ import {
     buildSearchUrls,
     type SearchSite,
 } from "@/lib/part-search";
+import {
+    getTargetPartKeysForRepairWorkCategory,
+    hasTargetPartMappingForRepairWorkCategory,
+} from "@/lib/repair-work-target-part-filter";
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { toast } from "@/components/ui/use-toast";
 
@@ -504,11 +508,48 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         () => selectedPartNameKey ? getPartNameOptionByKey(selectedPartNameKey) : undefined,
         [selectedPartNameKey]
     );
+    const selectedRepairWorkCategoryKey = useMemo(() => {
+        if (!newWorkCategoryId) return null;
+        return repairWorkCategoryOptions.find((option) => String(option.id) === newWorkCategoryId)?.key ?? null;
+    }, [newWorkCategoryId, repairWorkCategoryOptions]);
+    const filteredWorkTargetPartOptions = useMemo(() => {
+        if (!newWorkCategoryId) return workTargetPartOptions;
+
+        const targetPartKeys = getTargetPartKeysForRepairWorkCategory(selectedRepairWorkCategoryKey);
+        if (!targetPartKeys) return [];
+
+        const keySet = new Set(targetPartKeys);
+        return workTargetPartOptions.filter((option) => option.key ? keySet.has(option.key) : false);
+    }, [newWorkCategoryId, selectedRepairWorkCategoryKey, workTargetPartOptions]);
+    const targetPartCandidateMessage = useMemo(() => {
+        if (!newWorkCategoryId) return "";
+        if (!hasTargetPartMappingForRepairWorkCategory(selectedRepairWorkCategoryKey)) {
+            return "このカテゴリの対象部品候補は未設定です";
+        }
+        if (filteredWorkTargetPartOptions.length === 0) {
+            return "対象部品候補が未設定です。seed未投入、またはmapping未設定の可能性があります。";
+        }
+        return "";
+    }, [filteredWorkTargetPartOptions.length, newWorkCategoryId, selectedRepairWorkCategoryKey]);
     const handleRepairWorkCategoryChange = useCallback((nextId: string) => {
         setNewWorkCategoryId(nextId);
         const selected = repairWorkCategoryOptions.find((option) => String(option.id) === nextId);
         setNewWorkCategorySnapshot(selected?.name ?? "");
-    }, [repairWorkCategoryOptions]);
+        if (!nextId) return;
+
+        const targetPartKeys = getTargetPartKeysForRepairWorkCategory(selected?.key);
+        if (!targetPartKeys) {
+            setNewTargetPartNameId("");
+            setNewTargetPartNameSnapshot("");
+            return;
+        }
+
+        const currentTargetPart = workTargetPartOptions.find((option) => option.id === newTargetPartNameId);
+        if (currentTargetPart?.key && targetPartKeys.includes(currentTargetPart.key)) return;
+
+        setNewTargetPartNameId("");
+        setNewTargetPartNameSnapshot("");
+    }, [newTargetPartNameId, repairWorkCategoryOptions, workTargetPartOptions]);
     const handleRepairWorkActionChange = useCallback((nextId: string) => {
         setNewWorkActionId(nextId);
         const selected = repairWorkActionOptions.find((option) => String(option.id) === nextId);
@@ -516,9 +557,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, [repairWorkActionOptions]);
     const handleTargetPartNameChange = useCallback((nextId: string) => {
         setNewTargetPartNameId(nextId);
-        const selected = workTargetPartOptions.find((option) => option.id === nextId);
+        const selected = filteredWorkTargetPartOptions.find((option) => option.id === nextId);
         setNewTargetPartNameSnapshot(selected?.name ?? "");
-    }, [workTargetPartOptions]);
+    }, [filteredWorkTargetPartOptions]);
 
     const handlePartInputTypeChange = useCallback((nextType: PartInputType) => {
         setSelectedPartInputType(nextType);
@@ -2294,14 +2335,18 @@ ${shopName}
                                                             className="h-9 w-full rounded border border-zinc-300 bg-white px-2 text-sm"
                                                             value={newTargetPartNameId}
                                                             onChange={(e) => handleTargetPartNameChange(e.target.value)}
+                                                            disabled={Boolean(newWorkCategoryId) && filteredWorkTargetPartOptions.length === 0}
                                                         >
                                                             <option value="">選択なし</option>
-                                                            {workTargetPartOptions.map((option) => (
+                                                            {filteredWorkTargetPartOptions.map((option) => (
                                                                 <option key={option.id} value={option.id}>
                                                                     {option.categoryName ? `${option.name}（${option.categoryName}）` : option.name}
                                                                 </option>
                                                             ))}
                                                         </select>
+                                                        {targetPartCandidateMessage && (
+                                                            <p className="text-xs text-zinc-400">{targetPartCandidateMessage}</p>
+                                                        )}
                                                     </label>
                                                     <label className="space-y-1">
                                                         <span className="text-xs font-semibold text-zinc-500">処置</span>
