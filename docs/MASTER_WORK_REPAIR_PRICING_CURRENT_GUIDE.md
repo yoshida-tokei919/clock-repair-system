@@ -503,3 +503,32 @@ Task 完了時には、以下を報告する。
 - `docs/ai-tasks/109-3-seed-internal-part-name-diff.md`
 - `prisma/schema.prisma`
 
+## 20. 108-10AA / 108-10AB で確定した PricingRule schema 方針
+
+108-10AA で、`PricingRule` の schema / index / unique 制約方針を設計した。
+108-10AB で、その第一段階として `PricingRule.repairWorkNameId` を schema に追加し、`PricingRule` から `RepairWorkName` へ接続できるようにした。
+
+追加済みの方針:
+
+- `PricingRule.repairWorkNameId` を nullable field として追加する。
+- `PricingRule.repairWorkName` relation と `RepairWorkName.pricingRules` inverse relation を追加する。
+- `PricingRule` は価格ルールであり、作業名マスタ本体にはしない。
+- 既存の `repairWorkCategoryId` / `targetPartNameId` / `repairWorkActionId` / `detailLabel` / `suggestedWorkName` は残す。
+- `suggestedWorkName` は主キー的な判定軸ではなく、display / fallback / migration compat として扱う。
+- 業務 `@@unique` は初期では置かない。nullable field が多いため、同一価格ルール判定は後続 Task でアプリ側 helper に寄せる。
+- Cal 設計は短期では `PricingRule.caliberId` 1 本を維持する。`caliberRole`、`movementCaliberId`、`baseMovementCaliberId` は今回追加しない。
+- `customerType` は既存の nullable field を維持し、今回ロジック変更しない。
+- 既存の仮 PricingRule はまだ削除していない。
+
+108-10AB では schema / relation / index の最小実装だけを行い、以下は変更していない。
+
+- Repair API の PricingRule 自動作成・更新
+- `getPricingRules`
+- `RepairEntryForm`
+- seed
+- DB データ
+- 帳票 / PDF / LINE / 共有ページ
+- PublicCase
+- PartsMaster / `getPartsMatched` / PartsSearchPanel
+
+次は、PricingRule 自動作成・更新と `getPricingRules` の構造化対応へ進む。

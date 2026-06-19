@@ -260,6 +260,9 @@ model PricingRule {
   suggestedWorkName String
   notes             String?
 
+  repairWorkNameId Int?
+  repairWorkName   RepairWorkName? @relation("PricingRuleWorkName", fields: [repairWorkNameId], references: [id])
+
   repairWorkCategoryId Int?
   repairWorkCategory   RepairWorkCategory? @relation("PricingRuleWorkCategory", fields: [repairWorkCategoryId], references: [id])
 
@@ -273,10 +276,18 @@ model PricingRule {
 
   repairLineItems RepairLineItem[]
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([brandId, modelId, caliberId])
+  @@index([brandId, customerType])
+  @@index([repairWorkNameId])
+  @@index([brandId, repairWorkNameId])
   @@index([repairWorkCategoryId])
   @@index([repairWorkActionId])
   @@index([targetPartNameId])
   @@index([repairWorkCategoryId, repairWorkActionId, targetPartNameId])
+  @@index([brandId, repairWorkCategoryId, targetPartNameId, repairWorkActionId])
 }
 
 model Estimate {
@@ -467,6 +478,7 @@ model RepairWorkName {
   category       RepairWorkCategory @relation(fields: [categoryId], references: [id])
   targetPartName PartNameMaster?    @relation(fields: [targetPartNameId], references: [id])
   action         RepairWorkAction?   @relation(fields: [actionId], references: [id])
+  pricingRules   PricingRule[]      @relation("PricingRuleWorkName")
 
   @@index([repairType])
   @@index([categoryId])
