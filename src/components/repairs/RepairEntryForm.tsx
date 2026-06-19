@@ -1292,13 +1292,32 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         const c = calOpts.find(o => o.value === caliber || o.label === caliber);
 
         if (addItemCategory === 'internal') {
-            const pricingCaliberId =
-                masterCalOpts.find(o => o.value === movementCaliber || o.label === movementCaliber)?.id ??
-                masterCalOpts.find(o => o.value === baseMovementCaliber || o.label === baseMovementCaliber)?.id ??
-                c?.id;
+            const movementCaliberId = getOptionIdByValue(masterCalOpts, movementCaliber);
+            const baseMovementCaliberId = getOptionIdByValue(masterCalOpts, baseMovementCaliber);
+            const watchCaliberId = c?.id ?? null;
+            const pricingCaliberIds = [movementCaliberId, baseMovementCaliberId, watchCaliberId]
+                .filter((id): id is number => typeof id === 'number')
+                .filter((id, index, ids) => ids.indexOf(id) === index);
+
             // Fetch labor/work rules
-            getPricingRules(b.id, m?.id, pricingCaliberId).then(rules => {
-                const safeRules = Array.isArray(rules) ? rules : [];
+            Promise.all([
+                ...pricingCaliberIds.map((pricingCaliberId) => getPricingRules(b.id, m?.id, pricingCaliberId)),
+                getPricingRules(b.id, m?.id, undefined),
+            ]).then((ruleGroups) => {
+                const seenRuleIds = new Set<number>();
+                const safeRules = ruleGroups.flatMap((rules, groupIndex) => {
+                    const expectedCaliberId = groupIndex < pricingCaliberIds.length
+                        ? pricingCaliberIds[groupIndex]
+                        : null;
+
+                    return (Array.isArray(rules) ? rules : []).filter((rule) => {
+                        if (rule.caliberId !== expectedCaliberId) return false;
+                        if (seenRuleIds.has(rule.id)) return false;
+                        seenRuleIds.add(rule.id);
+                        return true;
+                    });
+                });
+
                 setWorkOpts(safeRules.map(r => ({
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
@@ -1346,7 +1365,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     console.log(`Fetched ${parts.length} matching parts for brand ${b.id}`);
                 });
             }
-    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, newItemName]);
+    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, newItemName, getOptionIdByValue]);
 
     // --- CALCULATIONS ---
     const totalAmount = lineItems.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);
@@ -2488,7 +2507,15 @@ ${shopName}
                                         </div>
                                         <Input className="h-9 text-sm w-14 text-center font-mono" placeholder="1" value={newItemQty} onChange={e => setNewItemQty(e.target.value)} type="number" min={1} />
                                         <Button size="sm" className="h-9 w-10 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
-                                            if (!newItemName) return;
+                                            const structuredWorkName = addItemCategory === 'internal'
+                                                ? [
+                                                    cleanOptionalText(newTargetPartNameSnapshot) ?? cleanOptionalText(newWorkCategorySnapshot),
+                                                    cleanOptionalText(newWorkActionSnapshot),
+                                                    cleanOptionalText(newWorkDetailLabel),
+                                                ].filter(Boolean).join(" ")
+                                                : "";
+                                            const resolvedItemName = cleanOptionalText(newItemName) ?? structuredWorkName;
+                                            if (!resolvedItemName) return;
                                             const fallbackMatch = addItemCategory === 'part_external'
                                                 ? workOpts.find(w => w.value === newItemName && w.partId)
                                                 : undefined;
@@ -2498,7 +2525,7 @@ ${shopName}
                                             const baseItem: LineItem = {
                                                 id: `auto-${Date.now()}`,
                                                 category: addItemCategory,
-                                                name: newItemName,
+                                                name: resolvedItemName,
                                                 cost: parseInt(newItemCost) || undefined,
                                                 price: parseInt(newItemPrice) || 0,
                                                 quantity: parseInt(newItemQty) || 1,
