@@ -909,6 +909,59 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [customerOpts, setCustomerOpts] = useState<any[]>([]);
     const [workOpts, setWorkOpts] = useState<any[]>([]);
 
+    const getOptionIdByValue = useCallback((options: any[], value: string) => {
+        const normalizedValue = value.trim();
+        if (!normalizedValue) return null;
+        return options.find((option) => option.value === normalizedValue || option.label === normalizedValue)?.id ?? null;
+    }, []);
+
+    const isValueInOptions = useCallback((value: string, options: any[]) => {
+        const normalizedValue = value.trim();
+        if (!normalizedValue) return true;
+        return options.some((option) => option.value === normalizedValue || option.label === normalizedValue);
+    }, []);
+
+    const movementMakerId = useMemo(
+        () => getOptionIdByValue(brandOpts, movementMaker),
+        [brandOpts, getOptionIdByValue, movementMaker]
+    );
+    const baseMovementMakerId = useMemo(
+        () => getOptionIdByValue(brandOpts, baseMovementMaker),
+        [baseMovementMaker, brandOpts, getOptionIdByValue]
+    );
+
+    const filteredMovementCalOpts = useMemo(() => {
+        if (!movementMakerId) return masterCalOpts;
+        return masterCalOpts.filter((option) => option.brandId === movementMakerId);
+    }, [masterCalOpts, movementMakerId]);
+
+    const filteredBaseMovementCalOpts = useMemo(() => {
+        if (!baseMovementMakerId) return masterCalOpts;
+        return masterCalOpts.filter((option) => option.brandId === baseMovementMakerId);
+    }, [baseMovementMakerId, masterCalOpts]);
+
+    const handleMovementMakerChange = useCallback((nextMaker: string) => {
+        setMovementMaker(nextMaker);
+        const nextMakerId = getOptionIdByValue(brandOpts, nextMaker);
+        if (!nextMakerId || !movementCaliber) return;
+
+        const nextCalOptions = masterCalOpts.filter((option) => option.brandId === nextMakerId);
+        if (!isValueInOptions(movementCaliber, nextCalOptions)) {
+            setMovementCaliber("");
+        }
+    }, [brandOpts, getOptionIdByValue, isValueInOptions, masterCalOpts, movementCaliber]);
+
+    const handleBaseMovementMakerChange = useCallback((nextMaker: string) => {
+        setBaseMovementMaker(nextMaker);
+        const nextMakerId = getOptionIdByValue(brandOpts, nextMaker);
+        if (!nextMakerId || !baseMovementCaliber) return;
+
+        const nextCalOptions = masterCalOpts.filter((option) => option.brandId === nextMakerId);
+        if (!isValueInOptions(baseMovementCaliber, nextCalOptions)) {
+            setBaseMovementCaliber("");
+        }
+    }, [baseMovementCaliber, brandOpts, getOptionIdByValue, isValueInOptions, masterCalOpts]);
+
     // --- 6. DIALOGS ---
     const [quickRegOpen, setQuickRegOpen] = useState(false);
     const [mobileQR, setMobileQR] = useState(false);
@@ -1173,7 +1226,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // --- INITIAL LOAD ---
     useEffect(() => {
         getBrands().then(d => setBrandOpts(d.map(b => ({ label: b.name, value: b.name, id: b.id }))));
-        getCalibers().then(d => setMasterCalOpts(d.map((c: any) => ({ label: c.name, value: c.name, id: c.id }))));
+        getCalibers().then(d => setMasterCalOpts(d.map((c: any) => ({ label: c.name, value: c.name, id: c.id, brandId: c.brandId ?? null }))));
     }, []);
 
     // --- LOOKUP CHAINS ---
@@ -2042,11 +2095,14 @@ ${shopName}
                                             ) : (
                                                 <div className="space-y-1">
                                                     <FormRow label="メーカー">
-                                                        <AdvancedCombobox value={movementMaker} onChange={setMovementMaker} options={brandOpts} placeholder="OMEGA / ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
+                                                        <AdvancedCombobox value={movementMaker} onChange={handleMovementMakerChange} options={brandOpts} placeholder="OMEGA / ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
                                                     </FormRow>
                                                     <FormRow label="Cal">
-                                                        <AdvancedCombobox value={movementCaliber} onChange={setMovementCaliber} options={masterCalOpts} placeholder="1120..." />
+                                                        <AdvancedCombobox value={movementCaliber} onChange={setMovementCaliber} options={filteredMovementCalOpts} placeholder="1120..." />
                                                     </FormRow>
+                                                    {movementMakerId && filteredMovementCalOpts.length === 0 ? (
+                                                        <p className="pl-[72px] text-[11px] text-zinc-500">このメーカーのCal候補は未登録です。</p>
+                                                    ) : null}
                                                 </div>
                                             )}
                                         </div>
@@ -2066,11 +2122,14 @@ ${shopName}
                                             ) : (
                                                 <div className="space-y-1">
                                                     <FormRow label="メーカー">
-                                                        <AdvancedCombobox value={baseMovementMaker} onChange={setBaseMovementMaker} options={brandOpts} placeholder="ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
+                                                        <AdvancedCombobox value={baseMovementMaker} onChange={handleBaseMovementMakerChange} options={brandOpts} placeholder="ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
                                                     </FormRow>
                                                     <FormRow label="Cal">
-                                                        <AdvancedCombobox value={baseMovementCaliber} onChange={setBaseMovementCaliber} options={masterCalOpts} placeholder="2892.A2..." />
+                                                        <AdvancedCombobox value={baseMovementCaliber} onChange={setBaseMovementCaliber} options={filteredBaseMovementCalOpts} placeholder="2892.A2..." />
                                                     </FormRow>
+                                                    {baseMovementMakerId && filteredBaseMovementCalOpts.length === 0 ? (
+                                                        <p className="pl-[72px] text-[11px] text-zinc-500">このメーカーのCal候補は未登録です。</p>
+                                                    ) : null}
                                                 </div>
                                             )}
                                         </div>
