@@ -52,7 +52,9 @@ export async function findOrCreateBrand(db: PrismaLike, rawName: string) {
 export async function findOrCreateCaliber(db: PrismaLike, rawName: string, brandId?: number | null) {
     const name = rawName.trim();
     const normalized = normalizeCaliberName(name);
+    const scopedBrandId = brandId ?? null;
     const calibers = await db.caliber.findMany({
+        where: { brandId: scopedBrandId },
         select: {
             id: true,
             brandId: true,
@@ -63,23 +65,16 @@ export async function findOrCreateCaliber(db: PrismaLike, rawName: string, brand
             standardWorkMinutes: true,
         },
     });
-    const existing = calibers.find((caliber) =>
+    const scopedExisting = calibers.find((caliber) =>
+        caliber.brandId === scopedBrandId &&
         matchesNormalizedCaliber([caliber.name, caliber.nameEn, caliber.nameJp], normalized)
     );
-    if (existing) {
-        if (brandId && !existing.brandId) {
-            return await db.caliber.update({
-                where: { id: existing.id },
-                data: { brandId },
-            });
-        }
-        return existing;
-    }
+    if (scopedExisting) return scopedExisting;
 
     return await db.caliber.create({
         data: {
             name: normalized,
-            brandId: brandId ?? null,
+            brandId: scopedBrandId,
         },
     });
 }
