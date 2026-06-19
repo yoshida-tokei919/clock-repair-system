@@ -29,7 +29,7 @@ function assertNoDuplicateKeys(label: string, items: ReadonlyArray<{ key: string
   }
 }
 
-async function main() {
+export async function seedPartStandardMasters(client: PrismaClient = prisma) {
   assertNoDuplicateKeys("PART_CATEGORIES", PART_CATEGORIES);
   assertNoDuplicateKeys("PART_NAME_OPTIONS", PART_NAME_OPTIONS);
   assertNoDuplicateKeys("PART_GRADES", PART_GRADES);
@@ -38,7 +38,7 @@ async function main() {
 
   for (let index = 0; index < PART_CATEGORIES.length; index += 1) {
     const category = PART_CATEGORIES[index];
-    const savedCategory = await prisma.partCategoryMaster.upsert({
+    const savedCategory = await client.partCategoryMaster.upsert({
       where: { key: category.key },
       update: {
         partType: category.partType,
@@ -65,7 +65,7 @@ async function main() {
   }
 
   for (const grade of PART_GRADES) {
-    await prisma.partGradeMaster.upsert({
+    await client.partGradeMaster.upsert({
       where: { key: grade.key },
       update: {
         nameJa: grade.nameJa,
@@ -98,7 +98,7 @@ async function main() {
       );
     }
 
-    await prisma.partNameMaster.upsert({
+    await client.partNameMaster.upsert({
       where: { key: partName.key },
       update: {
         categoryId: category.id,
@@ -130,11 +130,13 @@ async function main() {
   console.log("Done.");
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (require.main === module) {
+  seedPartStandardMasters()
+    .catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

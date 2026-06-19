@@ -1,5 +1,6 @@
 // prisma/seed.ts
 import { PrismaClient, RepairWorkType } from '@prisma/client'
+import { seedPartStandardMasters } from '../scripts/seed-part-standard-masters'
 
 const prisma = new PrismaClient()
 
@@ -83,6 +84,9 @@ async function main() {
         }
     }
     console.log(`Repair work categories seeded: ${repairWorkCategories.length}件`)
+
+    // 0. Standard part masters for LABOR targetPartNameId and part helper options
+    await seedPartStandardMasters(prisma)
 
     // 0. Supplier（購入店マスタ）初期データ
     const suppliers = [

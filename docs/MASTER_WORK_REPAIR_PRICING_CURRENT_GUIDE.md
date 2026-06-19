@@ -532,3 +532,23 @@ Task 完了時には、以下を報告する。
 - PartsMaster / `getPartsMatched` / PartsSearchPanel
 
 次は、PricingRule 自動作成・更新と `getPricingRules` の構造化対応へ進む。
+
+## 21. DB reset 後の標準部品マスタ seed 復元
+
+ローカル DB reset 後でも、作業入力に必要な標準部品マスタは seed で復元される必要がある。
+
+対象:
+
+- `PartCategoryMaster`
+- `PartNameMaster`
+- `PartGradeMaster`
+
+通常の `npx prisma db seed` で `prisma/seed.ts` が実行されると、`scripts/seed-part-standard-masters.ts` を通じて上記 3 テーブルを冪等に upsert する。
+これにより、`RepairEntryForm` の LABOR 行で使う対象部品候補は DB reset 後も復元される。
+
+改めて、ID の意味を混同しない。
+
+- `targetPartNameId`: LABOR 行の作業対象部品名 ID。`PartNameMaster` 由来。
+- `partsMasterId`: PART 行の実部品 ID。`PartsMaster` 由来。
+
+今回の seed 復元方針は `PartsMaster` 検索、`getPartsMatched`、PartsSearchPanel には影響させない。
