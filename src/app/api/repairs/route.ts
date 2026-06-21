@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
 import {
     estimateItemsLikeToRepairLineItemInputs,
     replaceRepairLineItems,
@@ -475,61 +476,18 @@ export async function POST(req: Request) {
                 }));
                 await replaceRepairLineItems(repair.id, repairLineItemInputs, tx);
 
-                const laborItems = estimateItems.filter((i: any) => i.type === 'labor');
-
-                if (laborItems.length > 0) {
-                    try {
-                    const pricingRuleWhere = {
+                try {
+                    await syncPricingRulesFromRepairLineItems(tx, {
                         brandId: brand.id,
-                        ...(modelId != null ? { modelId } : {}),
-                        ...(caliberId != null ? { caliberId } : {}),
-                    };
-                    const pricingRuleData = {
-                        brandId: brand.id,
-                        modelId: modelId ?? null,
-                        caliberId: caliberId ?? null,
-                    };
-                    const laborNames = laborItems.map((i: any) => i.name);
-                    const existingRules = await tx.pricingRule.findMany({
-                        where: {
-                            suggestedWorkName: { in: laborNames },
-                            ...pricingRuleWhere,
-                        },
-                        select: { suggestedWorkName: true }
+                        modelId,
+                        caliberId,
+                        items: repairLineItemInputs,
                     });
-                    const existingRuleNames = new Set(existingRules.map((r: any) => r.suggestedWorkName));
-                    // 譁ｰ隕冗匳骭ｲ
-                    const newRules = laborItems.filter((i: any) => !existingRuleNames.has(i.name));
-                    if (newRules.length > 0) {
-                        await tx.pricingRule.createMany({
-                            data: newRules.map((item: any) => ({
-                                suggestedWorkName: item.name,
-                                minPrice: Math.floor(Number(item.price) || 0),
-                                maxPrice: Math.floor(Number(item.price) || 0),
-                                ...pricingRuleData,
-                            }))
-                        });
-                    }
-                    // 譌｢蟄倥お繝ｳ繝医Μ縺ｮ譁呻ｿｽ・ｽ繧呈峩譁ｰ・ｽE・ｽﾂｧ3・ｽE・ｽ・ｽE蜍慕匳骭ｲ繝ｻ譖ｴ譁ｰ・ｽE・ｽE
-                    for (const item of laborItems) {
-                        if (existingRuleNames.has(item.name)) {
-                            await tx.pricingRule.updateMany({
-                                where: {
-                                    suggestedWorkName: item.name,
-                                    ...pricingRuleWhere,
-                                },
-                                data: {
-                                    minPrice: Math.floor(Number(item.price) || 0),
-                                    maxPrice: Math.floor(Number(item.price) || 0),
-                                }
-                            });
-                        }
-                    }
-                    } catch (error) {
-                        console.error("Failed to sync pricing rules during repair create:", error);
-                        throw error;
-                    }
+                } catch (error) {
+                    console.error("Failed to sync pricing rules during repair create:", error);
+                    throw error;
                 }
+
             }
 
             // 7. 蝨ｨ蠎ｫ繝√ぉ繝・・ｽ・ｽ・ｽE・ｽEartsMasterId 縺後≠繧矩Κ蜩・ｿｽE縺ｿ・ｽE・ｽE

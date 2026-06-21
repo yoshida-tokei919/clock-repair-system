@@ -552,3 +552,35 @@ Task 完了時には、以下を報告する。
 - `partsMasterId`: PART 行の実部品 ID。`PartsMaster` 由来。
 
 今回の seed 復元方針は `PartsMaster` 検索、`getPartsMatched`、PartsSearchPanel には影響させない。
+
+## 22. 108-10AD PricingRule 自動作成・更新での構造 field 保存
+
+108-10AD で、Repair 新規作成 API / Repair 更新 API の PricingRule 自動作成・更新処理を、RepairLineItem 用に正規化された LABOR 行から同期する方針へ進めた。
+
+保存する主な field:
+
+- `brandId`
+- `modelId`
+- `caliberId`
+- `customerType`
+- `suggestedWorkName`
+- `minPrice`
+- `maxPrice`
+- `repairWorkCategoryId`
+- `targetPartNameId`
+- `repairWorkActionId`
+- `detailLabel`
+
+`detailLabel` は `RepairLineItemInput.detailLabelSnapshot` から `PricingRule.detailLabel` へ保存する。`targetPartNameId` は引き続き LABOR 行の作業対象部品名 ID であり、`PartNameMaster` 由来である。PART 行の実部品 ID である `partsMasterId` とは混同しない。
+
+`PricingRule.repairWorkNameId` は schema に存在するが、現時点では `RepairLineItem` 側に `repairWorkNameId` がないため、108-10AD では自動設定しない。既存 PricingRule を `pricingRuleId` で更新する場合も、既存の `repairWorkNameId` を不用意に null 上書きしない。
+
+同名・同条件で構造 field が空の legacy PricingRule がある場合は、削除せず、次回保存時に構造 field を補完する。DB の業務 `@@unique` は引き続き置かず、nullable field を含む同一判定はアプリ側 helper で扱う。
+
+未対応で後続 Task に残すもの:
+
+- `getPricingRules` の構造 field 検索 / score 対応
+- RepairEntryForm の候補表示更新
+- 金額自動反映
+- 代表 PricingRule seed / 仮データ再生成
+- `RepairLineItem.repairWorkNameId` 追加要否の判断

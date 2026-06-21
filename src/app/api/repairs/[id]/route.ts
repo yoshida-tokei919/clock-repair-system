@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
 import {
     estimateItemsLikeToRepairLineItemInputs,
     replaceRepairLineItems,
@@ -333,6 +334,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                             relatedWorkLineItemId: null,
                         }));
                         await replaceRepairLineItems(id, repairLineItemInputs, tx);
+                        await syncPricingRulesFromRepairLineItems(tx, {
+                            brandId,
+                            modelId,
+                            caliberId,
+                            items: repairLineItemInputs,
+                        });
 
                         const pendingOrderQuantities = new Map<number, number>();
                         for (const item of syncedEstimateItems) {
@@ -354,40 +361,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                         }
                     } else {
                         await replaceRepairLineItems(id, [], tx);
-                    }
-                    const laborItems = body.estimate.items.filter((i: any) => i.type === 'labor');
-
-                    if (laborItems.length > 0) {
-                        const laborNames = laborItems.map((i: any) => i.name);
-                        const existingRules = await tx.pricingRule.findMany({
-                            where: { suggestedWorkName: { in: laborNames }, brandId, modelId, caliberId },
-                            select: { suggestedWorkName: true }
-                        });
-                        const existingRuleNames = new Set(existingRules.map((r: any) => r.suggestedWorkName));
-                        // 新規登録
-                        const newRules = laborItems.filter((i: any) => !existingRuleNames.has(i.name));
-                        if (newRules.length > 0) {
-                            await tx.pricingRule.createMany({
-                                data: newRules.map((item: any) => ({
-                                    suggestedWorkName: item.name,
-                                    minPrice: Math.floor(Number(item.price) || 0),
-                                    maxPrice: Math.floor(Number(item.price) || 0),
-                                    brandId, modelId, caliberId
-                                }))
-                            });
-                        }
-                        // 既存エントリの料��を更新�E�§3�E��E動登録・更新�E�E
-                        for (const item of laborItems) {
-                            if (existingRuleNames.has(item.name)) {
-                                await tx.pricingRule.updateMany({
-                                    where: { suggestedWorkName: item.name, brandId, modelId, caliberId },
-                                    data: {
-                                        minPrice: Math.floor(Number(item.price) || 0),
-                                        maxPrice: Math.floor(Number(item.price) || 0),
-                                    }
-                                });
-                            }
-                        }
                     }
                 }
             }
