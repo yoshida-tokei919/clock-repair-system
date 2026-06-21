@@ -600,3 +600,21 @@ Task 完了時には、以下を報告する。
 
 今回も schema / migration / seed / PricingRule 自動作成・更新 / RepairEntryForm UI は変更しない。
 RepairEntryForm から構造fieldを `getPricingRules` に渡す UI 連携、構造field変更時の候補再取得、金額自動反映は後続Taskで扱う。
+
+## 24. 108-10AF RepairEntryForm からの構造field lookup 連携
+
+108-10AF で `RepairEntryForm` の技術料候補取得から `getPricingRules` へ、現在入力中の構造fieldを optional lookup options として渡すようにした。
+
+渡す field:
+
+- `repairWorkCategoryId`: `newWorkCategoryId`
+- `targetPartNameId`: `newTargetPartNameId`
+- `repairWorkActionId`: `newWorkActionId`
+- `detailLabel`: `newWorkDetailLabel`
+- `customerType`: `isB2B ? "business" : "individual"`
+
+108-10X の Cal 優先取得は維持する。つまり movement Cal、base Cal、watch Cal、Cal なしの順で `getPricingRules` を呼び、`PricingRule.id` による重複排除も維持する。
+構造fieldは候補の score / priority に使うだけで、構造fieldを選んだだけでは金額欄へ自動反映しない。金額反映は従来どおり候補を選択したときに行う。
+
+今回も schema / migration / seed / PricingRule 自動作成・更新 / RepairLineItem DB schema / PartsMaster 検索系 / 帳票 / PDF / LINE / 共有ページ / PublicCase は変更しない。
+金額自動反映、exact match 1件時の自動入力、候補表示 meta の追加は後続Taskで扱う。

@@ -1298,11 +1298,18 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             const pricingCaliberIds = [movementCaliberId, baseMovementCaliberId, watchCaliberId]
                 .filter((id): id is number => typeof id === 'number')
                 .filter((id, index, ids) => ids.indexOf(id) === index);
+            const pricingLookupOptions = {
+                repairWorkCategoryId: newWorkCategoryId ? Number(newWorkCategoryId) : null,
+                targetPartNameId: newTargetPartNameId || null,
+                repairWorkActionId: newWorkActionId ? Number(newWorkActionId) : null,
+                detailLabel: cleanOptionalText(newWorkDetailLabel),
+                customerType: isB2B ? 'business' : 'individual',
+            };
 
             // Fetch labor/work rules
             Promise.all([
-                ...pricingCaliberIds.map((pricingCaliberId) => getPricingRules(b.id, m?.id, pricingCaliberId)),
-                getPricingRules(b.id, m?.id, undefined),
+                ...pricingCaliberIds.map((pricingCaliberId) => getPricingRules(b.id, m?.id, pricingCaliberId, pricingLookupOptions)),
+                getPricingRules(b.id, m?.id, undefined, pricingLookupOptions),
             ]).then((ruleGroups) => {
                 const seenRuleIds = new Set<number>();
                 const safeRules = ruleGroups.flatMap((rules, groupIndex) => {
@@ -1365,7 +1372,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     console.log(`Fetched ${parts.length} matching parts for brand ${b.id}`);
                 });
             }
-    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, newItemName, getOptionIdByValue]);
+    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, newItemName, newWorkCategoryId, newTargetPartNameId, newWorkActionId, newWorkDetailLabel, isB2B, getOptionIdByValue, cleanOptionalText]);
 
     // --- CALCULATIONS ---
     const totalAmount = lineItems.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);
