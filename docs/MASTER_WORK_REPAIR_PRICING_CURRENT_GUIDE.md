@@ -584,3 +584,19 @@ Task 完了時には、以下を報告する。
 - 金額自動反映
 - 代表 PricingRule seed / 仮データ再生成
 - `RepairLineItem.repairWorkNameId` 追加要否の判断
+## 23. 108-10AE getPricingRules 構造field / customerType score 対応
+
+108-10AE で `getPricingRules` は既存の `brandId` / `modelId` / `caliberId` に加えて、任意の lookup options として以下を受け取れるようにした。
+
+- `repairWorkNameId`
+- `repairWorkCategoryId`
+- `targetPartNameId`
+- `repairWorkActionId`
+- `detailLabel`
+- `customerType`
+
+候補取得は exact filter で候補を消しすぎない方針を維持する。既存の brand / model / caliber 条件で取得した候補を、Cal / model の既存優先度に加えて customerType と構造fieldの一致度で score / priority 並び替えする。
+`customerType` は完全一致を generic/null より優先する。`detailLabel` は完全一致を高評価し、未設定 PricingRule は fallback として残す。
+
+今回も schema / migration / seed / PricingRule 自動作成・更新 / RepairEntryForm UI は変更しない。
+RepairEntryForm から構造fieldを `getPricingRules` に渡す UI 連携、構造field変更時の候補再取得、金額自動反映は後続Taskで扱う。

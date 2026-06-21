@@ -1,6 +1,6 @@
 "use server";
 
-import { RepairWorkType } from "@prisma/client";
+import { RepairWorkType, type PricingRule } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
@@ -327,7 +327,79 @@ export async function upsertWorkMaster(data: {
     });
 }
 
-export async function getPricingRules(brandId?: number, modelId?: number, caliberId?: number) {
+type PricingRuleLookupOptions = {
+    repairWorkNameId?: number | null;
+    repairWorkCategoryId?: number | null;
+    targetPartNameId?: string | null;
+    repairWorkActionId?: number | null;
+    detailLabel?: string | null;
+    customerType?: string | null;
+};
+
+function cleanLookupText(value?: string | null): string | null {
+    const normalized = (value ?? "").replace(/\s+/g, " ").trim();
+    return normalized || null;
+}
+
+function scoreNullableNumber(
+    ruleValue: number | null,
+    lookupValue: number | null | undefined,
+    exactScore: number,
+    mismatchPenalty: number
+) {
+    if (!lookupValue) return 0;
+    if (ruleValue === lookupValue) return exactScore;
+    if (ruleValue == null) return 0;
+    return mismatchPenalty;
+}
+
+function scoreNullableText(
+    ruleValue: string | null,
+    lookupValue: string | null | undefined,
+    exactScore: number,
+    mismatchPenalty: number
+) {
+    const cleanedLookup = cleanLookupText(lookupValue);
+    if (!cleanedLookup) return 0;
+
+    const cleanedRule = cleanLookupText(ruleValue);
+    if (cleanedRule === cleanedLookup) return exactScore;
+    if (cleanedRule == null) return 0;
+    return mismatchPenalty;
+}
+
+function scorePricingRule(
+    rule: PricingRule,
+    modelId?: number,
+    caliberId?: number,
+    options: PricingRuleLookupOptions = {}
+) {
+    const modelScore = rule.modelId === modelId && modelId ? 50 : (rule.modelId ? -1 : 0);
+    const caliberScore = rule.caliberId === caliberId && caliberId ? 100 : (rule.caliberId ? -1 : 0);
+
+    const customerTypeScore = scoreNullableText(rule.customerType, options.customerType, 60, -30);
+    const repairWorkNameScore = scoreNullableNumber(rule.repairWorkNameId, options.repairWorkNameId, 120, -60);
+    const categoryScore = scoreNullableNumber(rule.repairWorkCategoryId, options.repairWorkCategoryId, 80, -40);
+    const targetPartScore = scoreNullableText(rule.targetPartNameId, options.targetPartNameId, 90, -45);
+    const actionScore = scoreNullableNumber(rule.repairWorkActionId, options.repairWorkActionId, 80, -40);
+    const detailLabelScore = scoreNullableText(rule.detailLabel, options.detailLabel, 40, -20);
+
+    return modelScore
+        + caliberScore
+        + customerTypeScore
+        + repairWorkNameScore
+        + categoryScore
+        + targetPartScore
+        + actionScore
+        + detailLabelScore;
+}
+
+export async function getPricingRules(
+    brandId?: number,
+    modelId?: number,
+    caliberId?: number,
+    options: PricingRuleLookupOptions = {}
+) {
     try {
         if (!brandId) return [];
 
@@ -346,11 +418,10 @@ export async function getPricingRules(brandId?: number, modelId?: number, calibe
         const rules = await prisma.pricingRule.findMany({ where });
 
         return rules.sort((a, b) => {
-            const scoreA = (a.caliberId === caliberId && caliberId ? 100 : (a.caliberId ? -1 : 0)) +
-                (a.modelId === modelId && modelId ? 50 : (a.modelId ? -1 : 0));
-            const scoreB = (b.caliberId === caliberId && caliberId ? 100 : (b.caliberId ? -1 : 0)) +
-                (b.modelId === modelId && modelId ? 50 : (b.modelId ? -1 : 0));
-            return scoreB - scoreA;
+            const scoreA = scorePricingRule(a, modelId, caliberId, options);
+            const scoreB = scorePricingRule(b, modelId, caliberId, options);
+            if (scoreB !== scoreA) return scoreB - scoreA;
+            return a.id - b.id;
         });
     } catch (error) {
         console.error("Failed to fetch pricing rules:", error);
