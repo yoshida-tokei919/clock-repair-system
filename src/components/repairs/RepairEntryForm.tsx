@@ -467,6 +467,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [newItemQty, setNewItemQty] = useState("1");
     const [newItemSpec, setNewItemSpec] = useState("");
     const [selectedWorkOption, setSelectedWorkOption] = useState<any | null>(null);
+    const [newItemPriceManuallyEdited, setNewItemPriceManuallyEdited] = useState(false);
+    const autoFilledPricingRuleIdRef = useRef<number | null>(null);
     const [structuredWorkOpen, setStructuredWorkOpen] = useState(false);
     const [repairWorkCategoryOptions, setRepairWorkCategoryOptions] = useState<RepairWorkSelectOption[]>([]);
     const [repairWorkActionOptions, setRepairWorkActionOptions] = useState<RepairWorkSelectOption[]>([]);
@@ -483,8 +485,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [selectedPartNameKey, setSelectedPartNameKey] = useState("");
 
     const isAddingPartItem = addItemCategory.includes("part");
-    const cleanOptionalText = useCallback((value: string) => {
-        const normalized = value.replace(/\s+/g, " ").trim();
+    const cleanOptionalText = useCallback((value?: string | null) => {
+        const normalized = (value ?? "").replace(/\s+/g, " ").trim();
         return normalized || null;
     }, []);
     const displayValueOrDash = useCallback((value?: string | null) => {
@@ -1328,7 +1330,14 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 setWorkOpts(safeRules.map(r => ({
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
-                    price: r.minPrice
+                    price: r.minPrice,
+                    pricingRuleId: r.id,
+                    caliberId: r.caliberId,
+                    customerType: r.customerType,
+                    repairWorkCategoryId: r.repairWorkCategoryId,
+                    targetPartNameId: r.targetPartNameId,
+                    repairWorkActionId: r.repairWorkActionId,
+                    detailLabel: r.detailLabel,
                 })));
             });
         } else {
@@ -1373,6 +1382,51 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 });
             }
     }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, newItemName, newWorkCategoryId, newTargetPartNameId, newWorkActionId, newWorkDetailLabel, isB2B, getOptionIdByValue, cleanOptionalText]);
+
+    useEffect(() => {
+        if (addItemCategory !== 'internal') return;
+        if (!newWorkCategoryId || !newTargetPartNameId || !newWorkActionId) return;
+        if (selectedWorkOption) return;
+        if (newItemPriceManuallyEdited) return;
+        if (newItemPrice && autoFilledPricingRuleIdRef.current == null) return;
+
+        const detailLabel = cleanOptionalText(newWorkDetailLabel);
+        const customerType = isB2B ? 'business' : 'individual';
+        const matchesStructure = (rule: any) => {
+            if (Number(rule.repairWorkCategoryId) !== Number(newWorkCategoryId)) return false;
+            if (rule.targetPartNameId !== newTargetPartNameId) return false;
+            if (Number(rule.repairWorkActionId) !== Number(newWorkActionId)) return false;
+            if (detailLabel && cleanOptionalText(rule.detailLabel) !== detailLabel) return false;
+            return rule.customerType === customerType || rule.customerType == null;
+        };
+
+        const structuralMatches = workOpts.filter(matchesStructure);
+        const exactCustomerMatches = structuralMatches.filter((rule) => rule.customerType === customerType);
+        const genericCustomerMatches = structuralMatches.filter((rule) => rule.customerType == null);
+        const highConfidenceMatches = exactCustomerMatches.length > 0
+            ? exactCustomerMatches
+            : genericCustomerMatches;
+
+        if (highConfidenceMatches.length !== 1) return;
+
+        const match = highConfidenceMatches[0];
+        if (match.price === undefined) return;
+
+        setNewItemPrice(String(match.price));
+        autoFilledPricingRuleIdRef.current = match.pricingRuleId ?? null;
+    }, [
+        addItemCategory,
+        newWorkCategoryId,
+        newTargetPartNameId,
+        newWorkActionId,
+        newWorkDetailLabel,
+        isB2B,
+        workOpts,
+        selectedWorkOption,
+        newItemPrice,
+        newItemPriceManuallyEdited,
+        cleanOptionalText,
+    ]);
 
     // --- CALCULATIONS ---
     const totalAmount = lineItems.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);
@@ -2376,13 +2430,21 @@ ${shopName}
                                                 setSelectedWorkOption(null);
                                                 const match = workOpts.find(w => w.value === v);
                                                 if (match) {
-                                                    if (match.price !== undefined) setNewItemPrice(String(match.price));
+                                                    if (match.price !== undefined) {
+                                                        setNewItemPrice(String(match.price));
+                                                        setNewItemPriceManuallyEdited(false);
+                                                        autoFilledPricingRuleIdRef.current = null;
+                                                    }
                                                     if (match.cost !== undefined) setNewItemCost(String(match.cost));
                                                 }
                                             }}
                                             onSelectOption={(option) => {
                                                 setSelectedWorkOption(option);
-                                                if (option.price !== undefined) setNewItemPrice(String(option.price));
+                                                if (option.price !== undefined) {
+                                                    setNewItemPrice(String(option.price));
+                                                    setNewItemPriceManuallyEdited(false);
+                                                    autoFilledPricingRuleIdRef.current = null;
+                                                }
                                                 if (option.cost !== undefined) setNewItemCost(String(option.cost));
                                             }}
                                             options={workOpts}
@@ -2510,7 +2572,11 @@ ${shopName}
                                         </div>
                                         <div className="relative w-24">
                                             <span className="absolute left-2 top-2.5 text-xs">¥</span>
-                                            <Input className="h-9 text-sm pl-5 font-mono text-right" placeholder="0" value={newItemPrice} onChange={e => setNewItemPrice(e.target.value)} />
+                                            <Input className="h-9 text-sm pl-5 font-mono text-right" placeholder="0" value={newItemPrice} onChange={e => {
+                                                setNewItemPrice(e.target.value);
+                                                setNewItemPriceManuallyEdited(true);
+                                                autoFilledPricingRuleIdRef.current = null;
+                                            }} />
                                         </div>
                                         <Input className="h-9 text-sm w-14 text-center font-mono" placeholder="1" value={newItemQty} onChange={e => setNewItemQty(e.target.value)} type="number" min={1} />
                                         <Button size="sm" className="h-9 w-10 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
@@ -2561,6 +2627,8 @@ ${shopName}
                                             setNewItemName("");
                                             setNewItemCost("");
                                             setNewItemPrice("");
+                                            setNewItemPriceManuallyEdited(false);
+                                            autoFilledPricingRuleIdRef.current = null;
                                             setNewItemQty("1");
                                             setNewItemSpec("");
                                             setSelectedWorkOption(null);

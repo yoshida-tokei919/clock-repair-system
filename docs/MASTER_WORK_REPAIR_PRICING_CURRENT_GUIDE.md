@@ -618,3 +618,22 @@ RepairEntryForm から構造fieldを `getPricingRules` に渡す UI 連携、構
 
 今回も schema / migration / seed / PricingRule 自動作成・更新 / RepairLineItem DB schema / PartsMaster 検索系 / 帳票 / PDF / LINE / 共有ページ / PublicCase は変更しない。
 金額自動反映、exact match 1件時の自動入力、候補表示 meta の追加は後続Taskで扱う。
+
+## 25. 108-10AG exact high-confidence match 1件時の価格自動反映
+
+108-10AG で `RepairEntryForm` は、技術料入力時に高信頼一致の `PricingRule` が1件だけに絞れる場合に限り、価格欄へ `minPrice` を自動反映するようにした。
+
+高信頼一致の条件:
+
+- `addItemCategory` が `internal`
+- `newWorkCategoryId` が選択済みで、`PricingRule.repairWorkCategoryId` と一致
+- `newTargetPartNameId` が選択済みで、`PricingRule.targetPartNameId` と一致
+- `newWorkActionId` が選択済みで、`PricingRule.repairWorkActionId` と一致
+- `newWorkDetailLabel` が入力されている場合のみ、`PricingRule.detailLabel` と一致
+- `customerType` は exact match を優先し、exact がない場合のみ rule 側 `null` の generic 候補を許容する
+- 上記の高信頼候補が1件だけ
+
+手入力済み価格は自動上書きしない。候補を手動選択して価格欄へ反映した場合も、その後の構造field変更で勝手に上書きしない。
+複数候補、構造field未分類の fallback 候補だけ、または低信頼候補では自動反映せず、従来どおり候補表示に留める。
+
+今回も schema / migration / seed / PricingRule 自動作成・更新 / RepairLineItem DB schema / PartsMaster 検索系 / 帳票 / PDF / LINE / 共有ページ / PublicCase は変更しない。
