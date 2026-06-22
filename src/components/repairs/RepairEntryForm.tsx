@@ -138,6 +138,91 @@ function toLocaleDate(isoDate: string): string {
     return `${parseInt(y)}/${parseInt(m)}/${parseInt(d)}`;
 }
 
+function normalizePricingCandidateKeyText(value?: string | null): string {
+    return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function normalizePricingCandidateKeyNumber(value?: number | null): string {
+    if (value == null) return "";
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? String(numberValue) : "";
+}
+
+function buildPricingRuleCandidateKey(rule: {
+    suggestedWorkName?: string | null;
+    minPrice?: number | null;
+}) {
+    return JSON.stringify([
+        normalizePricingCandidateKeyText(rule.suggestedWorkName),
+        normalizePricingCandidateKeyNumber(rule.minPrice),
+    ]);
+}
+
+type PricingRuleCandidateLookup = {
+    repairWorkCategoryId?: number | null;
+    targetPartNameId?: string | null;
+    repairWorkActionId?: number | null;
+    detailLabel?: string | null;
+    customerType?: string | null;
+};
+
+type PricingRuleCandidateForCollapse = Parameters<typeof buildPricingRuleCandidateKey>[0] & {
+    repairWorkCategoryId?: number | null;
+    targetPartNameId?: string | null;
+    repairWorkActionId?: number | null;
+    detailLabel?: string | null;
+    customerType?: string | null;
+};
+
+function scorePricingRuleCandidateRepresentative(
+    rule: PricingRuleCandidateForCollapse,
+    lookup: PricingRuleCandidateLookup
+): number {
+    let score = 0;
+    if (lookup.repairWorkCategoryId && rule.repairWorkCategoryId === lookup.repairWorkCategoryId) score += 100;
+    if (lookup.targetPartNameId && rule.targetPartNameId === lookup.targetPartNameId) score += 120;
+    if (lookup.repairWorkActionId && rule.repairWorkActionId === lookup.repairWorkActionId) score += 100;
+
+    const lookupDetail = normalizePricingCandidateKeyText(lookup.detailLabel);
+    if (lookupDetail && normalizePricingCandidateKeyText(rule.detailLabel) === lookupDetail) score += 40;
+
+    const lookupCustomerType = normalizePricingCandidateKeyText(lookup.customerType);
+    const ruleCustomerType = normalizePricingCandidateKeyText(rule.customerType);
+    if (lookupCustomerType && ruleCustomerType === lookupCustomerType) score += 30;
+    if (lookupCustomerType && !ruleCustomerType) score += 5;
+
+    return score;
+}
+
+function collapseDuplicatePricingRuleCandidates<T extends PricingRuleCandidateForCollapse>(
+    rules: T[],
+    lookup: PricingRuleCandidateLookup
+): T[] {
+    const candidateByKey = new Map<string, { index: number; rule: T; score: number }>();
+    rules.forEach((rule, index) => {
+        const key = buildPricingRuleCandidateKey(rule);
+        const score = scorePricingRuleCandidateRepresentative(rule, lookup);
+        const current = candidateByKey.get(key);
+        if (!current || score > current.score) {
+            candidateByKey.set(key, { index: current?.index ?? index, rule, score });
+        }
+    });
+
+    return Array.from(candidateByKey.values())
+        .sort((a, b) => a.index - b.index)
+        .map((candidate) => candidate.rule);
+}
+
+function dedupePricingRuleCandidatesForAutoFill<T extends Parameters<typeof buildPricingRuleCandidateKey>[0]>(rules: T[]): T[] {
+    const seenKeys = new Set<string>();
+    return rules.filter((rule) => {
+        const key = buildPricingRuleCandidateKey(rule);
+        if (seenKeys.has(key)) return false;
+        seenKeys.add(key);
+        return true;
+    });
+}
+
 /**
  * INTELLIGENCE CACHE & COMBOBOX
  * Independent, highly-optimized component for fast lookups.
@@ -910,6 +995,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [masterCalOpts, setMasterCalOpts] = useState<any[]>([]);
     const [customerOpts, setCustomerOpts] = useState<any[]>([]);
     const [workOpts, setWorkOpts] = useState<any[]>([]);
+    const [rawPricingRuleCandidates, setRawPricingRuleCandidates] = useState<any[]>([]);
 
     const getOptionIdByValue = useCallback((options: any[], value: string) => {
         const normalizedValue = value.trim();
@@ -1287,6 +1373,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         const b = brandOpts.find(o => o.value === brand || o.label === brand);
         if (!b) {
             setWorkOpts([]);
+            setRawPricingRuleCandidates([]);
             return;
         }
 
@@ -1326,11 +1413,26 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         return true;
                     });
                 });
-
-                setWorkOpts(safeRules.map(r => ({
+                const dedupedRules = collapseDuplicatePricingRuleCandidates(safeRules, pricingLookupOptions);
+                setRawPricingRuleCandidates(safeRules.map(r => ({
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
                     price: r.minPrice,
+                    maxPrice: r.maxPrice,
+                    pricingRuleId: r.id,
+                    caliberId: r.caliberId,
+                    customerType: r.customerType,
+                    repairWorkCategoryId: r.repairWorkCategoryId,
+                    targetPartNameId: r.targetPartNameId,
+                    repairWorkActionId: r.repairWorkActionId,
+                    detailLabel: r.detailLabel,
+                })));
+
+                setWorkOpts(dedupedRules.map(r => ({
+                    label: r.suggestedWorkName,
+                    value: r.suggestedWorkName,
+                    price: r.minPrice,
+                    maxPrice: r.maxPrice,
                     pricingRuleId: r.id,
                     caliberId: r.caliberId,
                     customerType: r.customerType,
@@ -1341,6 +1443,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 })));
             });
         } else {
+            setRawPricingRuleCandidates([]);
             // Fetch parts master data
                 getPartsMatched(
                     b.id,
@@ -1400,16 +1503,17 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             return rule.customerType === customerType || rule.customerType == null;
         };
 
-        const structuralMatches = workOpts.filter(matchesStructure);
+        const structuralMatches = rawPricingRuleCandidates.filter(matchesStructure);
         const exactCustomerMatches = structuralMatches.filter((rule) => rule.customerType === customerType);
         const genericCustomerMatches = structuralMatches.filter((rule) => rule.customerType == null);
         const highConfidenceMatches = exactCustomerMatches.length > 0
             ? exactCustomerMatches
             : genericCustomerMatches;
+        const dedupedHighConfidenceMatches = dedupePricingRuleCandidatesForAutoFill(highConfidenceMatches);
 
-        if (highConfidenceMatches.length !== 1) return;
+        if (dedupedHighConfidenceMatches.length !== 1) return;
 
-        const match = highConfidenceMatches[0];
+        const match = dedupedHighConfidenceMatches[0];
         if (match.price === undefined) return;
 
         setNewItemPrice(String(match.price));
@@ -1421,7 +1525,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         newWorkActionId,
         newWorkDetailLabel,
         isB2B,
-        workOpts,
+        rawPricingRuleCandidates,
         selectedWorkOption,
         newItemPrice,
         newItemPriceManuallyEdited,

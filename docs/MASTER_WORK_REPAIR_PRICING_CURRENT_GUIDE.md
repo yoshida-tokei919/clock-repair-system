@@ -637,3 +637,19 @@ RepairEntryForm から構造fieldを `getPricingRules` に渡す UI 連携、構
 複数候補、構造field未分類の fallback 候補だけ、または低信頼候補では自動反映せず、従来どおり候補表示に留める。
 
 今回も schema / migration / seed / PricingRule 自動作成・更新 / RepairLineItem DB schema / PartsMaster 検索系 / 帳票 / PDF / LINE / 共有ページ / PublicCase は変更しない。
+
+## 26. 108-10AI PricingRule候補表示の重複整理
+
+108-10AI で `RepairEntryForm` の技術料候補表示に、表示上同一の `PricingRule` 候補を 1件へ統合する処理を追加した。
+
+統合対象は、現在の UI で同じに見える同名・同価格の候補である。具体的には、`suggestedWorkName` と表示価格として使っている `minPrice` を正規化した key が同じ候補を 1件にまとめる。
+
+既存の Cal 優先順、`customerType` 優先順、構造 field の score / priority を壊さないため、`PricingRule.id` による重複排除と既存の並び順を維持する。
+
+同名でも表示価格が違う候補は統合しない。B2B/B2C 価格差、値引き、取引先別実績、過去修正価格などの可能性があるため、候補として残す。
+
+B2B/B2C derived candidate（B2C = B2B x 2 の計算候補）と候補ラベル表示は、今回まだ実装していない。後続 Task で扱う。
+
+108-10AI の追加修正で、価格自動反映用の raw PricingRule 候補と、ドロップダウン表示用の collapse 済み候補を分離した。108-10AG の高信頼 1件自動反映は、表示 collapse 後の候補ではなく、`getPricingRules` から取得した raw 候補を使って構造 field 完全一致を判定する。さらに raw 候補側の同名・同価格重複は、自動反映判定直前に `suggestedWorkName + minPrice` で semantic dedupe する。表示用候補は引き続き `suggestedWorkName + minPrice` で collapse し、同名・同価格の重複表示だけを消す。
+
+PricingRule 自動作成・更新側で同名・同条件・価格違い候補を潰さないための保存側 identity 修正は 108-10AI の責務外である。後続 Task 108-10AJ として分離する。
