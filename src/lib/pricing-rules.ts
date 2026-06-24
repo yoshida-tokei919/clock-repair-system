@@ -22,6 +22,13 @@ function cleanText(value?: string | null): string | null {
     return normalized || null;
 }
 
+function normalizeCustomerType(value?: string | null): "business" | "individual" | null {
+    const normalized = cleanText(value)?.toLowerCase();
+    if (normalized === "business" || normalized === "b2b") return "business";
+    if (normalized === "individual" || normalized === "b2c") return "individual";
+    return null;
+}
+
 function normalizePrice(value?: number | null): number {
     if (!Number.isFinite(value)) return 0;
     return Math.max(0, Math.floor(Number(value)));
@@ -33,6 +40,8 @@ function buildPricingRuleIdentity(params: {
     caliberId: number | null;
     customerType: string | null;
     suggestedWorkName: string;
+    minPrice: number;
+    maxPrice: number;
     repairWorkCategoryId: number | null;
     targetPartNameId: string | null;
     repairWorkActionId: number | null;
@@ -45,6 +54,8 @@ function buildPricingRuleIdentity(params: {
         customerType: params.customerType,
         repairWorkNameId: null,
         suggestedWorkName: params.suggestedWorkName,
+        minPrice: params.minPrice,
+        maxPrice: params.maxPrice,
         repairWorkCategoryId: params.repairWorkCategoryId,
         targetPartNameId: params.targetPartNameId,
         repairWorkActionId: params.repairWorkActionId,
@@ -58,6 +69,8 @@ function buildLegacyPricingRuleIdentity(params: {
     caliberId: number | null;
     customerType: string | null;
     suggestedWorkName: string;
+    minPrice: number;
+    maxPrice: number;
 }): Prisma.PricingRuleWhereInput {
     return {
         brandId: params.brandId,
@@ -66,6 +79,8 @@ function buildLegacyPricingRuleIdentity(params: {
         customerType: params.customerType,
         repairWorkNameId: null,
         suggestedWorkName: params.suggestedWorkName,
+        minPrice: params.minPrice,
+        maxPrice: params.maxPrice,
         repairWorkCategoryId: null,
         targetPartNameId: null,
         repairWorkActionId: null,
@@ -82,7 +97,10 @@ export async function syncPricingRulesFromRepairLineItems(
 
     const modelId = normalizeNullablePositiveInt(params.modelId);
     const caliberId = normalizeNullablePositiveInt(params.caliberId);
-    const customerType = cleanText(params.customerType);
+    const customerType = normalizeCustomerType(params.customerType);
+    if (!customerType) {
+        throw new Error("customerType is required to sync pricing rules.");
+    }
 
     let created = 0;
     let updated = 0;
@@ -129,10 +147,20 @@ export async function syncPricingRulesFromRepairLineItems(
         if (pricingRuleId) {
             const existingById = await db.pricingRule.findUnique({
                 where: { id: pricingRuleId },
-                select: { id: true },
+                select: {
+                    id: true,
+                    customerType: true,
+                    minPrice: true,
+                    maxPrice: true,
+                },
             });
 
-            if (existingById) {
+            if (
+                existingById
+                && normalizeCustomerType(existingById.customerType) === customerType
+                && normalizePrice(existingById.minPrice) === price
+                && normalizePrice(existingById.maxPrice) === price
+            ) {
                 await db.pricingRule.update({
                     where: { id: pricingRuleId },
                     data: updateData,
@@ -149,6 +177,8 @@ export async function syncPricingRulesFromRepairLineItems(
                 caliberId,
                 customerType,
                 suggestedWorkName,
+                minPrice: price,
+                maxPrice: price,
                 repairWorkCategoryId,
                 targetPartNameId,
                 repairWorkActionId,
@@ -177,6 +207,8 @@ export async function syncPricingRulesFromRepairLineItems(
                 caliberId,
                 customerType,
                 suggestedWorkName,
+                minPrice: price,
+                maxPrice: price,
             }),
             select: { id: true },
             orderBy: { id: "asc" },

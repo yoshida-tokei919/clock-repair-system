@@ -10,6 +10,20 @@ import {
     replaceRepairLineItems,
 } from "@/lib/repair-line-items";
 
+function normalizeCustomerType(value?: string | null): "business" | "individual" | null {
+    if (value === "business") return "business";
+    if (value === "individual") return "individual";
+    return null;
+}
+
+function requireCustomerType(value?: string | null): "business" | "individual" {
+    const customerType = normalizeCustomerType(value);
+    if (!customerType) {
+        throw new Error("customer.type must be business or individual.");
+    }
+    return customerType;
+}
+
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     try {
         const id = parseInt(params.id);
@@ -128,17 +142,28 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             }
 
             // 2. Update Customer Details
+            let customerType: "business" | "individual";
             if (body.customer) {
+                customerType = requireCustomerType(body.customer.type);
                 await tx.customer.update({
                     where: { id: repairRecord.customerId },
                     data: {
+                        type: customerType,
+                        isPartner: customerType === 'business',
+                        prefix: customerType === 'business' ? body.customer.prefix || undefined : 'C',
                         name: body.customer.name,
                         phone: body.customer.phone || null,
                         lineId: body.customer.lineId || null,
                         address: body.customer.address || null,
-                        companyName: body.customer.type === 'business' ? body.customer.name : undefined
+                        companyName: customerType === 'business' ? body.customer.name : null
                     }
                 });
+            } else {
+                const customer = await tx.customer.findUnique({
+                    where: { id: repairRecord.customerId },
+                    select: { type: true },
+                });
+                customerType = requireCustomerType(customer?.type);
             }
 
             // 3. Update Repair Fields
@@ -338,6 +363,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                             brandId,
                             modelId,
                             caliberId,
+                            customerType,
                             items: repairLineItemInputs,
                         });
 

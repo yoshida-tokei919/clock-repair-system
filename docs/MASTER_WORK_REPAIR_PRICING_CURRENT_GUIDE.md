@@ -652,4 +652,42 @@ B2B/B2C derived candidate（B2C = B2B x 2 の計算候補）と候補ラベル�
 
 108-10AI の追加修正で、価格自動反映用の raw PricingRule 候補と、ドロップダウン表示用の collapse 済み候補を分離した。108-10AG の高信頼 1件自動反映は、表示 collapse 後の候補ではなく、`getPricingRules` から取得した raw 候補を使って構造 field 完全一致を判定する。さらに raw 候補側の同名・同価格重複は、自動反映判定直前に `suggestedWorkName + minPrice` で semantic dedupe する。表示用候補は引き続き `suggestedWorkName + minPrice` で collapse し、同名・同価格の重複表示だけを消す。
 
-PricingRule 自動作成・更新側で同名・同条件・価格違い候補を潰さないための保存側 identity 修正は 108-10AI の責務外である。後続 Task 108-10AJ として分離する。
+PricingRule 自動作成・更新側の保存側 identity は、108-10AJ 追加修正で `customerType` と `minPrice/maxPrice` を含める最小対応を行った。B2B / B2C 派生価格や候補ラベル表示など、価格候補の追加設計は後続 Task で扱う。
+
+## 27. 108-10AJ 技術料候補の構造field / customerType filter
+
+108-10AJ で `RepairEntryForm` の技術料 dropdown 候補は、選択済みの構造field / `customerType` で表示候補を filter する方針へ進めた。
+
+filter 対象:
+
+- `repairWorkCategoryId`
+- `targetPartNameId`
+- `repairWorkActionId`
+- `detailLabel`
+- `customerType`
+
+選択済みfieldだけを filter 条件にし、未選択fieldでは候補を絞らない。`detailLabel` は入力がある場合だけ正規化後の一致を要求する。顧客は必ず B2B または B2C のどちらかであるため、`customerType` は B2B では `business`、B2C では `individual` の候補だけを表示する。`customerType = null` は旧データ / 未分類データとして扱い、dropdownには表示しない。
+
+構造fieldがすべて null の legacy/generic 候補は、`customerType` が `business` / `individual` の場合のみ、選択中の構造fieldから組み立てた表示名と `suggestedWorkName` が一致するものを fallback 表示対象にできる。`customerType = null` の legacy候補は表示しない。
+
+`PricingRule.customerType` が null で保存されていた原因は、Repair create / update API から `syncPricingRulesFromRepairLineItems` へ `customerType` を渡していなかったこと。108-10AJ の追加修正で、Repair create API は確定済み `customer.type`、Repair update API は payload / 既存顧客の `type` から `business` / `individual` を `syncPricingRulesFromRepairLineItems` へ渡す。API 側でも `business` / `individual` 以外を `individual` に丸めず、判定不能なら保存処理を止める。同期関数側でも `customerType` が判定できない場合は PricingRule 同期を止め、null PricingRule を新規作成しない。顧客検索で既存顧客を選択した場合も、Customer.type から `isB2B` を更新する。
+
+表示候補は filter 後も 108-10AI の方針どおり `suggestedWorkName + minPrice` で collapse する。同じ表示名・同じ価格の重複は1件にまとめ、同じ表示名でも価格違い候補は残す。
+
+追加修正で、候補取得中に古い広い候補が `workOpts` を上書きしないよう、`RepairEntryForm` の候補取得 `useEffect` に stale request のキャンセルガードを追加した。技術料候補の再取得開始時には `workOpts` / `rawPricingRuleCandidates` を一旦クリアし、完了済みの最新 request だけを反映する。
+
+高信頼1件時の価格自動反映は、表示用に filter / collapse した候補ではなく、`getPricingRules` から取得した raw 候補を使って判定する。これにより、表示整理で構造fieldが失われても自動反映判定へ影響しない。
+
+B2B/B2C derived candidate、候補ラベル表示は未実装であり、後続Taskで扱う。
+
+108-10AJ追加修正で、PricingRule保存時のidentityには `customerType` と `minPrice/maxPrice` を含める。`pricingRuleId` が指定されていても、既存ruleの `customerType` と価格が現在の保存内容と一致する場合だけupdateする。異なる `customerType`、または価格違いのruleは上書きせず、現在の条件に一致するruleを探し、なければ新規作成する。
+
+## 28. 108-10AJ-ui 顧客種別 B2B/B2C 選択UIの明確化・必須化
+
+顧客は必ず B2B または B2C のどちらかである。新規案件作成時、`RepairEntryForm` は顧客種別を未選択で開始できるが、未選択のまま顧客検索・顧客入力・保存・技術料の PricingRule 候補取得を進めない。
+
+顧客情報欄では、現在の顧客種別を「業者（B2B）」「一般（B2C）」「未選択」として明示する。小さな色違い表示だけに依存せず、大きめの選択ボタンと現在状態のテキストで判断できるようにする。
+
+B2B 選択中は `Customer.type = business` の候補だけを表示し、保存 payload の `customer.type` も `business` にする。B2C 選択中は `Customer.type = individual` の候補だけを表示し、保存 payload の `customer.type` も `individual` にする。顧客候補を選択しても、フォームの B2B/B2C 選択を勝手に切り替えない。候補 option の `type` が不明、または現在選択中の顧客種別と一致しない場合は採用しない。
+
+未選択時は保存不可とし、`customerType = null` の PricingRule を新規作成しない。`customerType = null` の既存 PricingRule は旧データ / 不正データ扱いであり、通常 dropdown には表示しない。旧データの変換・削除は今回行わず、後続Taskで扱う。

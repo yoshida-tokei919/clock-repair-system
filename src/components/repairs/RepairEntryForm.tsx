@@ -142,10 +142,29 @@ function normalizePricingCandidateKeyText(value?: string | null): string {
     return (value ?? "").replace(/\s+/g, " ").trim();
 }
 
+function normalizePricingCandidateCustomerType(value?: string | null): string {
+    const normalized = normalizePricingCandidateKeyText(value).toLowerCase();
+    if (normalized === "b2b" || normalized === "business") return "business";
+    if (normalized === "b2c" || normalized === "individual") return "individual";
+    return normalized;
+}
+
 function normalizePricingCandidateKeyNumber(value?: number | null): string {
     if (value == null) return "";
     const numberValue = Number(value);
     return Number.isFinite(numberValue) ? String(numberValue) : "";
+}
+
+function pricingCandidateNumberMatches(ruleValue: number | string | null | undefined, lookupValue?: number | null): boolean {
+    if (!lookupValue) return true;
+    if (ruleValue == null) return false;
+    return Number(ruleValue) === Number(lookupValue);
+}
+
+function pricingCandidateTextMatches(ruleValue: string | null | undefined, lookupValue?: string | null): boolean {
+    const normalizedLookup = normalizePricingCandidateKeyText(lookupValue);
+    if (!normalizedLookup) return true;
+    return normalizePricingCandidateKeyText(ruleValue) === normalizedLookup;
 }
 
 function buildPricingRuleCandidateKey(rule: {
@@ -164,7 +183,17 @@ type PricingRuleCandidateLookup = {
     repairWorkActionId?: number | null;
     detailLabel?: string | null;
     customerType?: string | null;
+    expectedWorkName?: string | null;
 };
+
+type CustomerTypeSelection = "business" | "individual" | null;
+
+function normalizeCustomerTypeSelection(value?: string | null): CustomerTypeSelection {
+    const normalized = normalizePricingCandidateKeyText(value).toLowerCase();
+    if (normalized === "business" || normalized === "b2b") return "business";
+    if (normalized === "individual" || normalized === "b2c") return "individual";
+    return null;
+}
 
 type PricingRuleCandidateForCollapse = Parameters<typeof buildPricingRuleCandidateKey>[0] & {
     repairWorkCategoryId?: number | null;
@@ -186,8 +215,8 @@ function scorePricingRuleCandidateRepresentative(
     const lookupDetail = normalizePricingCandidateKeyText(lookup.detailLabel);
     if (lookupDetail && normalizePricingCandidateKeyText(rule.detailLabel) === lookupDetail) score += 40;
 
-    const lookupCustomerType = normalizePricingCandidateKeyText(lookup.customerType);
-    const ruleCustomerType = normalizePricingCandidateKeyText(rule.customerType);
+    const lookupCustomerType = normalizePricingCandidateCustomerType(lookup.customerType);
+    const ruleCustomerType = normalizePricingCandidateCustomerType(rule.customerType);
     if (lookupCustomerType && ruleCustomerType === lookupCustomerType) score += 30;
     if (lookupCustomerType && !ruleCustomerType) score += 5;
 
@@ -211,6 +240,38 @@ function collapseDuplicatePricingRuleCandidates<T extends PricingRuleCandidateFo
     return Array.from(candidateByKey.values())
         .sort((a, b) => a.index - b.index)
         .map((candidate) => candidate.rule);
+}
+
+function filterPricingRuleCandidatesForDisplay<T extends PricingRuleCandidateForCollapse>(
+    rules: T[],
+    lookup: PricingRuleCandidateLookup
+): T[] {
+    const lookupDetail = normalizePricingCandidateKeyText(lookup.detailLabel);
+    const lookupCustomerType = normalizePricingCandidateCustomerType(lookup.customerType);
+    const expectedWorkName = normalizePricingCandidateKeyText(lookup.expectedWorkName);
+
+    const structurallyFiltered = rules.filter((rule) => {
+        const isLegacyStructuredRule = !rule.repairWorkCategoryId
+            && !rule.targetPartNameId
+            && !rule.repairWorkActionId
+            && !normalizePricingCandidateKeyText(rule.detailLabel);
+        const matchesExpectedLegacyName = Boolean(expectedWorkName)
+            && normalizePricingCandidateKeyText(rule.suggestedWorkName) === expectedWorkName;
+
+        if (isLegacyStructuredRule && matchesExpectedLegacyName) return true;
+
+        if (!pricingCandidateNumberMatches(rule.repairWorkCategoryId, lookup.repairWorkCategoryId)) return false;
+        if (!pricingCandidateTextMatches(rule.targetPartNameId, lookup.targetPartNameId)) return false;
+        if (!pricingCandidateNumberMatches(rule.repairWorkActionId, lookup.repairWorkActionId)) return false;
+        if (lookupDetail && !pricingCandidateTextMatches(rule.detailLabel, lookupDetail)) return false;
+
+        return true;
+    });
+
+    return structurallyFiltered.filter((rule) => {
+        const ruleCustomerType = normalizePricingCandidateCustomerType(rule.customerType);
+        return Boolean(lookupCustomerType) && ruleCustomerType === lookupCustomerType;
+    });
 }
 
 function dedupePricingRuleCandidatesForAutoFill<T extends Parameters<typeof buildPricingRuleCandidateKey>[0]>(rules: T[]): T[] {
@@ -248,6 +309,12 @@ const AdvancedCombobox: React.FC<{
         cousinsNumber?: string,
         stockQuantity?: number,
         supplierName?: string,
+        id?: number,
+        type?: string | null,
+        prefix?: string | null,
+        phone?: string | null,
+        lineId?: string | null,
+        address?: string | null,
     }) => void;
     value: string;
     onChange: (v: string) => void;
@@ -274,6 +341,12 @@ const AdvancedCombobox: React.FC<{
         cousinsNumber?: string,
         stockQuantity?: number,
         supplierName?: string,
+        id?: number,
+        type?: string | null,
+        prefix?: string | null,
+        phone?: string | null,
+        lineId?: string | null,
+        address?: string | null,
     }[];
     disabled?: boolean;
     className?: string;
@@ -442,7 +515,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [status, setStatus] = useState<string>(initialData?.status || "受付");
     const [statusLog, setStatusLog] = useState<Record<string, string>>(initialData?.statusLog ?? {});
     const [customerId, setCustomerId] = useState<number | null>(initialData?.customer?.id || null);
-    const [isB2B, setIsB2B] = useState<boolean>(initialData?.customer?.type === 'business');
+    const [customerTypeSelection, setCustomerTypeSelection] = useState<CustomerTypeSelection>(
+        normalizeCustomerTypeSelection(initialData?.customer?.type)
+    );
+    const isB2B = customerTypeSelection === 'business';
     const [customerName, setCustomerName] = useState(initialData?.customer?.name || "");
     const [customerPrefix, setCustomerPrefix] = useState(initialData?.customer?.prefix || "");
     const [endUserName, setEndUserName] = useState(initialData?.endUserName || "");
@@ -997,6 +1073,26 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [workOpts, setWorkOpts] = useState<any[]>([]);
     const [rawPricingRuleCandidates, setRawPricingRuleCandidates] = useState<any[]>([]);
 
+    const handleCustomerTypeSelect = useCallback((nextType: Exclude<CustomerTypeSelection, null>) => {
+        if (customerTypeSelection !== nextType) {
+            setCustomerId(null);
+            setCustomerName("");
+            setCustomerOpts([]);
+            setCustomerPhone("");
+            setLineId("");
+            setAddress("");
+            setEndUserName("");
+            setPartnerRef("");
+        }
+        setCustomerTypeSelection(nextType);
+        setCustomerPrefix(nextType === "business" ? "" : "C");
+    }, [customerTypeSelection]);
+    const selectedCustomerTypeLabel = customerTypeSelection === "business"
+        ? "業者（B2B）"
+        : customerTypeSelection === "individual"
+            ? "一般（B2C）"
+            : "未選択";
+
     const getOptionIdByValue = useCallback((options: any[], value: string) => {
         const normalizedValue = value.trim();
         if (!normalizedValue) return null;
@@ -1165,7 +1261,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const currentDataForPdf = {
         id: initialData?.id,
         inquiryNumber: initialData?.inquiryNumber,
-        customer: { name: customerName, type: isB2B ? 'business' : 'individual', address, phone: customerPhone },
+        customer: { name: customerName, type: customerTypeSelection, address, phone: customerPhone },
         endUserName,
         partnerRef,
         watch: { brand, model, ref: refName, serial, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber },
@@ -1377,10 +1473,19 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             return;
         }
 
+        if (addItemCategory === 'internal' && !customerTypeSelection) {
+            setWorkOpts([]);
+            setRawPricingRuleCandidates([]);
+            return;
+        }
+
         const m = modelOpts.find(o => o.value === model || o.label === model);
         const c = calOpts.find(o => o.value === caliber || o.label === caliber);
+        let cancelled = false;
 
         if (addItemCategory === 'internal') {
+            setWorkOpts([]);
+            setRawPricingRuleCandidates([]);
             const movementCaliberId = getOptionIdByValue(masterCalOpts, movementCaliber);
             const baseMovementCaliberId = getOptionIdByValue(masterCalOpts, baseMovementCaliber);
             const watchCaliberId = c?.id ?? null;
@@ -1392,7 +1497,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 targetPartNameId: newTargetPartNameId || null,
                 repairWorkActionId: newWorkActionId ? Number(newWorkActionId) : null,
                 detailLabel: cleanOptionalText(newWorkDetailLabel),
-                customerType: isB2B ? 'business' : 'individual',
+                customerType: customerTypeSelection,
+                expectedWorkName: [
+                    cleanOptionalText(newTargetPartNameSnapshot) ?? cleanOptionalText(newWorkCategorySnapshot),
+                    cleanOptionalText(newWorkActionSnapshot),
+                    cleanOptionalText(newWorkDetailLabel),
+                ].filter(Boolean).join(" ") || null,
             };
 
             // Fetch labor/work rules
@@ -1400,6 +1510,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 ...pricingCaliberIds.map((pricingCaliberId) => getPricingRules(b.id, m?.id, pricingCaliberId, pricingLookupOptions)),
                 getPricingRules(b.id, m?.id, undefined, pricingLookupOptions),
             ]).then((ruleGroups) => {
+                if (cancelled) return;
                 const seenRuleIds = new Set<number>();
                 const safeRules = ruleGroups.flatMap((rules, groupIndex) => {
                     const expectedCaliberId = groupIndex < pricingCaliberIds.length
@@ -1413,7 +1524,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         return true;
                     });
                 });
-                const dedupedRules = collapseDuplicatePricingRuleCandidates(safeRules, pricingLookupOptions);
+                const filteredDisplayRules = filterPricingRuleCandidatesForDisplay(safeRules, pricingLookupOptions);
+                const dedupedRules = collapseDuplicatePricingRuleCandidates(filteredDisplayRules, pricingLookupOptions);
                 setRawPricingRuleCandidates(safeRules.map(r => ({
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
@@ -1456,6 +1568,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     masterCalOpts.find(o => o.value === baseMovementCaliber || o.label === baseMovementCaliber)?.id,
                     newItemName
                 ).then(parts => {
+                    if (cancelled) return;
                     setWorkOpts(parts.map(p => ({
                         label: p.nameJp || p.name,
                         value: p.nameJp || p.name,
@@ -1484,31 +1597,33 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     console.log(`Fetched ${parts.length} matching parts for brand ${b.id}`);
                 });
             }
-    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, newItemName, newWorkCategoryId, newTargetPartNameId, newWorkActionId, newWorkDetailLabel, isB2B, getOptionIdByValue, cleanOptionalText]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, newItemName, newWorkCategoryId, newTargetPartNameId, newWorkActionId, newWorkDetailLabel, newWorkCategorySnapshot, newTargetPartNameSnapshot, newWorkActionSnapshot, customerTypeSelection, getOptionIdByValue, cleanOptionalText]);
 
     useEffect(() => {
         if (addItemCategory !== 'internal') return;
+        if (!customerTypeSelection) return;
         if (!newWorkCategoryId || !newTargetPartNameId || !newWorkActionId) return;
         if (selectedWorkOption) return;
         if (newItemPriceManuallyEdited) return;
         if (newItemPrice && autoFilledPricingRuleIdRef.current == null) return;
 
         const detailLabel = cleanOptionalText(newWorkDetailLabel);
-        const customerType = isB2B ? 'business' : 'individual';
+        const customerType = customerTypeSelection;
         const matchesStructure = (rule: any) => {
             if (Number(rule.repairWorkCategoryId) !== Number(newWorkCategoryId)) return false;
             if (rule.targetPartNameId !== newTargetPartNameId) return false;
             if (Number(rule.repairWorkActionId) !== Number(newWorkActionId)) return false;
             if (detailLabel && cleanOptionalText(rule.detailLabel) !== detailLabel) return false;
-            return rule.customerType === customerType || rule.customerType == null;
+            return normalizePricingCandidateCustomerType(rule.customerType) === customerType;
         };
 
         const structuralMatches = rawPricingRuleCandidates.filter(matchesStructure);
-        const exactCustomerMatches = structuralMatches.filter((rule) => rule.customerType === customerType);
-        const genericCustomerMatches = structuralMatches.filter((rule) => rule.customerType == null);
-        const highConfidenceMatches = exactCustomerMatches.length > 0
-            ? exactCustomerMatches
-            : genericCustomerMatches;
+        const exactCustomerMatches = structuralMatches.filter((rule) => normalizePricingCandidateCustomerType(rule.customerType) === customerType);
+        const highConfidenceMatches = exactCustomerMatches;
         const dedupedHighConfidenceMatches = dedupePricingRuleCandidatesForAutoFill(highConfidenceMatches);
 
         if (dedupedHighConfidenceMatches.length !== 1) return;
@@ -1524,7 +1639,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         newTargetPartNameId,
         newWorkActionId,
         newWorkDetailLabel,
-        isB2B,
+        customerTypeSelection,
         rawPricingRuleCandidates,
         selectedWorkOption,
         newItemPrice,
@@ -1562,6 +1677,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // --- ACTIONS ---
     const handleSave = async () => {
         if (isReadOnly) return;
+        if (!customerTypeSelection) {
+            alert("顧客種別（業者/B2B または 一般/B2C）を選択してください。");
+            return;
+        }
         if (!brand || !customerName) {
             alert("「ブランド」と「顧客名」は必須です。");
             return;
@@ -1587,7 +1706,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     id: customerId,
                     name: customerName,
                     companyName: isB2B ? customerName : undefined,
-                    type: isB2B ? 'business' : 'individual',
+                    type: customerTypeSelection,
                     phone: customerPhone,
                     lineId: lineId,
                     address: address,
@@ -2194,13 +2313,52 @@ ${shopName}
 
                         {/* ①顧客情報 */}
                         <Card className="p-3 shadow-sm border-t-4 border-t-zinc-500 bg-white">
-                            <div className="flex justify-between items-center mb-2">
-                                <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase tracking-wider">
+                            <div className="flex flex-col gap-3 mb-3">
+                                <h3 className="text-sm font-bold flex items-center gap-1.5 text-zinc-700 uppercase tracking-wider">
                                     <User className="w-3.5 h-3.5" /> 顧客情報
                                 </h3>
-                                <div className="flex bg-zinc-100 p-0.5 rounded">
-                                    <button onClick={() => setIsB2B(true)} className={cn("px-2 py-0.5 text-[10px] rounded-sm font-bold", isB2B ? "bg-white shadow text-blue-600" : "text-zinc-400")}>業者</button>
-                                    <button onClick={() => setIsB2B(false)} className={cn("px-2 py-0.5 text-[10px] rounded-sm font-bold", !isB2B ? "bg-white shadow text-green-600" : "text-zinc-400")}>一般</button>
+                                <div className={cn(
+                                    "rounded-md border p-2",
+                                    customerTypeSelection ? "border-zinc-200 bg-zinc-50" : "border-amber-300 bg-amber-50"
+                                )}>
+                                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                        <span className="text-sm font-bold text-zinc-700">
+                                            現在の顧客種別：{selectedCustomerTypeLabel}
+                                        </span>
+                                        {!customerTypeSelection && (
+                                            <span className="text-xs font-semibold text-amber-700">
+                                                顧客種別を選択してください
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCustomerTypeSelect("business")}
+                                            aria-pressed={customerTypeSelection === "business"}
+                                            className={cn(
+                                                "h-10 rounded-md border px-3 text-sm font-bold transition-colors",
+                                                customerTypeSelection === "business"
+                                                    ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                                                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-blue-50"
+                                            )}
+                                        >
+                                            業者（B2B）
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCustomerTypeSelect("individual")}
+                                            aria-pressed={customerTypeSelection === "individual"}
+                                            className={cn(
+                                                "h-10 rounded-md border px-3 text-sm font-bold transition-colors",
+                                                customerTypeSelection === "individual"
+                                                    ? "border-green-600 bg-green-600 text-white shadow-sm"
+                                                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-green-50"
+                                            )}
+                                        >
+                                            一般（B2C）
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div className="grid gap-2 md:grid-cols-3">
@@ -2210,14 +2368,60 @@ ${shopName}
                                         <AdvancedCombobox
                                             placeholder="名前検索 / 新規入力..."
                                             value={customerName}
-                                            onChange={setCustomerName}
+                                            onChange={(value) => {
+                                                if (!customerTypeSelection) return;
+                                                setCustomerName(value);
+                                                setCustomerId(null);
+                                            }}
                                             onSearchChange={async (s) => {
+                                                if (!customerTypeSelection) {
+                                                    setCustomerOpts([]);
+                                                    return;
+                                                }
                                                 const res = await getCustomers(s);
-                                                setCustomerOpts(res.map(c => ({ label: c.name, value: c.name, sub: c.phone || "No phone" })));
+                                                setCustomerOpts(res.filter((c) => normalizeCustomerTypeSelection(c.type) === customerTypeSelection).map(c => ({
+                                                    id: c.id,
+                                                    label: c.name,
+                                                    value: c.name,
+                                                    sub: c.phone || "No phone",
+                                                    type: c.type,
+                                                    prefix: c.prefix,
+                                                    phone: c.phone,
+                                                    lineId: c.lineId,
+                                                    address: c.address,
+                                                })));
+                                            }}
+                                            onSelectOption={(option) => {
+                                                const optionCustomerType = normalizeCustomerTypeSelection(option.type);
+                                                if (!customerTypeSelection || optionCustomerType !== customerTypeSelection) {
+                                                    alert("選択中の顧客種別と一致する顧客候補を選択してください。");
+                                                    return;
+                                                }
+                                                setCustomerId(option.id ?? null);
+                                                setCustomerName(option.value);
+                                                setCustomerPrefix(optionCustomerType === 'business' ? (option.prefix || "") : "C");
+                                                setCustomerPhone(option.phone || "");
+                                                setLineId(option.lineId || "");
+                                                setAddress(option.address || "");
                                             }}
                                             options={customerOpts}
+                                            disabled={!customerTypeSelection}
                                         />
-                                        <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={() => setQuickRegOpen(true)}><Plus className="w-4 h-4" /></Button>
+                                        <Button
+                                            size="icon"
+                                            variant="outline"
+                                            className="h-8 w-8 shrink-0"
+                                            onClick={() => {
+                                                if (!customerTypeSelection) {
+                                                    alert("顧客種別（業者/B2B または 一般/B2C）を先に選択してください。");
+                                                    return;
+                                                }
+                                                setQuickRegOpen(true);
+                                            }}
+                                            disabled={!customerTypeSelection}
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                        </Button>
                                     </div>
                                 </div>
                                 {isB2B && (
@@ -2908,9 +3112,13 @@ ${shopName}
                 mode="customer"
                 initialName={customerName}
                 onRegister={(d) => {
+                    const registeredCustomerType = normalizeCustomerTypeSelection(d.type);
+                    if (!customerTypeSelection || registeredCustomerType !== customerTypeSelection) {
+                        alert("登録された顧客種別が現在の選択と一致しません。顧客種別を確認してください。");
+                        return;
+                    }
                     setCustomerName(d.name);
-                    setIsB2B(d.type === 'business');
-                    setCustomerPrefix(d.type === 'business' ? (d.prefix || "") : "C");
+                    setCustomerPrefix(registeredCustomerType === 'business' ? (d.prefix || "") : "C");
                     setCustomerPhone(d.phone || "");
                     setLineId(d.lineId || "");
                     setAddress(d.address || "");

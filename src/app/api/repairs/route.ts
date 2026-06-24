@@ -18,6 +18,20 @@ function extractInquirySequence(inquiryNumber: string | null, prefix: string) {
     return Number.isFinite(seq) ? seq : 0;
 }
 
+function normalizeCustomerType(value?: string | null): "business" | "individual" | null {
+    if (value === "business") return "business";
+    if (value === "individual") return "individual";
+    return null;
+}
+
+function requireCustomerType(value?: string | null): "business" | "individual" {
+    const customerType = normalizeCustomerType(value);
+    if (!customerType) {
+        throw new Error("customer.type must be business or individual.");
+    }
+    return customerType;
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -33,7 +47,7 @@ export async function POST(req: Request) {
             }
 
             if (!customer) {
-                const type = body.customer.type || 'individual';
+                const type = requireCustomerType(body.customer.type);
                 const name = (body.customer.name || "").trim();
                 const companyName = (body.customer.companyName || name).trim();
 
@@ -481,6 +495,7 @@ export async function POST(req: Request) {
                         brandId: brand.id,
                         modelId,
                         caliberId,
+                        customerType: requireCustomerType(customer.type),
                         items: repairLineItemInputs,
                     });
                 } catch (error) {

@@ -109,19 +109,18 @@ minPrice
 
 ## 分離した後続Task
 
-保存時に同名・同条件・価格違いの PricingRule を潰さない問題は重要だが、108-10AI の責務外である。
+保存時に同名・同条件・価格違いの PricingRule を潰さない問題は重要だが、108-10AI の責務外である。B2B / B2C と価格違いの上書き防止は、108-10AJ の追加修正で最小対応した。
 
-後続Task案:
+108-10AJ 追加修正で対応した内容:
 
-```txt
-108-10AJ: PricingRule保存時に価格違い候補を潰さない
-```
+- PricingRule 自動作成・更新側の同一判定に `customerType` と `minPrice/maxPrice` を含める
+- `pricingRuleId` 指定時に `customerType` / 価格が違う rule を上書きしない制御
 
-108-10AJ で扱う内容:
+後続Taskで扱う内容:
 
-- PricingRule 自動作成・更新側の同一判定に価格を含めるか
-- `pricingRuleId` 指定時に価格違い rule を上書きしない制御
-- legacy rule 補完更新時に価格違い候補を潰さない制御
+- B2B/B2C derived candidate
+- 候補ラベル表示
+- legacy rule 補完更新の追加整理
 
 ## canonical docs 更新内容
 
@@ -131,7 +130,7 @@ minPrice
 - raw 候補と表示候補を分離すること
 - 表示候補は `suggestedWorkName + minPrice` で collapse すること
 - 高信頼自動反映は raw 候補から判定し、同名・同価格の重複だけ semantic dedupe すること
-- PricingRule 保存側 identity 修正は後続 Task 108-10AJ に分離すること
+- PricingRule 保存側 identity の B2B/B2C・価格違い上書き防止は 108-10AJ 追加修正で最小対応済みであること
 
 ## 検証結果
 
