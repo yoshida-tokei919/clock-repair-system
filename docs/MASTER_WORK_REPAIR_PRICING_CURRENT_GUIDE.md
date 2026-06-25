@@ -691,3 +691,11 @@ B2B/B2C derived candidate、候補ラベル表示は未実装であり、後続T
 B2B 選択中は `Customer.type = business` の候補だけを表示し、保存 payload の `customer.type` も `business` にする。B2C 選択中は `Customer.type = individual` の候補だけを表示し、保存 payload の `customer.type` も `individual` にする。顧客候補を選択しても、フォームの B2B/B2C 選択を勝手に切り替えない。候補 option の `type` が不明、または現在選択中の顧客種別と一致しない場合は採用しない。
 
 未選択時は保存不可とし、`customerType = null` の PricingRule を新規作成しない。`customerType = null` の既存 PricingRule は旧データ / 不正データ扱いであり、通常 dropdown には表示しない。旧データの変換・削除は今回行わず、後続Taskで扱う。
+
+## 29. 108-10AK 旧 customerType=null PricingRule の削除
+
+108-10AJ 以降、PricingRule は通常保存で必ず `customerType = business` または `customerType = individual` を持つ。`customerType = null` の PricingRule は旧データ / 不正データ扱いであり、dropdown候補には表示しない。
+
+108-10AK ではローカル仮データ整理として、`customerType = null` の PricingRule 4件を削除した。`business` / `individual` への変換は行わず、`customerType = business` / `individual` の PricingRule は削除していない。
+
+削除後のローカルDBでは `customerType = null` の PricingRule は0件である。schema / migration / seed は変更していない。
