@@ -51,16 +51,18 @@
 
 FMP過去案件には救済変換・表記ゆれ整理・確認対象抽出が必要だが、新アプリ通常 Repair の構造化入力を FMP 救済ルールで歪めない。
 
-### 外装技術料は初期手入力
+### 外装技術料方針
 
-初期外装入力では、内装のような価格自動入力を主軸にしない。
+108-10AL 時点では、初期外装入力で内装のような価格自動入力を主軸にしない方針だった。
+
+108-10AP でこの方針は上書きされた。外装 PricingRule 不要、外装価格候補不要、外装技術料は完全手入力のみ、という方針は撤回し、外装も `PricingRule` 候補選択式にする。RepairLineItem snapshot 方針は維持する。
 
 基本は以下とする。
 
 ```txt
 外装部品カテゴリ / 部品名 / 属性 / 処置 / 処置詳細を選ぶ
 -> 表示作業名を自動生成する
--> 技術料は手入力する
+-> PricingRule候補選択、または技術料を手入力する
 ```
 
 ## 外装作業入力構造
@@ -79,7 +81,7 @@ FMP過去案件には救済変換・表記ゆれ整理・確認対象抽出が�
 | 処置 | 交換 / 取付 / 修理など | `RepairWorkAction` 候補 |
 | 処置詳細 | 部品名 + 処置に紐づく詳細 | 初期は `detailLabelSnapshot`。将来 detail master 化候補 |
 | 表示作業名 | 案件明細に出す確定名 | `itemNameSnapshot` / `b2bDisplayNameSnapshot` / `b2cDisplayNameSnapshot` |
-| 技術料 | 外装 LABOR 行の金額 | 初期は手入力 `unitPrice` |
+| 技術料 | 外装 LABOR 行の金額 | 108-10AP 以降は `PricingRule` 候補選択、または手入力 `unitPrice` |
 | B2B/B2C表示用snapshot | 表示先ごとの確定名 | `RepairLineItem` snapshot |
 
 例:
@@ -90,7 +92,7 @@ FMP過去案件には救済変換・表記ゆれ整理・確認対象抽出が�
 処置: 交換
 B2B表示: ガラス交換技術料
 B2C表示: ガラス交換
-技術料: 手入力
+技術料: PricingRule候補選択、または手入力
 ```
 
 例:
@@ -102,7 +104,7 @@ B2C表示: ガラス交換
 処置詳細: 折れ込み巻芯
 B2B表示: リューズ折れ込み巻芯除去技術料
 B2C表示: リューズ折れ込み巻芯除去
-技術料: 手入力
+技術料: PricingRule候補選択、または手入力
 ```
 
 ## RepairLineItem接続案
@@ -121,7 +123,7 @@ B2C表示: リューズ折れ込み巻芯除去
 -> repairWorkActionId = 外装でも使う処置
 -> detailLabelSnapshot = 処置詳細
 -> display snapshot = B2B/B2C用の確定表示名
--> unitPrice = 手入力技術料
+-> unitPrice = PricingRule候補選択価格、または手入力技術料
 
 外装交換部品
 -> RepairLineItem.lineType = PART
@@ -166,8 +168,8 @@ B2C表示: リューズ折れ込み巻芯除去
 | `itemNameSnapshot` | 利用する | 表示作業名の正本 |
 | `b2bDisplayNameSnapshot` | 利用する | B2B / アプリ内部用 |
 | `b2cDisplayNameSnapshot` | 利用する | B2C 公開用 |
-| `unitPrice` | 利用する | 初期は手入力技術料 |
-| `pricingRuleId` | 初期は任意 | 初期は価格自動入力なし。将来参考価格で使用 |
+| `unitPrice` | 利用する | PricingRule候補選択価格、または手入力技術料 |
+| `pricingRuleId` | 任意 | PricingRule候補を選択した場合に参照 |
 | `relatedWorkLineItemId` | 利用する | PART 行を LABOR 行に紐づける |
 
 ### 初期schema追加を避けられる範囲
@@ -199,7 +201,7 @@ B2C表示: リューズ折れ込み巻芯除去
 | `externalVariantSnapshot` | 純正 / FIT / 特殊仕様など | 中 |
 | `workScopeSnapshot` | 仕上げ系のケース / ブレスレット等 | 高 |
 
-ただし 108-10AL では schema 追加しない。108-10AP で差分設計する。
+ただし 108-10AL では schema 追加しない。108-10AP の方針変更後、schema / API 影響は 108-10AR 以降で調査する。
 
 ## PartNameMaster / PartsMaster の関係
 
@@ -353,32 +355,30 @@ detailLabelSnapshot: ケース・ブレスレット
 
 ## 外装PricingRule方針
 
-初期外装作業では、価格自動入力を主軸にしない。
+108-10AP で方針変更した。初期外装作業では価格自動入力を主軸にしない、技術料は手入力、`PricingRule` は将来の参考価格候補に留める、という 108-10AL 時点の方針は撤回する。
 
-推奨方針:
+108-10AP 以降の推奨方針:
 
-- 初期は外装価格自動入力なし。
-- 技術料は手入力。
+- 外装も `PricingRule` を使う。
+- 外装も内装と同じように候補選択式にする。
 - 表示作業名の自動生成を優先する。
-- `PricingRule` は将来の参考価格候補として使う。
+- 短期の基本条件は `customerType + brandId + targetPartNameId + repairWorkActionId`。
+- `brandId` は外装では基本条件とする。
 - `customerType` は外装でも必ず `business` / `individual`。
-- `customerType = null` の外装 PricingRule は作らない、表示しない。
+- `customerType = null` の外装 PricingRule は作らない、表示しない、fallback しない。
+- 価格違いは別候補として保持する。
+- 手入力済み価格は候補再取得で自動上書きしない。
 
-将来的に参考価格候補として `PricingRule` を使う場合は、以下を条件候補にする。
+短期は以下を条件候補にする。
 
 ```txt
 brandId
-modelId
-caliberId
-ref
-repairWorkCategoryId
 targetPartNameId
 repairWorkActionId
-detailLabel
 customerType
 ```
 
-ただし、外装価格はブランド、Ref、部品入手性、純正 / FIT、加工有無、OH同時作業などで変動しやすい。したがって、将来も自動確定ではなく、参考価格表示に留めるのが安全である。
+中期以降、必要になれば `modelId`、`ref`、`detailLabel`、`material`、`size`、`variant`、`exteriorAttributeSnapshot` を条件追加候補として検討する。今回 schema 変更はしない。
 
 ## B2B/B2C表示ルール
 
@@ -447,7 +447,7 @@ FMP過去案件の救済ルールは、新アプリ通常 Repair の入力ルー
 - 外装処置詳細をいつ `RepairWorkDetailMaster` のような専用 master に昇格するか。
 - 仕上げ系を例外作業 master にするか、作業範囲 field を持つ通常作業にするか。
 - 外装 PART 行と LABOR 行の紐づけを必須にする範囲。
-- 外装参考価格候補を出す時期と、候補ラベルの表示方法。
+- 外装PricingRule候補の取得順、候補ラベルの表示方法。
 - `ref` 条件を PricingRule に持たせる場合の schema 方針。
 
 ## 推奨案
@@ -459,26 +459,34 @@ FMP過去案件の救済ルールは、新アプリ通常 Repair の入力ルー
 3. 内装 / 外装の区別は短期では `RepairWorkCategory.repairType = EXTERNAL` と UI 入力モードで扱う。
 4. 外装対象部品名は短期では既存 `PartNameMaster` を使う。`ExternalPartNameMaster` は作らない。
 5. `PartsMaster` は実部品・在庫マスタとして分け、作業マスタや LABOR 対象部品名に混ぜない。
-6. 初期外装入力では価格自動入力をしない。技術料は手入力。
-7. 将来、`PricingRule` は参考価格候補として使う。ただし `customerType` は必ず `business` / `individual`。
+6. 108-10AP 以降、外装も `PricingRule` 候補選択式にする。候補がない場合や例外価格は手入力できる。
+7. 外装 PricingRule の基本条件は `customerType + brandId + targetPartNameId + repairWorkActionId`。`customerType` は必ず `business` / `individual`。
 8. 帳票 / 共有ページ / PublicCase は `RepairLineItem` snapshot を正とし、外装作業マスタを直接表示しない。
 9. 仕上げ系は、初期は作業範囲込みの例外作業名として snapshot 保存する。
-10. schema 追加は 108-10AP で最小差分を別途設計する。
+10. schema / API 影響は 108-10AR 以降で別途調査する。
 
 ## 後続Task
 
 - 108-10AM: 外装カテゴリ・部品名 seed候補設計
-- 108-10AN: 外装処置・処置詳細 seed候補設計
-- 108-10AO: 外装作業入力UI設計
-- 108-10AP: 外装RepairLineItem schema差分設計
-- 108-10AQ: 外装入力最小実装
+- 108-10AN: 外装部品名 seed実装
+- 108-10AO: 外装処置・処置詳細 seed候補設計
+- 108-10AP: 外装PricingRule方針修正・ドリルダウン価格候補設計
+- 108-10AQ: 外装処置 seed実装
+- 108-10AR: 外装PricingRule schema/API影響調査
+- 108-10AS: 外装PricingRule候補取得設計
+- 108-10AT: 外装作業入力UI設計
+- 108-10AU: 外装PricingRule保存設計
 
 推奨順:
 
 ```txt
 1. 108-10AM: 外装カテゴリ・部品名 seed候補設計
-2. 108-10AN: 外装処置・処置詳細 seed候補設計
-3. 108-10AO: 外装作業入力UI設計
-4. 108-10AP: 外装RepairLineItem schema差分設計
-5. 108-10AQ: 外装入力最小実装
+2. 108-10AN: 外装部品名 seed実装
+3. 108-10AO: 外装処置・処置詳細 seed候補設計
+4. 108-10AP: 外装PricingRule方針修正・ドリルダウン価格候補設計
+5. 108-10AQ: 外装処置 seed実装
+6. 108-10AR: 外装PricingRule schema/API影響調査
+7. 108-10AS: 外装PricingRule候補取得設計
+8. 108-10AT: 外装作業入力UI設計
+9. 108-10AU: 外装PricingRule保存設計
 ```

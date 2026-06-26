@@ -710,7 +710,7 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 
 外装入力の基本構造は、外装部品カテゴリ、外装部品名、位置 / 素材 / サイズ / 色 / バリエーション、処置、処置詳細、表示作業名、技術料、B2B/B2C表示用 snapshot とする。ただし 108-10AL では schema 追加せず、外装属性の正式 field は後続 Task で検討する。
 
-外装 PricingRule は初期実装では価格自動入力に使わない。外装技術料は手入力を基本とし、将来 `PricingRule` を使う場合も参考価格候補に留める。外装でも `customerType` は必ず `business` / `individual` とし、`customerType = null` は旧データ / 不正データ扱いにする。
+108-10AP で外装 PricingRule 方針を変更した。外装 PricingRule 不要、外装価格候補不要、外装技術料は完全手入力のみ、という方針は撤回し、外装も `PricingRule` 候補選択式にする。外装の基本条件は `customerType + brandId + targetPartNameId + repairWorkActionId` とし、`customerType = null` fallback は禁止する。外装価格も内装と同様、価格違いを別候補として扱う。実装は後続 Task で扱う。
 
 帳票 / 共有ページ / PublicCase は、外装作業マスタや PartsMaster を直接表示せず、`RepairLineItem` の snapshot から表示する。FMP過去案件は FMP 専用変換ルールで扱い、新アプリ通常 Repair の構造化入力とは分ける。
 
@@ -738,3 +738,15 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 外装処置は短期では既存 `RepairWorkAction` を可能な限り共有する。`交換` / `取付` / `修理` / `修正` / `調整` / `製作` / `研磨` / `洗浄` / `検査` / `除去` は既存 action を使い、外装固有寄りの `加工` / `接着` / `仕上げ` / `簡易仕上げ` / `塗装` / `サビ取り` / `乾燥` / `溶接` / `ロウ付け` は後続 seed 実装候補として扱う。
 
 処置詳細は短期では新規 master を作らず、`RepairWorkName.detailLabel` と `RepairLineItem.detailLabelSnapshot` の snapshot で扱う。将来、候補数や検索・変換要件が増えた場合に `RepairWorkActionDetailMaster` などの master 化を検討する。
+
+## 34. 108-10AP 外装PricingRuleドリルダウン候補設計
+
+108-10AP で、外装料金も内装と同じように `PricingRule` の価格候補をドリルダウン選択する方針へ修正した。
+
+外装の候補取得は、短期では `customerType`、`brandId`、`targetPartNameId`、`repairWorkActionId` を基本条件にする。内装では movement Cal / base Cal が重要だが、外装ではムーブメント Cal を基本条件にせず、ブランド、外装部品名、処置、顧客種別を重視する。
+
+完全一致は `customerType + brandId + targetPartNameId + repairWorkActionId` とする。ブランドなし fallback は `brandId = null` のブランド共通候補として検討可能だが、処置なし fallback、部品なし fallback、`customerType = null` fallback は行わない。特に `customerType = null` は旧データ / 不正データ扱いであり、候補表示にも保存にも使わない。
+
+外装も将来的には PricingRule 保存対象にする。保存時は `customerType` を必須にし、価格違いは別候補として保持する。手入力済み価格は候補再取得や構造 field 変更で自動上書きしない。
+
+今回も docs 設計のみであり、schema / migration / seed / UI / API / PricingRule 実装 / RepairEntryForm / PartsMaster検索系 / 帳票 / PDF / LINE / 共有ページ / PublicCase は変更しない。

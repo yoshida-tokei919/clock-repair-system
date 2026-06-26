@@ -165,7 +165,7 @@
 
 `仕上げ` と `簡易仕上げ` は処置候補としては `APPROVED` とする。ただし、実際の作業名は `ケース仕上げ`、`ブレスレット仕上げ`、`ケース・ブレスレット仕上げ` のように範囲が価格・表示に強く効く。
 
-短期では、`RepairLineItem` の表示 snapshot と `detailLabelSnapshot` に範囲を残し、価格は手入力を基本とする。
+短期では、`RepairLineItem` の表示 snapshot と `detailLabelSnapshot` に範囲を残す。108-10AP 以降、外装価格も `PricingRule` 候補選択式へ方針変更されたため、価格は候補選択または手入力で扱う。
 
 将来、仕上げ系の候補が増える場合は、`ExternalWorkScopeMaster` か `RepairWorkActionDetailMaster` のような別 master を検討する。初期 seed 実装で `RepairWorkAction` に範囲込みの `ケース・ブレスレット仕上げ` を直接追加しない。
 
@@ -187,6 +187,8 @@
 短期では schema を増やさず、`RepairWorkName.detailLabel` と snapshot で進める。
 
 ## 実装対象外
+
+この一覧は 108-10AO で実装しない範囲を示す。UI / PricingRule / schema が不要という意味ではなく、108-10AP 以降の PricingRule 方針変更と後続 Task で扱う。
 
 - schema
 - migration
@@ -225,7 +227,9 @@ docs-only 変更のため、TypeScript / Prisma / seed は実行していない�
 
 ## 後続Task
 
-- 108-10AP: 外装処置・処置詳細 seed実装
-- 108-10AQ: 外装属性 field 設計
-- 108-10AR: 外装作業入力UI設計
-- 108-10AS: 外装 PricingRule / 参考価格候補設計
+- 108-10AP: 外装PricingRule方針修正・ドリルダウン価格候補設計
+- 108-10AQ: 外装処置 seed実装
+- 108-10AR: 外装PricingRule schema/API影響調査
+- 108-10AS: 外装PricingRule候補取得設計
+- 108-10AT: 外装作業入力UI設計
+- 108-10AU: 外装PricingRule保存設計
