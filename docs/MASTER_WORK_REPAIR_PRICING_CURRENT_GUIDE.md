@@ -699,3 +699,17 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 108-10AK ではローカル仮データ整理として、`customerType = null` の PricingRule 4件を削除した。`business` / `individual` への変換は行わず、`customerType = business` / `individual` の PricingRule は削除していない。
 
 削除後のローカルDBでは `customerType = null` の PricingRule は0件である。schema / migration / seed は変更していない。
+
+## 30. 108-10AL 外装作業入力・RepairLineItem接続設計
+
+108-10AL で、外装作業入力を現行の `RepairLineItem` / `PricingRule` / `PartNameMaster` / `PartsMaster` 方針へ接続する設計を追加した。
+
+外装技術料は初期実装では `RepairLineItem.lineType = LABOR` として扱い、外装交換部品は `RepairLineItem.lineType = PART` として扱う。内装 / 外装の区別は、短期では `RepairWorkCategory.repairType = EXTERNAL`、`RepairWorkName.repairType = EXTERNAL`、入力UIモード、各 snapshot で判断する。`RepairLineItem` 自体への `repairType` / `workSide` 追加は後続 Task で最小差分を設計する。
+
+外装対象部品名は短期では既存 `PartNameMaster` を使う。`ExternalPartNameMaster` は現時点では作らない。`RepairLineItem.targetPartNameId` は標準部品名 ID であり、`PartsMaster` ID ではない。`PartsMaster` は引き続き実部品・在庫・価格・写真・仕入先のためのマスタとして分ける。
+
+外装入力の基本構造は、外装部品カテゴリ、外装部品名、位置 / 素材 / サイズ / 色 / バリエーション、処置、処置詳細、表示作業名、技術料、B2B/B2C表示用 snapshot とする。ただし 108-10AL では schema 追加せず、外装属性の正式 field は後続 Task で検討する。
+
+外装 PricingRule は初期実装では価格自動入力に使わない。外装技術料は手入力を基本とし、将来 `PricingRule` を使う場合も参考価格候補に留める。外装でも `customerType` は必ず `business` / `individual` とし、`customerType = null` は旧データ / 不正データ扱いにする。
+
+帳票 / 共有ページ / PublicCase は、外装作業マスタや PartsMaster を直接表示せず、`RepairLineItem` の snapshot から表示する。FMP過去案件は FMP 専用変換ルールで扱い、新アプリ通常 Repair の構造化入力とは分ける。
