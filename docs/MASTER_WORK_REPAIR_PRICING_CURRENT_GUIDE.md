@@ -721,3 +721,12 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 既存 `src/lib/part-input-options.ts` には、外装カテゴリ6件と外装部品名73件がすでに定義されている。108-10AM では、この既存候補を土台に、`サイクロプスレンズ` と `尾錠` を追加候補、`ガラス` / `ミネラルクリスタル` / `サファイアクリスタル` 表記と針系の位置属性分離を確認対象として整理した。
 
 今回も docs 設計のみであり、seed / schema / migration / UI / API / PricingRule / PartsMaster検索系 / 帳票 / 共有ページ / PublicCase は変更しない。実装は後続 Task で扱う。
+
+## 32. 108-10AN APPROVED 外装部品名 seed追加
+
+108-10AN で、108-10AM の `APPROVED` 外装部品名2件だけを `src/lib/part-input-options.ts` の標準部品名 seed へ追加した。
+
+- `cyclops_lens` / サイクロプスレンズ: `case_glass` / ケース・風防
+- `tang_buckle` / 尾錠: `bracelet_band` / ブレス・バンド
+
+尾錠はバックルへ吸収せず、サイクロプスレンズもガラスへ吸収しない。REVIEW 候補、ALIAS_ONLY 候補、外装処置、処置詳細、外装属性 field、UI、API、PricingRule、PartsMaster検索系は変更していない。
