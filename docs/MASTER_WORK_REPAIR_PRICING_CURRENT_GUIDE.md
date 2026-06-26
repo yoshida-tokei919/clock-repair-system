@@ -766,3 +766,11 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 - `brazing` / ロウ付け
 
 `RepairWorkAction` は内装 / 外装で共有し、`side` / `repairType` は追加しない。外装 PricingRule 方針は 108-10AP の通り後続 Task で扱い、今回は PricingRule 実装を変更していない。
+
+## 36. 108-10AR 外装PricingRule schema/API影響調査
+
+108-10AR で、外装 PricingRule の schema / API / 保存処理への影響を調査した。実装は後続 Task で扱い、今回 schema / migration / seed / UI / API / PricingRule 実装 / RepairEntryForm は変更しない。
+
+外装 PricingRule の短期基本条件は 108-10AP の通り `customerType + brandId + targetPartNameId + repairWorkActionId` とする。現行 `PricingRule` はこれらの field をすでに持つため、短期実装は schema 変更なしで開始できる見込みである。ただし `customerType = null` fallback は禁止し、候補表示にも保存にも使わない。
+
+現行 `getPricingRules()` は `brandId` 必須かつブランド完全一致で候補取得し、構造 field / `customerType` は score とフォーム側 filter で扱う。外装のブランド完全一致候補はこの形を流用できるが、ブランドなし fallback を行う場合は後続 Task で明示的な分岐設計が必要である。
