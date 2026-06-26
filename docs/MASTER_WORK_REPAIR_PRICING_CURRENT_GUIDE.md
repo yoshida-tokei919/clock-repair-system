@@ -713,3 +713,11 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 外装 PricingRule は初期実装では価格自動入力に使わない。外装技術料は手入力を基本とし、将来 `PricingRule` を使う場合も参考価格候補に留める。外装でも `customerType` は必ず `business` / `individual` とし、`customerType = null` は旧データ / 不正データ扱いにする。
 
 帳票 / 共有ページ / PublicCase は、外装作業マスタや PartsMaster を直接表示せず、`RepairLineItem` の snapshot から表示する。FMP過去案件は FMP 専用変換ルールで扱い、新アプリ通常 Repair の構造化入力とは分ける。
+
+## 31. 108-10AM 外装カテゴリ・部品名 seed候補設計
+
+108-10AM で、外装カテゴリ・外装部品名を短期では既存 `PartCategoryMaster` / `PartNameMaster` に載せる方針を整理した。`ExternalPartNameMaster` は作らず、`targetPartNameId` は引き続き `PartNameMaster.id` を参照する。
+
+既存 `src/lib/part-input-options.ts` には、外装カテゴリ6件と外装部品名73件がすでに定義されている。108-10AM では、この既存候補を土台に、`サイクロプスレンズ` と `尾錠` を追加候補、`ガラス` / `ミネラルクリスタル` / `サファイアクリスタル` 表記と針系の位置属性分離を確認対象として整理した。
+
+今回も docs 設計のみであり、seed / schema / migration / UI / API / PricingRule / PartsMaster検索系 / 帳票 / 共有ページ / PublicCase は変更しない。実装は後続 Task で扱う。
