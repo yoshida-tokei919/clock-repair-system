@@ -24,6 +24,15 @@ async function main() {
         { name: 'overhaul',        displayName: 'オーバーホール', sortOrder: 130 },
         { name: 'inspection',      displayName: '検査',           sortOrder: 140 },
         { name: 'other',           displayName: 'その他',         sortOrder: 150 },
+        { name: 'processing',      displayName: '加工',           sortOrder: 160 },
+        { name: 'bonding',         displayName: '接着',           sortOrder: 170 },
+        { name: 'finishing',       displayName: '仕上げ',         sortOrder: 180 },
+        { name: 'light_finishing', displayName: '簡易仕上げ',     sortOrder: 190 },
+        { name: 'painting',        displayName: '塗装',           sortOrder: 200 },
+        { name: 'rust_removal',    displayName: 'サビ取り',       sortOrder: 210 },
+        { name: 'drying',          displayName: '乾燥',           sortOrder: 220 },
+        { name: 'welding',         displayName: '溶接',           sortOrder: 230 },
+        { name: 'brazing',         displayName: 'ロウ付け',       sortOrder: 240 },
     ]
     for (const action of repairWorkActions) {
         await prisma.repairWorkAction.upsert({

@@ -750,3 +750,19 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 外装も将来的には PricingRule 保存対象にする。保存時は `customerType` を必須にし、価格違いは別候補として保持する。手入力済み価格は候補再取得や構造 field 変更で自動上書きしない。
 
 今回も docs 設計のみであり、schema / migration / seed / UI / API / PricingRule 実装 / RepairEntryForm / PartsMaster検索系 / 帳票 / PDF / LINE / 共有ページ / PublicCase は変更しない。
+
+## 35. 108-10AQ 外装処置 seed追加
+
+108-10AQ で、108-10AO の `APPROVED` 外装処置9件を `RepairWorkAction` seed へ追加した。
+
+- `processing` / 加工
+- `bonding` / 接着
+- `finishing` / 仕上げ
+- `light_finishing` / 簡易仕上げ
+- `painting` / 塗装
+- `rust_removal` / サビ取り
+- `drying` / 乾燥
+- `welding` / 溶接
+- `brazing` / ロウ付け
+
+`RepairWorkAction` は内装 / 外装で共有し、`side` / `repairType` は追加しない。外装 PricingRule 方針は 108-10AP の通り後続 Task で扱い、今回は PricingRule 実装を変更していない。
