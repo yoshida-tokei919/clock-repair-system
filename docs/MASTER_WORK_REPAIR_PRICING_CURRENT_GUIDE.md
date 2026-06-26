@@ -730,3 +730,11 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 - `tang_buckle` / 尾錠: `bracelet_band` / ブレス・バンド
 
 尾錠はバックルへ吸収せず、サイクロプスレンズもガラスへ吸収しない。REVIEW 候補、ALIAS_ONLY 候補、外装処置、処置詳細、外装属性 field、UI、API、PricingRule、PartsMaster検索系は変更していない。
+
+## 33. 108-10AO 外装処置・処置詳細 seed候補設計
+
+108-10AO で、外装処置と処置詳細の seed 候補を docs 設計として整理した。実装は後続 Task とし、今回 schema / migration / seed / UI / API / PricingRule / RepairEntryForm / PartsMaster検索系 / 帳票 / 共有ページ / PublicCase は変更しない。
+
+外装処置は短期では既存 `RepairWorkAction` を可能な限り共有する。`交換` / `取付` / `修理` / `修正` / `調整` / `製作` / `研磨` / `洗浄` / `検査` / `除去` は既存 action を使い、外装固有寄りの `加工` / `接着` / `仕上げ` / `簡易仕上げ` / `塗装` / `サビ取り` / `乾燥` / `溶接` / `ロウ付け` は後続 seed 実装候補として扱う。
+
+処置詳細は短期では新規 master を作らず、`RepairWorkName.detailLabel` と `RepairLineItem.detailLabelSnapshot` の snapshot で扱う。将来、候補数や検索・変換要件が増えた場合に `RepairWorkActionDetailMaster` などの master 化を検討する。
