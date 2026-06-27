@@ -743,9 +743,9 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 
 108-10AP で、外装料金も内装と同じように `PricingRule` の価格候補をドリルダウン選択する方針へ修正した。
 
-外装の候補取得は、短期では `customerType`、`brandId`、`targetPartNameId`、`repairWorkActionId` を基本条件にする。内装では movement Cal / base Cal が重要だが、外装ではムーブメント Cal を基本条件にせず、ブランド、外装部品名、処置、顧客種別を重視する。
+外装の候補取得は、短期では `customerType`、`brandId`、`modelId`、`targetPartNameId`、`repairWorkActionId` を条件にする。`customerType`、`brandId`、`targetPartNameId`、`repairWorkActionId` は必須、`modelId` は任意とする。内装では movement Cal / base Cal が重要だが、外装では `caliberId` を使わず、ブランド、モデル、外装部品名、処置、顧客種別を重視する。
 
-完全一致は `customerType + brandId + targetPartNameId + repairWorkActionId` とする。ブランドなし fallback は `brandId = null` のブランド共通候補として検討可能だが、処置なし fallback、部品なし fallback、`customerType = null` fallback は行わない。特に `customerType = null` は旧データ / 不正データ扱いであり、候補表示にも保存にも使わない。
+外装候補取得は、モデル専用価格 `customerType + brandId + modelId + targetPartNameId + repairWorkActionId` を第1候補、同ブランド内の共通価格 `customerType + brandId + modelId = null + targetPartNameId + repairWorkActionId` を第2候補にする。`brandId = null` fallback、処置なし fallback、部品なし fallback、`customerType = null` fallback、`caliberId` による外装候補取得は行わない。
 
 外装も将来的には PricingRule 保存対象にする。保存時は `customerType` を必須にし、価格違いは別候補として保持する。手入力済み価格は候補再取得や構造 field 変更で自動上書きしない。
 
@@ -771,6 +771,16 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 
 108-10AR で、外装 PricingRule の schema / API / 保存処理への影響を調査した。実装は後続 Task で扱い、今回 schema / migration / seed / UI / API / PricingRule 実装 / RepairEntryForm は変更しない。
 
-外装 PricingRule の短期基本条件は 108-10AP の通り `customerType + brandId + targetPartNameId + repairWorkActionId` とする。現行 `PricingRule` はこれらの field をすでに持つため、短期実装は schema 変更なしで開始できる見込みである。ただし `customerType = null` fallback は禁止し、候補表示にも保存にも使わない。
+外装 PricingRule の短期条件は、必須 `customerType + brandId + targetPartNameId + repairWorkActionId`、任意 `modelId` とする。現行 `PricingRule` はこれらの field をすでに持つため、短期実装は schema 変更なしで開始できる見込みである。ただし `customerType = null` fallback は禁止し、候補表示にも保存にも使わない。外装では `caliberId` を使わない。
 
-現行 `getPricingRules()` は `brandId` 必須かつブランド完全一致で候補取得し、構造 field / `customerType` は score とフォーム側 filter で扱う。外装のブランド完全一致候補はこの形を流用できるが、ブランドなし fallback を行う場合は後続 Task で明示的な分岐設計が必要である。
+108-10AR 追加確定方針として、価格ルール取得は internal / external で分ける。内装は Cal 中心の既存 `getPricingRules()` 系を維持し、外装は専用 helper `getExternalPricingRules()` を作る。外装 helper では `customerType` を DB where に入れ、モデル専用価格を優先し、なければ `modelId = null` のブランド共通価格を候補にする。`brandId = null` fallback は不要であり、実装しない。
+
+## 37. 108-10AS 外装PricingRule候補取得設計
+
+108-10AS で、外装 PricingRule 候補取得の具体設計を追加した。実装は後続 Task で扱い、今回 schema / migration / seed / UI / API / PricingRule 実装 / RepairEntryForm は変更しない。
+
+外装候補取得は専用 helper `getExternalPricingRules()` を作る方針とする。引数は `customerType`、`brandId`、`targetPartNameId`、`repairWorkActionId` を必須、`modelId` を任意とし、`caliberId` は受け取らない。`customerType` はフォーム側 filter だけでなく DB where で絞る。
+
+外装候補の優先順位は、`modelId` 完全一致のモデル専用価格を第1候補、`modelId = null` の同ブランド共通価格を第2候補とする。`brandId = null` fallback、`customerType = null` fallback、処置なし fallback、部品なし fallback、外装での Cal fallback は行わない。
+
+display dedupe は既存方針の `suggestedWorkName + minPrice` を外装にも適用する。同一表示名・同一価格でモデル専用価格とブランド共通価格が重なる場合は、モデル専用価格を代表にする。候補ラベルは `モデル専用` / `ブランド共通` と B2B/B2C を表示用 meta として生成する方針とする。
