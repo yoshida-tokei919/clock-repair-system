@@ -1042,8 +1042,15 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [staffReply, setStaffReply] = useState("");
     const [isSendingStaffReply, setIsSendingStaffReply] = useState(false);
     const [showCustomerComments, setShowCustomerComments] = useState(false);
+    const [userTouchedCustomerCommentsToggle, setUserTouchedCustomerCommentsToggle] = useState(false);
     const customerMessages = initialData?.customerMessages || [];
     const unreadCustomerMessageCount = customerMessages.filter((message: any) => !message.readAt).length;
+
+    useEffect(() => {
+        if (!userTouchedCustomerCommentsToggle && customerMessages.length > 0) {
+            setShowCustomerComments(true);
+        }
+    }, [customerMessages.length, userTouchedCustomerCommentsToggle]);
 
     // --- 4. PHOTOS ---
     const [photos, setPhotos] = useState<any[]>(initialData?.photos || []);
@@ -2225,7 +2232,10 @@ ${shopName}
                             variant="outline"
                             size="sm"
                             className="h-8 px-3 text-xs"
-                            onClick={() => setShowCustomerComments((open) => !open)}
+                            onClick={() => {
+                                setUserTouchedCustomerCommentsToggle(true);
+                                setShowCustomerComments((open) => !open);
+                            }}
                         >
                             {showCustomerComments ? "閉じる" : "開く"}
                             <ChevronDown className={cn("ml-1 h-3.5 w-3.5 transition-transform", showCustomerComments && "rotate-180")} />
