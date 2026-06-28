@@ -784,3 +784,13 @@ B2B 選択中は `Customer.type = business` の候補だけを表示し、保存
 外装候補の優先順位は、`modelId` 完全一致のモデル専用価格を第1候補、`modelId = null` の同ブランド共通価格を第2候補とする。`brandId = null` fallback、`customerType = null` fallback、処置なし fallback、部品なし fallback、外装での Cal fallback は行わない。
 
 display dedupe は既存方針の `suggestedWorkName + minPrice` を外装にも適用する。同一表示名・同一価格でモデル専用価格とブランド共通価格が重なる場合は、モデル専用価格を代表にする。候補ラベルは `モデル専用` / `ブランド共通` と B2B/B2C を表示用 meta として生成する方針とする。
+
+## 38. 108-10AT 外装作業入力UI設計
+
+108-10AT で、`RepairEntryForm` に外装 LABOR（外装技術料行）入力を追加するための UI 方針を整理した。今回も docs-only とし、schema / migration / seed / src / API / UI / PricingRule 実装 / RepairEntryForm / PartsMaster検索系 / 帳票 / PDF / LINE / 共有ページ / PublicCase は変更しない。
+
+短期実装では、入力UI上のモードとして `external_labor` を追加する案を推奨する。`internal` は内装技術料、`external_labor` は外装技術料、`part_external` は外装交換部品として分ける。外装 LABOR は `RepairLineItem.lineType = LABOR`、`PricingRule` 候補選択式、`targetPartNameId = PartNameMaster.id` を使う。外装 PART の `part_external` は `RepairLineItem.lineType = PART`、`PartsMaster` 検索を使うため、外装 LABOR と混ぜない。
+
+外装 LABOR の入力は、`customerType`、`brandId`、外装カテゴリ、`targetPartNameId`、`repairWorkActionId`、価格候補または手入力価格を必須寄りの流れにする。`modelId` は任意で使い、モデル専用価格を優先し、なければ `modelId = null` の同ブランド共通価格を候補にする。外装 LABOR では `caliberId`、Cal fallback、`brandId = null` fallback、`customerType = null` fallback、`PartsMaster` は使わない。
+
+保存は既存 `RepairLineItem` の snapshot field を使う方針とし、初期実装は schema 変更なしで開始できる見込みである。外装属性 field、外装専用 line category、仕上げ系表示名の例外、外装カテゴリを `PartCategoryMaster` と `RepairWorkCategory.repairType = EXTERNAL` のどちらで扱うかは後続 Task で決める。
