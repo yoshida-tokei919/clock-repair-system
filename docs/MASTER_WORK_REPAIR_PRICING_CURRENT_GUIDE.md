@@ -794,3 +794,13 @@ display dedupe は既存方針の `suggestedWorkName + minPrice` を外装にも
 外装 LABOR の入力は、`customerType`、`brandId`、外装カテゴリ、`targetPartNameId`、`repairWorkActionId`、価格候補または手入力価格を必須寄りの流れにする。`modelId` は任意で使い、モデル専用価格を優先し、なければ `modelId = null` の同ブランド共通価格を候補にする。外装 LABOR では `caliberId`、Cal fallback、`brandId = null` fallback、`customerType = null` fallback、`PartsMaster` は使わない。
 
 保存は既存 `RepairLineItem` の snapshot field を使う方針とし、初期実装は schema 変更なしで開始できる見込みである。外装属性 field、外装専用 line category、仕上げ系表示名の例外、外装カテゴリを `PartCategoryMaster` と `RepairWorkCategory.repairType = EXTERNAL` のどちらで扱うかは後続 Task で決める。
+
+## 39. 108-10AU 外装PricingRule保存設計
+
+108-10AU で、外装 LABOR（外装技術料行）から `PricingRule` へ作成 / 更新する保存方針を整理した。今回は docs 設計のみであり、schema / migration / seed / UI / API / PricingRule 実装 / RepairEntryForm / PartsMaster検索系 / 帳票 / PDF / LINE / 共有ページ / PublicCase は変更しない。
+
+外装 PricingRule 保存対象は `external_labor` 相当の LABOR 行だけとし、`part_external`、PART 行、`PartsMaster` 由来の実部品・在庫・部品価格は対象外にする。必須条件は `customerType + brandId + targetPartNameId + repairWorkActionId + suggestedWorkName + minPrice` とする。`customerType` は `business` / `individual` のみ許可し、`customerType = null` の外装 PricingRule は作らない。`brandId = null` の汎用外装価格も作らない。
+
+`modelId` は任意条件として使う。案件に `modelId` があればモデル専用価格として保存し、案件に `modelId` がなければ `modelId = null` の同ブランド共通価格として保存する。外装保存では `caliberId`、movement Cal、base Cal、Cal fallback は使わず、外装 branch では `PricingRule.caliberId = null` に寄せる方針とする。
+
+外装 PricingRule の identity は、`customerType`、`brandId`、`modelId`、`targetPartNameId`、`repairWorkActionId`、`suggestedWorkName`、`minPrice/maxPrice`、必要に応じて `detailLabel` を含める。価格違いは別候補として残し、完全重複だけをアプリ側 identity で避ける。短期は schema 変更なしで開始できる見込みだが、件数増加時は `customerType + brandId + modelId + targetPartNameId + repairWorkActionId` の index 追加を後続 migration Task で検討する。
