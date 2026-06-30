@@ -1,4 +1,5 @@
-import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import type { PricingRule, Prisma } from "@prisma/client";
 import type { RepairLineItemInput } from "@/lib/repair-line-items";
 
 type DbLike = Prisma.TransactionClient;
@@ -9,6 +10,16 @@ type SyncPricingRulesParams = {
     caliberId?: number | null;
     customerType?: string | null;
     items: RepairLineItemInput[];
+};
+
+export type ExternalPricingRuleCustomerType = "business" | "individual";
+
+export type GetExternalPricingRulesParams = {
+    customerType: ExternalPricingRuleCustomerType;
+    brandId: number;
+    modelId?: number | null;
+    targetPartNameId: string;
+    repairWorkActionId: number;
 };
 
 function normalizeNullablePositiveInt(value?: number | null): number | null {
@@ -29,9 +40,107 @@ function normalizeCustomerType(value?: string | null): "business" | "individual"
     return null;
 }
 
+function normalizeExternalCustomerType(value?: string | null): ExternalPricingRuleCustomerType | null {
+    const normalized = cleanText(value)?.toLowerCase();
+    if (normalized === "business" || normalized === "individual") return normalized;
+    return null;
+}
+
 function normalizePrice(value?: number | null): number {
     if (!Number.isFinite(value)) return 0;
     return Math.max(0, Math.floor(Number(value)));
+}
+
+function compareExternalPricingRules(
+    a: PricingRule,
+    b: PricingRule,
+    requestedModelId: number | null
+): number {
+    const modelPriorityA = requestedModelId && a.modelId === requestedModelId ? 0 : 1;
+    const modelPriorityB = requestedModelId && b.modelId === requestedModelId ? 0 : 1;
+    if (modelPriorityA !== modelPriorityB) return modelPriorityA - modelPriorityB;
+
+    if (a.minPrice !== b.minPrice) return a.minPrice - b.minPrice;
+
+    const updatedAtDiff = b.updatedAt.getTime() - a.updatedAt.getTime();
+    if (updatedAtDiff !== 0) return updatedAtDiff;
+
+    const createdAtDiff = b.createdAt.getTime() - a.createdAt.getTime();
+    if (createdAtDiff !== 0) return createdAtDiff;
+
+    return a.id - b.id;
+}
+
+function dedupeExternalPricingRules(
+    rules: PricingRule[],
+    requestedModelId: number | null
+): PricingRule[] {
+    const deduped = new Map<string, PricingRule>();
+
+    for (const rule of rules) {
+        const suggestedWorkName = cleanText(rule.suggestedWorkName) ?? "";
+        const key = `${suggestedWorkName}\u0000${normalizePrice(rule.minPrice)}`;
+        const existing = deduped.get(key);
+
+        if (!existing) {
+            deduped.set(key, rule);
+            continue;
+        }
+
+        if (
+            requestedModelId
+            && rule.modelId === requestedModelId
+            && existing.modelId !== requestedModelId
+        ) {
+            deduped.set(key, rule);
+        }
+    }
+
+    return Array.from(deduped.values());
+}
+
+export async function getExternalPricingRules(
+    params: GetExternalPricingRulesParams
+): Promise<PricingRule[]> {
+    try {
+        const customerType = normalizeExternalCustomerType(params.customerType);
+        const brandId = normalizeNullablePositiveInt(params.brandId);
+        const modelId = normalizeNullablePositiveInt(params.modelId);
+        const targetPartNameId = cleanText(params.targetPartNameId);
+        const repairWorkActionId = normalizeNullablePositiveInt(params.repairWorkActionId);
+
+        if (!customerType || !brandId || !targetPartNameId || !repairWorkActionId) {
+            return [];
+        }
+
+        const where: Prisma.PricingRuleWhereInput = {
+            customerType,
+            brandId,
+            targetPartNameId,
+            repairWorkActionId,
+            ...(modelId
+                ? { OR: [{ modelId }, { modelId: null }] }
+                : { modelId: null }),
+        };
+
+        const rules = await prisma.pricingRule.findMany({
+            where,
+            orderBy: [
+                { minPrice: "asc" },
+                { updatedAt: "desc" },
+                { createdAt: "desc" },
+                { id: "asc" },
+            ],
+        });
+
+        return dedupeExternalPricingRules(
+            rules.sort((a, b) => compareExternalPricingRules(a, b, modelId)),
+            modelId
+        );
+    } catch (error) {
+        console.error("Failed to fetch external pricing rules:", error);
+        return [];
+    }
 }
 
 function buildPricingRuleIdentity(params: {

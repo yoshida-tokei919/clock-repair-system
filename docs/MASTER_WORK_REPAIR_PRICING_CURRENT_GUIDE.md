@@ -804,3 +804,15 @@ display dedupe は既存方針の `suggestedWorkName + minPrice` を外装にも
 `modelId` は任意条件として使う。案件に `modelId` があればモデル専用価格として保存し、案件に `modelId` がなければ `modelId = null` の同ブランド共通価格として保存する。外装保存では `caliberId`、movement Cal、base Cal、Cal fallback は使わず、外装 branch では `PricingRule.caliberId = null` に寄せる方針とする。
 
 外装 PricingRule の identity は、`customerType`、`brandId`、`modelId`、`targetPartNameId`、`repairWorkActionId`、`suggestedWorkName`、`minPrice/maxPrice`、必要に応じて `detailLabel` を含める。価格違いは別候補として残し、完全重複だけをアプリ側 identity で避ける。短期は schema 変更なしで開始できる見込みだが、件数増加時は `customerType + brandId + modelId + targetPartNameId + repairWorkActionId` の index 追加を後続 migration Task で検討する。
+
+## 40. 108-10AV 外装PricingRule候補取得実装
+
+108-10AVで、`src/lib/pricing-rules.ts` に外装専用の `getExternalPricingRules()` を追加した。既存の内装向け `getPricingRules()` は変更していない。
+
+外装候補取得の必須条件は `customerType`、`brandId`、`targetPartNameId`、`repairWorkActionId` とし、`modelId` は任意条件として扱う。`targetPartNameId` は現行schemaどおり `String` の `PartNameMaster.id` として扱う。
+
+`modelId` がある場合は `modelId = 指定値` と `modelId = null` のブランド共通価格を取得し、モデル専用価格を優先する。`modelId` がない場合は `modelId = null` のブランド共通価格のみを取得する。
+
+外装候補取得では `caliberId` を where に入れない。`brandId = null`、`customerType = null`、部品なし、処置なしの fallback も行わない。`suggestedWorkName + minPrice` が同じ候補は表示重複としてまとめ、モデル専用価格とブランド共通価格が同一表示名・同一価格で重複する場合はモデル専用価格を代表にする。
+
+今回の実装は helper の追加のみで、UI / API / PricingRule保存 / RepairEntryForm / RepairLineItem保存 / PartsMaster検索 / 帳票 / PDF / LINE / 共有ページ / PublicCase には接続していない。
