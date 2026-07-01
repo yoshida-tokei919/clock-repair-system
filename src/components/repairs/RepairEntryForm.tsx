@@ -55,7 +55,8 @@ import { toast } from "@/components/ui/use-toast";
 import {
     getBrands, getModels, getCalibers, getCalibersForModel, getCalibersForRef,
     getPricingRules, getPartsMatched, upsertBrand, upsertModel, upsertCaliber,
-    getRefsByModel, upsertRef, getRepairWorkCategories, getRepairWorkActions, getInternalPartNameMasters
+    getRefsByModel, upsertRef, getRepairWorkCategories, getRepairWorkActions, getInternalPartNameMasters,
+    getExternalRepairPricingRules
 } from "@/actions/master-actions";
 import { getCustomers } from "@/actions/customer-actions";
 
@@ -70,15 +71,19 @@ type RepairWorkSelectOption = {
     id: number;
     name: string;
     key?: string | null;
+    repairType?: "INTERNAL" | "EXTERNAL" | string | null;
     sortOrder?: number | null;
 };
 type WorkTargetPartOption = {
     id: string;
     name: string;
     key?: string | null;
+    partType?: string | null;
+    categoryKey?: string | null;
     sortOrder?: number | null;
     categoryName?: string | null;
 };
+type AddItemCategory = 'internal' | 'external_labor' | 'part_external';
 
 function FormRow({
     label,
@@ -549,7 +554,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // Unified list with 'category' flag
     interface LineItem {
         id: string;
-        category: 'internal' | 'external' | 'part_internal' | 'part_external' | 'part_generic';
+        category: AddItemCategory | 'external' | 'part_internal' | 'part_generic';
         partType?: string;
         name: string;
         price: number;   // 上代
@@ -621,7 +626,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     );
 
     // Inputs for adding new items
-    const [addItemCategory, setAddItemCategory] = useState<'internal' | 'part_external'>('internal');
+    const [addItemCategory, setAddItemCategory] = useState<AddItemCategory>('internal');
     const [newItemName, setNewItemName] = useState("");
     const [newItemCost, setNewItemCost] = useState("");
     const [newItemPrice, setNewItemPrice] = useState("");
@@ -646,6 +651,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [selectedPartNameKey, setSelectedPartNameKey] = useState("");
 
     const isAddingPartItem = addItemCategory.includes("part");
+    const isAddingExternalLaborItem = addItemCategory === "external_labor";
+    const isAddingLaborItem = !isAddingPartItem;
     const cleanOptionalText = useCallback((value?: string | null) => {
         const normalized = (value ?? "").replace(/\s+/g, " ").trim();
         return normalized || null;
@@ -681,25 +688,42 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         if (!newWorkCategoryId) return null;
         return repairWorkCategoryOptions.find((option) => String(option.id) === newWorkCategoryId)?.key ?? null;
     }, [newWorkCategoryId, repairWorkCategoryOptions]);
+    const visibleRepairWorkCategoryOptions = useMemo(() => {
+        const expectedRepairType = isAddingExternalLaborItem ? "EXTERNAL" : "INTERNAL";
+        return repairWorkCategoryOptions.filter((option) => !option.repairType || option.repairType === expectedRepairType);
+    }, [isAddingExternalLaborItem, repairWorkCategoryOptions]);
+    const visibleWorkTargetPartOptions = useMemo(() => {
+        const externalPartTypes = new Set(["part_external", "external", "exterior"]);
+        const internalPartTypes = new Set(["part_internal", "internal", "interior"]);
+        const allowedPartTypes = isAddingExternalLaborItem ? externalPartTypes : internalPartTypes;
+
+        return workTargetPartOptions.filter((option) => {
+            if (!option.partType) return !isAddingExternalLaborItem;
+            return allowedPartTypes.has(option.partType);
+        });
+    }, [isAddingExternalLaborItem, workTargetPartOptions]);
     const filteredWorkTargetPartOptions = useMemo(() => {
-        if (!newWorkCategoryId) return workTargetPartOptions;
+        if (!newWorkCategoryId) return visibleWorkTargetPartOptions;
 
         const targetPartKeys = getTargetPartKeysForRepairWorkCategory(selectedRepairWorkCategoryKey);
-        if (!targetPartKeys) return [];
+        if (!targetPartKeys) {
+            if (!isAddingExternalLaborItem || !selectedRepairWorkCategoryKey) return [];
+            return visibleWorkTargetPartOptions.filter((option) => option.categoryKey === selectedRepairWorkCategoryKey);
+        }
 
         const keySet = new Set(targetPartKeys);
-        return workTargetPartOptions.filter((option) => option.key ? keySet.has(option.key) : false);
-    }, [newWorkCategoryId, selectedRepairWorkCategoryKey, workTargetPartOptions]);
+        return visibleWorkTargetPartOptions.filter((option) => option.key ? keySet.has(option.key) : false);
+    }, [isAddingExternalLaborItem, newWorkCategoryId, selectedRepairWorkCategoryKey, visibleWorkTargetPartOptions]);
     const targetPartCandidateMessage = useMemo(() => {
         if (!newWorkCategoryId) return "";
-        if (!hasTargetPartMappingForRepairWorkCategory(selectedRepairWorkCategoryKey)) {
+        if (!hasTargetPartMappingForRepairWorkCategory(selectedRepairWorkCategoryKey) && !isAddingExternalLaborItem) {
             return "このカテゴリの対象部品候補は未設定です";
         }
         if (filteredWorkTargetPartOptions.length === 0) {
             return "対象部品候補が未設定です。seed未投入、またはmapping未設定の可能性があります。";
         }
         return "";
-    }, [filteredWorkTargetPartOptions.length, newWorkCategoryId, selectedRepairWorkCategoryKey]);
+    }, [filteredWorkTargetPartOptions.length, isAddingExternalLaborItem, newWorkCategoryId, selectedRepairWorkCategoryKey]);
     const handleRepairWorkCategoryChange = useCallback((nextId: string) => {
         setNewWorkCategoryId(nextId);
         const selected = repairWorkCategoryOptions.find((option) => String(option.id) === nextId);
@@ -708,17 +732,19 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
         const targetPartKeys = getTargetPartKeysForRepairWorkCategory(selected?.key);
         if (!targetPartKeys) {
+            const currentTargetPart = visibleWorkTargetPartOptions.find((option) => option.id === newTargetPartNameId);
+            if (isAddingExternalLaborItem && currentTargetPart?.categoryKey === selected?.key) return;
             setNewTargetPartNameId("");
             setNewTargetPartNameSnapshot("");
             return;
         }
 
-        const currentTargetPart = workTargetPartOptions.find((option) => option.id === newTargetPartNameId);
+        const currentTargetPart = visibleWorkTargetPartOptions.find((option) => option.id === newTargetPartNameId);
         if (currentTargetPart?.key && targetPartKeys.includes(currentTargetPart.key)) return;
 
         setNewTargetPartNameId("");
         setNewTargetPartNameSnapshot("");
-    }, [newTargetPartNameId, repairWorkCategoryOptions, workTargetPartOptions]);
+    }, [isAddingExternalLaborItem, newTargetPartNameId, repairWorkCategoryOptions, visibleWorkTargetPartOptions]);
     const handleRepairWorkActionChange = useCallback((nextId: string) => {
         setNewWorkActionId(nextId);
         const selected = repairWorkActionOptions.find((option) => String(option.id) === nextId);
@@ -1451,7 +1477,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     useEffect(() => {
         let cancelled = false;
 
-        Promise.all([getRepairWorkCategories(), getRepairWorkActions(), getInternalPartNameMasters()])
+        Promise.all([getRepairWorkCategories(), getRepairWorkActions(), getInternalPartNameMasters(true)])
             .then(([categories, actions, targetParts]) => {
                 if (cancelled) return;
                 setRepairWorkCategoryOptions(Array.isArray(categories) ? categories : []);
@@ -1480,7 +1506,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             return;
         }
 
-        if (addItemCategory === 'internal' && !customerTypeSelection) {
+        if (isAddingLaborItem && !customerTypeSelection) {
             setWorkOpts([]);
             setRawPricingRuleCandidates([]);
             return;
@@ -1561,6 +1587,56 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     detailLabel: r.detailLabel,
                 })));
             });
+        } else if (addItemCategory === 'external_labor') {
+            setWorkOpts([]);
+            setRawPricingRuleCandidates([]);
+
+            if (!customerTypeSelection || !newTargetPartNameId || !newWorkActionId) {
+                return () => {
+                    cancelled = true;
+                };
+            }
+
+            const pricingLookupOptions = {
+                repairWorkCategoryId: newWorkCategoryId ? Number(newWorkCategoryId) : null,
+                targetPartNameId: newTargetPartNameId || null,
+                repairWorkActionId: newWorkActionId ? Number(newWorkActionId) : null,
+                detailLabel: cleanOptionalText(newWorkDetailLabel),
+                customerType: customerTypeSelection,
+                expectedWorkName: [
+                    cleanOptionalText(newTargetPartNameSnapshot) ?? cleanOptionalText(newWorkCategorySnapshot),
+                    cleanOptionalText(newWorkActionSnapshot),
+                    cleanOptionalText(newWorkDetailLabel),
+                ].filter(Boolean).join(" ") || null,
+            };
+
+            getExternalRepairPricingRules({
+                customerType: customerTypeSelection,
+                brandId: b.id,
+                modelId: m?.id ?? null,
+                targetPartNameId: newTargetPartNameId,
+                repairWorkActionId: Number(newWorkActionId),
+            }).then((rules) => {
+                if (cancelled) return;
+                const safeRules = Array.isArray(rules) ? rules : [];
+                const filteredDisplayRules = filterPricingRuleCandidatesForDisplay(safeRules, pricingLookupOptions);
+                const dedupedRules = collapseDuplicatePricingRuleCandidates(filteredDisplayRules, pricingLookupOptions);
+                const toWorkOption = (r: any) => ({
+                    label: r.suggestedWorkName,
+                    value: r.suggestedWorkName,
+                    price: r.minPrice,
+                    maxPrice: r.maxPrice,
+                    pricingRuleId: r.id,
+                    caliberId: r.caliberId,
+                    customerType: r.customerType,
+                    repairWorkCategoryId: r.repairWorkCategoryId,
+                    targetPartNameId: r.targetPartNameId,
+                    repairWorkActionId: r.repairWorkActionId,
+                    detailLabel: r.detailLabel,
+                });
+                setRawPricingRuleCandidates(safeRules.map(toWorkOption));
+                setWorkOpts(dedupedRules.map(toWorkOption));
+            });
         } else {
             setRawPricingRuleCandidates([]);
             // Fetch parts master data
@@ -1608,12 +1684,13 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         return () => {
             cancelled = true;
         };
-    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, newItemName, newWorkCategoryId, newTargetPartNameId, newWorkActionId, newWorkDetailLabel, newWorkCategorySnapshot, newTargetPartNameSnapshot, newWorkActionSnapshot, customerTypeSelection, getOptionIdByValue, cleanOptionalText]);
+    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, isAddingLaborItem, newItemName, newWorkCategoryId, newTargetPartNameId, newWorkActionId, newWorkDetailLabel, newWorkCategorySnapshot, newTargetPartNameSnapshot, newWorkActionSnapshot, customerTypeSelection, getOptionIdByValue, cleanOptionalText]);
 
     useEffect(() => {
-        if (addItemCategory !== 'internal') return;
+        if (!isAddingLaborItem) return;
         if (!customerTypeSelection) return;
-        if (!newWorkCategoryId || !newTargetPartNameId || !newWorkActionId) return;
+        if (addItemCategory === 'internal' && !newWorkCategoryId) return;
+        if (!newTargetPartNameId || !newWorkActionId) return;
         if (selectedWorkOption) return;
         if (newItemPriceManuallyEdited) return;
         if (newItemPrice && autoFilledPricingRuleIdRef.current == null) return;
@@ -1621,7 +1698,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         const detailLabel = cleanOptionalText(newWorkDetailLabel);
         const customerType = customerTypeSelection;
         const matchesStructure = (rule: any) => {
-            if (Number(rule.repairWorkCategoryId) !== Number(newWorkCategoryId)) return false;
+            if (addItemCategory === 'internal' && Number(rule.repairWorkCategoryId) !== Number(newWorkCategoryId)) return false;
             if (rule.targetPartNameId !== newTargetPartNameId) return false;
             if (Number(rule.repairWorkActionId) !== Number(newWorkActionId)) return false;
             if (detailLabel && cleanOptionalText(rule.detailLabel) !== detailLabel) return false;
@@ -1642,6 +1719,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         autoFilledPricingRuleIdRef.current = match.pricingRuleId ?? null;
     }, [
         addItemCategory,
+        isAddingLaborItem,
         newWorkCategoryId,
         newTargetPartNameId,
         newWorkActionId,
@@ -2598,6 +2676,11 @@ ${shopName}
                                 {/* 明細行 */}
                                 {lineItems.map((item, idx) => {
                                     const isPartItem = item.category.includes('part');
+                                    const itemCategoryLabel = item.category === 'external_labor'
+                                        ? '外装修理技術料'
+                                        : isPartItem
+                                            ? '交換部品'
+                                            : '技術料';
                                     const isSearchablePartItem = ((item as { type?: 'labor' | 'part' }).type ?? (isPartItem ? 'part' : 'labor')) === 'part';
                                     const statusLabel = isPartItem ? getStatusLabelForLineItem(item, idx) : null;
                                     return (
@@ -2611,7 +2694,7 @@ ${shopName}
                                                     ))}
                                                     className={`text-xs px-1.5 py-1 rounded border shrink-0 ${item.category.includes('part') ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-zinc-100 text-zinc-500 border-zinc-200'}`}
                                                 >
-                                                    {item.category.includes('part') ? '交換部品' : '技術料'}
+                                                    {itemCategoryLabel}
                                                 </button>
                                                 <div className="min-w-0 flex-1">
                                                     <span className="min-w-0 break-words font-medium">
@@ -2737,6 +2820,7 @@ ${shopName}
                                             }}
                                         >
                                             <option value="internal">技術料</option>
+                                            <option value="external_labor">外装修理技術料</option>
                                             <option value="part_external">交換部品</option>
                                         </select>
                                         <AdvancedCombobox
@@ -2808,7 +2892,7 @@ ${shopName}
                                             </select>
                                         </div>
                                     )}
-                                    {!isAddingPartItem && (
+                                    {isAddingLaborItem && (
                                         <div className="mb-2 rounded border border-dashed border-zinc-200 bg-white">
                                             <button
                                                 type="button"
@@ -2828,7 +2912,7 @@ ${shopName}
                                                             onChange={(e) => handleRepairWorkCategoryChange(e.target.value)}
                                                         >
                                                             <option value="">選択なし</option>
-                                                            {repairWorkCategoryOptions.map((option) => (
+                                                            {visibleRepairWorkCategoryOptions.map((option) => (
                                                                 <option key={option.id} value={option.id}>
                                                                     {option.name}
                                                                 </option>
@@ -2898,7 +2982,7 @@ ${shopName}
                                         </div>
                                         <Input className="h-9 text-sm w-14 text-center font-mono" placeholder="1" value={newItemQty} onChange={e => setNewItemQty(e.target.value)} type="number" min={1} />
                                         <Button size="sm" className="h-9 w-10 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
-                                            const structuredWorkName = addItemCategory === 'internal'
+                                            const structuredWorkName = isAddingLaborItem
                                                 ? [
                                                     cleanOptionalText(newTargetPartNameSnapshot) ?? cleanOptionalText(newWorkCategorySnapshot),
                                                     cleanOptionalText(newWorkActionSnapshot),
@@ -2921,7 +3005,7 @@ ${shopName}
                                                 price: parseInt(newItemPrice) || 0,
                                                 quantity: parseInt(newItemQty) || 1,
                                                 spec: newItemSpec,
-                                                ...(addItemCategory === 'internal' ? {
+                                                ...(isAddingLaborItem ? {
                                                     repairWorkCategoryId: newWorkCategoryId ? Number(newWorkCategoryId) : null,
                                                     repairWorkActionId: newWorkActionId ? Number(newWorkActionId) : null,
                                                     targetPartNameId: newTargetPartNameId || null,

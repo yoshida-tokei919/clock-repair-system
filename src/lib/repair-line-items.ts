@@ -5,6 +5,7 @@ type DbLike = PrismaClient | Prisma.TransactionClient;
 
 export type RepairLineItemInput = {
     lineType: "LABOR" | "PART";
+    sourceCategory?: string | null;
     partsMasterId?: number | null;
     pricingRuleId?: number | null;
     repairWorkCategoryId?: number | null;
@@ -33,6 +34,7 @@ export type RepairLineItemInput = {
 
 export type EstimateItemLikeInput = {
     type?: string | null;
+    category?: string | null;
     itemName?: string | null;
     name?: string | null;
     unitPrice?: number | string | null;
@@ -66,6 +68,7 @@ export type EstimateItemLikeInput = {
 
 export type NormalizedRepairLineItemInput = {
     lineType: RepairLineItemType;
+    sourceCategory?: string | null;
     partsMasterId: number | null;
     pricingRuleId: number | null;
     repairWorkCategoryId: number | null;
@@ -170,6 +173,7 @@ export function normalizeRepairLineItemInput(
 
     return {
         lineType: input.lineType,
+        sourceCategory: cleanText(input.sourceCategory),
         partsMasterId: normalizeNullablePositiveInt(input.partsMasterId),
         pricingRuleId: normalizeNullablePositiveInt(input.pricingRuleId),
         repairWorkCategoryId: normalizeNullablePositiveInt(input.repairWorkCategoryId),
@@ -211,6 +215,7 @@ export function estimateItemLikeToRepairLineItemInput(
 
     const input: RepairLineItemInput = {
         lineType: toRepairLineItemType(item.type),
+        sourceCategory: cleanText(item.category),
         partsMasterId: parseNullableNumber(item.partsMasterId),
         pricingRuleId: parseNullableNumber(item.pricingRuleId),
         repairWorkCategoryId: parseNullableNumber(item.repairWorkCategoryId),

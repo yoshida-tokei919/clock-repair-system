@@ -4,6 +4,10 @@ import { RepairWorkType, type PricingRule } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
+import {
+    getExternalPricingRules as getExternalPricingRulesFromDb,
+    type ExternalPricingRuleCustomerType,
+} from "@/lib/pricing-rules";
 
 // --- Brand ---
 export async function getBrands() {
@@ -103,10 +107,10 @@ export async function upsertCaliber(name: string, brandId?: number) {
     return await findOrCreateCaliber(prisma, name, brandId);
 }
 
-export async function getRepairWorkCategories() {
+export async function getRepairWorkCategories(repairType?: "INTERNAL" | "EXTERNAL") {
     const categories = await prisma.repairWorkCategory.findMany({
         where: {
-            repairType: RepairWorkType.INTERNAL,
+            ...(repairType ? { repairType: RepairWorkType[repairType] } : {}),
             isActive: true,
         },
         orderBy: [
@@ -118,6 +122,7 @@ export async function getRepairWorkCategories() {
             id: true,
             name: true,
             displayName: true,
+            repairType: true,
             sortOrder: true,
         },
     });
@@ -126,6 +131,7 @@ export async function getRepairWorkCategories() {
         id: category.id,
         name: category.displayName || category.name,
         key: category.name,
+        repairType: category.repairType,
         sortOrder: category.sortOrder,
     }));
 }
@@ -154,14 +160,18 @@ export async function getRepairWorkActions() {
     }));
 }
 
-export async function getInternalPartNameMasters() {
+export async function getInternalPartNameMasters(includeExternal = false) {
     const internalPartTypes = ['part_internal', 'internal', 'interior'];
+    const externalPartTypes = ['part_external', 'external', 'exterior'];
+    const partTypes = includeExternal
+        ? [...internalPartTypes, ...externalPartTypes]
+        : internalPartTypes;
     const partNames = await prisma.partNameMaster.findMany({
         where: {
             isActive: true,
             OR: [
-                { partType: { in: internalPartTypes } },
-                { category: { partType: { in: internalPartTypes } } },
+                { partType: { in: partTypes } },
+                { category: { partType: { in: partTypes } } },
             ],
         },
         orderBy: [
@@ -172,6 +182,7 @@ export async function getInternalPartNameMasters() {
         select: {
             id: true,
             key: true,
+            partType: true,
             nameJa: true,
             displayJa: true,
             sortOrder: true,
@@ -179,6 +190,7 @@ export async function getInternalPartNameMasters() {
                 select: {
                     key: true,
                     nameJa: true,
+                    partType: true,
                 },
             },
         },
@@ -188,9 +200,38 @@ export async function getInternalPartNameMasters() {
         id: partName.id,
         name: partName.displayJa || partName.nameJa,
         key: partName.key,
+        partType: partName.partType || partName.category?.partType || null,
+        categoryKey: partName.category?.key ?? null,
         sortOrder: partName.sortOrder,
         categoryName: partName.category?.nameJa || partName.category?.key || null,
     }));
+}
+
+export async function getExternalRepairPricingRules(params: {
+    customerType?: string | null;
+    brandId?: number | null;
+    modelId?: number | null;
+    targetPartNameId?: string | null;
+    repairWorkActionId?: number | null;
+}) {
+    const customerType: ExternalPricingRuleCustomerType | null =
+        params.customerType === "business" || params.customerType === "individual"
+            ? params.customerType
+            : null;
+    const brandId = Number(params.brandId);
+    const repairWorkActionId = Number(params.repairWorkActionId);
+
+    if (!customerType || !Number.isFinite(brandId) || !params.targetPartNameId || !Number.isFinite(repairWorkActionId)) {
+        return [];
+    }
+
+    return getExternalPricingRulesFromDb({
+        customerType,
+        brandId,
+        modelId: params.modelId ?? null,
+        targetPartNameId: params.targetPartNameId,
+        repairWorkActionId,
+    });
 }
 
 /**

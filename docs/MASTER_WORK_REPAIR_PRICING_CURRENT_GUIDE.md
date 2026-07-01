@@ -816,3 +816,15 @@ display dedupe は既存方針の `suggestedWorkName + minPrice` を外装にも
 外装候補取得では `caliberId` を where に入れない。`brandId = null`、`customerType = null`、部品なし、処置なしの fallback も行わない。`suggestedWorkName + minPrice` が同じ候補は表示重複としてまとめ、モデル専用価格とブランド共通価格が同一表示名・同一価格で重複する場合はモデル専用価格を代表にする。
 
 今回の実装は helper の追加のみで、UI / API / PricingRule保存 / RepairEntryForm / RepairLineItem保存 / PartsMaster検索 / 帳票 / PDF / LINE / 共有ページ / PublicCase には接続していない。
+
+## 41. 108-10AX 外装修理技術料入力 UI 実装
+
+108-10AX で `RepairEntryForm` に `external_labor` 入力モードを追加した。`external_labor` は `RepairLineItem.lineType = LABOR` として保存し、`part_external` は引き続き `RepairLineItem.lineType = PART` の交換部品として分離する。
+
+`external_labor` の `targetPartNameId` は現行 schema どおり `String` で、`PartNameMaster.id` を参照する。PartsMaster は使用しない。`caliberId` も使用しない。
+
+UI では外装修理技術料、交換部品、内部技術料を別モードとして扱う。外装修理技術料は対象部品、処置、detail、単価、数量を入力でき、条件が揃う場合は `getExternalPricingRules()` を server action 経由で呼び、候補を表示/反映する。既存 `getPricingRules()` は変更していない。
+
+PricingRule 保存同期は未実装で、後続 Task 108-10AW の対象とする。今回の暫定ガードとして、`syncPricingRulesFromRepairLineItems` は `external_labor` または `RepairWorkCategory.repairType = EXTERNAL` の LABOR 行を内部 PricingRule 同期対象から除外する。
+
+詳細は `docs/ai-tasks/108-10AX-implement-external-labor-input-ui.md` を参照する。

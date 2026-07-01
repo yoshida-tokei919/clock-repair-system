@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { PricingRule, Prisma } from "@prisma/client";
+import { RepairWorkType, type PricingRule, type Prisma } from "@prisma/client";
 import type { RepairLineItemInput } from "@/lib/repair-line-items";
 
 type DbLike = Prisma.TransactionClient;
@@ -214,9 +214,24 @@ export async function syncPricingRulesFromRepairLineItems(
     let created = 0;
     let updated = 0;
     let skipped = 0;
+    const externalCategoryIds = new Set(
+        (
+            await db.repairWorkCategory.findMany({
+                where: { repairType: RepairWorkType.EXTERNAL },
+                select: { id: true },
+            })
+        ).map((category) => category.id)
+    );
 
     for (const item of params.items) {
         if (item.lineType !== "LABOR") {
+            skipped += 1;
+            continue;
+        }
+
+        const sourceCategory = cleanText(item.sourceCategory);
+        const repairWorkCategoryId = normalizeNullablePositiveInt(item.repairWorkCategoryId);
+        if (sourceCategory === "external_labor" || (repairWorkCategoryId && externalCategoryIds.has(repairWorkCategoryId))) {
             skipped += 1;
             continue;
         }
@@ -228,7 +243,6 @@ export async function syncPricingRulesFromRepairLineItems(
         }
 
         const price = normalizePrice(item.unitPrice);
-        const repairWorkCategoryId = normalizeNullablePositiveInt(item.repairWorkCategoryId);
         const targetPartNameId = cleanText(item.targetPartNameId);
         const repairWorkActionId = normalizeNullablePositiveInt(item.repairWorkActionId);
         const detailLabel = cleanText(item.detailLabelSnapshot);
