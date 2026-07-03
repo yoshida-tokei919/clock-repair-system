@@ -12,6 +12,12 @@ type SyncPricingRulesParams = {
     items: RepairLineItemInput[];
 };
 
+type PricingRuleSyncResult = {
+    created: number;
+    updated: number;
+    skipped: number;
+};
+
 export type ExternalPricingRuleCustomerType = "business" | "individual";
 
 export type GetExternalPricingRulesParams = {
@@ -197,6 +203,114 @@ function buildLegacyPricingRuleIdentity(params: {
     };
 }
 
+function isExternalLaborLine(
+    item: RepairLineItemInput,
+    externalCategoryIds: Set<number>
+): boolean {
+    if (item.lineType !== "LABOR") return false;
+    if (cleanText(item.sourceCategory)?.toLowerCase() === "external_labor") return true;
+
+    const repairWorkCategoryId = normalizeNullablePositiveInt(item.repairWorkCategoryId);
+    return repairWorkCategoryId !== null && externalCategoryIds.has(repairWorkCategoryId);
+}
+
+function buildExternalPricingRuleIdentity(params: {
+    brandId: number;
+    modelId: number | null;
+    customerType: ExternalPricingRuleCustomerType;
+    targetPartNameId: string;
+    repairWorkActionId: number;
+    suggestedWorkName: string;
+    minPrice: number;
+    maxPrice: number;
+    detailLabel: string | null;
+}): Prisma.PricingRuleWhereInput {
+    return {
+        brandId: params.brandId,
+        modelId: params.modelId,
+        caliberId: null,
+        customerType: params.customerType,
+        repairWorkNameId: null,
+        targetPartNameId: params.targetPartNameId,
+        repairWorkActionId: params.repairWorkActionId,
+        suggestedWorkName: params.suggestedWorkName,
+        minPrice: params.minPrice,
+        maxPrice: params.maxPrice,
+        detailLabel: params.detailLabel,
+    };
+}
+
+async function syncExternalPricingRuleFromLineItem(
+    db: DbLike,
+    params: {
+        brandId: number;
+        modelId: number | null;
+        customerType: ExternalPricingRuleCustomerType | null;
+        item: RepairLineItemInput;
+    }
+): Promise<PricingRuleSyncResult> {
+    const customerType = params.customerType;
+    const suggestedWorkName = cleanText(params.item.itemNameSnapshot);
+    const targetPartNameId = cleanText(params.item.targetPartNameId);
+    const repairWorkActionId = normalizeNullablePositiveInt(params.item.repairWorkActionId);
+    const repairWorkCategoryId = normalizeNullablePositiveInt(params.item.repairWorkCategoryId);
+    const detailLabel = cleanText(params.item.detailLabelSnapshot);
+    const price = normalizePrice(params.item.unitPrice);
+
+    if (
+        !customerType
+        || !suggestedWorkName
+        || !targetPartNameId
+        || !repairWorkActionId
+        || price <= 0
+    ) {
+        return { created: 0, updated: 0, skipped: 1 };
+    }
+
+    const identity = buildExternalPricingRuleIdentity({
+        brandId: params.brandId,
+        modelId: params.modelId,
+        customerType,
+        targetPartNameId,
+        repairWorkActionId,
+        suggestedWorkName,
+        minPrice: price,
+        maxPrice: price,
+        detailLabel,
+    });
+    const data: Prisma.PricingRuleUncheckedCreateInput = {
+        brandId: params.brandId,
+        modelId: params.modelId,
+        caliberId: null,
+        customerType,
+        suggestedWorkName,
+        minPrice: price,
+        maxPrice: price,
+        repairWorkNameId: null,
+        repairWorkCategoryId,
+        targetPartNameId,
+        repairWorkActionId,
+        detailLabel,
+    };
+
+    const existing = await db.pricingRule.findFirst({
+        where: identity,
+        select: { id: true },
+        orderBy: { id: "asc" },
+    });
+
+    if (existing) {
+        await db.pricingRule.update({
+            where: { id: existing.id },
+            data,
+        });
+        return { created: 0, updated: 1, skipped: 0 };
+    }
+
+    await db.pricingRule.create({ data });
+    return { created: 1, updated: 0, skipped: 0 };
+}
+
 export async function syncPricingRulesFromRepairLineItems(
     db: DbLike,
     params: SyncPricingRulesParams
@@ -207,6 +321,7 @@ export async function syncPricingRulesFromRepairLineItems(
     const modelId = normalizeNullablePositiveInt(params.modelId);
     const caliberId = normalizeNullablePositiveInt(params.caliberId);
     const customerType = normalizeCustomerType(params.customerType);
+    const externalCustomerType = normalizeExternalCustomerType(params.customerType);
     if (!customerType) {
         throw new Error("customerType is required to sync pricing rules.");
     }
@@ -229,10 +344,16 @@ export async function syncPricingRulesFromRepairLineItems(
             continue;
         }
 
-        const sourceCategory = cleanText(item.sourceCategory);
-        const repairWorkCategoryId = normalizeNullablePositiveInt(item.repairWorkCategoryId);
-        if (sourceCategory === "external_labor" || (repairWorkCategoryId && externalCategoryIds.has(repairWorkCategoryId))) {
-            skipped += 1;
+        if (isExternalLaborLine(item, externalCategoryIds)) {
+            const result = await syncExternalPricingRuleFromLineItem(db, {
+                brandId,
+                modelId,
+                customerType: externalCustomerType,
+                item,
+            });
+            created += result.created;
+            updated += result.updated;
+            skipped += result.skipped;
             continue;
         }
 
@@ -243,6 +364,7 @@ export async function syncPricingRulesFromRepairLineItems(
         }
 
         const price = normalizePrice(item.unitPrice);
+        const repairWorkCategoryId = normalizeNullablePositiveInt(item.repairWorkCategoryId);
         const targetPartNameId = cleanText(item.targetPartNameId);
         const repairWorkActionId = normalizeNullablePositiveInt(item.repairWorkActionId);
         const detailLabel = cleanText(item.detailLabelSnapshot);

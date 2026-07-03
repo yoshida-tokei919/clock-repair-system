@@ -828,3 +828,13 @@ UI では外装修理技術料、交換部品、内部技術料を別モード�
 PricingRule 保存同期は未実装で、後続 Task 108-10AW の対象とする。今回の暫定ガードとして、`syncPricingRulesFromRepairLineItems` は `external_labor` または `RepairWorkCategory.repairType = EXTERNAL` の LABOR 行を内部 PricingRule 同期対象から除外する。
 
 詳細は `docs/ai-tasks/108-10AX-implement-external-labor-input-ui.md` を参照する。
+
+## 42. 108-10AW 外装PricingRule保存実装
+
+108-10AWで、`syncPricingRulesFromRepairLineItems()` に外装PricingRule保存同期を実装した。`external_labor` または `RepairWorkCategory.repairType = EXTERNAL` に該当するLABOR行を外装専用branchへ振り分け、外装PricingRuleとして作成または更新する。
+
+外装PricingRuleは `customerType`、`brandId`、`targetPartNameId`、`repairWorkActionId`、`suggestedWorkName`、`minPrice` を必須とする。`targetPartNameId` は現行schemaどおり `String` の `PartNameMaster.id` として扱う。`modelId` は任意で、案件にモデルがあればモデル専用価格、なければ `modelId = null` の同ブランド共通価格として保存する。
+
+価格は `unitPrice` を基準に `minPrice = maxPrice` として保存し、`unitPrice <= 0` は対象外とする。外装保存では `caliberId = null` とし、Cal fallbackは使わない。`part_external`、PART行、PartsMaster由来の部品行は保存対象外である。
+
+既存の内装PricingRule保存処理は維持し、外装判定に該当しないLABORは従来の内装同期へ進む。
