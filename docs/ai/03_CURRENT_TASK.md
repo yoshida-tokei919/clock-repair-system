@@ -5,153 +5,134 @@
 
 ## 現在Task
 
-外装作業マスタ最終確認: external_labor（外装技術料）とPricingRule（価格ルール）の取得・保存・再表示確認
+Phase 2開始: 内装部品マスタの現行定義・実装・正本差分確認
 
 ## 目的
 
-external_labor（外装技術料）を実運用前の最小完成状態へ近づける。
+PartCategoryMaster（標準部品カテゴリ）とPartNameMaster（標準部品名マスタ）の内装部品定義を確認し、時計修理実務上の正しい内装部品マスタへ整理する。
 
-内装/外装の処置表示分離は完了済み。次は外装LABOR（外装技術料）で作成した明細が、保存後もRepairLineItem（修理明細）とPricingRule（価格ルール）に正しく反映され、次回以降の候補表示に使えるかを確認する。
+既存の内装作業マスタは原則変更しない。
+作業マスタと部品マスタを混同せず、内装部品マスタの差分確認から開始する。
 
 ## 現在地
 
-完了済み:
+Phase 1（作業マスタ）は一旦完了。
 
-- 108-10AV: getExternalPricingRules（外装価格候補取得補助関数）実装
-- 108-10AX: external_labor（外装技術料）入力UI実装
-- 108-10AW: 外装PricingRule（外装価格ルール）保存同期実装
-- 108-10AY: external_labor（外装技術料）選択時の作業分類欄自動展開、外装作業カテゴリ6件追加
-- 108-10AZ: RepairWorkAction（処置マスタ）の内装/外装表示分離
+確認済み:
 
-最新commit:
+- internal（内装作業）を構造化入力できる
+- external_labor（外装技術料）を構造化入力できる
+- internal（内装）とexternal_labor（外装技術料）の処置候補は分離されている
+- external_labor（外装技術料）とpart_external（外装部品行）は分離されている
+- 外装PricingRule（外装価格ルール）は保存後、同条件で候補再表示される
+- customerType（顧客区分）business / individual の候補は混在しない
+- modelId（モデルID）あり候補はmodelId=null（モデル共通候補）より優先される
+- 編集画面で保存済み外装LABOR（外装技術料）の表示は維持される
+- part_external（外装部品行）はPricingRule（価格ルール）へ学習されない
+
+最新の作業マスタ実装commit:
 
 - `d754b09 fix: separate internal and external work actions`
 
-画面確認済み:
+## 内装部品マスタの設計前提
 
-- external_labor（外装技術料）で外装処置19件のみ表示
-- internal（内装）で内装処置14件のみ表示
-- 外装カテゴリ6件と対象部品が表示
-- 外装LABOR（外装技術料）を保存するとPricingRule（価格ルール）に反映
+### 部品マスタと作業マスタは別物
 
-## 確定事項
+PartNameMaster（標準部品名マスタ）:
 
-### 内装処置
+- 対象部品名の標準マスタ
+- 内装部品名の候補定義に使用する
+- 作業入力ではtargetPartNameId（対象部品名ID）として参照される場合がある
 
-internal（内装作業）で表示するRepairWorkAction（処置マスタ）は以下のみ。
+PartsMaster（実部品・在庫マスタ）:
 
-- 交換
-- 修理
-- 調整
-- 修正
-- 研磨
-- 洗浄
-- 注油
-- 製作
-- 取付
-- 除去
-- 穴締め
-- かしめ
-- オーバーホール
-- 検査
+- 実部品
+- 在庫
+- 仕入
+- 価格
+- 写真
+- 発注
+- 部品検索
 
-### 外装処置
+RepairWorkName（作業名マスタ）やRepairWorkAction（処置マスタ）とは別物として扱う。
 
-external_labor（外装技術料）で表示するRepairWorkAction（処置マスタ）は以下のみ。
+### 内装部品の軸
 
-- 交換
-- 取付
-- 修理
-- 修正
-- 調整
-- 加工
-- 製作
-- 接着
-- 研磨
-- 仕上げ
-- 簡易仕上げ
-- 洗浄
-- 検査
-- 塗装
-- サビ取り
-- 乾燥
-- 除去
-- 溶接
-- ロウ付け
+内装部品はmovementCaliber（ムーブメントCal）中心で扱う。
 
-内装処置と外装処置を一緒に表示してはならない。
+必要な場合はbaseMovementCaliber（ベースCal）をfallback（代替検索）として使用する。
+watch.caliber（時計登録Cal）は既存設計との整合を確認して扱う。
 
-### 外装LABOR
-
-external_labor（外装技術料）:
-
-- lineType（明細行種別）= LABOR
-- PricingRule（価格ルール）保存対象
-- PartsMaster（実部品・在庫マスタ）は使わない
-- targetPartNameId（対象部品名ID）はPartNameMaster（標準部品名マスタ）由来
-
-外装PricingRule（外装価格ルール）は以下を使用する。
-
-- customerType（顧客区分）
-- brandId（ブランドID）
-- modelId（モデルID）
-- targetPartNameId（対象部品名ID）
-- repairWorkActionId（処置ID）
-
-外装では caliberId（Cal ID）を使わない。
-
-### 外装PART
-
-part_external（外装部品行）:
-
-- lineType（明細行種別）= PART
-- PartsMaster（実部品・在庫マスタ）検索/発注/在庫対象
-- PricingRule（価格ルール）保存対象外
-
-## 現在の問題
-
-外装LABOR（外装技術料）の基本入力と処置分離は確認済み。
-
-次に、保存済み外装PricingRule（外装価格ルール）が次回以降の同条件入力で候補表示されるか、編集画面でRepairLineItem（修理明細）のsnapshot（保存時点表示値）が崩れないかを確認する必要がある。
+brandId（ブランドID）を内装部品の主軸にしない。
 
 ## 現在Taskの対象範囲
 
-- external_labor（外装技術料）の新規保存確認
-- 保存済み外装PricingRule（外装価格ルール）の候補再表示確認
-- modelId（モデルID）あり候補とmodelId=null（モデル共通候補）の優先確認
-- customerType（顧客区分）business / individual の分離確認
-- 編集画面で外装LABOR（外装技術料）の表示が崩れないか確認
-- internal（内装作業）の既存挙動が維持されているか確認
-- part_external（外装部品行）がPricingRule（価格ルール）保存対象外であることの確認
+- PartCategoryMaster（標準部品カテゴリ）の内装カテゴリ定義確認
+- PartNameMaster（標準部品名マスタ）の内装部品名定義確認
+- prisma/schema.prisma の関連model確認
+- prisma/seed.ts と関連seed/helper（補助処理）の確認
+- src/lib/part-input-options.ts の現行定義確認
+- 内装部品候補取得処理の確認
+- Notionにある内装部品カテゴリー・部品名資料との照合
+- docs/ai-tasks 配下の内装部品関連Taskは必要な過去経緯の確認時のみ参照
+
+## 今回最初に確認する差分
+
+1. 正本資料の内装部品カテゴリ一覧
+2. 現行seedの内装PartCategoryMaster（標準部品カテゴリ）
+3. 正本資料の内装部品名一覧
+4. 現行seedの内装PartNameMaster（標準部品名マスタ）
+5. 不足項目
+6. 余剰項目
+7. 表記差
+8. categoryKey（カテゴリキー）紐付け差
+9. partType（部品種別）差
+10. 外装部品定義が内装候補へ混在していないか
+
+## 方針
+
+- 正本資料に記載された内装カテゴリ・内装部品名を優先する
+- 推測で部品名を追加しない
+- 推測でカテゴリを追加しない
+- 不明な差分はユーザーへ確認する
+- 現在の内装作業マスタは原則変更しない
+- 外装作業マスタは変更しない
+- 差分は一つずつ確認し、正本資料修正またはアプリ修正を判断する
 
 ## 対象外
 
+- 外装部品マスタの本実装
+- 部品検索ワード生成修正
+- 複数サイト検索
+- 通貨変換
+- 価格クリック挿入
+- 発注管理連携
+- QRタグ
+- 作業可能判定
+- 作業優先順位
+- スケジュール
+- 事例公開
 - 帳票
 - PDF
 - LINE
 - 共有ページ
-- PublicCase（公開事例）
 - 顧客コメント
-- 部品マスタ再設計
-- 部品検索ワード生成
-- QRタグ
-- 作業優先順位
-- スケジュール
 
 ## 次の作業
 
-1. 外装LABOR（外装技術料）を複数条件で保存する
-2. 同条件で外装PricingRule（外装価格ルール）候補が再表示されるか確認する
-3. customerType（顧客区分）違いで候補が混ざらないか確認する
-4. modelId（モデルID）あり候補がmodelId=null（モデル共通候補）より優先されるか確認する
-5. 編集画面で既存外装LABOR（外装技術料）の表示が崩れないか確認する
-6. 問題なければPhase 1（作業マスタ）を一旦完了扱いにし、Phase 2（部品マスタ・部品検索・発注連携）へ進む
+1. Notionの内装部品カテゴリー・部品名資料を確認する
+2. 現行schema・seed・part-input-options・候補取得処理を確認する
+3. 正本資料と現行アプリの差分表を作る
+4. 差分をユーザーと一つずつ確認する
+5. 確定した差分のみ最小修正する
 
 ## 現在Taskの禁止事項
 
-- RepairWorkAction（処置マスタ）を推測で追加しない
-- RepairWorkCategory（作業カテゴリ）を推測で追加しない
-- 内装/外装処置を混在表示しない
-- targetPartNameId（対象部品名ID）をnumber（数値）へ変換しない
-- PricingRule（価格ルール）保存条件を緩めない
+- PartNameMaster（標準部品名マスタ）を推測で追加しない
+- PartCategoryMaster（標準部品カテゴリ）を推測で追加しない
+- 部品マスタと作業マスタを混同しない
+- 内装/外装部品を混在させない
+- RepairWorkAction（処置マスタ）を変更しない
+- RepairWorkCategory（作業カテゴリ）を変更しない
+- PricingRule（価格ルール）の条件を変更しない
 - 現在Task対象外を変更しない
