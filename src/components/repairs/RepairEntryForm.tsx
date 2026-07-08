@@ -85,6 +85,45 @@ type WorkTargetPartOption = {
 };
 type AddItemCategory = 'internal' | 'external_labor' | 'part_external';
 
+const INTERNAL_REPAIR_WORK_ACTION_KEYS = new Set([
+    "exchange",
+    "repair",
+    "adjust",
+    "correction",
+    "polish",
+    "clean",
+    "oil",
+    "make",
+    "install",
+    "remove",
+    "hole_tightening",
+    "staking",
+    "overhaul",
+    "inspection",
+]);
+
+const EXTERNAL_REPAIR_WORK_ACTION_KEYS = new Set([
+    "exchange",
+    "install",
+    "repair",
+    "correction",
+    "adjust",
+    "processing",
+    "make",
+    "bonding",
+    "polish",
+    "finishing",
+    "light_finishing",
+    "clean",
+    "inspection",
+    "painting",
+    "rust_removal",
+    "drying",
+    "remove",
+    "welding",
+    "brazing",
+]);
+
 function FormRow({
     label,
     children,
@@ -692,6 +731,13 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         const expectedRepairType = isAddingExternalLaborItem ? "EXTERNAL" : "INTERNAL";
         return repairWorkCategoryOptions.filter((option) => !option.repairType || option.repairType === expectedRepairType);
     }, [isAddingExternalLaborItem, repairWorkCategoryOptions]);
+    const visibleRepairWorkActionOptions = useMemo(() => {
+        const allowedKeys = isAddingExternalLaborItem
+            ? EXTERNAL_REPAIR_WORK_ACTION_KEYS
+            : INTERNAL_REPAIR_WORK_ACTION_KEYS;
+
+        return repairWorkActionOptions.filter((option) => Boolean(option.key && allowedKeys.has(option.key)));
+    }, [isAddingExternalLaborItem, repairWorkActionOptions]);
     const visibleWorkTargetPartOptions = useMemo(() => {
         const externalPartTypes = new Set(["part_external", "external", "exterior"]);
         const internalPartTypes = new Set(["part_internal", "internal", "interior"]);
@@ -747,9 +793,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, [isAddingExternalLaborItem, newTargetPartNameId, repairWorkCategoryOptions, visibleWorkTargetPartOptions]);
     const handleRepairWorkActionChange = useCallback((nextId: string) => {
         setNewWorkActionId(nextId);
-        const selected = repairWorkActionOptions.find((option) => String(option.id) === nextId);
+        const selected = visibleRepairWorkActionOptions.find((option) => String(option.id) === nextId);
         setNewWorkActionSnapshot(selected?.name ?? "");
-    }, [repairWorkActionOptions]);
+    }, [visibleRepairWorkActionOptions]);
     const handleTargetPartNameChange = useCallback((nextId: string) => {
         setNewTargetPartNameId(nextId);
         const selected = filteredWorkTargetPartOptions.find((option) => option.id === nextId);
@@ -1731,6 +1777,14 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         newItemPriceManuallyEdited,
         cleanOptionalText,
     ]);
+
+    useEffect(() => {
+        if (!newWorkActionId) return;
+        const selectedActionVisible = visibleRepairWorkActionOptions.some((option) => String(option.id) === newWorkActionId);
+        if (selectedActionVisible) return;
+        setNewWorkActionId("");
+        setNewWorkActionSnapshot("");
+    }, [newWorkActionId, visibleRepairWorkActionOptions]);
 
     // --- CALCULATIONS ---
     const totalAmount = lineItems.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);
@@ -2810,6 +2864,9 @@ ${shopName}
                                             onChange={(e) => {
                                                 const nextCategory = e.target.value as typeof addItemCategory;
                                                 setAddItemCategory(nextCategory);
+                                                if (nextCategory === "external_labor") {
+                                                    setStructuredWorkOpen(true);
+                                                }
                                                 if (!nextCategory.includes("part")) {
                                                     setSelectedPartCategoryKey("");
                                                     setSelectedPartNameKey("");
@@ -2946,7 +3003,7 @@ ${shopName}
                                                             onChange={(e) => handleRepairWorkActionChange(e.target.value)}
                                                         >
                                                             <option value="">選択なし</option>
-                                                            {repairWorkActionOptions.map((option) => (
+                                                            {visibleRepairWorkActionOptions.map((option) => (
                                                                 <option key={option.id} value={option.id}>
                                                                     {option.name}
                                                                 </option>

@@ -63,6 +63,12 @@ async function main() {
         { repairType: RepairWorkType.INTERNAL, name: 'automatic_winding', displayName: '自動巻',                   sortOrder: 90  },
         { repairType: RepairWorkType.INTERNAL, name: 'chronograph',       displayName: 'クロノグラフ',             sortOrder: 100 },
         { repairType: RepairWorkType.INTERNAL, name: 'main_plate',        displayName: '地板',                     sortOrder: 110 },
+        { repairType: RepairWorkType.EXTERNAL, name: 'case_glass',        displayName: 'ケース・風防',             sortOrder: 10  },
+        { repairType: RepairWorkType.EXTERNAL, name: 'crown_tube',        displayName: 'リューズ・チューブ',       sortOrder: 20  },
+        { repairType: RepairWorkType.EXTERNAL, name: 'pushers',           displayName: 'プッシャー',               sortOrder: 30  },
+        { repairType: RepairWorkType.EXTERNAL, name: 'bezel',             displayName: 'ベゼル',                   sortOrder: 40  },
+        { repairType: RepairWorkType.EXTERNAL, name: 'dial_hands',        displayName: '文字盤・針',               sortOrder: 50  },
+        { repairType: RepairWorkType.EXTERNAL, name: 'bracelet_band',     displayName: 'ブレス・バンド',           sortOrder: 60  },
     ]
     for (const category of repairWorkCategories) {
         const existing = await prisma.repairWorkCategory.findFirst({
