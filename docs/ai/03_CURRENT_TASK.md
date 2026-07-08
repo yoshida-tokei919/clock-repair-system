@@ -5,15 +5,13 @@
 
 ## 現在Task
 
-外装作業マスタ完成: external_labor（外装技術料）の処置表示分離と現行実装整合確認
+外装作業マスタ最終確認: external_labor（外装技術料）とPricingRule（価格ルール）の取得・保存・再表示確認
 
 ## 目的
 
-external_labor（外装技術料）を、内装作業と混在しない構造化入力として完成へ進める。
+external_labor（外装技術料）を実運用前の最小完成状態へ近づける。
 
-現在は外装LABOR入力、外装PricingRule（外装価格ルール）候補取得、外装PricingRule保存同期まで実装が進んでいる。
-
-外装作業入力でRepairWorkAction（処置マスタ）が内外装混在表示される問題を解消し、内装作業の既存挙動が外装実装途中で変更されていないか確認する。
+内装/外装の処置表示分離は完了済み。次は外装LABOR（外装技術料）で作成した明細が、保存後もRepairLineItem（修理明細）とPricingRule（価格ルール）に正しく反映され、次回以降の候補表示に使えるかを確認する。
 
 ## 現在地
 
@@ -22,43 +20,25 @@ external_labor（外装技術料）を、内装作業と混在しない構造化
 - 108-10AV: getExternalPricingRules（外装価格候補取得補助関数）実装
 - 108-10AX: external_labor（外装技術料）入力UI実装
 - 108-10AW: 外装PricingRule（外装価格ルール）保存同期実装
+- 108-10AY: external_labor（外装技術料）選択時の作業分類欄自動展開、外装作業カテゴリ6件追加
+- 108-10AZ: RepairWorkAction（処置マスタ）の内装/外装表示分離
 
 最新commit:
 
-- `9a31f1f feat: sync external pricing rules`
+- `d754b09 fix: separate internal and external work actions`
 
-ローカル未commit作業:
+画面確認済み:
 
-- 108-10AY
-- `prisma/seed.ts`
-- `src/components/repairs/RepairEntryForm.tsx`
-
-108-10AYの内容:
-
-- external_labor（外装技術料）選択時に作業分類欄を自動展開
-- 既存外装部品カテゴリに対応するRepairWorkCategory（外装作業カテゴリ）6件をseedへ追加
-
-外装作業カテゴリ:
-
-- ケース・風防
-- リューズ・チューブ
-- プッシャー
-- ベゼル
-- 文字盤・針
-- ブレス・バンド
-
-DB確認済み情報:
-
-- 外装作業カテゴリ: seed前0件、seed後6件
-- 外装対象部品: 75件
-- 有効な処置: 24件
-- 外装PricingRule: 0件
+- external_labor（外装技術料）で外装処置19件のみ表示
+- internal（内装）で内装処置14件のみ表示
+- 外装カテゴリ6件と対象部品が表示
+- 外装LABOR（外装技術料）を保存するとPricingRule（価格ルール）に反映
 
 ## 確定事項
 
 ### 内装処置
 
-内装作業で表示するRepairWorkAction（処置マスタ）は以下のみ。
+internal（内装作業）で表示するRepairWorkAction（処置マスタ）は以下のみ。
 
 - 交換
 - 修理
@@ -77,7 +57,7 @@ DB確認済み情報:
 
 ### 外装処置
 
-外装作業で表示するRepairWorkAction（処置マスタ）は以下のみ。
+external_labor（外装技術料）で表示するRepairWorkAction（処置マスタ）は以下のみ。
 
 - 交換
 - 取付
@@ -130,23 +110,19 @@ part_external（外装部品行）:
 
 ## 現在の問題
 
-RepairWorkAction（処置マスタ）は現行schema上でrepairType（内装/外装区分）を持たない。
+外装LABOR（外装技術料）の基本入力と処置分離は確認済み。
 
-RepairEntryForm（修理入力フォーム）は取得したrepairWorkActionOptions（処置候補）を内装/外装で分離せず表示している。
-
-そのためexternal_labor（外装技術料）で内装専用処置を含む候補が混在する。
-
-また、外装作業実装中に内装作業の表示・取得・保存挙動が意図せず変更されていないか確認が必要。
+次に、保存済み外装PricingRule（外装価格ルール）が次回以降の同条件入力で候補表示されるか、編集画面でRepairLineItem（修理明細）のsnapshot（保存時点表示値）が崩れないかを確認する必要がある。
 
 ## 現在Taskの対象範囲
 
-- `prisma/seed.ts` の108-10AY未commit差分確認
-- `src/components/repairs/RepairEntryForm.tsx` の108-10AY未commit差分確認
-- RepairWorkAction（処置マスタ）の内装/外装表示分離
-- internal（内装作業）の既存挙動確認
-- external_labor（外装技術料）の処置候補確認
-- part_external（外装部品行）の既存挙動確認
-- TypeScript検証
+- external_labor（外装技術料）の新規保存確認
+- 保存済み外装PricingRule（外装価格ルール）の候補再表示確認
+- modelId（モデルID）あり候補とmodelId=null（モデル共通候補）の優先確認
+- customerType（顧客区分）business / individual の分離確認
+- 編集画面で外装LABOR（外装技術料）の表示が崩れないか確認
+- internal（内装作業）の既存挙動が維持されているか確認
+- part_external（外装部品行）がPricingRule（価格ルール）保存対象外であることの確認
 
 ## 対象外
 
@@ -164,12 +140,12 @@ RepairEntryForm（修理入力フォーム）は取得したrepairWorkActionOpti
 
 ## 次の作業
 
-1. 108-10AY未commit差分を確認する
-2. 内装処置14件、外装処置19件の確定定義に基づき表示分離方式を確認する
-3. schema変更を行わず、現行RepairWorkAction（処置マスタ）のkeyを使ったUI表示分離が安全か確認する
-4. 安全ならRepairEntryForm（修理入力フォーム）へ最小修正する
-5. internal（内装）、external_labor（外装技術料）、part_external（外装部品行）の挙動を確認する
-6. Task完了後、外装LABOR（外装技術料）とPricingRule（価格ルール）の取得・保存を画面操作で確認する
+1. 外装LABOR（外装技術料）を複数条件で保存する
+2. 同条件で外装PricingRule（外装価格ルール）候補が再表示されるか確認する
+3. customerType（顧客区分）違いで候補が混ざらないか確認する
+4. modelId（モデルID）あり候補がmodelId=null（モデル共通候補）より優先されるか確認する
+5. 編集画面で既存外装LABOR（外装技術料）の表示が崩れないか確認する
+6. 問題なければPhase 1（作業マスタ）を一旦完了扱いにし、Phase 2（部品マスタ・部品検索・発注連携）へ進む
 
 ## 現在Taskの禁止事項
 
