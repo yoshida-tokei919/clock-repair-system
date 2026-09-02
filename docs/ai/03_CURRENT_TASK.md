@@ -5,16 +5,17 @@
 
 ## 現在Task
 
-Phase 2開始: 内装部品マスタの差分確定と部品用語マスタ設計
+Phase 2: 内装部品マスタを Cal 別実部品中心へ再設計し、メーカー資料・多言語名称・カテゴリー・解説書連携の要件を確定する。
 
 ## 目的
 
-PartCategoryMaster（標準部品カテゴリ）とPartNameMaster（標準部品名マスタ）の内装部品定義を、時計修理実務上の正しい内装部品マスタへ整理する。
+内装部品を、メーカー横断の日本語標準名を先に完成させる方式ではなく、movementCaliber（ムーブメントCal）ごとの実部品として段階的に蓄積できるようにする。
 
-既存の内装作業マスタは原則変更しない。
-作業マスタと部品マスタを混同せず、内装部品マスタの確定差分だけを最小修正する。
+クロノグラフ等、メーカーごとに機構や部品構成が大きく異なる領域では、共通名を推測して無理に統一しない。
+メーカー解説書・部品表・展開図を根拠に、部品番号・メーカー原名・日本語名または仮訳・カテゴリーを登録し、UIでは選択中Calに属する部品だけを段階的に絞り込んで表示する。
 
-部品検索・海外部品調達に使う英語/フランス語/ドイツ語などの部品表記は、PartNameMaster（標準部品名マスタ）へ直接ベタ持ちせず、PartNameTerm（部品用語マスタ）として分離する方向で設計する。
+既存の内装作業マスタ、外装作業マスタ、PricingRuleは原則変更しない。
+作業マスタと部品マスタを混同しない。
 
 ## 現在地
 
@@ -24,314 +25,289 @@ Phase 1（作業マスタ）は一旦完了。
 
 - internal（内装作業）を構造化入力できる
 - external_labor（外装技術料）を構造化入力できる
-- internal（内装）とexternal_labor（外装技術料）の処置候補は分離されている
-- external_labor（外装技術料）とpart_external（外装部品行）は分離されている
-- 外装PricingRule（外装価格ルール）は保存後、同条件で候補再表示される
-- customerType（顧客区分）business / individual の候補は混在しない
-- modelId（モデルID）あり候補はmodelId=null（モデル共通候補）より優先される
-- 編集画面で保存済み外装LABOR（外装技術料）の表示は維持される
-- part_external（外装部品行）はPricingRule（価格ルール）へ学習されない
+- internal と external_labor の処置候補は分離されている
+- external_labor と part_external（外装部品行）は分離されている
+- 外装PricingRuleは保存後、同条件で候補再表示される
+- customerType は business / individual のみ
+- modelIdあり候補はmodelId=nullより優先される
+- 編集画面で保存済み外装LABORの表示は維持される
+- part_external はPricingRuleへ学習されない
 
-最新の作業マスタ実装commit:
+現行schema確認済み:
 
-- `d754b09 fix: separate internal and external work actions`
+- PartsMaster.standardPartNameId は nullable
+- PartsMaster は caliberId / baseCaliberId / movementMakerId / partRefs / name / nameEn / nameJp / 在庫 / 価格 / 仕入先 / 写真等を持つ
+- PartsMaster.nameJp は現状必須であり、「日本語名不明・英語名のみ」の登録方針と衝突するため変更要否を検討する
+- PartNameMaster.nameJa は現状必須
+- getInternalPartNameMasters() は現状 movementCaliber で絞り込まず、activeな候補を広く取得している
+- RepairLineItem には itemNameSnapshot / estimateDisplayNameSnapshot / b2bDisplayNameSnapshot / b2cDisplayNameSnapshot 等があり、発行時点表示の保持に利用できる
 
-内装部品マスタ差分調査は完了。
-現行アプリと正本資料の差分について、以下の扱いを確定済み。
+## 内装部品マスタの基本方針
 
-既存の部品検索・検索ワード生成実装はある程度存在する。
-PC環境に戻った後、CousinsUK PDF、ETA多言語資料、その他部品表資料を投入し、既存検索実装と照合しながらPartNameTerm（部品用語マスタ）設計へ接続する。
+### 1. PartsMasterをCal固有実部品の主軸にする
 
-## 内装部品マスタの設計前提
+PartsMaster（実部品・在庫マスタ）は以下を扱う。
 
-### 部品マスタと作業マスタは別物
-
-PartNameMaster（標準部品名マスタ）:
-
-- 対象部品名の標準マスタ
-- 内装部品名の候補定義に使用する
-- 作業入力ではtargetPartNameId（対象部品名ID）として参照される場合がある
-- 日本語標準名と内部識別を中心に持つ
-- 海外部品検索用の全表記を直接抱え込まない
-
-PartsMaster（実部品・在庫マスタ）:
-
-- 実部品
+- movementMaker / movementCaliber
+- baseMovementMaker / baseMovementCaliber
+- 部品番号（partRef）
+- メーカー原名
+- 日本語標準名または日本語仮訳
+- カテゴリー
+- グレード
 - 在庫
 - 仕入
 - 価格
 - 写真
 - 発注
-- 部品検索
+- 出典資料
 
-PartNameTerm（部品用語マスタ）:
+日本語標準名が未確定でも、Cal・部品番号・メーカー原名等が分かれば登録可能にする。
+standardPartNameId は必須にしない。
 
-- PartNameMaster（標準部品名マスタ）に紐づく検索・多言語・出典別の部品表記を管理する
-- 英語、フランス語、ドイツ語などを扱う
-- CousinsUK、ETA、Jules Borel、Esslinger、メーカー資料、販売サイトなどの出典を持てるようにする
-- 検索ワード生成の主材料にする
+PartNameMaster（標準部品名マスタ）は、メーカー横断で意味が安定している部品名に使う。
+クロノグラフ等で1対1対応が成立しない部品を、推測でPartNameMasterへ統合しない。
 
-RepairWorkName（作業名マスタ）やRepairWorkAction（処置マスタ）とは別物として扱う。
+### 2. 部品名は多言語・段階確定を前提にする
 
-### 内装部品の軸
+メーカー資料の原語名は必ず保持する。
+日本語名は「確定した標準名」と「メーカー原名から作った日本語仮訳」を区別する。
 
-内装部品はmovementCaliber（ムーブメントCal）中心で扱う。
+表示名の優先順位:
 
-必要な場合はbaseMovementCaliber（ベースCal）をfallback（代替検索）として使用する。
-watch.caliber（時計登録Cal）は既存設計との整合を確認して扱う。
-
-brandId（ブランドID）を内装部品の主軸にしない。
-
-### 内装部品選択のdrill-down（段階絞り込み）
-
-現状はブランド→モデル→Ref→Calまではdrill-down（段階絞り込み）されているが、内装部品候補はCal連動で絞り込まれていない。
-
-今後の内装部品選択はmovementCaliber（ムーブメントCal）を起点として、実際にそのCalへ存在するカテゴリ・機能・部品だけを通常候補に出す方向で設計する。
+1. 日本語標準名
+2. 日本語仮訳
+3. メーカー英語名
+4. 最深カテゴリー名 + 「部品」 + 部品番号
+5. 部品番号のみ
 
 例:
 
-- ROLEX 3135等の三針Calではクロノグラフカテゴリを通常候補に出さない
-- ETA 7750等のクロノグラフCalではクロノグラフカテゴリを候補に出す
-- baseMovementCaliber（ベースCal）を持つ場合のfallback（代替検索）条件は別途明示的に設計する
+- 分積算中間車
+- Minute counter intermediate wheel の日本語仮訳
+- Minute counter intermediate wheel
+- 分積算 部品 8042
+- 8042
 
-候補数が少ないカテゴリは従来どおり「カテゴリ→部品」の2段階を基本とする。
-候補数が多いカテゴリは「カテゴリ→機能グループ→部品」の3段階を使える構造を検討する。
+表示名生成ロジックはUI、見積書、納品書、共有表示等で個別実装せず、共通ロジックへ集約する方向で設計する。
+発行済み帳票等はRepairLineItem側のsnapshotを保持し、後日のマスタ名称更新で過去表示を意図せず書き換えない。
 
-クロノグラフの例:
+### 3. メーカー横断の部品名完全統一を前提にしない
 
-- クロノグラフ → 秒クロノグラフ → クロノグラフ車 / 一番中間車 / 二番中間車 / 駆動車
-- クロノグラフ → 分積算 → 積算車 / 一番中間車 / 二番中間車 / 駆動車
-- クロノグラフ → 時積算 → 積算車 / 一番中間車 / 二番中間車 / 駆動車
+クロノグラフをSEIKO / ETA / OMEGAで比較した結果、機構・部品構成・名称がメーカー間で大きく異なり、完全な共通標準名を先に作る方式は採用しない。
 
-機能グループは全カテゴリへ強制しない。
-UI上では機能グループ配下で「駆動車」等の短い表示を許容するが、PartNameMaster（標準部品名マスタ）の標準名は「分積算駆動車」等、単独でも対象を特定できる名称を保持する。
+分かるものだけ標準名へ紐づける。
+分からないものはメーカー原名 + 部品番号で登録し、後から名称や紐付けを更新する。
 
-クロノグラフ伝達車の標準化では、現時点の基本形を「一番中間車」「二番中間車」「駆動車」とし、存在しない段数を機械的に追加しない。
+確定済みのクロノグラフ名称例:
 
-### クロノグラフ積算系の標準名
+- 秒クロノグラフ車
+- 分積算車
+- 時積算車
+- リセットハンマー
+- ハートカム
 
-クロノグラフのカウンター系は、ヨシダ時計修理工房標準名として「積算車」を採用する。
+`クロノグラフ車` は `秒クロノグラフ車` へ統合する方向。
+既存 `クラッチレバー` は汎用標準名としては廃止候補。実資料上の Clutch / Clutch ring / Operating lever 等を別部品として扱う。
 
-- 分カウンター本体: 分積算車
-- 時カウンター本体: 時積算車
-- 必要に応じて秒カウンター本体: 秒積算車
-- 伝達車は対象機能を接頭辞にして「一番中間車」「二番中間車」「駆動車」を組み合わせる
-  - 例: 分積算一番中間車 / 分積算二番中間車 / 分積算駆動車
-  - 例: 時積算一番中間車 / 時積算二番中間車 / 時積算駆動車
+### 4. メーカー原名からの日本語仮訳ルール
 
-SEIKOの「分CG車」等、ETAの「Minute counting wheel」「Hour counting wheel」等のメーカー固有表記は標準名へそのまま固定せず、PartNameTerm（部品用語マスタ）のメーカー用語・検索用語として紐づける。
+直訳だけでなく、時計修理で自然な用語へ寄せる。ただし英語原名は必ず保持する。
 
-中央クロノ秒系は積算系と分け、「秒クロノグラフ車」等の標準名を基本候補とする。1/5秒・1/10秒・1/20秒等は表示機能と機構を確認してから「クロノグラフ車」か「積算車」かを確定し、分解能だけで機械的に命名しない。
+現時点の基本ルール例:
 
-### 属性駆動のカテゴリ自動構成
+- counting wheel → 積算車
+- driving wheel → 駆動車
+- intermediate wheel → 中間車
+- bridge → 受け
+- hammer → リセットハンマー
+- operating lever → 作動レバー
+- jumper → ジャンパー
+- yoke → 原則レバー
 
-新規Cal登録時に、利用可能なPartCategoryMaster（標準部品カテゴリ）を毎回ゼロから一括選択する方式は主運用にしない。
+`yoke lever` のようにそのまま訳すと不自然な場合は、前半を機能名として解釈し「○○作動レバー」「○○中間レバー」等へ自然化する。
+例: Fly-back yoke → 復針レバー、Reversing yoke → 切替レバー。
 
-時計情報/ムーブメント情報の入力周辺に属性選択UIを設け、未知のCalでは実機の仕様に当てはまる属性を登録する方向で設計する。
+翻訳ルールは固定辞書として過信せず、解説書の展開図・位置・作用を確認して補正する。
 
-ムーブメント属性の例:
+## Cal連動drill-down
 
-- mechanical（機械式）/ quartz（クォーツ）
-- manual_winding（手巻）/ automatic_winding（自動巻）
-- date（日付）
-- day（曜日）
-- chronograph（クロノグラフ）
-- gmt（GMT/第二時間帯）
-- alarm（アラーム）
-- power_reserve（パワーリザーブ）
+UIではDB全体の部品名を一括表示しない。
+最初に movementCaliber で候補を絞り、そのCalに登録済みの部品・カテゴリーだけを通常候補として表示する。
 
-保存済み属性から利用可能な内装部品カテゴリ・機能グループを自動導出する。
-既知Calでは保存済み属性を再利用し、次回入力時に同じ属性/カテゴリを再選択しない。
+基本:
 
-属性からの自動導出結果で不足または例外がある場合のみ、Cal固有override（例外設定）でカテゴリ・機能を追加/除外できる構造を検討する。
+movementCaliber
+→ そのCalに存在するカテゴリー
+→ 必要なら機能グループ
+→ そのCalに存在する部品
 
-baseMovementCaliber（ベースCal）がある場合は、ベースCalの属性・部品候補を継承/fallback（代替参照）し、派生Cal固有差分だけを保持できる構造を検討する。
+例: ETA 7750
 
-カテゴリ選択用だけの無意味なフラグではなく、Cal自身の機能属性として保存し、将来の検索・集計・作業判定等にも再利用できるデータにする。
+- クロノグラフ
+  - 秒クロノグラフ
+  - 分積算
+  - 時積算
+  - 発停・クラッチ
+  - 作動・制御
+  - 復針
+  - 受け・保持
+  - その他
 
-### 外装部品側の属性駆動
+大量のメーカー固有部品名がDBに存在しても、選択中Calに属さない部品を通常候補へ混在させない。
 
-外装部品でも、新規model（モデル）/Ref（時計Ref）登録時に外装部品カテゴリを毎回ゼロから一括選択する方式を主運用にしない。
+baseMovementCaliber がある場合の継承/fallback条件は別途明示的に設計する。
 
-時計/外装属性の例:
+## カテゴリー分類
 
-- chronograph（クロノグラフケース）
-- rotating_bezel（回転ベゼル）
-- screw_down_pusher（ねじ込みプッシャー）
-- helium_escape_valve（ヘリウムエスケープバルブ）
-- bracelet（ブレスレット）
+部品名はメーカー/Cal固有を許容するが、カテゴリーはUIの共通軸として機能ベースで可能な範囲を共通化する。
 
-時計/外装属性から利用可能な外装部品カテゴリを自動導出する方向で設計する。
-モデル共通属性を基本とし、Ref固有差分はoverride（例外設定）として持てる構造を検討する。
+クロノグラフの基本カテゴリー候補:
 
-時計全体/外装属性とムーブメント属性は分離する。
-同じ「クロノグラフ」でも、内装のクロノグラフ機構判定と外装のプッシャー等の判定を同一フラグへ無条件に統合しない。
+- 秒クロノグラフ
+- 分積算
+- 時積算
+- 発停・クラッチ
+- 作動・制御
+- 復針
+- 受け・保持
+- その他
 
-このdrill-down（段階絞り込み）と属性駆動を実現するためのCal/Model/RefとPartCategoryMaster（標準部品カテゴリ）/機能グループ/PartNameMaster（標準部品名マスタ）の関連モデルは、既存schemaと検索実装を確認してから確定する。推測でFKや新規マスタを追加しない。
+新Cal解析時は、メーカー原名・部品表・展開図・組立順・作用説明からAIがカテゴリー候補を付ける。
+高確度なものは自動候補、曖昧なものだけヨシダ確認対象にする。
 
-## 部品用語マスタの設計前提
+1部品が複数機能にまたがる場合は、UI用の主カテゴリー1つ + 機能タグ複数の方式を候補とする。
+厳密なschemaは既存schemaとの整合を確認してから決定する。
 
-PartNameTerm（部品用語マスタ）は、PartNameMaster（標準部品名マスタ）1件に対して複数持てる。
+## 解説書（Technical Document）
 
-想定フィールド:
+Calごとに対応するメーカー解説書・部品表・展開図を登録し、アプリの修理画面等から「解説書」ボタンで直接閲覧できるようにする。
 
-- partNameId（標準部品名ID）
-- language（言語）: ja / en / fr / de など
-- term（用語）
-- normalizedTerm（正規化用語）
-- termType（用語種別）: primary / official / supplier / alias / search など
-- source（出典）: ETA / CousinsUK / JulesBorel / Esslinger / generic など
-- manufacturer（メーカー）: ETA / Sellita / Seiko など
-- sourceDocumentId（出典資料ID）
-- sourcePage（出典ページ）
-- priority（優先順位）
-- isActive（有効フラグ）
+要件:
 
-英語表記は直訳ではなく、実際の部品表・販売サイト・メーカー資料で使われる表記を優先する。
+- Calから対応解説書を特定できる
+- 1つの資料が複数Calを対象にできる
+- 1つのCalに複数資料を紐づけられる
+- 将来的には部品表ページ / 展開図ページ等の該当ページへ直接開ける余地を残す
+- DBをGoogle Drive等の特定保存先へ固定しない
+- TechnicalDocumentとCalの多対多関係を候補とする
+- PDF本体の保存場所は要検討
 
-英語以外のフランス語・ドイツ語は後からデータ投入で追加できる構造にする。
-schema（DB構造）は多言語を前提にする。
+### 解説書を保有していないCal
+
+未決定。実装前に業務ルールを決める。
+
+検討候補:
+
+- 「解説書未登録」と明示して通常運用を継続する
+- 部品番号・既知名称のみでPartsMasterを暫定登録する
+- 後日資料入手時にメーカー原名・日本語仮訳・カテゴリー・出典を追記する
+- baseMovementCaliberの資料を参照可能にする条件を定義する
+- メーカー公式以外の信頼できる資料を代替資料として登録可能にするか決める
+- 解説書未登録Calを後から確認できる一覧/フラグを用意するか検討する
+
+解説書がないことを理由に修理案件登録そのものを止めない方向を基本候補とするが、未確定。
+
+## 新Cal追加時の当面の運用
+
+当面はChatGPT/Codexを使用して人間確認付きで蓄積する。
+
+1. 新しいmovementCaliberが案件で初登場
+2. メーカー解説書を所定の保存場所へ登録
+3. カタリが解説書・部品表・展開図を確認
+4. 部品番号、メーカー原名、日本語標準名または仮訳、カテゴリー候補を作成
+5. 確信度の低い項目だけヨシダ確認
+6. 承認後、CodexがDB/seed等へ追加
+7. 次回同Cal案件では登録済み部品を再利用
+
+将来的な「アプリ内PDFアップロード→AI解析→DB登録」はOpenAI API等の別従量課金が必要になるため、現段階では実装しない。
+実例が十分に蓄積し、費用対効果が見えた時点で再検討する。
+
+## PartNameTerm / 多言語名称の設計前提
+
+多言語・出典別用語を扱える構造は維持する。
+ただし従来の「PartNameMaster 1件にだけ紐づく検索用語」という前提は再検討する。
+標準名未確定のCal固有PartsMasterにもメーカー原名・多言語表記を保持できる必要がある。
+
+想定情報:
+
+- language
+- term
+- normalizedTerm
+- termType: primary / official / supplier / alias / search / translated 等
+- source
+- manufacturer
+- movementCaliber / family
+- sourceDocumentId
+- sourcePage
+- priority / confidence
+- isActive
+
+既存PartNameTerm案を拡張するか、実部品側名称テーブルを分けるかはschema確認後に決定する。
 
 ## 検索ワード生成の設計前提
 
-検索ワード生成は、PartNameMaster（標準部品名マスタ）のnameEn（英語名）だけに依存させない。
+検索ワード生成はPartNameMaster.nameEnだけに依存させない。
 
-検索ワード生成では以下を組み合わせる。
+組み合わせ候補:
 
-- movementMaker（ムーブメントメーカー）
-- movementCaliber（ムーブメントCal）
-- baseMovementCaliber（ベースCal）
-- brand（時計ブランド）※外装部品中心
-- model（モデル）※外装部品中心
-- partRef（部品Ref）
-- PartNameTerm（部品用語マスタ）のterm（用語）
-- supplier（仕入先）ごとの検索方針
-- language（言語）ごとの検索方針
+- movementMaker
+- movementCaliber
+- baseMovementCaliber
+- partRef
+- メーカー原名
+- 多言語名称
+- supplier別検索方針
+- language別検索方針
 
-サイト別に検索言語・検索語の優先順位を変えられるようにする。
+サイトごとに検索語・言語の優先順位を変更できるようにする。
 
-例:
+## 既存の確定済み内装部品差分
 
-- CousinsUK: 英語表記優先
-- ETA資料由来: ETA公式表記を優先
-- フランス系部品サイト: フランス語表記を優先
-- ドイツ系部品サイト: ドイツ語表記を優先
+以下は従来調査で追加方針が確定済み。今回の方針変更で自動的に削除しない。
 
-## PDF資料の扱い
-
-PC環境復帰後に以下を投入し、用語抽出とマッピングを行う。
-
-- CousinsUK PDF資料
-- ETA多言語解説・部品表PDF
-- 必要に応じてJules Borel、Esslinger、その他販売サイト資料
-
-PDFから抽出した用語は、PartNameMaster（標準部品名マスタ）へ直接入れず、PartNameTerm（部品用語マスタ）候補として扱う。
-
-PDFから抽出した用語は出典を残す。
-
-## 既存検索実装の確認対象
-
-PC環境復帰後、以下を確認する。
-
-- src/components/parts/PartsSearchPanel.tsx
-- src/components/parts/PartsWebSearchPanel.tsx
-- src/app/api/parts/search/route.ts
-- src/app/parts-sourcing/page.tsx
-- docs/ai-tasks/006-design-parts-search-to-order-flow.md
-- docs/ai-tasks/020-investigate-web-search-area-for-parts-panel.md
-- docs/ai-tasks/021-create-parts-web-search-panel-shell.md
-- docs/ai-tasks/022-enable-web-search-sites-in-parts-web-search-panel.md
-- docs/ai-tasks/036-design-parts-search-standard-master-integration.md
-
-既存検索実装を壊さず、段階的にPartNameTerm（部品用語マスタ）へ接続する。
-
-## 確定した正本反映方針
-
-### 正本資料をアプリ側に合わせるもの
-
-以下は現行アプリ側を正として、正本資料へ反映する扱いとする。
-
-- quartz（クォーツ）カテゴリkey
-- main_plate（地板）カテゴリkey
-- movement（ムーブメント）カテゴリを正式カテゴリとして残す
-- escape_wheel（ガンギ車）keyを正式扱いにする
-- 電池系部品
-- 曜送り系部品
-- ローター真系部品
-
-### アプリへ追加するもの
-
-train_wheel（輪列）へ追加する。
+train_wheel:
 
 - 秒カナ受け
 - 秒カナ受けネジ
 - 秒カナ押さえ
 - 秒カナ押さえネジ
+- 三番耐震穴石（上/下）
+- 三番耐震受石（上/下）
+- 三番耐震バネ（上/下）
+- 四番耐震穴石（上/下）
+- 四番耐震受石（上/下）
+- 四番耐震バネ（上/下）
 
-quartz（クォーツ）へ追加する。
+quartz:
 
-- 五番受石（上）
-- 五番受石（下）
+- 五番受石（上/下）
+- 五番耐震穴石（上/下）
+- 五番耐震受石（上/下）
+- 五番耐震バネ（上/下）
 
-train_wheel（輪列）へ追加する耐震系。
-
-- 三番耐震穴石（上）
-- 三番耐震穴石（下）
-- 三番耐震受石（上）
-- 三番耐震受石（下）
-- 三番耐震バネ（上）
-- 三番耐震バネ（下）
-- 四番耐震穴石（上）
-- 四番耐震穴石（下）
-- 四番耐震受石（上）
-- 四番耐震受石（下）
-- 四番耐震バネ（上）
-- 四番耐震バネ（下）
-
-quartz（クォーツ）へ追加する五番耐震系。
-
-- 五番耐震穴石（上）
-- 五番耐震穴石（下）
-- 五番耐震受石（上）
-- 五番耐震受石（下）
-- 五番耐震バネ（上）
-- 五番耐震バネ（下）
-
-### 追加しないもの
-
-以下は不要。
+追加しない:
 
 - 汎用 受石
 - 汎用 穴石
 - 五番耐震穴石座
 
-## 五番車の扱い
-
-fifth_wheel_quartz（クォーツ五番車）を正式な通常使用対象とする。
-
-train_wheel（輪列）側の既存 fifth_wheel（五番車）は新規利用対象にしない。
-ただし、ごく稀に機械式五番車が存在するため、既存定義がある場合は削除しない。
-
-五番車の耐震系はquartz（クォーツ）カテゴリに置く。
-五番耐震穴石座は作らない。
-
-耐震穴石、穴石、耐震穴石座は別物として扱う。
+fifth_wheel_quartz（クォーツ五番車）を通常使用対象とする。
+train_wheel側の既存 fifth_wheel は新規利用対象にしないが、既存定義がある場合は削除しない。
 
 ## 現在Taskの対象範囲
 
-- 部品マスタ要件整理
-- PartNameTerm（部品用語マスタ）設計
-- Cal連動の内装部品drill-down（段階絞り込み）要件整理
-- ムーブメント属性から内装部品カテゴリを自動構成する要件整理
-- 時計/外装属性から外装部品カテゴリを自動構成する将来要件整理
-- 必要なカテゴリのみ機能グループ階層を使う設計の要否確認
-- 既存部品検索実装の調査
-- PDF資料投入後の用語抽出方針整理
-- src/lib/part-input-options.ts の内装部品名候補への追加準備
-- scripts/seed-part-standard-masters.ts の既存安全性確認
-- prisma/schema.prisma の変更要否確認
-- seed実行によるPartNameMaster（標準部品名マスタ）反映確認
-- 内装部品候補取得で追加部品が表示されるか確認
+- Cal固有PartsMaster中心の内装部品設計
+- 部品名fallback表示要件
+- 日本語標準名 / 日本語仮訳 / メーカー原名の保持方式
+- Cal連動drill-down
+- カテゴリー / 機能タグ設計
+- TechnicalDocument / Cal紐付け要件
+- 解説書閲覧ボタン要件
+- 解説書未保有Calの運用検討
+- 多言語名称 / PartNameTerm再設計
+- 既存schemaとUIへの最小変更案調査
+- 既存部品検索・検索ワード生成との接続確認
 
 ## 対象外
 
@@ -341,50 +317,33 @@ train_wheel（輪列）側の既存 fifth_wheel（五番車）は新規利用対
 - 作業優先順位
 - スケジュール
 - 事例公開
-- 帳票
-- PDF
 - LINE
-- 共有ページ
 - 顧客コメント
-- RepairWorkAction（処置マスタ）
-- RepairWorkCategory（作業カテゴリ）
-- PricingRule（価格ルール）
+- RepairWorkActionの変更
+- RepairWorkCategoryの推測追加
+- PricingRuleの不要な変更
+- アプリ内AI PDF解析の本実装
+
+帳票そのものの改修はこのTaskで無条件に触らない。ただし、将来すべての表示箇所で同一fallbackルールを使う要件は保持する。
 
 ## 次の作業
 
-1. メーカー資料を比較し、PartNameMaster（標準部品名マスタ）の日本語標準名と分類ルールを確定する
-2. Cal/Model/Refへ属性を保持するために必要な既存データ構造を調査する
-3. 属性→部品カテゴリ/機能グループの導出方式とoverride（例外設定）方式を設計する
-4. Cal連動の部品候補絞り込みに必要な既存データ構造を調査する
-5. 機能グループ相当の中間階層が必要なカテゴリと、既存schemaへの影響を確認する
-6. 既存の部品検索・検索ワード生成実装を確認する
-7. PartNameTerm（部品用語マスタ）のschema案を作る
-8. PDF投入後の用語抽出・出典管理フローを設計する
-9. 追加部品のkey（キー）、日本語名、英語代表名、検索別名、多言語別名、categoryKey（カテゴリキー）、movementTarget（ムーブメント対象）、movementPosition（上下位置）を確定する
-10. Codexへ調査Taskを渡す
-11. 必要に応じてschema変更または暫定static定義を選ぶ
-12. `src/lib/part-input-options.ts` のみを中心に追加する場合は、PartNameTerm（部品用語マスタ）設計と矛盾しないようにする
-13. seedを実行して重複・categoryKey不整合・partType不整合がないか確認する
-14. TypeScript検証を行う
-15. 画面または取得処理で内装部品候補に追加部品が出るか確認する
+1. 現行schema / seed / RepairEntryForm / 部品検索実装を再確認し、新方針に必要な最小差分を設計する
+2. PartsMaster.nameJp必須、Legacy name、PartNameMasterとの関係をどう変更するか比較案を作る
+3. Cal→PartsMaster→カテゴリー→部品のdrill-downに必要な関連モデルを設計する
+4. カテゴリー主分類 + 機能タグの要否とschemaを検討する
+5. TechnicalDocumentとCalの関連モデル、保存先非依存の参照方式を設計する
+6. 解説書未保有Calの業務ルールをヨシダと確定する
+7. 新Cal投入用のレビュー形式とCodex投入手順を標準化する
+8. 既存の部品検索・検索ワード生成を新しい名称データへ段階的に接続する
 
-## 現在Taskの禁止事項
+## 禁止事項
 
-- PartNameMaster（標準部品名マスタ）を推測で追加しない
-- PartCategoryMaster（標準部品カテゴリ）を推測で追加しない
-- Calと部品の関連構造を既存調査なしで推測実装しない
-- Cal/Model/Refの属性schemaを既存調査なしで追加しない
-- 属性→カテゴリ対応を推測で固定実装しない
-- 機能グループ用の新規マスタ/FKを既存schema調査前に追加しない
-- 英語表記を直訳だけで確定しない
-- PDFや出典資料の用語を出典なしで確定語として扱わない
-- 部品マスタと作業マスタを混同しない
-- 内装/外装部品を混在させない
-- RepairWorkAction（処置マスタ）を変更しない
-- RepairWorkCategory（作業カテゴリ）を変更しない
-- PricingRule（価格ルール）の条件を変更しない
-- 既存検索実装を確認せず検索ロジックを作り替えない
-- train_wheel（輪列）側のfifth_wheel（五番車）を削除しない
-- 五番耐震穴石座を追加しない
-- 汎用 受石 / 汎用 穴石を追加しない
-- 現在Task対象外を変更しない
+- メーカー資料を見ずにクロノグラフ等の部品を日本語共通名へ推測統合しない
+- 英語名だけを見て部品の同一性を断定しない。可能な限り展開図の形・位置・作用を確認する
+- Calに存在しない部品を通常候補へ出す設計にしない
+- PartsMaster.subcategoryを新しい機能グループ用途へ流用しない
+- targetPartNameId と partsMasterId を混同しない
+- external_labor に PartsMaster を使わない
+- part_external に PricingRule を使わない
+- schemaを既存参照調査なしで決め打ちしない
