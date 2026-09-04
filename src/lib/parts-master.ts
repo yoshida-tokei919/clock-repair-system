@@ -22,6 +22,8 @@ type ResolveMasterRefsInput = {
     movementMakerName?: string | null;
     baseMakerId?: number | string | null;
     baseMakerName?: string | null;
+    gradeId?: string | null;
+    grade?: string | null;
 };
 
 export type PartsMasterInput = ResolveMasterRefsInput & {
@@ -91,13 +93,13 @@ function parseNullableFloat(value?: number | string | null) {
 
 function splitMultiValue(value?: string | null) {
     return (value ?? "")
-        .split(/[\n,、/]+/)
+        .split(/[\n,、]+/)
         .map((entry) => entry.trim())
         .filter(Boolean);
 }
 
 function normalizeRefToken(value?: string | null) {
-    return (value ?? "").replace(/[\s\-./]+/g, "").toLowerCase();
+    return (value ?? "").trim();
 }
 
 function normalizeTextToken(value?: string | null) {
@@ -141,6 +143,7 @@ export async function resolveMasterRefs(input: ResolveMasterRefsInput, db: DbLik
     const directBaseCaliberId = parseNullableInt(input.baseCaliberId);
     const directMovementMakerId = parseNullableInt(input.movementMakerId);
     const directBaseMakerId = parseNullableInt(input.baseMakerId);
+    const directGradeId = cleanText(input.gradeId);
 
     const brandName = cleanText(input.brandName);
     const modelName = cleanText(input.modelName);
@@ -148,6 +151,7 @@ export async function resolveMasterRefs(input: ResolveMasterRefsInput, db: DbLik
     const baseCaliberName = cleanText(input.baseCaliberName);
     const movementMakerName = cleanText(input.movementMakerName);
     const baseMakerName = cleanText(input.baseMakerName);
+    const gradeName = cleanText(input.grade);
 
     const brand = directBrandId
         ? await db.brand.findUnique({ where: { id: directBrandId }, select: { id: true, name: true, nameEn: true, nameJp: true } })
@@ -173,6 +177,17 @@ export async function resolveMasterRefs(input: ResolveMasterRefsInput, db: DbLik
         ? await db.brand.findUnique({ where: { id: directBaseMakerId }, select: { id: true, name: true } })
         : (baseMakerName ? await findOrCreateBrand(db as any, baseMakerName) : null);
 
+    const grade = directGradeId
+        ? { id: directGradeId }
+        : (gradeName
+            ? (await db.partGradeMaster.findMany({
+                where: { isActive: true },
+                select: { id: true, key: true, nameJa: true, nameEn: true },
+            })).find((item) =>
+                [item.id, item.key, item.nameJa, item.nameEn].some((value) => cleanText(value) === gradeName)
+            ) ?? null
+            : null);
+
     return {
         brandId: brand?.id ?? null,
         modelId: model?.id ?? null,
@@ -180,6 +195,7 @@ export async function resolveMasterRefs(input: ResolveMasterRefsInput, db: DbLik
         baseCaliberId: baseCaliber?.id ?? null,
         movementMakerId: movementMaker?.id ?? null,
         baseMakerId: baseMaker?.id ?? null,
+        gradeId: grade?.id ?? null,
     };
 }
 
@@ -194,7 +210,7 @@ function buildNormalizedPartsMasterData(input: PartsMasterInput, refs: Awaited<R
         category: normalizeCategoryValue(input.category),
         subcategory: cleanText(input.subcategory),
         standardPartNameId: cleanText(input.standardPartNameId),
-        gradeId: cleanText(input.gradeId),
+        gradeId: refs.gradeId,
         brandId: refs.brandId,
         modelId: refs.modelId,
         watchRefs,
@@ -229,9 +245,25 @@ function isInteriorPart(partType?: string | null) {
     return cleanText(partType) === "interior";
 }
 
+function gradeMatches(
+    data: ReturnType<typeof buildNormalizedPartsMasterData>,
+    candidate: { gradeId?: string | null; grade?: string | null }
+) {
+    const dataGradeId = cleanText(data.gradeId);
+    const candidateGradeId = cleanText(candidate.gradeId);
+    if (dataGradeId && candidateGradeId) return dataGradeId === candidateGradeId;
+
+    const dataGrade = cleanText(data.grade);
+    const candidateGrade = cleanText(candidate.grade);
+    if (dataGrade || candidateGrade) return dataGrade === candidateGrade;
+
+    return !dataGradeId && !candidateGradeId;
+}
+
 async function findExistingPartsMaster(db: DbLike, data: ReturnType<typeof buildNormalizedPartsMasterData>, currentId?: number | null) {
-    const baseWhere: any = { partType: data.partType };
-    if (data.brandId !== null) baseWhere.brandId = data.brandId;
+    const baseWhere: any = isInteriorPart(data.partType)
+        ? { OR: [{ partType: "interior" }, { category: "internal" }] }
+        : { OR: [{ partType: "exterior" }, { category: "external" }] };
     if (isInteriorPart(data.partType) && data.caliberId !== null) {
         baseWhere.caliberId = data.caliberId;
     }
@@ -245,6 +277,9 @@ async function findExistingPartsMaster(db: DbLike, data: ReturnType<typeof build
             modelId: true,
             watchRefs: true,
             caliberId: true,
+            movementMakerId: true,
+            gradeId: true,
+            grade: true,
             nameJp: true,
             partRefs: true,
         },
@@ -252,13 +287,13 @@ async function findExistingPartsMaster(db: DbLike, data: ReturnType<typeof build
 
     const others = candidates.filter((candidate) => candidate.id !== currentId);
     const inputPartRefs = splitMultiValue(data.partRefs);
-    const inputWatchRefs = splitMultiValue(data.watchRefs);
     const inputName = normalizeTextToken(data.nameJp);
 
     if (isInteriorPart(data.partType)) {
         return others.find((candidate) => {
-            if (data.brandId !== null && candidate.brandId !== data.brandId) return false;
             if (data.caliberId !== null && candidate.caliberId !== data.caliberId) return false;
+            if (data.movementMakerId !== null && candidate.movementMakerId !== data.movementMakerId) return false;
+            if (!gradeMatches(data, candidate)) return false;
             if (inputPartRefs.length > 0) {
                 return hasTokenOverlap(inputPartRefs, splitMultiValue(candidate.partRefs), normalizeRefToken);
             }
@@ -268,9 +303,7 @@ async function findExistingPartsMaster(db: DbLike, data: ReturnType<typeof build
 
     return others.find((candidate) => {
         if (data.brandId !== null && candidate.brandId !== data.brandId) return false;
-        if (inputWatchRefs.length > 0 && !hasTokenOverlap(inputWatchRefs, splitMultiValue(candidate.watchRefs), normalizeRefToken)) {
-            return false;
-        }
+        if (!gradeMatches(data, candidate)) return false;
         if (inputPartRefs.length > 0) {
             return hasTokenOverlap(inputPartRefs, splitMultiValue(candidate.partRefs), normalizeRefToken);
         }
@@ -312,5 +345,6 @@ export const __partsMasterInternals = {
     inferPartType,
     normalizeRefToken,
     splitMultiValue,
+    gradeMatches,
     findOrCreateModel,
 };

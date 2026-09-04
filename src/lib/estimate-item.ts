@@ -6,6 +6,7 @@ type PartSource = {
     partsMasterId?: number | null;
     name?: NullableText;
     nameJp?: NullableText;
+    nameEn?: NullableText;
     itemName?: NullableText;
     retailPrice?: number | null;
     unitPrice?: number | null;
@@ -29,6 +30,7 @@ type PartSource = {
 type EstimateItemCore = {
     partsMasterId: number | null;
     name: string;
+    partNameEn?: string;
     price: number;
     cost?: number;
     grade?: string;
@@ -68,6 +70,7 @@ export function createEstimateItemFromPart<T extends EstimateItemOverrides = Est
             cleanText(part.nameJp) ??
             cleanText(part.itemName) ??
             "",
+        partNameEn: cleanText(part.nameEn),
         price:
             asNumber(part.price) ??
             asNumber(part.retailPrice) ??

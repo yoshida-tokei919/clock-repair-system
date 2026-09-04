@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import PartsWebSearchPanel from './PartsWebSearchPanel'
 
@@ -57,6 +57,27 @@ type SupplierOption = {
   name: string
 }
 
+type PartSelection = {
+  id: number
+  partsMasterId?: number
+  partType?: string
+  name: string
+  nameJp?: string
+  nameEn?: string | null
+  grade: string
+  note1: string
+  note2: string
+  partRef: string
+  partRefs?: string
+  cousinsNumber: string
+  price: number
+  retailPrice?: number
+  cost: number
+  latestCostYen?: number
+  stockQuantity: number
+  supplierName: string
+}
+
 type MasterData = {
   partCategories: StandardPartCategory[]
   partNames: StandardPartName[]
@@ -68,25 +89,30 @@ type Props = {
   mode: 'standalone' | 'panel'
   initialKeyword?: string
   initialPartType?: 'interior' | 'exterior'
-  onSelect?: (part: {
-    id: number
-    partsMasterId?: number
-    partType?: string
-    name: string
-    nameJp?: string
-    grade: string
-    note1: string
-    note2: string
-    partRef: string
-    partRefs?: string
-    cousinsNumber: string
-    price: number
-    retailPrice?: number
-    cost: number
-    latestCostYen?: number
-    stockQuantity: number
-    supplierName: string
-  }) => void
+  initialPartRef?: string
+  initialPartsMasterId?: number | null
+  initialPartNameEn?: string
+  initialStandardPartNameId?: string | null
+  initialStandardPartNameKey?: string | null
+  initialGrade?: string
+  targetKey?: string | number
+  repairId?: number | null
+  brandId?: number | null
+  brandName?: string
+  modelId?: number | null
+  modelName?: string
+  watchCaliberId?: number | null
+  watchRef?: string
+  watchCaliber?: string
+  movementMakerId?: number | null
+  movementMaker?: string
+  movementCaliberId?: number | null
+  movementCaliber?: string
+  baseMovementMakerId?: number | null
+  baseMovementMaker?: string
+  baseMovementCaliberId?: number | null
+  baseMovementCaliber?: string
+  onSelect?: (part: PartSelection) => void
 }
 
 function toStandardPartType(value: 'all' | 'interior' | 'exterior') {
@@ -95,7 +121,35 @@ function toStandardPartType(value: 'all' | 'interior' | 'exterior') {
   return ''
 }
 
-export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', initialPartType }: Props) {
+export default function PartsSearchPanel({
+  mode,
+  onSelect,
+  initialKeyword = '',
+  initialPartType,
+  initialPartRef,
+  initialPartsMasterId,
+  initialPartNameEn,
+  initialStandardPartNameId,
+  initialStandardPartNameKey,
+  initialGrade,
+  targetKey,
+  repairId,
+  brandId,
+  brandName,
+  modelId,
+  modelName,
+  watchCaliberId,
+  watchRef,
+  watchCaliber,
+  movementMakerId,
+  movementMaker,
+  movementCaliberId,
+  movementCaliber,
+  baseMovementMakerId,
+  baseMovementMaker,
+  baseMovementCaliberId,
+  baseMovementCaliber,
+}: Props) {
   const router = useRouter()
   const [partType, setPartType] = useState<'all' | 'interior' | 'exterior'>(initialPartType ?? 'all')
   const [keyword, setKeyword] = useState(initialKeyword)
@@ -113,6 +167,9 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
   })
   const [parts, setParts] = useState<Part[]>([])
   const [loading, setLoading] = useState(false)
+  const resolvedTargetKey = targetKey ?? '__standalone__'
+  const lastTargetKeyRef = useRef(resolvedTargetKey)
+  const searchRequestSeqRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -140,7 +197,25 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
     }
   }, [])
 
+  useEffect(() => {
+    if (lastTargetKeyRef.current === resolvedTargetKey) return
+    lastTargetKeyRef.current = resolvedTargetKey
+    searchRequestSeqRef.current += 1
+    setLoading(false)
+    setParts([])
+    setPartType(initialPartType ?? 'all')
+    setKeyword(initialKeyword)
+    setCalNumber('')
+    setRefKeyword('')
+    setSelectedPartCategoryId('')
+    setSelectedStandardPartNameId('')
+    setSelectedGradeId('')
+    setSelectedSupplierId('')
+  }, [initialKeyword, initialPartType, resolvedTargetKey])
+
   const search = useCallback(async () => {
+    const requestSeq = searchRequestSeqRef.current + 1
+    searchRequestSeqRef.current = requestSeq
     setLoading(true)
     const params = new URLSearchParams()
     if (partType !== 'all') params.set('partType', partType)
@@ -149,6 +224,7 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
     if (refKeyword) params.set('ref', refKeyword)
     const res = await fetch(`/api/parts/search?${params.toString()}`)
     const data = await res.json()
+    if (searchRequestSeqRef.current !== requestSeq) return
     setParts(data)
     setLoading(false)
   }, [partType, keyword, calNumber, refKeyword])
@@ -164,6 +240,12 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
     (!standardPartType || partName.partType === standardPartType) &&
     (!selectedPartCategoryId || partName.categoryId === selectedPartCategoryId)
   )
+  const selectedStandardPartName = masterData.partNames.find(partName => partName.id === selectedStandardPartNameId)
+  const initialStandardPartName = masterData.partNames.find(partName =>
+    (initialStandardPartNameId && partName.id === initialStandardPartNameId) ||
+    (initialStandardPartNameKey && partName.key === initialStandardPartNameKey)
+  )
+  const selectedGrade = masterData.partGrades.find(grade => grade.id === selectedGradeId)
 
   const handlePartTypeChange = (nextPartType: 'all' | 'interior' | 'exterior') => {
     setPartType(nextPartType)
@@ -179,6 +261,7 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
         partType: part.partType ?? undefined,
         name: part.nameJp,
         nameJp: part.nameJp,
+        nameEn: part.nameEn,
         grade: part.grade ?? '',
         note1: part.notes1 ?? '',
         note2: part.notes2 ?? '',
@@ -386,11 +469,32 @@ export default function PartsSearchPanel({ mode, onSelect, initialKeyword = '', 
       </div>
 
       <PartsWebSearchPanel
-        watchRef={refKeyword}
-        cal={calNumber}
+        repairId={repairId}
+        brandId={brandId}
+        brandName={brandName}
+        modelId={modelId}
+        modelName={modelName}
+        watchCaliberId={watchCaliberId}
+        watchRef={refKeyword || watchRef}
+        cal={calNumber || watchCaliber}
+        movementMakerId={movementMakerId}
+        movementMaker={movementMaker}
+        movementCaliberId={movementCaliberId}
+        movementCaliber={movementCaliber}
+        baseMovementMakerId={baseMovementMakerId}
+        baseMovementMaker={baseMovementMaker}
+        baseMovementCaliberId={baseMovementCaliberId}
+        baseMovementCaliber={baseMovementCaliber}
         partType={partType === 'all' ? initialPartType : partType}
-        partName={keyword}
+        partName={keyword || selectedStandardPartName?.displayJa || selectedStandardPartName?.nameJa || initialKeyword}
+        partNameEn={selectedStandardPartName?.displayEn || selectedStandardPartName?.nameEn || initialPartNameEn}
+        standardPartNameId={selectedStandardPartNameId || initialStandardPartName?.id || initialStandardPartNameId}
+        partRef={initialPartRef}
+        gradeId={selectedGradeId || null}
+        grade={selectedGrade?.nameJa || initialGrade}
+        partsMasterId={initialPartsMasterId}
         disabled={loading}
+        onResolvePart={onSelect}
       />
     </div>
   )

@@ -8,6 +8,7 @@ const PART_GRADES = [
   { key: "genuine", nameJa: "純正", nameEn: "genuine", sortOrder: 10 },
   { key: "fit", nameJa: "FIT", nameEn: "fit / aftermarket", sortOrder: 20 },
   { key: "custom_fit", nameJa: "合わせ", nameEn: "custom fit", sortOrder: 30 },
+  { key: "used", nameJa: "中古", nameEn: "used", sortOrder: 40 },
 ] as const;
 
 function findDuplicateKeys(items: ReadonlyArray<{ key: string }>) {

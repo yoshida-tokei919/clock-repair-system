@@ -42,6 +42,7 @@ import {
     buildEnglishPartQueries,
     buildJapanesePartQueries,
     buildSearchUrls,
+    normalizeSearchSites,
     type SearchSite,
 } from "@/lib/part-search";
 import {
@@ -84,6 +85,9 @@ type WorkTargetPartOption = {
     categoryName?: string | null;
 };
 type AddItemCategory = 'internal' | 'external_labor' | 'part_external';
+
+const toLineItemPartType = (partInputType: PartInputType): "interior" | "exterior" =>
+    partInputType === "part_internal" ? "interior" : "exterior";
 
 const INTERNAL_REPAIR_WORK_ACTION_KEYS = new Set([
     "exchange",
@@ -596,6 +600,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         category: AddItemCategory | 'external' | 'part_internal' | 'part_generic';
         partType?: string;
         name: string;
+        partNameEn?: string;
         price: number;   // 上代
         cost?: number;   // 仕入値（管理者のみ）
         quantity: number; // 個数
@@ -834,25 +839,35 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             ?.trim();
         const stripGradeText = (name: string) =>
             name
-                .replace(/（(純正|FIT|合わせ)）/g, "")
-                .replace(/\((純正|FIT|合わせ)\)/g, "")
+                .replace(/（(純正|FIT|合わせ|中古)）/g, "")
+                .replace(/\((純正|FIT|合わせ|中古)\)/g, "")
                 .trim();
         const name = stripGradeText(selectedName ?? baseName);
         return name;
     }, []);
 
-    const buildPartLineItem = useCallback((base: LineItem, part: any): LineItem => (
-        createEstimateItemFromPart(part, {
+    const buildPartLineItem = useCallback((base: LineItem, part: any): LineItem => {
+        const resolvedPartType = part.partType === "interior" || part.partType === "exterior"
+            ? part.partType
+            : base.partType;
+        const resolvedCategory = resolvedPartType === "interior"
+            ? "part_internal"
+            : resolvedPartType === "exterior"
+                ? "part_external"
+                : base.category;
+
+        return createEstimateItemFromPart(part, {
             ...base,
             name: buildSelectedPartName(base.name, part),
             price: part.price ?? part.retailPrice ?? base.price,
             cost: part.cost ?? part.latestCostYen ?? base.cost,
             grade: part.grade ?? base.grade,
             spec: part.grade || base.spec,
-            category: 'part_external',
+            category: resolvedCategory,
+            partType: resolvedPartType,
             partsMasterId: part.partsMasterId ?? part.partId ?? part.id ?? base.partsMasterId ?? null,
         }) as LineItem
-    ), [buildSelectedPartName]);
+    }, [buildSelectedPartName]);
 
     const queuePartForOrderList = useCallback((partId: number, quantity = 1) => {
         if (quantity <= 0) return false;
@@ -1188,9 +1203,29 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         () => getOptionIdByValue(brandOpts, movementMaker),
         [brandOpts, getOptionIdByValue, movementMaker]
     );
+    const selectedBrandId = useMemo(
+        () => getOptionIdByValue(brandOpts, brand),
+        [brand, brandOpts, getOptionIdByValue]
+    );
+    const selectedModelId = useMemo(
+        () => getOptionIdByValue(modelOpts, model),
+        [model, modelOpts, getOptionIdByValue]
+    );
+    const selectedWatchCaliberId = useMemo(
+        () => getOptionIdByValue(calOpts, caliber),
+        [caliber, calOpts, getOptionIdByValue]
+    );
+    const movementCaliberId = useMemo(
+        () => getOptionIdByValue(masterCalOpts, movementCaliber),
+        [masterCalOpts, getOptionIdByValue, movementCaliber]
+    );
     const baseMovementMakerId = useMemo(
         () => getOptionIdByValue(brandOpts, baseMovementMaker),
         [baseMovementMaker, brandOpts, getOptionIdByValue]
+    );
+    const baseMovementCaliberId = useMemo(
+        () => getOptionIdByValue(masterCalOpts, baseMovementCaliber),
+        [baseMovementCaliber, masterCalOpts, getOptionIdByValue]
     );
 
     const filteredMovementCalOpts = useMemo(() => {
@@ -1246,19 +1281,34 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [partsPanelOpen, setPartsPanelOpen] = useState(false);
     const [partsPanelRowIdx, setPartsPanelRowIdx] = useState<number | null>(null);
     const [partsSearchQuery, setPartsSearchQuery] = useState('');
+    const activePartsPanelLineItem = partsPanelRowIdx !== null ? lineItems[partsPanelRowIdx] : undefined;
 
     const partsPanelInitialKeyword = useMemo(() => {
+        if (partsPanelRowIdx !== null) {
+            return activePartsPanelLineItem?.name ?? "";
+        }
         if (selectedPartNameOption) {
             return selectedPartNameOption.displayJa ?? selectedPartNameOption.nameJa;
         }
-        if (partsPanelRowIdx !== null) {
-            return lineItems[partsPanelRowIdx]?.name ?? "";
-        }
         return newItemName;
-    }, [lineItems, newItemName, partsPanelRowIdx, selectedPartNameOption]);
+    }, [activePartsPanelLineItem?.name, newItemName, partsPanelRowIdx, selectedPartNameOption]);
+    const partsPanelInitialPartNameEn = useMemo(() => {
+        if (partsPanelRowIdx !== null) {
+            return activePartsPanelLineItem?.partNameEn;
+        }
+        return selectedPartNameOption?.displayEn ?? selectedPartNameOption?.nameEn;
+    }, [activePartsPanelLineItem?.partNameEn, partsPanelRowIdx, selectedPartNameOption]);
+    const partsPanelTargetKey = partsPanelRowIdx !== null
+        ? `line:${partsPanelRowIdx}:${activePartsPanelLineItem?.id ?? ""}:${activePartsPanelLineItem?.partsMasterId ?? ""}`
+        : `new:${selectedPartInputType}:${selectedPartNameKey}`;
+    const partsPanelStandardPartNameId = partsPanelRowIdx !== null
+        ? activePartsPanelLineItem?.targetPartNameId ?? null
+        : null;
+    const partsPanelStandardPartNameKey = partsPanelRowIdx !== null
+        ? null
+        : selectedPartNameOption?.key ?? null;
     const partsPanelInitialPartType: "interior" | "exterior" =
         selectedPartInputType === "part_internal" ? "interior" : "exterior";
-    const activePartsPanelLineItem = partsPanelRowIdx !== null ? lineItems[partsPanelRowIdx] : undefined;
     const derivePartsSearchPartTypeFromLineItem = useCallback((item: LineItem | undefined): "interior" | "exterior" | undefined => {
         if (!item) return undefined;
 
@@ -1268,8 +1318,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         if (item.partType === "internal") return "interior";
         if (item.partType === "external") return "exterior";
 
-        if (item.category === "part_internal") return "interior";
-        if (item.category === "part_external") return "exterior";
+        if (item.category === "internal" || item.category === "part_internal") return "interior";
+        if (item.category === "external" || item.category === "part_external") return "exterior";
 
         return undefined;
     }, []);
@@ -1365,19 +1415,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             const saved = window.localStorage.getItem(PART_SEARCH_SITES_STORAGE_KEY);
             if (!saved) return;
             const parsed = JSON.parse(saved);
-            if (!Array.isArray(parsed)) return;
-            const normalized = parsed
-                .filter((site): site is SearchSite =>
-                    site &&
-                    typeof site.id === "string" &&
-                    typeof site.name === "string" &&
-                    (site.lang === "ja" || site.lang === "en") &&
-                    typeof site.url === "string"
-                )
-                .map((site) => ({
-                    ...site,
-                    enabled: site.enabled !== false,
-                }));
+            const normalized = normalizeSearchSites(parsed, []);
             if (normalized.length > 0) {
                 setSearchSites(normalized);
                 setSelectedSearchSiteId(normalized[0].id);
@@ -1432,7 +1470,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             enabled: true,
         };
 
-        setSearchSites((prev) => [...prev, nextSite]);
+        setSearchSites((prev) => normalizeSearchSites([...prev, nextSite]));
         setSelectedSearchSiteId(nextSite.id);
     }, []);
 
@@ -3057,6 +3095,10 @@ ${shopName}
                                             const baseItem: LineItem = {
                                                 id: `auto-${Date.now()}`,
                                                 category: addItemCategory,
+                                                ...(isAddingPartItem ? {
+                                                    partType: toLineItemPartType(selectedPartInputType),
+                                                    partNameEn: selectedPartNameOption?.displayEn ?? selectedPartNameOption?.nameEn,
+                                                } : {}),
                                                 name: resolvedItemName,
                                                 cost: parseInt(newItemCost) || undefined,
                                                 price: parseInt(newItemPrice) || 0,
@@ -3137,6 +3179,29 @@ ${shopName}
                                         mode="panel"
                                         initialKeyword={partsPanelInitialKeyword}
                                         initialPartType={partsPanelEffectiveInitialPartType}
+                                        initialPartRef={activePartsPanelLineItem?.partRef}
+                                        initialPartsMasterId={activePartsPanelLineItem?.partsMasterId ?? null}
+                                        initialPartNameEn={partsPanelInitialPartNameEn}
+                                        initialStandardPartNameId={partsPanelStandardPartNameId}
+                                        initialStandardPartNameKey={partsPanelStandardPartNameKey}
+                                        initialGrade={activePartsPanelLineItem?.grade}
+                                        targetKey={partsPanelTargetKey}
+                                        repairId={initialData?.id ? Number(initialData.id) : null}
+                                        brandId={selectedBrandId}
+                                        brandName={brand}
+                                        modelId={selectedModelId}
+                                        modelName={model}
+                                        watchCaliberId={selectedWatchCaliberId}
+                                        watchRef={refName}
+                                        watchCaliber={caliber}
+                                        movementMakerId={movementMakerId}
+                                        movementMaker={movementMaker}
+                                        movementCaliberId={movementCaliberId}
+                                        movementCaliber={movementCaliber}
+                                        baseMovementMakerId={baseMovementMakerId}
+                                        baseMovementMaker={baseMovementMaker}
+                                        baseMovementCaliberId={baseMovementCaliberId}
+                                        baseMovementCaliber={baseMovementCaliber}
                                         onSelect={isReadOnly ? undefined : (part) => {
                                             if (partsPanelRowIdx === null) return;
                                             const nextItems = lineItems.map((li, i) =>
