@@ -89,6 +89,16 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
 
     if (!repair) return notFound();
 
+    const publicCase = await prisma.publicCase.findUnique({
+        where: {
+            sourceType_sourceRepairId: {
+                sourceType: "WEB_APP",
+                sourceRepairId: String(repair.id),
+            },
+        },
+        select: { id: true },
+    });
+
     // RepairEntryForm のステータスバーは日本語ステータス名をキーにして日付を読む。
     const statusLog: Record<string, string> = {};
     repair.logs.forEach(log => {
@@ -147,6 +157,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
         issuedWarranty: repair.warranty
             ? { id: repair.warranty.id, number: repair.warranty.warrantyNumber }
             : null,
+        publicCaseId: publicCase?.id ?? null,
     }));
 
     return (

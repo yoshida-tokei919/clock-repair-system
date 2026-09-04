@@ -19,7 +19,12 @@ function getBrandDisplayName(publicCase: B2CPublicCaseDetail): string {
 function getWorkNames(publicCase: B2CPublicCaseDetail): string[] {
   const names = publicCase.workItems
     .filter((workItem) => workItem.isPublishable)
-    .map((workItem) => text(workItem.b2cDisplayName))
+    .map(
+      (workItem) =>
+        text(workItem.b2cDisplayName) ||
+        text(workItem.b2bDisplayName) ||
+        text(workItem.normalizedWorkName),
+    )
     .filter(Boolean)
     .map((name) => name.replace(/技術料/g, "").trim())
     .filter(Boolean);
@@ -43,6 +48,10 @@ function getTitle(publicCase: B2CPublicCaseDetail, fallbackWorkName: string): st
     fallbackWorkName ||
     "修理事例"
   );
+}
+
+function getSummary(publicCase: B2CPublicCaseDetail): string {
+  return typeof publicCase.b2cSummary === "string" ? publicCase.b2cSummary.trim() : "";
 }
 
 function getMeta(publicCase: B2CPublicCaseDetail): string {
@@ -93,6 +102,7 @@ export default async function PublicCaseDetailPage({
   const primaryWorkName = workNames[0] ?? "修理内容確認中";
   const title = getTitle(publicCase, primaryWorkName);
   const meta = getMeta(publicCase);
+  const summary = getSummary(publicCase);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 md:px-8">
@@ -155,6 +165,15 @@ export default async function PublicCaseDetailPage({
                     </li>
                   ))}
                 </ul>
+              </section>
+            ) : null}
+
+            {summary ? (
+              <section className="space-y-3 border-t border-neutral-100 pt-6">
+                <h2 className="text-sm font-semibold tracking-[0.16em] text-neutral-500">
+                  説明文
+                </h2>
+                <p className="text-base leading-7 text-neutral-700">{summary}</p>
               </section>
             ) : null}
 

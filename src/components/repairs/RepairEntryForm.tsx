@@ -357,6 +357,8 @@ const AdvancedCombobox: React.FC<{
         cousinsNumber?: string,
         stockQuantity?: number,
         supplierName?: string,
+        repairWorkCategoryId?: number | null,
+        repairWorkActionId?: number | null,
         id?: number,
         type?: string | null,
         prefix?: string | null,
@@ -389,6 +391,8 @@ const AdvancedCombobox: React.FC<{
         cousinsNumber?: string,
         stockQuantity?: number,
         supplierName?: string,
+        repairWorkCategoryId?: number | null,
+        repairWorkActionId?: number | null,
         id?: number,
         type?: string | null,
         prefix?: string | null,
@@ -542,6 +546,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const router = useRouter();
     useAutoRefreshOnReturn();
     const [isSaving, setIsSaving] = useState(false);
+    const [isCreatingPublicCase, setIsCreatingPublicCase] = useState(false);
     const [isEditingEnabled, setIsEditingEnabled] = useState(mode !== 'view');
     const isReadOnly = mode === 'view' && !isEditingEnabled;
 
@@ -1972,6 +1977,36 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         }
     };
 
+    const handleCreatePublicCaseDraft = async () => {
+        if (!initialData?.id) return;
+
+        setIsCreatingPublicCase(true);
+        try {
+            const response = await fetch(`/api/repairs/${initialData.id}/public-case`, {
+                method: "POST",
+            });
+            const json = await response.json();
+            if (!response.ok) {
+                throw new Error(json.error || "事例下書きの作成に失敗しました。");
+            }
+
+            toast({
+                title: json.created ? "下書きを作成しました" : "既存の下書きがあります",
+                description: `PublicCase ID: ${json.publicCaseId}`,
+            });
+            router.push(`/public-cases/${json.publicCaseId}`);
+        } catch (error) {
+            console.error(error);
+            toast({
+                title: "事例下書きを作成できませんでした",
+                description: error instanceof Error ? error.message : undefined,
+                variant: "destructive",
+            });
+        } finally {
+            setIsCreatingPublicCase(false);
+        }
+    };
+
     const handleStaffReply = async () => {
         if (!initialData?.id) {
             toast({ title: "案件保存後に返信できます。" });
@@ -2207,6 +2242,28 @@ ${shopName}
                             className="h-9 px-4 font-bold"
                         >
                             {isReadOnly ? "編集する" : "閲覧に戻る"}
+                        </Button>
+                    )}
+                    {mode !== 'create' && initialData?.publicCaseId ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => router.push(`/public-cases/${initialData.publicCaseId}`)}
+                            className="h-9 px-4 font-bold"
+                        >
+                            事例下書きを確認
+                        </Button>
+                    ) : mode !== 'create' && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCreatePublicCaseDraft}
+                            disabled={isCreatingPublicCase}
+                            className="h-9 px-4 font-bold"
+                        >
+                            {isCreatingPublicCase ? "下書き作成中..." : "事例下書きを作成"}
                         </Button>
                     )}
                     {shippingFee > 0 && (
@@ -2937,6 +2994,16 @@ ${shopName}
                                             }}
                                             onSelectOption={(option) => {
                                                 setSelectedWorkOption(option);
+                                                if (isAddingLaborItem) {
+                                                    const categoryId = Number(option.repairWorkCategoryId);
+                                                    if (Number.isInteger(categoryId) && categoryId > 0) {
+                                                        handleRepairWorkCategoryChange(String(categoryId));
+                                                    }
+                                                    const actionId = Number(option.repairWorkActionId);
+                                                    if (Number.isInteger(actionId) && actionId > 0) {
+                                                        handleRepairWorkActionChange(String(actionId));
+                                                    }
+                                                }
                                                 if (option.price !== undefined) {
                                                     setNewItemPrice(String(option.price));
                                                     setNewItemPriceManuallyEdited(false);

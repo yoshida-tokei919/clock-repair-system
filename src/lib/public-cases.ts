@@ -205,6 +205,33 @@ async function findB2CPublicCases(
 export async function getB2CPublicCasesForGallery(query = "", brand = "") {
   const normalizedQuery = normalizePublicCaseSearchQuery(query);
   const normalizedBrand = normalizePublicCaseBrandFilter(brand);
+
+  if (isLocalDatabaseUrl()) {
+    const [webAppCases, fmpCases] = await Promise.all([
+      findB2CPublicCases(
+        withPublicCaseGalleryFilters(
+          {
+            sourceType: "WEB_APP",
+            b2cPublishStatus: "PUBLISHED",
+            reviewStatus: "APPROVED",
+            showPriceB2c: false,
+          },
+          normalizedQuery,
+          normalizedBrand,
+        ),
+      ),
+      findB2CPublicCases(
+        withPublicCaseGalleryFilters(
+          { sourceType: "FMP", showPriceB2c: false },
+          normalizedQuery,
+          normalizedBrand,
+        ),
+      ),
+    ]);
+
+    return [...webAppCases, ...fmpCases].slice(0, galleryTake);
+  }
+
   const publishedCases = await findB2CPublicCases(
     withPublicCaseGalleryFilters(
       {
@@ -217,20 +244,7 @@ export async function getB2CPublicCasesForGallery(query = "", brand = "") {
     ),
   );
 
-  if (publishedCases.length > 0 || !isLocalDatabaseUrl()) {
-    return publishedCases;
-  }
-
-  return findB2CPublicCases(
-    withPublicCaseGalleryFilters(
-      {
-        sourceType: "FMP",
-        showPriceB2c: false,
-      },
-      normalizedQuery,
-      normalizedBrand,
-    ),
-  );
+  return publishedCases;
 }
 
 function toBrandOptions(cases: B2CPublicCaseForGallery[]): PublicCaseBrandOption[] {
@@ -269,6 +283,19 @@ function toBrandOptions(cases: B2CPublicCaseForGallery[]): PublicCaseBrandOption
 }
 
 export async function getB2CBrandOptionsForGallery() {
+  if (isLocalDatabaseUrl()) {
+    const [webAppCases, fmpCases] = await Promise.all([
+      findB2CPublicCases({
+        sourceType: "WEB_APP",
+        b2cPublishStatus: "PUBLISHED",
+        reviewStatus: "APPROVED",
+        showPriceB2c: false,
+      }, brandOptionTake),
+      findB2CPublicCases({ sourceType: "FMP", showPriceB2c: false }, brandOptionTake),
+    ]);
+    return toBrandOptions([...webAppCases, ...fmpCases]);
+  }
+
   const publishedCases = await findB2CPublicCases(
     {
       b2cPublishStatus: "PUBLISHED",
@@ -278,19 +305,7 @@ export async function getB2CBrandOptionsForGallery() {
     brandOptionTake,
   );
 
-  if (publishedCases.length > 0 || !isLocalDatabaseUrl()) {
-    return toBrandOptions(publishedCases);
-  }
-
-  const fallbackCases = await findB2CPublicCases(
-    {
-      sourceType: "FMP",
-      showPriceB2c: false,
-    },
-    brandOptionTake,
-  );
-
-  return toBrandOptions(fallbackCases);
+  return toBrandOptions(publishedCases);
 }
 
 export async function getLatestB2CPublicCasesForHome(limit = 10) {
