@@ -2,6 +2,7 @@ import crypto from "crypto";
 
 import { NextRequest, NextResponse } from "next/server";
 
+import { buildCustomerShareUrl } from "@/lib/customer-share-url";
 import { prisma } from "@/lib/prisma";
 
 async function ensureRepairPublicToken(repairId: number) {
@@ -118,7 +119,10 @@ export async function POST(
   `;
 
   const publicToken = await ensureRepairPublicToken(repairId);
-  const sharedUrl = new URL(`/customer/repairs/${publicToken}`, request.url).toString();
+  const sharedUrl = buildCustomerShareUrl(
+    `/customer/repairs/${publicToken}`,
+    request.url
+  );
   const lineId = repair.customer.lineId?.trim();
   const notification = lineId
     ? await sendStaffReplyNotification({ lineId, sharedUrl })

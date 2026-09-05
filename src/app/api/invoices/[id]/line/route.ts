@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
+import { buildCustomerShareUrl } from "@/lib/customer-share-url";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -87,23 +88,6 @@ function formatBillingMonth(billingMonth: string | null, deliveryDates: Delivery
   }
 
   return `${firstIssuedDate.getFullYear()}年${firstIssuedDate.getMonth() + 1}月分`;
-}
-
-function getAppBaseUrl(request: NextRequest) {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
-  if (configuredUrl) {
-    return configuredUrl.replace(/\/+$/, "");
-  }
-
-  const forwardedProto = request.headers.get("x-forwarded-proto");
-  const forwardedHost = request.headers.get("x-forwarded-host");
-
-  if (forwardedProto && forwardedHost) {
-    return `${forwardedProto}://${forwardedHost}`;
-  }
-
-  const requestUrl = new URL(request.url);
-  return requestUrl.origin;
 }
 
 function buildInvoiceMessage(billingMonthLabel: string, sharedUrl: string) {
@@ -201,10 +185,10 @@ export async function POST(
     WHERE r."invoiceId" = ${invoice.id}
   `;
   const billingMonthLabel = formatBillingMonth(invoice.billingMonth, deliveryDates);
-  const sharedUrl = new URL(
+  const sharedUrl = buildCustomerShareUrl(
     `/customer/invoices/${publicToken}`,
-    getAppBaseUrl(request)
-  ).toString();
+    request.url
+  );
 
   const lineResponse = await fetch("https://api.line.me/v2/bot/message/push", {
     method: "POST",

@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
+import { buildCustomerShareUrl } from "@/lib/customer-share-url";
 import { prisma } from "@/lib/prisma";
 
 const WAITING_FOR_APPROVAL_STATUS = "承認待ち";
@@ -185,7 +186,10 @@ export async function POST(
 
   const publicToken = await ensureEstimateDocumentPublicToken(estimateDocument.id);
   await Promise.all(estimateDocument.repairs.map((repair) => ensureRepairPublicToken(repair.id)));
-  const estimateUrl = new URL(`/customer/repairs/${publicToken}`, request.url).toString();
+  const estimateUrl = buildCustomerShareUrl(
+    `/customer/repairs/${publicToken}`,
+    request.url
+  );
 
   const lineResponse = await fetch("https://api.line.me/v2/bot/message/push", {
     method: "POST",
