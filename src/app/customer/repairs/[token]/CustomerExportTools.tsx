@@ -147,11 +147,13 @@ export function CustomerExportTools({ repairs }: Props) {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    const nextGuideAmounts: Record<string, string> = {};
     const nextMemos: Record<string, string> = {};
     repairs.forEach((repair) => {
+      nextGuideAmounts[repair.amountKey] = window.localStorage.getItem(repair.amountKey) || "";
       nextMemos[repair.privateMemoKey] = window.localStorage.getItem(repair.privateMemoKey) || "";
     });
-    setGuideAmounts({});
+    setGuideAmounts(nextGuideAmounts);
     setPrivateMemos(nextMemos);
   }, [repairs]);
 
@@ -300,6 +302,7 @@ export function CustomerGuideAmountInput({
   amountKey: string;
   baseAmount: number;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [selectedMultiplier, setSelectedMultiplier] = useState("");
   const guideAmount = parseAmount(amount);
@@ -307,11 +310,12 @@ export function CustomerGuideAmountInput({
   const ratio = guideAmount && baseAmount ? guideAmount / baseAmount : 0;
 
   useEffect(() => {
-    setAmount("");
+    const storedAmount = window.localStorage.getItem(amountKey) || "";
+    setAmount(storedAmount);
     setSelectedMultiplier("");
     window.dispatchEvent(
       new CustomEvent("customer-guide-amount-change", {
-        detail: { key: amountKey, amount: "" },
+        detail: { key: amountKey, amount: storedAmount },
       }),
     );
   }, [amountKey]);
@@ -319,6 +323,11 @@ export function CustomerGuideAmountInput({
   const saveAmount = (value: string) => {
     const normalized = value.replace(/[^\d]/g, "");
     setAmount(normalized);
+    if (normalized) {
+      window.localStorage.setItem(amountKey, normalized);
+    } else {
+      window.localStorage.removeItem(amountKey);
+    }
     window.dispatchEvent(
       new CustomEvent("customer-guide-amount-change", {
         detail: { key: amountKey, amount: normalized },
@@ -341,7 +350,19 @@ export function CustomerGuideAmountInput({
   };
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-3">
+    <section className="rounded-lg border border-slate-200 bg-slate-50">
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-100"
+        aria-expanded={isOpen}
+      >
+        <span>金額メモ</span>
+        <span aria-hidden="true">{isOpen ? "⌃" : "∨"}</span>
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-slate-200 p-3">
       <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
         <label className="block text-base font-bold text-slate-700">
           ご案内金額
@@ -386,6 +407,8 @@ export function CustomerGuideAmountInput({
       <p className="mt-2 text-sm leading-5 text-slate-500">
         この金額はこの端末のブラウザ内だけで利用され、当店には送信されません。
       </p>
+        </div>
+      )}
     </section>
   );
 }

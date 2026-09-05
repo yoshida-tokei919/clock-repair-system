@@ -184,8 +184,6 @@ export default async function CustomerRepairPage({ params }: PageProps) {
             </div>
           </header>
 
-          <CustomerExportTools repairs={exportRepairs} />
-
           <CustomerRepairAccordionRoot>
             {repairs.map((repair, index) => {
               const estimateItems = getEstimateItems(repair);
@@ -284,8 +282,6 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                     </div>
                   </section>
 
-                  <CustomerGuideAmountInput amountKey={amountKey} baseAmount={total} />
-
                   <CustomerRepairActions
                     token={repairActionToken}
                     isBusiness={isBusiness}
@@ -295,10 +291,14 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                   />
 
                   <PartnerPrivateMemo token={privateMemoToken} inquiryNumber={repair.inquiryNumber} />
+
+                  <CustomerGuideAmountInput amountKey={amountKey} baseAmount={total} />
                 </CustomerRepairAccordionItem>
               );
             })}
           </CustomerRepairAccordionRoot>
+
+          <CustomerExportTools repairs={exportRepairs} />
         </div>
       </main>
     );
