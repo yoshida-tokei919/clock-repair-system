@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
-import imageCompression from 'browser-image-compression';
 import {
     ArrowLeft, Camera, Printer, Save, Search, Check, ChevronDown, ChevronRight, User, Watch,
     Settings, Trash2, Plus, Image as ImageIcon, MapPin, Phone, Mail, MessageCircle,
@@ -1166,6 +1165,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [isCapturing, setIsCapturing] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
+    const [cameraInfo, setCameraInfo] = useState<string>('');
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -2065,9 +2065,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const uploadPhotoFile = async (file: File) => {
         setIsUploading(true);
         try {
-            const compressed = await imageCompression(file, { maxSizeMB: 1, useWebWorker: true });
             const fd = new FormData();
-            fd.append("file", compressed);
+            fd.append("file", file);
             if (initialData?.id) fd.append("repairId", initialData.id);
 
             const res = await fetch("/api/upload", { method: "POST", body: fd });
@@ -2104,6 +2103,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         setIsCameraReady(false);
         setCapturedPreview(null);
         setCameraError(null);
+        setCameraInfo('');
         setIsCapturing(false);
     };
 
@@ -2134,10 +2134,20 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         try {
             stopCameraStream();
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" },
+                video: {
+                    facingMode: { ideal: "environment" },
+                    width: { ideal: 3840 },
+                    height: { ideal: 2160 },
+                    aspectRatio: { ideal: 16 / 9 },
+                    frameRate: { ideal: 30 },
+                },
                 audio: false
             });
             mediaStreamRef.current = stream;
+            const settings = stream.getVideoTracks()[0]?.getSettings();
+            if (settings) {
+                setCameraInfo(`入力: ${settings.width ?? "?"} × ${settings.height ?? "?"} / 比率 ${settings.aspectRatio ?? "?"} / ${settings.frameRate ?? "?"} fps / deviceId: ${settings.deviceId ?? "?"}`);
+            }
 
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
@@ -2156,8 +2166,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        canvas.width = video.videoWidth || 1280;
-        canvas.height = video.videoHeight || 720;
+        if (!video.videoWidth || !video.videoHeight) {
+            setCameraError("カメラ映像の解像度を取得できませんでした。");
+            return;
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
         const context = canvas.getContext("2d");
         if (!context) {
@@ -2167,6 +2181,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         setCapturedPreview(canvas.toDataURL("image/jpeg", 0.92));
+        setCameraInfo((current) => `${current} / 保存: ${canvas.width} × ${canvas.height}px (JPEG 92%)`);
         stopCameraStream();
         setIsCameraReady(false);
     };
@@ -3575,9 +3590,19 @@ ${shopName}
 
                         <div className="min-h-0 flex-1 overflow-hidden bg-zinc-950">
                             {capturedPreview ? (
-                                <img src={capturedPreview} alt="撮影プレビュー" className="h-full w-full object-cover" />
+                                <img src={capturedPreview} alt="撮影プレビュー" className="h-full w-full object-contain" />
                             ) : (
-                                <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    className="h-full w-full object-contain"
+                                    onLoadedMetadata={() => {
+                                        const video = videoRef.current;
+                                        if (video) setCameraInfo((current) => `${current} / 映像: ${video.videoWidth} × ${video.videoHeight} / 表示: ${video.clientWidth} × ${video.clientHeight}`);
+                                    }}
+                                />
                             )}
                         </div>
 
@@ -3585,6 +3610,7 @@ ${shopName}
                     </div>
 
                     <DialogFooter className="border-t bg-white px-6 py-4 sm:justify-between">
+                        {cameraInfo ? <p className="text-xs font-mono text-zinc-500">{cameraInfo}</p> : null}
                         <Button type="button" variant="outline" onClick={closeCameraDialog}>
                             閉じる
                         </Button>

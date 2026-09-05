@@ -74,7 +74,7 @@ function DetailImage({ publicCase }: { publicCase: B2CPublicCaseDetail }) {
       <img
         src={src}
         alt={`${brand ? `${brand} ` : ""}${title}`}
-        className="h-full w-full object-cover"
+        className="h-auto w-full object-contain"
       />
     );
   }
@@ -118,7 +118,7 @@ export default async function PublicCaseDetailPage({
 
       <article className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-          <div className="aspect-[4/3] bg-neutral-100 lg:aspect-auto">
+          <div className="bg-neutral-100 lg:flex lg:min-h-[28rem] lg:items-center lg:justify-center">
             <DetailImage publicCase={publicCase} />
           </div>
 

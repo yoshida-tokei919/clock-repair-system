@@ -9,9 +9,8 @@ import { saveRepairPhoto } from "@/actions/photo-actions";
 
 // キャプチャ時の最大幅（2560px = QHD相当）
 // S5M2XのHDMI出力 → キャプチャボードは4K入力だが、WebPで圧縮するため2560pxに制限
-const MAX_CAPTURE_WIDTH = 2560;
 // WebP品質: 80%（画質とファイルサイズのバランス）
-const WEBP_QUALITY = 0.8;
+const WEBP_QUALITY = 0.92;
 
 interface CameraCaptureDialogProps {
     isOpen: boolean;
@@ -40,6 +39,7 @@ export function CameraCaptureDialog({
     const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
     const [capturedUrl, setCapturedUrl]   = useState<string | null>(null);
     const [captureInfo, setCaptureInfo]   = useState<string>('');
+    const [inputInfo, setInputInfo]       = useState<string>('');
     const [error, setError]               = useState<string | null>(null);
     const [uploadError, setUploadError]   = useState<string | null>(null);
 
@@ -53,6 +53,7 @@ export function CameraCaptureDialog({
         setCapturedUrl(null);
         setError(null);
         setUploadError(null);
+        setInputInfo('');
         onClose();
     }, [stream, capturedUrl, onClose]);
 
@@ -84,9 +85,11 @@ export function CameraCaptureDialog({
 
                 const newStream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        deviceId: { exact: selectedDeviceId },
+                        deviceId: { ideal: selectedDeviceId },
                         width:  { ideal: 3840 }, // 4K入力を受け付ける（キャプチャボード対応）
-                        height: { ideal: 2160 }
+                        height: { ideal: 2160 },
+                        aspectRatio: { ideal: 16 / 9 },
+                        frameRate: { ideal: 30 }
                     }
                 });
 
@@ -94,6 +97,10 @@ export function CameraCaptureDialog({
                 setStream(newStream);
                 if (videoRef.current) {
                     videoRef.current.srcObject = newStream;
+                }
+                const settings = newStream.getVideoTracks()[0]?.getSettings();
+                if (settings) {
+                    setInputInfo(`入力: ${settings.width ?? '?'} × ${settings.height ?? '?'} / 比率 ${settings.aspectRatio ?? '?'} / ${settings.frameRate ?? '?'} fps / deviceId: ${settings.deviceId ?? '?'}`);
                 }
                 setError(null);
             } catch (err) {
@@ -116,11 +123,12 @@ export function CameraCaptureDialog({
         if (!video || !canvas) return;
 
         // 最大幅を超える場合はリサイズ
-        const scale = video.videoWidth > MAX_CAPTURE_WIDTH
-            ? MAX_CAPTURE_WIDTH / video.videoWidth
-            : 1;
-        canvas.width  = Math.round(video.videoWidth  * scale);
-        canvas.height = Math.round(video.videoHeight * scale);
+        if (!video.videoWidth || !video.videoHeight) {
+            setError('カメラ映像の解像度を取得できませんでした。');
+            return;
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
@@ -132,7 +140,7 @@ export function CameraCaptureDialog({
             const url = URL.createObjectURL(blob);
             setCapturedBlob(blob);
             setCapturedUrl(url);
-            setCaptureInfo(`${canvas.width} × ${canvas.height}px / ${(blob.size / 1024).toFixed(0)} KB (WebP)`);
+            setCaptureInfo(`保存: ${canvas.width} × ${canvas.height}px / ${(blob.size / 1024).toFixed(0)} KB (WebP)`);
             // ストリームは保持したまま、レビュー画面へ遷移
             setPhase('review');
         }, 'image/webp', WEBP_QUALITY);
@@ -242,12 +250,16 @@ export function CameraCaptureDialog({
                                 playsInline
                                 muted
                                 className="w-full h-full object-contain"
+                                onLoadedMetadata={() => {
+                                    const video = videoRef.current;
+                                    if (video) setInputInfo((current) => `${current} / 映像: ${video.videoWidth} × ${video.videoHeight} / 表示: ${video.clientWidth} × ${video.clientHeight}`);
+                                }}
                             />
                             {/* フォーカスガイド */}
                             <div className="absolute inset-0 pointer-events-none border border-white/10 flex items-center justify-center">
                                 <div className="w-32 h-32 border border-white/20 rounded-full" />
                                 <div className="absolute top-3 left-3 text-[10px] font-mono text-white/40 bg-black/40 px-2 py-0.5 rounded">
-                                    ライブプレビュー
+                                    {inputInfo || 'カメラ入力を確認中…'}
                                 </div>
                             </div>
                         </>
