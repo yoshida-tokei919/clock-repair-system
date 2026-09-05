@@ -67,6 +67,8 @@ async function main() {
     const { POST: createDraft } = await import('../src/app/api/repairs/[id]/public-case/route');
     const { estimateItemSnapshots } = await import('../src/lib/estimate-item-snapshots');
     const { __partsMasterInternals } = await import('../src/lib/parts-master');
+    const { __partsMasterGrowthPreviewInternals: growth } = await import('../src/lib/parts-master-growth-preview');
+    const { buildProfiledPartSearchQuery } = await import('../src/lib/part-search');
     const input = [
         { type: 'labor', category: 'internal', name: '内装修理', price: 5000, quantity: 1,
           repairWorkCategoryId: 10, repairWorkActionId: 20, targetPartNameId: 'part-name-01',
@@ -138,7 +140,26 @@ async function main() {
             assert.equal(publicCaseData.partItems.create[0].metadata.gradeNameSnapshot, '中古');
         }
         assert.equal((await createDraft(request({}), { params: { id: 'bad' } })).status, 400);
-        assert.ok(__partsMasterInternals);
+        for (const ref of [' AB-12 ', 'AB.12', 'AB/12', 'ab12']) {
+            assert.equal(__partsMasterInternals.normalizeRefToken(ref), ref.trim());
+            assert.equal(growth.normalizePartRefForCompare(ref), ref.trim());
+        }
+        for (const grade of ['純正', 'FIT', '合わせ', '中古']) {
+            assert.equal(growth.gradeMatches({ grade }, { grade }), true);
+            for (const other of ['純正', 'FIT', '合わせ', '中古'].filter(value => value !== grade)) {
+                assert.equal(growth.gradeMatches({ grade }, { grade: other }), false);
+            }
+        }
+        const context = { watchBrand: 'WatchBrand', movementMaker: 'MovementMaker',
+            movementCaliber: 'Cal. 1234', partRef: 'AB-12', partNameEn: 'gear' };
+        const internalQuery = buildProfiledPartSearchQuery({ context: { ...context, partType: 'interior' },
+            lang: 'en', profile: { tokens: ['movementMaker', 'movementCaliber'], partIdentifierMode: 'partRef' } });
+        const externalQuery = buildProfiledPartSearchQuery({ context: { ...context, partType: 'external' },
+            lang: 'en', profile: { tokens: ['watchBrand'], partIdentifierMode: 'partName' } });
+        assert.match(internalQuery, /MovementMaker/);
+        assert.doesNotMatch(internalQuery, /WatchBrand/);
+        assert.match(externalQuery, /WatchBrand/);
+        assert.doesNotMatch(externalQuery, /MovementMaker/);
     } finally { console.log = originalLog; }
     console.log('PASS: Repair create + two resaves, structured IDs, seven snapshots, external pricing, structured-first / legacy PublicCase, duplicate guard, Cal fallback, unregistered parts. No DB connection.');
 }

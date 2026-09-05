@@ -7,9 +7,7 @@ import { Camera, RefreshCw, Check, X, CameraOff, Loader2, RotateCcw } from "luci
 import { uploadRepairPhoto } from "@/lib/supabase-storage";
 import { saveRepairPhoto } from "@/actions/photo-actions";
 
-// キャプチャ時の最大幅（2560px = QHD相当）
-// S5M2XのHDMI出力 → キャプチャボードは4K入力だが、WebPで圧縮するため2560pxに制限
-// WebP品質: 80%（画質とファイルサイズのバランス）
+// 入力映像の解像度を維持してWebP品質92%で保存する。
 const WEBP_QUALITY = 0.92;
 
 interface CameraCaptureDialogProps {
@@ -122,7 +120,7 @@ export function CameraCaptureDialog({
         const canvas = canvasRef.current;
         if (!video || !canvas) return;
 
-        // 最大幅を超える場合はリサイズ
+        // CSS表示サイズではなく、入力映像の実解像度を使用する。
         if (!video.videoWidth || !video.videoHeight) {
             setError('カメラ映像の解像度を取得できませんでした。');
             return;

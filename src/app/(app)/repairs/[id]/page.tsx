@@ -51,6 +51,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 select: {
                     lineType: true,
                     repairWorkCategoryId: true,
+                    repairWorkCategory: { select: { repairType: true } },
                     repairWorkActionId: true,
                     targetPartNameId: true,
                     b2cDisplayNameSnapshot: true,
@@ -127,6 +128,10 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
         return {
             ...item,
             repairWorkCategoryId: repairLineItem.repairWorkCategoryId,
+            sourceAreaSnapshot: repairLineItem.repairWorkCategory?.repairType === 'EXTERNAL'
+                ? 'external'
+                : repairLineItem.repairWorkCategory?.repairType === 'INTERNAL'
+                    ? 'internal' : item.sourceAreaSnapshot,
             repairWorkActionId: repairLineItem.repairWorkActionId,
             targetPartNameId: repairLineItem.targetPartNameId,
             b2cDisplayNameSnapshot: repairLineItem.b2cDisplayNameSnapshot ?? item.b2cDisplayNameSnapshot,
