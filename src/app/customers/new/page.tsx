@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowLeft, Save, Building2, User, Star, AlertTriangle, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,12 +8,15 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createCustomer, checkDuplicateCustomer } from "@/actions/customer-actions";
 import { toast } from "@/components/ui/use-toast";
 
 export default function NewCustomerPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const lineUserId = searchParams.get("lineUserId") || "";
+    const lineDisplayName = searchParams.get("lineDisplayName") || "";
     const [isSaving, setIsSaving] = useState(false);
 
     // フォームの状態
@@ -26,8 +29,12 @@ export default function NewCustomerPage() {
     const [address, setAddress] = useState("");
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
-    const [lineId, setLineId] = useState("");
+    const [lineId, setLineId] = useState(searchParams.get("lineId") || lineUserId);
     const [prefix, setPrefix] = useState("");
+
+    useEffect(() => {
+        if (lineDisplayName) setName(lineDisplayName);
+    }, [lineDisplayName]);
 
     // 重複チェック用
     const [showDupDialog, setShowDupDialog] = useState(false);
@@ -77,7 +84,7 @@ export default function NewCustomerPage() {
     const performSave = async () => {
         setIsSaving(true);
         const res = await createCustomer({
-            type, name, companyName, kana, rank, zipCode, address, phone, email, lineId,
+            type, name, companyName, kana, rank, zipCode, address, phone, email, lineId, lineUserId: lineUserId || undefined,
             prefix: type === "business" ? prefix : "C"
         });
 
@@ -101,6 +108,11 @@ export default function NewCustomerPage() {
                     <h1 className="text-2xl font-bold text-zinc-800">新規顧客登録</h1>
                 </div>
 
+                {lineUserId && (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                        LINEユーザー「{lineDisplayName || "表示名未取得"}」から登録しています。LINE表示名は確認用です。顧客名として保存する前に内容を確認・修正してください。
+                    </div>
+                )}
                 <form onSubmit={handleSaveRequest}>
                     <Card className="border-t-4 border-t-blue-600 shadow-md">
                         <CardHeader>
@@ -186,7 +198,7 @@ export default function NewCustomerPage() {
                                             <Label className="text-xs font-bold text-zinc-700 flex items-center gap-1">
                                                 <MessageCircle className="w-3 h-3 text-emerald-500" /> LINE ID
                                             </Label>
-                                            <Input value={lineId} onChange={e => setLineId(e.target.value)} placeholder="line_id" className="bg-white" />
+                                            <Input value={lineId} onChange={e => setLineId(e.target.value)} placeholder="line_id" className="bg-white" disabled={Boolean(lineUserId)} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label className="text-xs font-bold text-zinc-700">郵便番号</Label>

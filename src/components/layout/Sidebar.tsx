@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/masters/pricing', label: '料金マスタ', icon: '💴' },
   { href: '/invoices', label: '請求書管理', icon: '📄' },
   { href: '/customers', label: '顧客管理', icon: '👤' },
+  { href: '/line-users', label: 'LINEユーザー', icon: '💬' },
 ]
 
 export default function Sidebar() {

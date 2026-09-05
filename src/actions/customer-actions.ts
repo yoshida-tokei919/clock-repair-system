@@ -58,24 +58,31 @@ export async function createCustomer(data: any) {
             }
         }
 
-        const customer = await prisma.customer.create({
-            data: {
-                name: displayName,
-                type: type,
-                phone: data.phone,
-                email: data.email,
-                lineId: data.lineId,
-                address: data.address,
-                zipCode: data.zipCode,
-                kana: data.kana,
-                companyName: data.companyName,
-                isPartner: type === 'business',
-                prefix: finalPrefix,
-                currentSeq: type === 'individual' ? 9999 : 0,
-                rank: parseInt(data.rank || "1"),
-            }
-        });
+        const createData = {
+            name: displayName, type, phone: data.phone, email: data.email, lineId: data.lineUserId || data.lineId,
+            address: data.address, zipCode: data.zipCode, kana: data.kana, companyName: data.companyName,
+            isPartner: type === 'business', prefix: finalPrefix,
+            currentSeq: type === 'individual' ? 9999 : 0, rank: parseInt(data.rank || "1"),
+        };
+        const customer = data.lineUserId
+            ? await prisma.$transaction(async (tx) => {
+                const lineUser = await tx.lineUser.findUnique({ where: { lineUserId: data.lineUserId }, select: { linkedCustomerId: true } });
+                if (!lineUser) throw new Error("対象のLINEユーザーが見つかりません。");
+                if (lineUser.linkedCustomerId !== null) throw new Error("このLINEユーザーはすでに別の顧客へ紐付いています。");
+                if (await tx.customer.count({ where: { lineId: data.lineUserId } }) > 0) {
+                    throw new Error("このLINE userIdを持つ既存顧客があるため、新規登録を中止しました。");
+                }
+                const created = await tx.customer.create({ data: createData });
+                const linked = await tx.lineUser.updateMany({
+                    where: { lineUserId: data.lineUserId, linkedCustomerId: null },
+                    data: { linkedCustomerId: created.id, linkedAt: new Date() },
+                });
+                if (linked.count !== 1) throw new Error("LINEユーザーの紐付け状態が変わったため、新規登録を中止しました。");
+                return created;
+            })
+            : await prisma.customer.create({ data: createData });
         revalidatePath("/customers");
+        revalidatePath("/line-users");
         return { success: true, customer };
     } catch (e: any) {
         return { success: false, error: e.message };
