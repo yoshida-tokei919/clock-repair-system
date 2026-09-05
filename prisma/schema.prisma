@@ -53,6 +53,26 @@ model Customer {
   estimatePdfFiles  EstimatePdfFile[]
   invoicePdfFiles   InvoicePdfFile[]
   warranties        Warranty[]
+  lineUsers         LineUser[]
+}
+
+// LINE webhook users are retained before, and independently from, any Customer UI link.
+model LineUser {
+  id               Int       @id @default(autoincrement())
+  lineUserId       String    @unique
+  displayName      String?
+  firstReceivedAt  DateTime
+  lastReceivedAt   DateTime
+  lastEventType    String
+  linkedCustomerId Int?
+  linkedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  linkedCustomer Customer? @relation(fields: [linkedCustomerId], references: [id], onDelete: SetNull)
+
+  @@index([linkedCustomerId])
+  @@index([lastReceivedAt])
 }
 
 // 2. Watch Metadata (Smart Input)
