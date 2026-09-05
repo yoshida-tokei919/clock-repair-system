@@ -626,6 +626,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         categoryNameSnapshot?: string | null;
         targetPartNameSnapshot?: string | null;
         actionNameSnapshot?: string | null;
+        b2cDisplayNameSnapshot?: string | null;
+        sourceAreaSnapshot?: string | null;
     }
     type OrderListItem = { id?: number; partId: number; quantity: number; status: 'pending' | 'ordered' | 'received' };
     const [lineItems, setLineItems] = useState<LineItem[]>(() => {
@@ -634,7 +636,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             i.type === 'labor'
                 ? {
                     id: String(i.id),
-                    category: i.category || 'internal',
+                    category: i.category || (i.sourceAreaSnapshot === 'external' ? 'external_labor' : 'internal'),
+                    sourceAreaSnapshot: i.sourceAreaSnapshot ?? null,
+                    b2cDisplayNameSnapshot: i.b2cDisplayNameSnapshot ?? null,
+                    grade: i.gradeNameSnapshot ?? undefined,
                     name: i.itemName,
                     price: i.unitPrice,
                     quantity: i.quantity || 1,
@@ -649,7 +654,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 }
                 : createEstimateItemFromPart(i.partsMaster ?? {}, {
                     id: String(i.id),
-                    category: 'part_external',
+                    category: i.sourceAreaSnapshot === 'internal' ? 'part_internal' : 'part_external',
+                    sourceAreaSnapshot: i.sourceAreaSnapshot ?? null,
+                    b2cDisplayNameSnapshot: i.b2cDisplayNameSnapshot ?? null,
+                    ...(i.gradeNameSnapshot != null ? { grade: i.gradeNameSnapshot } : {}),
                     name: i.itemName,
                     price: i.unitPrice,
                     quantity: i.quantity || 1,
@@ -658,10 +666,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     repairWorkCategoryId: null,
                     repairWorkActionId: null,
                     targetPartNameId: null,
-                    detailLabelSnapshot: null,
-                    categoryNameSnapshot: null,
-                    targetPartNameSnapshot: null,
-                    actionNameSnapshot: null,
+                    detailLabelSnapshot: i.detailLabelSnapshot ?? null,
+                    categoryNameSnapshot: i.categoryNameSnapshot ?? null,
+                    targetPartNameSnapshot: i.targetPartNameSnapshot ?? null,
+                    actionNameSnapshot: i.actionNameSnapshot ?? null,
                 }) as LineItem
         ));
     });
@@ -1933,10 +1941,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         repairWorkCategoryId: i.category.includes('part') ? null : i.repairWorkCategoryId ?? null,
                         repairWorkActionId: i.category.includes('part') ? null : i.repairWorkActionId ?? null,
                         targetPartNameId: i.category.includes('part') ? null : i.targetPartNameId ?? null,
-                        detailLabelSnapshot: i.category.includes('part') ? null : i.detailLabelSnapshot ?? null,
-                        categoryNameSnapshot: i.category.includes('part') ? null : i.categoryNameSnapshot ?? null,
-                        targetPartNameSnapshot: i.category.includes('part') ? null : i.targetPartNameSnapshot ?? null,
-                        actionNameSnapshot: i.category.includes('part') ? null : i.actionNameSnapshot ?? null,
+                        sourceAreaSnapshot: i.sourceAreaSnapshot ?? null,
+                        b2cDisplayNameSnapshot: i.b2cDisplayNameSnapshot ?? null,
+                        detailLabelSnapshot: i.detailLabelSnapshot ?? null,
+                        categoryNameSnapshot: i.categoryNameSnapshot ?? null,
+                        targetPartNameSnapshot: i.targetPartNameSnapshot ?? null,
+                        actionNameSnapshot: i.actionNameSnapshot ?? null,
                     }))
                 },
                 status: nextStatus,

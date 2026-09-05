@@ -53,6 +53,8 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                     repairWorkCategoryId: true,
                     repairWorkActionId: true,
                     targetPartNameId: true,
+                    b2cDisplayNameSnapshot: true,
+                    gradeNameSnapshot: true,
                     detailLabelSnapshot: true,
                     categoryNameSnapshot: true,
                     targetPartNameSnapshot: true,
@@ -119,10 +121,6 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 repairWorkCategoryId: null,
                 repairWorkActionId: null,
                 targetPartNameId: null,
-                detailLabelSnapshot: null,
-                categoryNameSnapshot: null,
-                targetPartNameSnapshot: null,
-                actionNameSnapshot: null,
             };
         }
 
@@ -131,10 +129,12 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
             repairWorkCategoryId: repairLineItem.repairWorkCategoryId,
             repairWorkActionId: repairLineItem.repairWorkActionId,
             targetPartNameId: repairLineItem.targetPartNameId,
-            detailLabelSnapshot: repairLineItem.detailLabelSnapshot,
-            categoryNameSnapshot: repairLineItem.categoryNameSnapshot,
-            targetPartNameSnapshot: repairLineItem.targetPartNameSnapshot,
-            actionNameSnapshot: repairLineItem.actionNameSnapshot,
+            b2cDisplayNameSnapshot: repairLineItem.b2cDisplayNameSnapshot ?? item.b2cDisplayNameSnapshot,
+            gradeNameSnapshot: repairLineItem.gradeNameSnapshot ?? item.gradeNameSnapshot,
+            detailLabelSnapshot: repairLineItem.detailLabelSnapshot ?? item.detailLabelSnapshot,
+            categoryNameSnapshot: repairLineItem.categoryNameSnapshot ?? item.categoryNameSnapshot,
+            targetPartNameSnapshot: repairLineItem.targetPartNameSnapshot ?? item.targetPartNameSnapshot,
+            actionNameSnapshot: repairLineItem.actionNameSnapshot ?? item.actionNameSnapshot,
         };
     });
 

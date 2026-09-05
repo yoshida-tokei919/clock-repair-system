@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
 import {
     estimateItemsLikeToRepairLineItemInputs,
@@ -345,6 +346,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
                         await tx.estimateItem.createMany({
                             data: syncedEstimateItems.map((item: any) => ({
+                                ...estimateItemSnapshots(item),
                                 estimateId: estimate.id,
                                 itemName: item.name,
                                 type: item.type,

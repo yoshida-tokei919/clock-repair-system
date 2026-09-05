@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
 import {
     estimateItemsLikeToRepairLineItemInputs,
@@ -474,6 +475,7 @@ export async function POST(req: Request) {
                         taxAmount: Math.floor(total * 0.1),
                         items: {
                             create: estimateItems.map((item: any) => ({
+                                ...estimateItemSnapshots(item),
                                 itemName: item.name,
                                 type: item.type,
                                 unitPrice: Math.floor(Number(item.price) || 0),

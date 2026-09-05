@@ -310,6 +310,14 @@ model Estimate {
 }
 
 model EstimateItem {
+  // Production Task125 compatibility; structured work remains in RepairLineItem.
+  sourceAreaSnapshot     String?
+  categoryNameSnapshot   String?
+  targetPartNameSnapshot String?
+  actionNameSnapshot     String?
+  detailLabelSnapshot    String?
+  b2cDisplayNameSnapshot String?
+  gradeNameSnapshot      String?
   id         Int    @id @default(autoincrement())
   estimateId Int
   itemName   String

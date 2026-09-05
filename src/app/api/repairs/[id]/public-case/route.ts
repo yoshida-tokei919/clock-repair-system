@@ -54,6 +54,9 @@ export async function POST(
           receptionDate: true,
           movementCaliber: { select: { name: true } },
           baseMovementCaliber: { select: { name: true } },
+          estimate: { select: { items: { orderBy: { id: "asc" }, include: {
+            partsMaster: { select: { id: true, nameJp: true, partType: true } },
+          } } } },
           watch: {
             select: {
               brand: { select: { id: true, name: true, nameJp: true, kana: true } },
@@ -103,8 +106,42 @@ export async function POST(
         .filter((value): value is string => Boolean(value))
         .join(" ");
 
-      const workItems = repair.repairLineItems.flatMap((lineItem) => {
-        if (lineItem.lineType !== "LABOR" || !lineItem.repairWorkCategory) {
+      // Structured lines are authoritative. Only legacy Repairs without any
+      // structured lines use Task125's EstimateItem snapshots as their source.
+      const estimateItems = repair.estimate?.items ?? [];
+      const sourceItems = repair.repairLineItems.length > 0
+        ? repair.repairLineItems.map((item) => ({
+            ...item,
+            estimateItemId: null as number | null,
+            sourceArea: item.repairWorkCategory
+              ? publicCaseSourceArea(item.repairWorkCategory.repairType)
+              : estimateItems[item.sortOrder]?.sourceAreaSnapshot
+                ?? (item.partsMaster ? partSourceArea(item.partsMaster.partType) : null),
+          }))
+        : estimateItems.map((item, sortOrder) => ({
+            id: null,
+            estimateItemId: item.id,
+            lineType: item.type === "labor" ? "LABOR" : "PART",
+            partsMasterId: item.partsMasterId,
+            partsMaster: item.partsMaster,
+            repairWorkCategoryId: null,
+            repairWorkActionId: null,
+            targetPartNameId: null,
+            itemNameSnapshot: item.itemName,
+            estimateDisplayNameSnapshot: item.itemName,
+            b2cDisplayNameSnapshot: item.b2cDisplayNameSnapshot,
+            gradeNameSnapshot: item.gradeNameSnapshot,
+            detailLabelSnapshot: item.detailLabelSnapshot,
+            categoryNameSnapshot: item.categoryNameSnapshot,
+            targetPartNameSnapshot: item.targetPartNameSnapshot,
+            actionNameSnapshot: item.actionNameSnapshot,
+            sortOrder,
+            sourceArea: item.sourceAreaSnapshot
+              ?? (item.type === "part" ? partSourceArea(item.partsMaster?.partType ?? null) ?? "external" : "internal"),
+          }));
+
+      const workItems = sourceItems.flatMap((lineItem) => {
+        if (lineItem.lineType !== "LABOR" || !lineItem.sourceArea) {
           return [];
         }
 
@@ -112,7 +149,7 @@ export async function POST(
         if (!sourceText) return [];
 
         return [{
-          sourceArea: publicCaseSourceArea(lineItem.repairWorkCategory.repairType),
+          sourceArea: lineItem.sourceArea,
           sourceSlot: lineItem.sortOrder,
           sourceText,
           normalizedSourceText: sourceText,
@@ -131,6 +168,7 @@ export async function POST(
           actionDetail: text(lineItem.detailLabelSnapshot),
           attributes: {
             repairLineItemId: lineItem.id,
+            estimateItemId: lineItem.estimateItemId,
             repairWorkCategoryId: lineItem.repairWorkCategoryId,
             repairWorkActionId: lineItem.repairWorkActionId,
             targetPartNameId: lineItem.targetPartNameId,
@@ -139,12 +177,12 @@ export async function POST(
         }];
       });
 
-      const partItems = repair.repairLineItems.flatMap((lineItem) => {
-        if (lineItem.lineType !== "PART" || !lineItem.partsMaster) {
+      const partItems = sourceItems.flatMap((lineItem) => {
+        if (lineItem.lineType !== "PART") {
           return [];
         }
 
-        const sourceArea = partSourceArea(lineItem.partsMaster.partType);
+        const sourceArea = lineItem.sourceArea;
         const sourceText = text(lineItem.itemNameSnapshot);
         if (!sourceArea || !sourceText) return [];
 
@@ -153,7 +191,7 @@ export async function POST(
           sourceSlot: lineItem.sortOrder,
           sourceText,
           normalizedSourceText: sourceText,
-          displayName: text(lineItem.partsMaster.nameJp) ?? sourceText,
+          displayName: text(lineItem.estimateDisplayNameSnapshot) ?? sourceText,
           price: null,
           showPriceB2b: false,
           showPriceB2c: false,
@@ -162,7 +200,8 @@ export async function POST(
           sortOrder: lineItem.sortOrder,
           metadata: {
             repairLineItemId: lineItem.id,
-            partsMasterId: lineItem.partsMaster.id,
+            estimateItemId: lineItem.estimateItemId,
+            partsMasterId: lineItem.partsMasterId,
             gradeNameSnapshot: text(lineItem.gradeNameSnapshot),
           },
         }];
