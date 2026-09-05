@@ -32,10 +32,9 @@ const repairWorkCategories = [
   [RepairWorkType.EXTERNAL, "bracelet_band", "ブレス・バンド", 60],
 ] as const;
 
-// `used` exists in the current generic seed but is intentionally excluded:
-// Task142 promotes the three grades actually present in clock_repair_local.
+// The four operational part grades.  Grade is independent from the part name.
 const partGrades = [
-  ["genuine", "純正", "genuine", 10], ["fit", "FIT", "fit / aftermarket", 20], ["custom_fit", "合わせ", "custom fit", 30],
+  ["genuine", "純正", "genuine", 10], ["fit", "FIT", "fit / aftermarket", 20], ["custom_fit", "合わせ", "custom fit", 30], ["used", "中古", "used", 40],
 ] as const;
 
 const suppliers = [
