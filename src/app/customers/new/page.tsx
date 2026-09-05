@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { ArrowLeft, Save, Building2, User, Star, AlertTriangle, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,14 @@ import { createCustomer, checkDuplicateCustomer } from "@/actions/customer-actio
 import { toast } from "@/components/ui/use-toast";
 
 export default function NewCustomerPage() {
+    return (
+        <Suspense fallback={null}>
+            <NewCustomerForm />
+        </Suspense>
+    );
+}
+
+function NewCustomerForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const lineUserId = searchParams.get("lineUserId") || "";
