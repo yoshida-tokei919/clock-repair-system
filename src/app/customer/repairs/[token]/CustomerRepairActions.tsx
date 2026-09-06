@@ -15,6 +15,7 @@ type CustomerMessage = {
 type Props = {
   token: string;
   isBusiness: boolean;
+  isApproved?: boolean;
   inquiryNumber: string;
   messages?: CustomerMessage[];
   customerName?: string;
@@ -94,6 +95,7 @@ export function CopyExplanationButton({ text }: { text: string }) {
 
 export function PartnerPrivateMemo({ token }: { token: string; inquiryNumber: string }) {
   const storageKey = `customer-repair-partner-private-memo:${token}`;
+  const [isOpen, setIsOpen] = useState(false);
   const [memo, setMemo] = useState("");
   const [toast, setToast] = useState("");
 
@@ -145,15 +147,26 @@ export function PartnerPrivateMemo({ token }: { token: string; inquiryNumber: st
   };
 
   return (
-    <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="text-base font-bold text-slate-900">貴社専用メモ</h2>
-        <span className="text-sm font-bold text-amber-900">この内容は当店には送信されません。</span>
-      </div>
+    <section className="rounded-lg border border-slate-200 bg-slate-50">
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-100"
+        aria-expanded={isOpen}
+      >
+        <span>貴社専用メモ</span>
+        <span aria-hidden="true">{isOpen ? "⌃" : "∨"}</span>
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-slate-200 p-3">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-slate-500">この内容は当店には送信されません。</span>
+          </div>
       <textarea
         value={memo}
         onChange={(event) => handleMemoChange(event.target.value)}
-        className="min-h-24 w-full rounded-lg border border-amber-200 bg-white p-3 text-base leading-6 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+        className="min-h-24 w-full rounded-lg border border-slate-300 bg-white p-3 text-base leading-6 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
         placeholder="こちらにメモを入力してください"
       />
       <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
@@ -175,6 +188,8 @@ export function PartnerPrivateMemo({ token }: { token: string; inquiryNumber: st
         </button>
       </div>
       <MiniToast message={toast} onClose={() => setToast("")} />
+        </div>
+      )}
     </section>
   );
 }
@@ -185,10 +200,11 @@ function getBusinessMessageSenderName(message: CustomerMessage, partnerName?: st
   return `${name || "取引先"} 様`;
 }
 
-export function CustomerRepairActions({ token, isBusiness, inquiryNumber, messages = [], customerName }: Props) {
+export function CustomerRepairActions({ token, isBusiness, isApproved = false, inquiryNumber, messages = [], customerName }: Props) {
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
+  const [approved, setApproved] = useState(isApproved);
 
   const postAction = async (path: string, body?: unknown) => {
     setLoading(path);
@@ -224,8 +240,10 @@ export function CustomerRepairActions({ token, isBusiness, inquiryNumber, messag
   };
 
   const handleApprove = async () => {
+    if (approved || loading) return;
     try {
       await postAction("approve");
+      setApproved(true);
       router.refresh();
       alert("承認しました。");
     } catch (error) {
@@ -250,20 +268,20 @@ export function CustomerRepairActions({ token, isBusiness, inquiryNumber, messag
 
   if (isBusiness) {
     return (
-      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid grid-cols-2 gap-3">
+      <section className="rounded-xl border border-blue-100 bg-[#f8fbff] p-4 shadow-sm">
+        <div className="mb-3 border-b border-blue-100 pb-3">
+          <p className="text-sm font-bold text-slate-800">ご確認・ご回答</p>
+          <p className="mt-1 text-sm text-slate-600">見積内容をご確認のうえ、承認または修正依頼を選択してください。</p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={handleApprove}
-            disabled={!!loading}
-            className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+            disabled={approved || !!loading}
+            className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <CheckCircle className="h-5 w-5" />
-            <span>
-              この内容で
-              <br className="min-[420px]:hidden" />
-              承認する
-            </span>
+            <span>{approved ? "承認済み" : "この内容で承認する"}</span>
           </button>
           <button
             type="button"
@@ -272,21 +290,12 @@ export function CustomerRepairActions({ token, isBusiness, inquiryNumber, messag
             className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-3 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
           >
             <RefreshCw className="h-5 w-5" />
-            <span>
-              差戻し・
-              <br className="min-[420px]:hidden" />
-              修正依頼する
-            </span>
+            <span>修正を依頼する</span>
           </button>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-5">
           <h2 className="text-base font-bold text-slate-900">コメント</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            ご不明点は本案件のコメント欄よりご連絡ください。
-            <br />
-            このコメントは本案件に紐づいて保存されます。
-          </p>
         </div>
 
         {messages.length > 0 && (
@@ -303,12 +312,12 @@ export function CustomerRepairActions({ token, isBusiness, inquiryNumber, messag
           </div>
         )}
 
-        <div className="mt-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-[1fr_11rem]">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_11rem]">
           <textarea
             value={comment}
             onChange={(event) => setComment(event.target.value.slice(0, 500))}
             className="min-h-11 rounded-lg border border-slate-300 p-3 text-sm leading-6 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            placeholder="コメントを入力してください"
+            placeholder="コメントを入力してください（任意）"
             maxLength={500}
           />
           <button

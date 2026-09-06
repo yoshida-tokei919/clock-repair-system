@@ -41,18 +41,23 @@ export async function POST(
       orderStatuses: repair.orderRequests.map((order) => order.status as RepairPartsOrderStatus),
     });
 
-    const updated = await tx.repair.update({
-      where: { id: repair.id },
+    const approvalDate = new Date();
+    const updateResult = await tx.repair.updateMany({
+      where: { id: repair.id, approvalStatus: { not: "approved" } },
       data: {
         status: nextStatus,
         approvalStatus: "approved",
-        approvalDate: new Date(),
+        approvalDate,
       },
     });
 
+    if (updateResult.count === 0) {
+      throw new Error("この案件はすでに承認済みです。");
+    }
+
     await addStatusLogIfMissing(tx, repair.id, nextStatus);
 
-    return updated;
+    return tx.repair.findUniqueOrThrow({ where: { id: repair.id } });
   });
 
   return NextResponse.json({ success: true, repair: result });

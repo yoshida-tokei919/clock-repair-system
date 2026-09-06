@@ -38,9 +38,25 @@ const repairInclude = {
 };
 
 function getStatusBadgeClass(status: string) {
+  if (status.includes("完了")) return "bg-blue-50 text-blue-700 border-blue-200";
   if (isApprovedRepairStatus(status)) return "bg-green-50 text-green-700 border-green-200";
   if (status.includes("差戻") || status.includes("保留") || status.includes("キャンセル")) return "bg-red-50 text-red-700 border-red-200";
   return "bg-orange-50 text-orange-700 border-orange-200";
+}
+
+function getStatusBandClass(status: string) {
+  if (status.includes("完了")) return "bg-blue-50/70 hover:bg-blue-50";
+  if (isApprovedRepairStatus(status)) return "bg-green-50/70 hover:bg-green-50";
+  if (status.includes("差戻") || status.includes("保留") || status.includes("キャンセル")) return "bg-red-50/70 hover:bg-red-50";
+  if (status === "承認待ち") return "bg-orange-50/70 hover:bg-orange-50";
+  return "bg-slate-50 hover:bg-slate-100";
+}
+
+function getStatusMessage(status: string) {
+  if (status === "承認待ち") return "お見積内容をご確認ください。";
+  if (status.includes("完了")) return "作業が完了しました。";
+  if (isApprovedRepairStatus(status)) return "現在の進行状況をご確認いただけます。";
+  return "現在の案件状況をご確認いただけます。";
 }
 
 function isApprovedRepairStatus(status: string) {
@@ -55,6 +71,13 @@ function getEstimateTotal(repair: any) {
   return getEstimateItems(repair).reduce((sum: number, item: any) => sum + item.unitPrice * (item.quantity || 1), 0);
 }
 
+function getEstimateAmounts(repair: any) {
+  const subtotal = getEstimateTotal(repair);
+  const taxAmount = Math.floor(subtotal * 0.1);
+
+  return { subtotal, taxAmount, total: subtotal + taxAmount };
+}
+
 function getEndUserDisplayName(repair: any) {
   return repair.endUserName?.trim() || "";
 }
@@ -67,9 +90,6 @@ function getWatchBrandModelLine(repair: any) {
     .filter(Boolean)
     .join(" ");
 }
-
-const defaultExplanation =
-  "このお見積は、現在の状態を確認したうえで作成したものです。\n修理内容や金額についてご不明な点がございましたら、承認前にいつでもご質問ください。";
 
 export default async function CustomerRepairPage({ params }: PageProps) {
   const token = params.token?.trim();
@@ -146,7 +166,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
       serialNumber: repair.watch?.serialNumber || "",
       shopEstimate: getEstimateTotal(repair),
       customerEstimate: "",
-      explanation: repair.customerNote?.trim() || defaultExplanation,
+      explanation: repair.customerNote?.trim() || "",
       privateMemo: "",
     };
   });
@@ -158,15 +178,12 @@ export default async function CustomerRepairPage({ params }: PageProps) {
     const publicPdfHref = `/customer/repairs/${token}/estimate.pdf`;
 
     return (
-      <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
+      <main className="min-h-screen bg-[#f5f8fc] px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
         <div className="mx-auto max-w-5xl space-y-4">
           <header className="space-y-3">
-            <div className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+            <div className="relative overflow-hidden rounded-xl border border-blue-100 bg-gradient-to-r from-white via-white to-blue-50/70 p-4 shadow-sm sm:p-5">
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-2xl font-bold tracking-tight">お見積確認ページ</h1>
-                <span className="rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-sm font-bold text-blue-700">
-                  B2B専用
-                </span>
               </div>
               <p className="mt-3 text-base text-slate-700">共有先: {customerName} 様</p>
               {documentMeta && (
@@ -187,8 +204,8 @@ export default async function CustomerRepairPage({ params }: PageProps) {
           <CustomerRepairAccordionRoot>
             {repairs.map((repair, index) => {
               const estimateItems = getEstimateItems(repair);
-              const total = getEstimateTotal(repair);
-              const explanationText = repair.customerNote?.trim() || defaultExplanation;
+              const { subtotal, taxAmount, total } = getEstimateAmounts(repair);
+              const explanationText = repair.customerNote?.trim() || "";
               const repairActionToken = repair.publicToken || token;
               const amountToken = repair.publicToken || `${token}:${repair.id}`;
               const privateMemoToken = repair.publicToken || `${token}:${repair.id}`;
@@ -207,9 +224,6 @@ export default async function CustomerRepairPage({ params }: PageProps) {
 
               const repairHeader = (
                 <div className="min-w-0 space-y-2">
-                  <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-sm font-bold ${getStatusBadgeClass(repair.status)}`}>
-                    {repair.status}
-                  </span>
                   {(endUserDisplayName || partnerRef || repair.inquiryNumber) && (
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
                       {endUserDisplayName && <span className="text-base font-semibold leading-6 text-slate-900">{endUserDisplayName} 様</span>}
@@ -217,7 +231,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                       {repair.inquiryNumber && <span className="text-sm font-medium leading-5 text-slate-700">問 {repair.inquiryNumber}</span>}
                     </div>
                   )}
-                  <div className="min-w-0 truncate text-base font-medium leading-6 text-slate-800">{brandModelLine || "-"}</div>
+                  <div className="min-w-0 truncate text-lg font-bold leading-6 text-slate-900">{brandModelLine || "-"}</div>
                   <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-sm font-medium leading-5 text-slate-600">
                     {referenceName && <span className="break-all">Ref: {referenceName}</span>}
                     {serialNumber && <span className="break-all">Ser: {serialNumber}</span>}
@@ -229,9 +243,21 @@ export default async function CustomerRepairPage({ params }: PageProps) {
               );
 
               return (
-                <CustomerRepairAccordionItem key={repair.id} index={index} summary={repairHeader}>
+                <CustomerRepairAccordionItem
+                  key={repair.id}
+                  index={index}
+                  summary={repairHeader}
+                  statusBand={
+                    <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-black/5 px-4 py-3 ${getStatusBandClass(repair.status)}`}>
+                      <span className={`inline-flex rounded-full border px-4 py-2 text-lg font-bold shadow-sm ${getStatusBadgeClass(repair.status)}`}>
+                        {repair.status}
+                      </span>
+                      <p className="text-sm font-medium text-slate-700">{getStatusMessage(repair.status)}</p>
+                    </div>
+                  }
+                >
                   <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="-mx-4 -mt-4 mb-4 flex items-center justify-between gap-3 bg-[#f2f7ff] px-4 py-3">
                       <h2 className="text-lg font-bold text-slate-900">見積内容</h2>
                       {repair.estimateDocument && <PdfLinkButton href={publicPdfHref} />}
                     </div>
@@ -264,35 +290,46 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                       )}
                     </div>
 
-                    <div className="mt-4 border-t border-slate-200 pt-3">
-                      <div className="flex items-center justify-between gap-3">
+                    <div className="mt-4 space-y-2 border-t border-slate-200 pt-3">
+                      <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+                        <div>税抜小計</div>
+                        <div className="font-mono font-medium">¥{subtotal.toLocaleString()}</div>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+                        <div>消費税（10%）</div>
+                        <div className="font-mono font-medium">¥{taxAmount.toLocaleString()}</div>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2 pt-1">
                         <div className="font-bold text-slate-900">税込合計</div>
                         <div className="font-mono text-2xl font-bold text-blue-700">¥{total.toLocaleString()}</div>
                       </div>
                     </div>
                   </section>
 
-                  <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <h2 className="text-lg font-bold text-slate-900">お客様への説明文</h2>
-                      <CopyExplanationButton text={explanationText} />
-                    </div>
-                    <div className="mt-3 whitespace-pre-wrap rounded-lg bg-white p-3 text-base leading-7 text-slate-800">
-                      {explanationText}
-                    </div>
-                  </section>
+                  {explanationText && (
+                    <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <h2 className="text-lg font-bold text-slate-900">お客様への説明</h2>
+                        <CopyExplanationButton text={explanationText} />
+                      </div>
+                      <div className="mt-3 min-h-28 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-base leading-7 text-slate-800">
+                        {explanationText}
+                      </div>
+                    </section>
+                  )}
 
                   <CustomerRepairActions
                     token={repairActionToken}
                     isBusiness={isBusiness}
+                    isApproved={repair.approvalStatus === "approved"}
                     inquiryNumber={repair.inquiryNumber}
                     messages={latestMessages}
                     customerName={customerName || "取引先"}
                   />
 
-                  <PartnerPrivateMemo token={privateMemoToken} inquiryNumber={repair.inquiryNumber} />
+                  <CustomerGuideAmountInput amountKey={amountKey} baseAmount={subtotal} />
 
-                  <CustomerGuideAmountInput amountKey={amountKey} baseAmount={total} />
+                  <PartnerPrivateMemo token={privateMemoToken} inquiryNumber={repair.inquiryNumber} />
                 </CustomerRepairAccordionItem>
               );
             })}

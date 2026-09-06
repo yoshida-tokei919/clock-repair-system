@@ -23,16 +23,19 @@ export function CustomerRepairAccordionItem({
   index,
   summary,
   children,
+  statusBand,
 }: {
   index: number;
   summary: ReactNode;
   children: ReactNode;
+  statusBand?: ReactNode;
 }) {
   const context = useContext(AccordionContext);
   const isOpen = context?.openIndex === index;
 
   return (
     <section className={`overflow-hidden rounded-xl border bg-white shadow-sm ${isOpen ? "border-blue-400" : "border-slate-200"}`}>
+      {statusBand}
       <button
         type="button"
         onClick={() => context?.setOpenIndex(index)}

@@ -36,7 +36,7 @@ type Props = {
 };
 
 const exportFields: { key: ExportField; label: string }[] = [
-  { key: "partnerRef", label: "管理番号" },
+  { key: "partnerRef", label: "貴社管理番号" },
   { key: "inquiryNumber", label: "お問合番号" },
   { key: "customerName", label: "お客様名" },
   { key: "brand", label: "ブランド" },
@@ -44,7 +44,7 @@ const exportFields: { key: ExportField; label: string }[] = [
   { key: "reference", label: "Ref" },
   { key: "serialNumber", label: "シリアルNo" },
   { key: "shopEstimate", label: "当店見積額" },
-  { key: "customerEstimate", label: "ご案内金額" },
+  { key: "customerEstimate", label: "金額" },
   { key: "explanation", label: "お客様への説明文" },
   { key: "privateMemo", label: "貴社専用メモ" },
 ];
@@ -231,7 +231,7 @@ export function CustomerExportTools({ repairs }: Props) {
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
-        className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-slate-50"
+        className="flex w-full items-center justify-between gap-3 bg-slate-50/80 p-4 text-left hover:bg-slate-100"
         aria-expanded={isOpen}
       >
         <div>
@@ -240,18 +240,18 @@ export function CustomerExportTools({ repairs }: Props) {
             CSV / メモ出力用の設定です。この内容は当店には送信されません。
           </p>
         </div>
-        <span className="shrink-0 rounded-full border border-slate-200 px-3 py-1 text-sm font-bold text-slate-600">
-          {isOpen ? "閉じる" : "開く"}
+        <span className="shrink-0 text-sm font-medium text-slate-600" aria-hidden="true">
+          {isOpen ? "⌃" : "∨"}
         </span>
       </button>
 
       {isOpen && (
-        <div className="border-t border-slate-100 p-4">
+        <div className="border-t border-slate-200 p-4">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {exportFields.map((field) => (
               <label
                 key={field.key}
-                className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-base font-bold text-slate-700"
+                className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700"
               >
                 <input
                   type="checkbox"
@@ -365,7 +365,7 @@ export function CustomerGuideAmountInput({
         <div className="border-t border-slate-200 p-3">
       <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
         <label className="block text-base font-bold text-slate-700">
-          ご案内金額
+          金額
           <div className="mt-1.5 flex items-center rounded-lg border border-slate-300 bg-white px-3 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-50">
             <span className="font-mono text-base font-bold text-slate-500">¥</span>
             <input
