@@ -231,15 +231,10 @@ export function CustomerExportTools({ repairs }: Props) {
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
-        className="flex w-full items-center justify-between gap-3 bg-slate-50/80 p-4 text-left hover:bg-slate-100"
+        className="flex w-full items-center justify-between gap-3 bg-slate-50/80 px-4 py-3 text-left hover:bg-slate-100"
         aria-expanded={isOpen}
       >
-        <div>
-          <h2 className="text-lg font-bold text-slate-900">貴社用データ出力設定</h2>
-          <p className="mt-1 text-base leading-6 text-slate-600">
-            CSV / メモ出力用の設定です。この内容は当店には送信されません。
-          </p>
-        </div>
+        <h2 className="text-sm font-medium text-slate-600">貴社用データ出力設定</h2>
         <span className="shrink-0 text-sm font-medium text-slate-600" aria-hidden="true">
           {isOpen ? "⌃" : "∨"}
         </span>
@@ -247,7 +242,10 @@ export function CustomerExportTools({ repairs }: Props) {
 
       {isOpen && (
         <div className="border-t border-slate-200 p-4">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <p className="text-base leading-6 text-slate-600">
+            CSV / メモ出力用の設定です。この内容は当店には送信されません。
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {exportFields.map((field) => (
               <label
                 key={field.key}

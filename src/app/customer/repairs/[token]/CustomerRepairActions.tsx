@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Clipboard, Copy, FileText, RefreshCw, Share2, X } from "lucide-react";
+import { CheckCircle, Clipboard, Copy, FileText, Share2, X } from "lucide-react";
 
 type CustomerMessage = {
   id: number;
@@ -289,7 +289,6 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, i
             disabled={!!loading}
             className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-3 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
           >
-            <RefreshCw className="h-5 w-5" />
             <span>修正を依頼する</span>
           </button>
         </div>

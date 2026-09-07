@@ -193,11 +193,23 @@ export default async function CustomerRepairPage({ params }: PageProps) {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-lg border border-slate-200 bg-white p-3 text-base font-bold shadow-sm">全 {repairs.length}件</div>
-              <div className="rounded-lg border border-slate-200 bg-white p-3 text-base font-bold shadow-sm">未確認 {pendingCount}</div>
-              <div className="rounded-lg border border-slate-200 bg-white p-3 text-base font-bold shadow-sm">コメントあり {commentCount}</div>
-              <div className="rounded-lg border border-slate-200 bg-white p-3 text-base font-bold shadow-sm">承認済み {approvedCount}</div>
+            <div className="grid grid-cols-4 gap-1 sm:gap-2">
+              <div className="rounded-lg border border-slate-200 bg-white p-2 text-center font-bold shadow-sm sm:p-3 sm:text-base">
+                <span className="block text-[10px] leading-4 sm:inline sm:text-base">全</span>
+                <span className="block font-mono text-lg leading-5 sm:ml-1 sm:inline sm:text-base">{repairs.length}件</span>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-2 text-center font-bold shadow-sm sm:p-3 sm:text-base">
+                <span className="block text-[10px] leading-4 sm:inline sm:text-base">未確認</span>
+                <span className="block font-mono text-lg leading-5 sm:ml-1 sm:inline sm:text-base">{pendingCount}</span>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-2 text-center font-bold shadow-sm sm:p-3 sm:text-base">
+                <span className="block text-[10px] leading-4 sm:inline sm:text-base">コメントあり</span>
+                <span className="block font-mono text-lg leading-5 sm:ml-1 sm:inline sm:text-base">{commentCount}</span>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-2 text-center font-bold shadow-sm sm:p-3 sm:text-base">
+                <span className="block text-[10px] leading-4 sm:inline sm:text-base">承認済み</span>
+                <span className="block font-mono text-lg leading-5 sm:ml-1 sm:inline sm:text-base">{approvedCount}</span>
+              </div>
             </div>
           </header>
 
