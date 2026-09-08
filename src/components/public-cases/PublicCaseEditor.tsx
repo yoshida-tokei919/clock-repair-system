@@ -9,12 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 
-type Photo = { id: number; storageKey: string; fileName?: string | null };
+type Photo = { id: number; storageKey: string; fileName?: string | null; publicCaseVisible: boolean };
 type CaseImage = { storagePath?: string | null; isPrimary: boolean };
 type EditableWorkItem = { id?: number; displayName: string };
 type PublicCaseEditorData = {
   id: number;
-  repair: { id: number; inquiryNumber?: string | null; photos: Photo[] };
+  repair: { id: number; inquiryNumber?: string | null; photoPostingOptOut: boolean; photos: Photo[] };
   brandDisplayName?: string | null;
   brandName?: string | null;
   modelName?: string | null;
@@ -47,7 +47,9 @@ function display(value?: string | null): string {
 export function PublicCaseEditor({ data }: { data: PublicCaseEditorData }) {
   const initiallySelected = useMemo(() => {
     const paths = new Set(data.images.map((image) => image.storagePath).filter(Boolean));
-    return data.repair.photos.filter((photo) => paths.has(photo.storageKey)).map((photo) => photo.id);
+    return data.repair.photos
+      .filter((photo) => photo.publicCaseVisible && paths.has(photo.storageKey))
+      .map((photo) => photo.id);
   }, [data.images, data.repair.photos]);
   const initialPrimary = useMemo(() => {
     const primaryPath = data.images.find((image) => image.isPrimary)?.storagePath;
@@ -111,11 +113,11 @@ export function PublicCaseEditor({ data }: { data: PublicCaseEditorData }) {
           <p className="text-sm text-zinc-500">修理番号: {display(data.repair.inquiryNumber)} / PublicCase ID: {data.id}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => submit("save")} disabled={isSaving}><Save className="mr-1 h-4 w-4" />下書き保存</Button>
+          <Button type="button" variant="outline" onClick={() => submit("save")} disabled={isSaving || data.repair.photoPostingOptOut}><Save className="mr-1 h-4 w-4" />下書き保存</Button>
           {isPublished ? (
-            <Button type="button" variant="outline" onClick={() => submit("unpublish")} disabled={isSaving}>非公開に戻す</Button>
+            <Button type="button" variant="outline" onClick={() => submit("unpublish")} disabled={isSaving || data.repair.photoPostingOptOut}>非公開に戻す</Button>
           ) : (
-            <Button type="button" onClick={() => submit("publish")} disabled={isSaving}>公開する</Button>
+            <Button type="button" onClick={() => submit("publish")} disabled={isSaving || data.repair.photoPostingOptOut}>公開する</Button>
           )}
           {isPublished ? <Link href={`/cases/gallery/${data.id}`} target="_blank" className="inline-flex items-center rounded-md border border-zinc-300 px-3 text-sm font-medium"><ExternalLink className="mr-1 h-4 w-4" />公開ページ</Link> : null}
         </div>
@@ -169,14 +171,14 @@ export function PublicCaseEditor({ data }: { data: PublicCaseEditorData }) {
       <section className="rounded-lg border bg-white p-5">
         <h2 className="mb-1 text-base font-bold">写真</h2>
         <p className="mb-4 text-sm text-zinc-500">元Repairに保存済みの写真だけを選択します。写真なしでも公開できます。</p>
-        {data.repair.photos.length ? <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">{data.repair.photos.map((photo) => {
+        {data.repair.photoPostingOptOut ? <p className="text-sm text-amber-700">お客様が事例・SNS掲載を希望していないため、新規の写真候補は表示しません。既存PublicCase画像は変更しません。</p> : data.repair.photos.filter((photo) => photo.publicCaseVisible).length ? <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">{data.repair.photos.filter((photo) => photo.publicCaseVisible).map((photo) => {
           const selected = selectedPhotoIds.includes(photo.id);
           return <label key={photo.id} className="overflow-hidden rounded border bg-zinc-50 text-sm">
             <img src={photoUrl(photo.storageKey)} alt={photo.fileName || "Repair photo"} className="aspect-square w-full object-cover" />
             <span className="flex items-center gap-2 p-2"><input type="checkbox" checked={selected} onChange={(event) => togglePhoto(photo.id, event.target.checked)} /> 使用する</span>
             {selected ? <span className="flex items-center gap-2 px-2 pb-2"><input type="radio" name="primary-photo" checked={primaryPhotoId === photo.id} onChange={() => setPrimaryPhotoId(photo.id)} /> メイン写真</span> : null}
           </label>;
-        })}</div> : <p className="text-sm text-zinc-500">元Repairに写真はありません。</p>}
+        })}</div> : <p className="text-sm text-zinc-500">事例公開を許可した元Repair写真はありません。</p>}
       </section>
     </main>
   );

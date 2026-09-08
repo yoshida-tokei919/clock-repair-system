@@ -21,6 +21,7 @@ type Props = {
   inquiryNumber: string;
   messages?: CustomerMessage[];
   customerName?: string;
+  photoPostingOptOut?: boolean;
 };
 
 function MiniToast({ message, onClose }: { message: string; onClose: () => void }) {
@@ -202,11 +203,12 @@ function getBusinessMessageSenderName(message: CustomerMessage, partnerName?: st
   return `${name || "取引先"} 様`;
 }
 
-export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, messages = [], customerName }: Props) {
+export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, messages = [], customerName, photoPostingOptOut = false }: Props) {
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
   const [approved, setApproved] = useState(isApproved);
+  const [postingOptOut, setPostingOptOut] = useState(photoPostingOptOut);
 
   const postAction = async (path: string, body?: unknown) => {
     setLoading(path);
@@ -265,6 +267,16 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
       alert(isBusiness ? "差戻しを送信しました。" : "相談内容を送信しました。");
     } catch (error) {
       alert(isBusiness ? (error instanceof Error ? error.message : "差戻しに失敗しました。") : "相談内容の送信に失敗しました。");
+    }
+  };
+
+  const handlePostingOptOut = async (checked: boolean) => {
+    try {
+      await postAction("photo-posting-opt-out", { photoPostingOptOut: checked });
+      setPostingOptOut(checked);
+      router.refresh();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "写真掲載設定の変更に失敗しました。");
     }
   };
 
@@ -355,6 +367,11 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
               {approved ? "承認済み" : "この内容で進める"}
             </button>
           </div>
+
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <input type="checkbox" checked={postingOptOut} disabled={!!loading} onChange={(event) => void handlePostingOptOut(event.target.checked)} className="mt-1" />
+            <span><span className="font-bold">修理写真の事例・SNSへの掲載を希望しない</span><span className="mt-1 block text-xs leading-5 text-slate-500">顧客共有ページの写真表示には影響しません。</span></span>
+          </label>
 
           <div className="my-4 border-t border-slate-200" />
         </>

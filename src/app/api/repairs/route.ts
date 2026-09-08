@@ -10,6 +10,11 @@ import {
     estimateItemsLikeToRepairLineItemInputs,
     replaceRepairLineItems,
 } from "@/lib/repair-line-items";
+import {
+    photoSharingFallbacks,
+    repairPhotoCategory,
+    repairPhotoStage,
+} from "@/lib/repair-photo-sharing";
 
 function extractInquirySequence(inquiryNumber: string | null, prefix: string) {
     if (!inquiryNumber) return 0;
@@ -375,17 +380,24 @@ export async function POST(req: Request) {
             // 5.5 Create Photos (New)
             const photoList = body.photos || [];
             if (photoList.length > 0) {
-                await Promise.all(photoList.map((p: any) =>
-                    tx.repairPhoto.create({
+                await Promise.all(photoList.map(async (p: any) => {
+                    const category = repairPhotoCategory(p.category);
+                    const preset = await tx.photoSharingDefault.findUnique({ where: { category } });
+                    const sharing = preset ?? photoSharingFallbacks[category];
+                    return tx.repairPhoto.create({
                         data: {
                             repairId: repair.id,
-                            category: p.category || 'general',
+                            stage: repairPhotoStage(p.stage),
+                            category,
+                            customerVisible: sharing.customerVisible,
+                            publicCaseVisible: sharing.publicCaseVisible,
+                            snsVisible: sharing.snsVisible,
                             storageKey: p.storageKey,
                             fileName: p.fileName,
                             mimeType: p.mimeType,
                         }
-                    })
-                ));
+                    });
+                }));
             }
 
             // 6. Create Estimate (if items exist)

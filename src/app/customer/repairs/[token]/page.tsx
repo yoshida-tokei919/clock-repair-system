@@ -21,7 +21,10 @@ type PageProps = {
 const repairInclude = {
   customer: true,
   watch: { include: { brand: true, model: true, reference: true, caliber: true } },
-  photos: { orderBy: { id: "asc" as const } },
+  photos: {
+    where: { customerVisible: true },
+    orderBy: { id: "asc" as const },
+  },
   estimate: {
     include: {
       items: {
@@ -102,6 +105,32 @@ function getRepairPhotoUrl(photo?: { storageKey?: string | null } | null) {
   return `${REPAIR_PHOTO_PUBLIC_BASE_URL}/${storageKey.replace(/^\/+/, "")}`;
 }
 
+function receptionPhotosForWatchCard(repair: { photos?: any[] }) {
+  const photos = repair.photos ?? [];
+  return photos.filter(
+    (photo) => photo.stage === "RECEPTION" && ["FRONT", "BACK"].includes(photo.category),
+  );
+}
+
+function photosForCustomerProgress(repair: { status?: string | null; photos?: any[] }) {
+  const photos = repair.photos ?? [];
+  const status = repair.status ?? "";
+  const byStage = (stage: string, categories: string[]) => photos.filter(
+    (photo) => photo.stage === stage && categories.includes(photo.category),
+  );
+
+  if (status.includes("作業中")) {
+    const movementPhotos = byStage("WORK", ["MOVEMENT_OPEN"]);
+    return movementPhotos.length ? movementPhotos : byStage("WORK", ["REPAIR_DETAIL"]);
+  }
+  if (status.includes("作業完了") || status.includes("納品")) {
+    return byStage("COMPLETION", ["FRONT", "BACK"]);
+  }
+  // Reception photos belong to the watch card only. They must never be used
+  // as a progress-photo fallback below the estimate total.
+  return [];
+}
+
 function getCustomerStatus(status: string) {
   if (status === "承認待ち") return { label: "見積確認中", className: "border-blue-200 bg-blue-50 text-blue-800" };
   if (status === "見積中") return { label: "見積作成中", className: "border-slate-200 bg-slate-50 text-slate-700" };
@@ -130,7 +159,9 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string
           {repairs.map((repair, index) => {
             const estimateItems = getEstimateItems(repair);
             const { subtotal, taxAmount, total } = getEstimateAmounts(repair);
-            const primaryPhotoUrl = getRepairPhotoUrl(repair.photos?.[0]);
+            const receptionPhotos = receptionPhotosForWatchCard(repair);
+            const customerPhotos = photosForCustomerProgress(repair);
+            const primaryPhotoUrl = getRepairPhotoUrl(receptionPhotos[0]);
             const status = getCustomerStatus(repair.status);
             const watchName = getWatchBrandModelLine(repair);
             const identifiers = [
@@ -163,9 +194,9 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string
 
                 {explanationText && <section className="rounded-xl border border-slate-200 bg-slate-50 p-4"><h2 className="text-lg font-bold">ご案内</h2><div className="mt-3 min-h-32 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-sm leading-7 text-slate-800">{explanationText}</div></section>}
 
-                {repair.photos?.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{repair.photos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
+                {customerPhotos.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{customerPhotos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
 
-                <CustomerRepairActions token={repair.publicToken || token} isBusiness={false} isApproved={repair.approvalStatus === "approved"} showApproval={needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} />
+                <CustomerRepairActions token={repair.publicToken || token} isBusiness={false} isApproved={repair.approvalStatus === "approved"} showApproval={needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} photoPostingOptOut={repair.photoPostingOptOut} />
               </CustomerRepairAccordionItem>
             );
           })}
@@ -420,6 +451,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                     isApproved={repair.approvalStatus === "approved"}
                     inquiryNumber={repair.inquiryNumber}
                     messages={latestMessages}
+                    photoPostingOptOut={repair.photoPostingOptOut}
                     customerName={customerName || "取引先"}
                   />
 
@@ -567,6 +599,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
                   token={repairActionToken}
                   isBusiness={isBusiness}
                   inquiryNumber={repair.inquiryNumber}
+                  photoPostingOptOut={repair.photoPostingOptOut}
                 />
               </div>
             </section>

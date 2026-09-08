@@ -64,15 +64,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     const publicCase = await prisma.publicCase.findFirst({
       where: { id: publicCaseId, sourceType: "WEB_APP", repairId: { not: null } },
-      select: { repairId: true, reviewStatus: true, b2cPublishStatus: true },
+      select: { repairId: true, reviewStatus: true, b2cPublishStatus: true, repair: { select: { photoPostingOptOut: true } } },
     });
     if (!publicCase?.repairId) {
       return NextResponse.json({ error: "通常Repair由来のPublicCaseが見つかりません。" }, { status: 404 });
     }
-
     const selectedPhotoIds = imagePhotoIds(body.photoIds);
     if (selectedPhotoIds === null) {
       return NextResponse.json({ error: "写真の指定が不正です。" }, { status: 400 });
+    }
+    if (publicCase.repair?.photoPostingOptOut && selectedPhotoIds.length > 0) {
+      return NextResponse.json({ error: "お客様が事例・SNS掲載を希望していないため写真を選択できません。" }, { status: 400 });
     }
 
     const editedWorkItems = workItemInputs(body.workItems);
@@ -82,12 +84,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     const repairPhotos: ImagePhoto[] = selectedPhotoIds.length
       ? await prisma.repairPhoto.findMany({
-          where: { repairId: publicCase.repairId, id: { in: selectedPhotoIds } },
+          where: {
+            repairId: publicCase.repairId,
+            id: { in: selectedPhotoIds },
+            publicCaseVisible: true,
+          },
           select: { id: true, storageKey: true, fileName: true },
         })
       : [];
     if (repairPhotos.length !== selectedPhotoIds.length) {
-      return NextResponse.json({ error: "元Repairにない写真は選択できません。" }, { status: 400 });
+      return NextResponse.json({ error: "事例公開を許可していない写真は選択できません。" }, { status: 400 });
     }
 
     const photoById = new Map(repairPhotos.map((photo) => [photo.id, photo]));

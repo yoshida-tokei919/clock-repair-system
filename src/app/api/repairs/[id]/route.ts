@@ -10,6 +10,12 @@ import {
     estimateItemsLikeToRepairLineItemInputs,
     replaceRepairLineItems,
 } from "@/lib/repair-line-items";
+import {
+    normalizePhotoSharing,
+    repairPhotoCategory,
+    repairPhotoStage,
+} from "@/lib/repair-photo-sharing";
+import { enforceRepairPhotoPostingOptOut } from "@/lib/repair-photo-posting-opt-out";
 
 function normalizeCustomerType(value?: string | null): "business" | "individual" | null {
     if (value === "business") return "business";
@@ -173,6 +179,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             const dbStatus = requestedStatus === "受付" && hasEstimateItems ? "見積中" : requestedStatus;
             const rawEndUserName = body.customer?.endUserName ?? body.request?.endUserName ?? null;
             const endUserName = rawEndUserName && String(rawEndUserName).trim() ? String(rawEndUserName).trim() : null;
+            const photoPostingOptOut = typeof body.photoPostingOptOut === "boolean"
+                ? body.photoPostingOptOut
+                : repairRecord.photoPostingOptOut;
 
             let updatedRepair = await tx.repair.update({
                 where: { id },
@@ -188,8 +197,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     internalNotes: body.request?.internalNotes || null,
                     customerNote: body.request?.customerNote ?? null,
                     endUserName,
+                    photoPostingOptOut,
                 }
             });
+
+            await enforceRepairPhotoPostingOptOut(tx, id, photoPostingOptOut);
 
             // RepairStatusLog: スチE�Eタスが変化した場合�Eみ記録
             if (hasEstimateItems && dbStatus === "見積中") {
@@ -391,6 +403,44 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                         await replaceRepairLineItems(id, [], tx);
                     }
                 }
+            }
+
+            // Existing photos are updated in place and newly uploaded storage
+            // objects are registered. Omitted photos are deliberately retained:
+            // deleting a database record must remain an explicit future action.
+            if (Array.isArray(body.photos)) {
+                const existingPhotoIds = new Set((await tx.repairPhoto.findMany({
+                    where: { repairId: id },
+                    select: { id: true },
+                })).map((photo) => photo.id));
+
+                await Promise.all(body.photos.map((rawPhoto: any) => {
+                    const category = repairPhotoCategory(rawPhoto.category);
+                    const sharing = normalizePhotoSharing({
+                        customerVisible: rawPhoto.customerVisible,
+                        publicCaseVisible: rawPhoto.publicCaseVisible,
+                        snsVisible: rawPhoto.snsVisible,
+                    });
+                    if (photoPostingOptOut) {
+                        sharing.publicCaseVisible = false;
+                        sharing.snsVisible = false;
+                    }
+                    const data = {
+                        stage: repairPhotoStage(rawPhoto.stage),
+                        category,
+                        ...sharing,
+                        fileName: rawPhoto.fileName || null,
+                        mimeType: rawPhoto.mimeType || null,
+                    };
+                    const photoId = Number(rawPhoto.id);
+                    if (Number.isInteger(photoId) && existingPhotoIds.has(photoId)) {
+                        return tx.repairPhoto.update({ where: { id: photoId }, data });
+                    }
+                    if (!rawPhoto.storageKey || typeof rawPhoto.storageKey !== "string") {
+                        return Promise.resolve(null);
+                    }
+                    return tx.repairPhoto.create({ data: { repairId: id, storageKey: rawPhoto.storageKey, ...data } });
+                }));
             }
 
             const repairOrders = await tx.orderRequest.findMany({

@@ -24,7 +24,9 @@ export function CameraCaptureDialog({
     isOpen,
     onClose,
     repairId,
-    category = 'general',
+    // This legacy gallery has no pre-capture category selector.  Treat it as
+    // explicitly unclassified rather than passing the former non-enum value.
+    category = 'OTHER',
     onSaved
 }: CameraCaptureDialogProps) {
     const videoRef   = useRef<HTMLVideoElement>(null);

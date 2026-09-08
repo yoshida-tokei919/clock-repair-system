@@ -168,6 +168,7 @@ model Repair {
   uuid                 String    @unique @default(uuid())
   publicToken          String?   @unique
   publicTokenCreatedAt DateTime?
+  photoPostingOptOut   Boolean   @default(false)
   inquiryNumber        String    @unique // T-001
   customerId           Int
   watchId              Int
@@ -256,16 +257,50 @@ model RepairCustomerMessage {
 }
 
 // 4. Photos
+enum RepairPhotoStage {
+  RECEPTION
+  WORK
+  COMPLETION
+}
+
+enum RepairPhotoCategory {
+  FRONT
+  CROWN_SIDE
+  BACK
+  BRACELET
+  MOVEMENT_OPEN
+  REPAIR_DETAIL
+  OTHER
+}
+
 model RepairPhoto {
-  id         Int      @id @default(autoincrement())
-  repairId   Int
-  category   String
-  storageKey String
-  fileName   String?
-  mimeType   String?
-  createdAt  DateTime @default(now())
+  id                 Int                 @id @default(autoincrement())
+  repairId           Int
+  stage              RepairPhotoStage?
+  category           RepairPhotoCategory @default(OTHER)
+  customerVisible    Boolean             @default(true)
+  publicCaseVisible  Boolean             @default(false)
+  snsVisible         Boolean             @default(false)
+  storageKey         String
+  fileName           String?
+  mimeType           String?
+  createdAt          DateTime            @default(now())
   
-  repair     Repair   @relation(fields: [repairId], references: [id])
+  repair             Repair              @relation(fields: [repairId], references: [id])
+
+  @@index([repairId, customerVisible])
+  @@index([repairId, publicCaseVisible])
+}
+
+// One editable preset per photo category. Applied only when the operator chooses
+// a category; existing RepairPhoto rows retain their migrated visibility values.
+model PhotoSharingDefault {
+  category           RepairPhotoCategory @id
+  customerVisible    Boolean
+  publicCaseVisible  Boolean
+  snsVisible         Boolean
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 // 5. Accounting

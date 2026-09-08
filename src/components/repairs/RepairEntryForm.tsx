@@ -50,6 +50,14 @@ import {
 } from "@/lib/repair-work-target-part-filter";
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { toast } from "@/components/ui/use-toast";
+import {
+    photoSharingFallbacks,
+    repairPhotoCategories,
+    repairPhotoCategoryLabels,
+    repairPhotoStageLabels,
+    repairPhotoStages,
+    type PhotoSharingValues,
+} from "@/lib/repair-photo-sharing";
 
 // --- ACTIONS (Server) ---
 import {
@@ -164,6 +172,15 @@ const STATUS_STEPS: { id: string; label: string }[] = [
 const MAIN_STATUS_STEPS = STATUS_STEPS.filter(s => s.id !== 'キャンセル' && s.id !== '保留');
 const PART_SEARCH_SITES_STORAGE_KEY = "repair-part-search-sites:v1";
 const REPAIR_PHOTO_PUBLIC_BASE_URL = "https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev";
+
+const repairPhotoStageFromStatus = (repairStatus: string) => {
+    if (repairStatus === "作業中") return "WORK" as const;
+    if (repairStatus === "作業完了" || repairStatus === "納品済み") return "COMPLETION" as const;
+    if (["受付", "見積中", "承認待ち", "部品待ち(未注文)", "部品待ち(注文済み)", "部品入荷済み", "作業待ち"].includes(repairStatus)) {
+        return "RECEPTION" as const;
+    }
+    return null;
+};
 
 function getRepairPhotoSrc(photo?: { storageKey?: string | null } | null): string | null {
     const storageKey = photo?.storageKey?.trim();
@@ -1153,6 +1170,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
     // --- 4. PHOTOS ---
     const [photos, setPhotos] = useState<any[]>(initialData?.photos || []);
+    const [photoPostingOptOut, setPhotoPostingOptOut] = useState(Boolean(initialData?.photoPostingOptOut));
+    const [isUpdatingPhotoPostingOptOut, setIsUpdatingPhotoPostingOptOut] = useState(false);
+    const [newPhotoCategory, setNewPhotoCategory] = useState("FRONT");
+    const [photoSettingsOpen, setPhotoSettingsOpen] = useState(false);
+    const [photoSharingDefaults, setPhotoSharingDefaults] = useState<Record<string, PhotoSharingValues>>(photoSharingFallbacks);
     const primaryPhoto = photos[0];
     const primaryPhotoUrl = getRepairPhotoSrc(primaryPhoto);
     const [frontImageFailed, setFrontImageFailed] = useState(false);
@@ -1166,9 +1188,37 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
     const [cameraInfo, setCameraInfo] = useState<string>('');
+    const [expandedPhoto, setExpandedPhoto] = useState<any | null>(null);
+    const [photoViewerZoom, setPhotoViewerZoom] = useState(1);
+    const [photoViewerPan, setPhotoViewerPan] = useState({ x: 0, y: 0 });
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
+    const photoFileInputRef = useRef<HTMLInputElement>(null);
+    const photoViewerDragRef = useRef<{ pointerId: number; startX: number; startY: number; panX: number; panY: number } | null>(null);
+
+    const resetPhotoViewer = useCallback(() => {
+        setPhotoViewerZoom(1);
+        setPhotoViewerPan({ x: 0, y: 0 });
+    }, []);
+
+    useEffect(() => {
+        resetPhotoViewer();
+    }, [expandedPhoto, resetPhotoViewer]);
+
+    useEffect(() => {
+        fetch("/api/photo-sharing-defaults")
+            .then((response) => response.ok ? response.json() : null)
+            .then((defaults) => {
+                if (defaults && typeof defaults === "object") {
+                    setPhotoSharingDefaults((current) => ({ ...current, ...defaults }));
+                }
+            })
+            .catch(() => {
+                // The typed fallback presets keep photo entry usable before the
+                // settings table has been migrated in a local development DB.
+            });
+    }, []);
 
     // --- 5. MASTERS & OPTIONS ---
     const [brandOpts, setBrandOpts] = useState<any[]>([]);
@@ -1951,6 +2001,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 },
                 status: nextStatus,
                 statusLog: nextStatusLog,
+                photoPostingOptOut,
                 photos
             };
 
@@ -2068,17 +2119,94 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             const fd = new FormData();
             fd.append("file", file);
             if (initialData?.id) fd.append("repairId", initialData.id);
+            fd.append("category", newPhotoCategory);
+            const captureStage = repairPhotoStageFromStatus(status);
+            if (captureStage) fd.append("stage", captureStage);
 
             const res = await fetch("/api/upload", { method: "POST", body: fd });
-            const data = await res.json();
-            if (data.success) {
-                setPhotos(prev => [...prev, { storageKey: data.storageKey, fileName: data.fileName, mimeType: data.mimeType }]);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || `画像アップロードに失敗しました (HTTP ${res.status})`);
             }
-        } catch (err) {
-            console.error(err);
-            alert("画像アップロードエラー");
+            const savedPhoto = data.photo ?? {
+                storageKey: data.storageKey,
+                fileName: data.fileName,
+                mimeType: data.mimeType,
+                stage: captureStage,
+                category: newPhotoCategory,
+                ...(photoSharingDefaults[newPhotoCategory] ?? photoSharingFallbacks.OTHER),
+            };
+            setPhotos(prev => [...prev, savedPhoto]);
+            return savedPhoto;
+        } catch (error) {
+            console.error("Repair photo upload failed", error);
+            throw error;
         } finally {
             setIsUploading(false);
+        }
+    };
+
+    const updatePhoto = async (index: number, changes: Record<string, unknown>) => {
+        const current = photos[index];
+        if (!current) return;
+        const next = { ...current, ...changes };
+        if (photoPostingOptOut) {
+            next.publicCaseVisible = false;
+            next.snsVisible = false;
+        }
+        setPhotos((items) => items.map((photo, photoIndex) => photoIndex === index ? next : photo));
+
+        if (!initialData?.id || !Number.isInteger(Number(current.id))) return;
+        try {
+            const response = await fetch(`/api/repairs/${initialData.id}/photos`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ photoId: current.id, ...next }),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || "写真設定を保存できませんでした。");
+            setPhotos((items) => items.map((photo, photoIndex) => photoIndex === index
+                ? { ...next, ...result.sharing }
+                : photo));
+        } catch (error) {
+            console.error(error);
+            toast({ title: "写真設定の保存に失敗しました", variant: "destructive" });
+        }
+    };
+
+    const applyPhotoCategory = (index: number, category: string) => {
+        void updatePhoto(index, { category });
+    };
+
+    const updatePhotoPostingOptOut = async (nextPhotoPostingOptOut: boolean) => {
+        if (!initialData?.id || isReadOnly || isUpdatingPhotoPostingOptOut) return;
+
+        setIsUpdatingPhotoPostingOptOut(true);
+        try {
+            const response = await fetch(`/api/repairs/${initialData.id}/photo-posting-opt-out`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ photoPostingOptOut: nextPhotoPostingOptOut }),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || "写真の掲載設定を保存できませんでした。");
+            }
+
+            setPhotoPostingOptOut(nextPhotoPostingOptOut);
+            if (nextPhotoPostingOptOut) {
+                setPhotos((items) => items.map((photo) => ({
+                    ...photo,
+                    publicCaseVisible: false,
+                    snsVisible: false,
+                })));
+            }
+            toast({ title: nextPhotoPostingOptOut ? "写真の事例・SNS掲載を拒否に設定しました" : "写真の事例・SNS掲載を許可に戻しました" });
+        } catch (error) {
+            console.error(error);
+            toast({ title: "写真の掲載設定の保存に失敗しました", variant: "destructive" });
+        } finally {
+            setIsUpdatingPhotoPostingOptOut(false);
         }
     };
 
@@ -2086,7 +2214,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         if (isReadOnly) return;
         const file = e.target.files?.[0];
         if (!file) return;
-        await uploadPhotoFile(file);
+        try {
+            await uploadPhotoFile(file);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : "画像アップロードエラー");
+        }
         e.target.value = "";
     };
 
@@ -2204,7 +2336,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             closeCameraDialog();
         } catch (error) {
             console.error(error);
-            setCameraError("撮影画像の保存に失敗しました。");
+            setCameraError(error instanceof Error ? error.message : "撮影画像の保存に失敗しました。");
         } finally {
             setIsCapturing(false);
         }
@@ -3332,11 +3464,31 @@ ${shopName}
                 <div className="p-3">
                 <div>
                     <Card className="shadow-sm border-t-4 border-t-purple-600 bg-white p-3 flex flex-col">
-                        <div className="flex justify-between items-center mb-2">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                             <h3 className="text-xs font-bold flex items-center gap-1.5 text-zinc-700 uppercase">
                                 <ImageIcon className="w-3.5 h-3.5" /> 写真
                             </h3>
-                            <div className="flex items-center gap-1">
+                            <div className="flex flex-wrap items-center gap-1">
+                                <select
+                                    aria-label="新規写真の撮影箇所"
+                                    className="h-7 max-w-28 rounded border border-zinc-200 bg-white px-1 text-[10px]"
+                                    value={newPhotoCategory}
+                                    disabled={isReadOnly || isUploading || isCapturing}
+                                    onChange={(event) => setNewPhotoCategory(event.target.value)}
+                                >
+                                    {repairPhotoCategories.map((value) => <option key={value} value={value}>{repairPhotoCategoryLabels[value]}</option>)}
+                                </select>
+                                <Button type="button" variant="ghost" className="h-7 px-2 text-[10px] font-bold text-zinc-700" onClick={() => setPhotoSettingsOpen(true)} disabled={photos.length === 0}>
+                                    写真共有設定
+                                </Button>
+                                <label className="flex h-7 items-center gap-1 rounded border border-zinc-200 bg-white px-2 text-[10px] font-medium text-zinc-700">
+                                    <Checkbox
+                                        checked={photoPostingOptOut}
+                                        disabled={isReadOnly || !initialData?.id || isUpdatingPhotoPostingOptOut}
+                                        onCheckedChange={(checked) => void updatePhotoPostingOptOut(checked === true)}
+                                    />
+                                    <span>写真の事例・SNS掲載: {photoPostingOptOut ? "お客様より掲載拒否" : "掲載可"}</span>
+                                </label>
                                 <Button
                                     type="button"
                                     variant="ghost"
@@ -3347,6 +3499,16 @@ ${shopName}
                                     <Camera className="w-4 h-4 mr-1 text-zinc-600" />
                                     カメラで撮影
                                 </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-[10px] font-bold text-zinc-700"
+                                    onClick={() => photoFileInputRef.current?.click()}
+                                    disabled={isReadOnly || isUploading || isCapturing}
+                                >
+                                    写真追加
+                                </Button>
+                                <input ref={photoFileInputRef} type="file" className="hidden" accept="image/*" multiple onChange={handlePhotoUpload} />
                                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => {
                                     if (isReadOnly) return;
                                     if (!canUseMobileQR) {
@@ -3359,21 +3521,46 @@ ${shopName}
                                 </Button>
                             </div>
                         </div>
-                        <div className="bg-zinc-100 rounded-md p-2 grid grid-cols-3 gap-2 auto-rows-min content-start min-h-[200px]">
-                            <label className="aspect-square border-2 border-dashed border-zinc-300 rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-white transition-all group min-h-[100px]">
-                                <Camera className="w-6 h-6 text-zinc-400 group-hover:text-blue-500 mb-1" />
-                                <span className="text-[9px] text-zinc-400 group-hover:text-blue-500">写真を追加</span>
-                                <input type="file" className="hidden" accept="image/*" multiple onChange={handlePhotoUpload} />
-                            </label>
-                            {photos.map((p, i) => (
-                                <div key={i} className="aspect-square relative rounded-md overflow-hidden bg-black group border border-zinc-200 shadow-sm">
-                                    <img src={`https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev/${p.storageKey}`} className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                        <button className="text-white hover:text-blue-300"><Eye className="w-4 h-4" /></button>
-                                        <button onClick={() => { if (isReadOnly) return; setPhotos(photos.filter((_, x) => x !== i)); }} className="text-white hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                        <div className="grid auto-rows-min grid-cols-3 content-start gap-2 rounded-md bg-zinc-100 p-2">
+                            {photos.map((p, i) => {
+                                const category = repairPhotoCategories.includes(p.category) ? p.category : "OTHER";
+                                const customerVisible = p.customerVisible !== false;
+                                const publicCaseVisible = p.publicCaseVisible === true;
+                                const snsVisible = p.snsVisible === true;
+                                return (
+                                    <div key={p.id ?? `${p.storageKey}-${i}`} className="relative overflow-hidden rounded-md border border-zinc-200 bg-white shadow-sm">
+                                        <img src={getRepairPhotoSrc(p) ?? ""} alt={p.fileName || "修理写真"} className="aspect-square w-full bg-black object-cover" />
+                                        <div className="space-y-1.5 p-2 text-[10px] text-zinc-700">
+                                            <select
+                                                aria-label="撮影工程"
+                                                className="h-7 w-full rounded border border-zinc-200 bg-white px-1"
+                                                value={p.stage ?? ""}
+                                                disabled={isReadOnly}
+                                                onChange={(event) => void updatePhoto(i, { stage: event.target.value || null })}
+                                            >
+                                                <option value="">工程未設定</option>
+                                                {repairPhotoStages.map((stage) => <option key={stage} value={stage}>{repairPhotoStageLabels[stage]}</option>)}
+                                            </select>
+                                            <select
+                                                aria-label="撮影部位"
+                                                className="h-7 w-full rounded border border-zinc-200 bg-white px-1"
+                                                value={category}
+                                                disabled={isReadOnly}
+                                                onChange={(event) => applyPhotoCategory(i, event.target.value)}
+                                            >
+                                                {repairPhotoCategories.map((value) => <option key={value} value={value}>{repairPhotoCategoryLabels[value]}</option>)}
+                                            </select>
+                                            <label className="flex items-center gap-1"><Checkbox checked={customerVisible} disabled={isReadOnly} onCheckedChange={(checked) => void updatePhoto(i, { customerVisible: checked === true, publicCaseVisible, snsVisible })} /> 顧客共有</label>
+                                            <label className="flex items-center gap-1 text-zinc-600"><Checkbox checked={publicCaseVisible} disabled={isReadOnly || photoPostingOptOut} onCheckedChange={(checked) => void updatePhoto(i, { customerVisible, publicCaseVisible: checked === true, snsVisible })} /> 事例公開</label>
+                                            <label className="flex items-center gap-1 text-zinc-600"><Checkbox checked={snsVisible} disabled={isReadOnly || photoPostingOptOut} onCheckedChange={(checked) => void updatePhoto(i, { customerVisible, publicCaseVisible, snsVisible: checked === true })} /> SNS利用</label>
+                                        </div>
+                                        <div className="absolute right-1 top-1 flex gap-1">
+                                            <button type="button" aria-label="写真を拡大" onClick={() => setExpandedPhoto(p)} className="rounded bg-black/60 p-1 text-white hover:text-blue-300"><Eye className="h-3.5 w-3.5" /></button>
+                                            <button type="button" onClick={() => { if (isReadOnly) return; setPhotos(photos.filter((_, x) => x !== i)); }} className="rounded bg-black/60 p-1 text-white hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </Card>
                 </div>
@@ -3442,6 +3629,85 @@ ${shopName}
                     console.log("Photos uploaded from mobile");
                 }}
             />
+
+            <Dialog open={photoSettingsOpen} onOpenChange={setPhotoSettingsOpen}>
+                <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                        <DialogTitle>写真共有設定</DialogTitle>
+                        <DialogDescription>写真ごとの工程・撮影箇所と、共有先をまとめて確認・変更できます。<a href="/masters/photo-sharing" className="ml-2 font-medium text-blue-600 underline">新規写真の初期値を設定</a></DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[65vh] space-y-2 overflow-y-auto">
+                        {photos.map((photo, index) => {
+                            const category = repairPhotoCategories.includes(photo.category) ? photo.category : "OTHER";
+                            return <div key={photo.id ?? `${photo.storageKey}-${index}`} className="grid grid-cols-[3.5rem_1fr] gap-3 rounded border p-2 sm:grid-cols-[5rem_8rem_8rem_1fr]">
+                                <img src={getRepairPhotoSrc(photo) ?? ""} alt={photo.fileName || "修理写真"} className="aspect-square w-full rounded object-cover" />
+                                <div className="grid grid-cols-2 gap-2 sm:contents">
+                                    <select className="h-8 rounded border px-1 text-xs" value={photo.stage ?? ""} disabled={isReadOnly} onChange={(event) => void updatePhoto(index, { stage: event.target.value || null })}>
+                                        <option value="">工程未設定</option>
+                                        {repairPhotoStages.map((stage) => <option key={stage} value={stage}>{repairPhotoStageLabels[stage]}</option>)}
+                                    </select>
+                                    <select className="h-8 rounded border px-1 text-xs" value={category} disabled={isReadOnly} onChange={(event) => applyPhotoCategory(index, event.target.value)}>
+                                        {repairPhotoCategories.map((value) => <option key={value} value={value}>{repairPhotoCategoryLabels[value]}</option>)}
+                                    </select>
+                                    <div className="col-span-2 flex flex-wrap gap-3 text-xs">
+                                        <label className="flex items-center gap-1"><Checkbox checked={photo.customerVisible !== false} disabled={isReadOnly} onCheckedChange={(checked) => void updatePhoto(index, { customerVisible: checked === true, publicCaseVisible: photo.publicCaseVisible === true, snsVisible: photo.snsVisible === true })} />共有</label>
+                                        <label className="flex items-center gap-1"><Checkbox checked={photo.publicCaseVisible === true} disabled={isReadOnly || photoPostingOptOut} onCheckedChange={(checked) => void updatePhoto(index, { customerVisible: photo.customerVisible !== false, publicCaseVisible: checked === true, snsVisible: photo.snsVisible === true })} />事例</label>
+                                        <label className="flex items-center gap-1"><Checkbox checked={photo.snsVisible === true} disabled={isReadOnly || photoPostingOptOut} onCheckedChange={(checked) => void updatePhoto(index, { customerVisible: photo.customerVisible !== false, publicCaseVisible: photo.publicCaseVisible === true, snsVisible: checked === true })} />SNS</label>
+                                    </div>
+                                </div>
+                            </div>;
+                        })}
+                    </div>
+                    {photoPostingOptOut && <p className="text-sm text-amber-700">お客様が事例・SNS掲載を希望していないため、事例・SNSは変更できません。</p>}
+                    <DialogFooter><Button type="button" onClick={() => setPhotoSettingsOpen(false)}>閉じる</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={expandedPhoto !== null} onOpenChange={(open) => { if (!open) setExpandedPhoto(null); }}>
+                <DialogContent className="!fixed !inset-0 !flex !h-[100dvh] !w-screen !max-h-none !max-w-none !translate-x-0 !translate-y-0 !rounded-none !border-0 !bg-black !p-0 text-white [&>button]:right-4 [&>button]:top-4 [&>button]:z-20 [&>button]:opacity-100 [&>button]:text-white">
+                    <DialogHeader className="absolute left-4 top-4 z-10 pr-16">
+                        <DialogTitle className="text-sm text-white/80">写真確認</DialogTitle>
+                    </DialogHeader>
+                    <div className="absolute left-4 top-12 z-10">
+                        <Button type="button" variant="outline" size="sm" className="h-8 border-white/30 bg-white/15 text-xs text-white hover:bg-white/25 hover:text-white" onClick={resetPhotoViewer}>
+                            フィット / リセット
+                        </Button>
+                    </div>
+                    <div
+                        className={cn("flex h-full w-full touch-none items-center justify-center overflow-hidden", photoViewerZoom > 1 ? "cursor-grab" : "cursor-default")}
+                        onWheel={(event) => {
+                            event.preventDefault();
+                            setPhotoViewerZoom((current) => {
+                                const next = Math.min(5, Math.max(0.5, current - event.deltaY * 0.0015));
+                                if (next <= 1) setPhotoViewerPan({ x: 0, y: 0 });
+                                return next;
+                            });
+                        }}
+                        onPointerDown={(event) => {
+                            if (photoViewerZoom <= 1) return;
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            photoViewerDragRef.current = {
+                                pointerId: event.pointerId,
+                                startX: event.clientX,
+                                startY: event.clientY,
+                                panX: photoViewerPan.x,
+                                panY: photoViewerPan.y,
+                            };
+                        }}
+                        onPointerMove={(event) => {
+                            const drag = photoViewerDragRef.current;
+                            if (!drag || drag.pointerId !== event.pointerId) return;
+                            setPhotoViewerPan({ x: drag.panX + event.clientX - drag.startX, y: drag.panY + event.clientY - drag.startY });
+                        }}
+                        onPointerUp={(event) => {
+                            if (photoViewerDragRef.current?.pointerId === event.pointerId) photoViewerDragRef.current = null;
+                        }}
+                        onPointerCancel={() => { photoViewerDragRef.current = null; }}
+                    >
+                        {expandedPhoto && <img src={getRepairPhotoSrc(expandedPhoto) ?? ""} alt={expandedPhoto.fileName || "修理写真"} draggable={false} className="max-h-full max-w-full select-none object-contain transition-transform duration-75" style={{ transform: `translate(${photoViewerPan.x}px, ${photoViewerPan.y}px) scale(${photoViewerZoom})` }} />}
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={partSearchDialogOpen} onOpenChange={setPartSearchDialogOpen}>
                 <DialogContent className="max-w-3xl">

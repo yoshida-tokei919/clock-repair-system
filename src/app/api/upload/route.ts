@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { photoSharingFallbacks, repairPhotoCategory, repairPhotoStage } from "@/lib/repair-photo-sharing";
 
 
 export async function POST(request: NextRequest) {
@@ -8,7 +9,8 @@ export async function POST(request: NextRequest) {
         const file: File | null = data.get("file") as unknown as File;
         const repairId = data.get("repairId") as string;
         const partId = data.get("partId") as string;
-        const category = data.get("category") as string || "general";
+        const category = repairPhotoCategory(data.get("category"));
+        const stage = repairPhotoStage(data.get("stage"));
 
         if (!file) {
             return NextResponse.json({ success: false, error: "No file uploaded" }, { status: 400 });
@@ -29,17 +31,28 @@ export async function POST(request: NextRequest) {
         // Save to DB only if repairId is present (for repair photos specifically)
         if (repairId && repairId !== "null" && repairId !== "undefined") {
             try {
+                const repair = await prisma.repair.findUnique({
+                    where: { id: parseInt(repairId) },
+                    select: { photoPostingOptOut: true },
+                });
+                if (!repair) return NextResponse.json({ success: false, error: "Repair not found" }, { status: 404 });
+                const preset = await prisma.photoSharingDefault.findUnique({ where: { category } });
+                const sharing = preset ?? photoSharingFallbacks[category];
                 photo = await prisma.repairPhoto.create({
                     data: {
                         repairId: parseInt(repairId),
-                        category: category,
+                        stage,
+                        category,
+                        customerVisible: sharing.customerVisible,
+                        publicCaseVisible: repair.photoPostingOptOut ? false : sharing.publicCaseVisible,
+                        snsVisible: repair.photoPostingOptOut ? false : sharing.snsVisible,
                         storageKey: storageKey, // Saving Base64 directly
                         fileName: file.name,
                         mimeType: file.type,
                     },
                 });
             } catch (e) {
-                console.error("DB Save failed for repairPhoto", e);
+                console.error("DB Save failed for repairPhoto", { repairId, category, stage, error: e });
                 return NextResponse.json({ success: false, error: "Database save failed" }, { status: 500 });
             }
         }

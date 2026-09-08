@@ -15,7 +15,7 @@ export default async function PublicCaseEditorPage({ params }: { params: { id: s
       workItems: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
       partItems: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
       images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }, { id: "asc" }] },
-      repair: { select: { id: true, inquiryNumber: true, photos: { orderBy: { createdAt: "asc" } } } },
+      repair: { select: { id: true, inquiryNumber: true, photoPostingOptOut: true, photos: { orderBy: { createdAt: "asc" } } } },
     },
   });
   if (!publicCase?.repair) notFound();
