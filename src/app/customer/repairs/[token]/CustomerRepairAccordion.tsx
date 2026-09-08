@@ -9,8 +9,8 @@ type AccordionContextValue = {
 
 const AccordionContext = createContext<AccordionContextValue | null>(null);
 
-export function CustomerRepairAccordionRoot({ children }: { children: ReactNode }) {
-  const [openIndex, setOpenIndex] = useState(0);
+export function CustomerRepairAccordionRoot({ children, initialOpenIndex = 0 }: { children: ReactNode; initialOpenIndex?: number }) {
+  const [openIndex, setOpenIndex] = useState(initialOpenIndex);
 
   return (
     <AccordionContext.Provider value={{ openIndex, setOpenIndex }}>

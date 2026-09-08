@@ -20,7 +20,8 @@ type PageProps = {
 
 const repairInclude = {
   customer: true,
-  watch: { include: { brand: true, model: true, reference: true } },
+  watch: { include: { brand: true, model: true, reference: true, caliber: true } },
+  photos: { orderBy: { id: "asc" as const } },
   estimate: {
     include: {
       items: {
@@ -89,6 +90,89 @@ function getWatchBrandModelLine(repair: any) {
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+const REPAIR_PHOTO_PUBLIC_BASE_URL = "https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev";
+const CUSTOMER_LINE_URL = "https://lin.ee/3C0XfJW";
+
+function getRepairPhotoUrl(photo?: { storageKey?: string | null } | null) {
+  const storageKey = photo?.storageKey?.trim();
+  if (!storageKey) return null;
+  if (/^(https?:|data:|blob:)/i.test(storageKey)) return storageKey;
+  return `${REPAIR_PHOTO_PUBLIC_BASE_URL}/${storageKey.replace(/^\/+/, "")}`;
+}
+
+function getCustomerStatus(status: string) {
+  if (status === "承認待ち") return { label: "見積確認中", className: "border-blue-200 bg-blue-50 text-blue-800" };
+  if (status === "見積中") return { label: "見積作成中", className: "border-slate-200 bg-slate-50 text-slate-700" };
+  if (status === "保留") return { label: "確認中", className: "border-slate-200 bg-slate-50 text-slate-700" };
+  if (["部品待ち(未注文)", "部品待ち(注文済み)", "部品入荷済み", "作業待ち"].includes(status)) return { label: "作業待ち", className: "border-sky-200 bg-sky-50 text-sky-800" };
+  if (status === "作業中") return { label: "作業中", className: "border-indigo-200 bg-indigo-50 text-indigo-800" };
+  if (status === "作業完了" || status === "納品済み") return { label: "完了", className: "border-emerald-200 bg-emerald-50 text-emerald-800" };
+  return { label: status || "確認中", className: "border-slate-200 bg-slate-50 text-slate-700" };
+}
+
+function needsCustomerApproval(repair: any) {
+  return repair.approvalStatus === "pending" && repair.status === "承認待ち";
+}
+
+function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null }) {
+  return (
+    <main className="min-h-screen bg-[#f3f6fa] px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
+      <div className="mx-auto max-w-2xl space-y-4">
+        <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-bold tracking-wide text-slate-500">時計修理のご案内</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">修理状況・お見積</h1>
+          {documentMeta && <p className="mt-2 text-sm text-slate-500">{documentMeta.estimateNumber} / {documentMeta.issuedDate.toLocaleDateString("ja-JP")}</p>}
+        </header>
+
+        <CustomerRepairAccordionRoot initialOpenIndex={repairs[0]?.status === "作業中" ? -1 : 0}>
+          {repairs.map((repair, index) => {
+            const estimateItems = getEstimateItems(repair);
+            const { subtotal, taxAmount, total } = getEstimateAmounts(repair);
+            const primaryPhotoUrl = getRepairPhotoUrl(repair.photos?.[0]);
+            const status = getCustomerStatus(repair.status);
+            const watchName = getWatchBrandModelLine(repair);
+            const identifiers = [
+              repair.watch?.reference?.name && `Ref. ${repair.watch.reference.name}`,
+              repair.watch?.caliber?.name && `Cal. ${repair.watch.caliber.name}`,
+            ].filter(Boolean);
+            const explanationText = repair.customerNote?.trim() || "";
+
+            return (
+              <CustomerRepairAccordionItem
+                key={repair.id}
+                index={index}
+                statusBand={<div className="border-b border-slate-100 bg-white px-4 pt-4"><span className={`inline-flex rounded-full border px-3 py-1 text-sm font-bold ${status.className}`}>{status.label}</span></div>}
+                summary={
+                  <div className="flex min-w-0 gap-3">
+                    {primaryPhotoUrl && <img src={primaryPhotoUrl} alt={`${watchName || "時計"}の写真`} className="h-20 w-20 shrink-0 rounded-xl border border-slate-200 bg-slate-50 object-cover" />}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-lg font-bold leading-6 text-slate-950">{watchName || "時計情報を確認中"}</p>
+                      {identifiers.length > 0 && <p className="mt-1 break-words text-sm leading-5 text-slate-500">{identifiers.join(" / ")}</p>}
+                      <div className="mt-3"><p className="text-xs font-bold text-slate-500">税込合計</p><p className="font-mono text-2xl font-bold text-blue-700">¥{total.toLocaleString()}</p></div>
+                    </div>
+                  </div>
+                }
+              >
+                <section className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">見積内容</h2>{repair.estimateDocument && <PdfLinkButton href={`/customer/repairs/${token}/estimate.pdf`} />}</div>
+                  <div className="mt-3 divide-y divide-slate-100">{estimateItems.length === 0 ? <p className="py-3 text-sm text-slate-500">見積明細はまだありません。</p> : estimateItems.map((item: any) => <div key={item.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div className="min-w-0 font-medium">{item.type === "part" ? formatPartDisplay({ name: item.itemName, grade: item.partsMaster?.grade, note2: item.partsMaster?.notes2 }) : item.itemName}{item.quantity > 1 && <span className="ml-2 text-slate-500">数量 {item.quantity}</span>}</div><span className="shrink-0 font-mono font-bold">¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}</span></div>)}</div>
+                  <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm"><div className="flex justify-between text-slate-600"><span>税抜小計</span><span className="font-mono">¥{subtotal.toLocaleString()}</span></div><div className="flex justify-between text-slate-600"><span>消費税（10%）</span><span className="font-mono">¥{taxAmount.toLocaleString()}</span></div><div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2"><span className="font-bold">税込合計</span><span className="font-mono text-xl font-bold text-blue-700">¥{total.toLocaleString()}</span></div></div>
+                </section>
+
+                {explanationText && <section className="rounded-xl border border-slate-200 bg-slate-50 p-4"><h2 className="text-lg font-bold">ご案内</h2><div className="mt-3 min-h-32 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-sm leading-7 text-slate-800">{explanationText}</div></section>}
+
+                {repair.photos?.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{repair.photos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
+
+                <CustomerRepairActions token={repair.publicToken || token} isBusiness={false} isApproved={repair.approvalStatus === "approved"} showApproval={needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} />
+              </CustomerRepairAccordionItem>
+            );
+          })}
+        </CustomerRepairAccordionRoot>
+      </div>
+    </main>
+  );
 }
 
 export default async function CustomerRepairPage({ params }: PageProps) {
@@ -188,7 +272,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
               <p className="mt-3 text-base text-slate-700">共有先: {customerName} 様</p>
               {documentMeta && (
                 <p className="mt-1 text-sm text-slate-500">
-                  {documentMeta.estimateNumber} / {documentMeta.issuedDate.toLocaleDateString("ja-JP")}
+                  {documentMeta?.estimateNumber} / {documentMeta?.issuedDate.toLocaleDateString("ja-JP")}
                 </p>
               )}
             </div>
@@ -353,6 +437,8 @@ export default async function CustomerRepairPage({ params }: PageProps) {
     );
   }
 
+  return <CustomerRepairB2CPage token={token} repairs={repairs} documentMeta={documentMeta} />;
+
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
       <div className="mx-auto max-w-2xl space-y-4">
@@ -371,7 +457,7 @@ export default async function CustomerRepairPage({ params }: PageProps) {
               <div className="text-lg font-bold">{customerName || "お客様"}</div>
               {documentMeta && (
                 <p className="mt-1 text-xs text-slate-500">
-                  {documentMeta.estimateNumber} / {documentMeta.issuedDate.toLocaleDateString("ja-JP")}
+                  {documentMeta?.estimateNumber} / {documentMeta?.issuedDate.toLocaleDateString("ja-JP")}
                 </p>
               )}
             </div>

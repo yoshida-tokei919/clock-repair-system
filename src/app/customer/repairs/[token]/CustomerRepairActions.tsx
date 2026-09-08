@@ -16,6 +16,8 @@ type Props = {
   token: string;
   isBusiness: boolean;
   isApproved?: boolean;
+  showApproval?: boolean;
+  lineUrl?: string;
   inquiryNumber: string;
   messages?: CustomerMessage[];
   customerName?: string;
@@ -200,7 +202,7 @@ function getBusinessMessageSenderName(message: CustomerMessage, partnerName?: st
   return `${name || "取引先"} 様`;
 }
 
-export function CustomerRepairActions({ token, isBusiness, isApproved = false, inquiryNumber, messages = [], customerName }: Props) {
+export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, messages = [], customerName }: Props) {
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
@@ -253,16 +255,16 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, i
 
   const handleReject = async () => {
     if (!comment.trim()) {
-      alert("差戻し理由をコメント欄に入力してください。");
+      alert(isBusiness ? "差戻し理由をコメント欄に入力してください。" : "相談・修正をご希望の内容を入力してください。");
       return;
     }
     try {
       await postAction("reject", { body: comment });
       setComment("");
       router.refresh();
-      alert("差戻しを送信しました。");
+      alert(isBusiness ? "差戻しを送信しました。" : "相談内容を送信しました。");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "差戻しに失敗しました。");
+      alert(isBusiness ? (error instanceof Error ? error.message : "差戻しに失敗しました。") : "相談内容の送信に失敗しました。");
     }
   };
 
@@ -333,55 +335,41 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, i
   }
 
   return (
-    <section className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
-      <div className="mb-3">
-        <h2 className="text-lg font-bold">連絡・承認</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-500">
-          ご不明点や追加のご希望がございましたら、こちらのフォームよりお気軽にご連絡ください。
-        </p>
-        <p className="mt-2 rounded bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
-          対象案件: {inquiryNumber}
-        </p>
-      </div>
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      {showApproval && (
+        <>
+          <div className="mb-3">
+            <h2 className="text-lg font-bold">お見積の確認</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              内容をご確認のうえ、この内容で進めてよいかお知らせください。
+            </p>
+          </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={handleApprove}
-          disabled={!!loading}
-          className="h-12 rounded-lg border border-green-300 bg-green-50 px-4 text-base font-bold text-green-700 hover:bg-green-100 disabled:opacity-50"
+          <div>
+            <button
+              type="button"
+              onClick={handleApprove}
+              disabled={approved || !!loading}
+              className="h-12 w-full rounded-lg bg-blue-600 px-4 text-base font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {approved ? "承認済み" : "この内容で進める"}
+            </button>
+          </div>
+
+          <div className="my-4 border-t border-slate-200" />
+        </>
+      )}
+
+      {lineUrl && (
+        <a
+          href={lineUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex h-12 items-center justify-center rounded-lg border border-[#06c755] bg-white px-4 text-base font-bold text-[#078a3f] hover:bg-[#f0fbf4]"
         >
-          承認する
-        </button>
-        <button
-          type="button"
-          onClick={handleReject}
-          disabled={!!loading}
-          className="h-12 rounded-lg border border-amber-300 bg-amber-50 px-4 text-base font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-        >
-          差戻し
-        </button>
-      </div>
-
-      <div className="my-4 border-t border-slate-200" />
-
-      <textarea
-        value={comment}
-        onChange={(event) => setComment(event.target.value.slice(0, 500))}
-        className="min-h-32 w-full rounded-lg border border-slate-300 p-3 text-base leading-7 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-        placeholder="ご質問や追加のご希望があればご記入ください"
-        maxLength={500}
-      />
-      <div className="mt-1 text-right text-xs text-slate-400">{comment.length}/500</div>
-
-      <button
-        type="button"
-        onClick={handleComment}
-        disabled={!!loading}
-        className="mt-3 h-12 w-full rounded-lg bg-blue-600 px-4 text-base font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-      >
-        コメント送信
-      </button>
+          LINEで相談する
+        </a>
+      )}
     </section>
   );
 }
