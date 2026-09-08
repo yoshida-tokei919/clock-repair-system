@@ -7,6 +7,7 @@ import {
     repairPhotoCategory,
     repairPhotoStage,
 } from "@/lib/repair-photo-sharing";
+import { deleteRepairPhotoObject, isR2RepairPhotoKey } from "@/lib/r2-repair-photos";
 
 // GET /api/repairs/[id]/photos
 // Fetch existing photos for a repair
@@ -123,6 +124,32 @@ export async function PATCH(
         return NextResponse.json({ success: true, sharing });
     } catch (error) {
         console.error("Photo update error:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+    try {
+        const repairId = Number(params.id);
+        const body = await req.json();
+        const photoId = Number(body.photoId);
+        if (!Number.isInteger(repairId) || repairId <= 0 || !Number.isInteger(photoId) || photoId <= 0) {
+            return NextResponse.json({ error: "Invalid photo ID" }, { status: 400 });
+        }
+        const photo = await prisma.repairPhoto.findFirst({ where: { id: photoId, repairId }, select: { storageKey: true } });
+        if (!photo) return NextResponse.json({ error: "Photo not found" }, { status: 404 });
+        await prisma.repairPhoto.delete({ where: { id: photoId } });
+        if (isR2RepairPhotoKey(photo.storageKey)) {
+            try {
+                await deleteRepairPhotoObject(photo.storageKey);
+            } catch (error) {
+                console.error("R2 repair photo cleanup failed", { photoId, storageKey: photo.storageKey, error });
+                return NextResponse.json({ error: "Repair photo was deleted, but R2 object cleanup failed" }, { status: 500 });
+            }
+        }
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error("Photo delete error", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

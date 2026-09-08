@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 
 type Photo = { id: number; storageKey: string; fileName?: string | null; publicCaseVisible: boolean };
-type CaseImage = { storagePath?: string | null; isPrimary: boolean };
+type CaseImage = { id: number; storagePath?: string | null; url?: string | null; isPrimary: boolean };
 type EditableWorkItem = { id?: number; displayName: string };
 type PublicCaseEditorData = {
   id: number;
@@ -29,11 +29,10 @@ type PublicCaseEditorData = {
   partItems: { id: number; displayName?: string | null; sourceText: string }[];
 };
 
-const REPAIR_PHOTO_PUBLIC_BASE_URL = "https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev";
-
-function photoUrl(storageKey: string): string {
-  if (/^(https?:|data:)/i.test(storageKey)) return storageKey;
-  return `${REPAIR_PHOTO_PUBLIC_BASE_URL}/${storageKey.replace(/^\/+/, "")}`;
+function photoUrl(photo: Photo): string {
+  if (/^(https?:|data:)/i.test(photo.storageKey)) return photo.storageKey;
+  if (/^repairs\/\d+\/\d{6}\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(photo.storageKey)) return `/api/repair-photos/${photo.id}`;
+  return "";
 }
 
 function summaryText(value: unknown): string {
@@ -45,21 +44,37 @@ function display(value?: string | null): string {
 }
 
 export function PublicCaseEditor({ data }: { data: PublicCaseEditorData }) {
+  const candidatePhotos = useMemo(
+    () => data.repair.photos.filter((photo) => photo.publicCaseVisible),
+    [data.repair.photos],
+  );
+  const sourceImageIdByPhotoId = useMemo(() => new Map(data.images.flatMap((image) => {
+    const sourceId = image.url?.match(/[?&]sourceRepairPhotoId=(\d+)/)?.[1];
+    return sourceId ? [[Number(sourceId), image.id] as const] : [];
+  })), [data.images]);
   const initiallySelected = useMemo(() => {
     const paths = new Set(data.images.map((image) => image.storagePath).filter(Boolean));
-    return data.repair.photos
-      .filter((photo) => photo.publicCaseVisible && paths.has(photo.storageKey))
+    const sourceIds = new Set(data.images.flatMap((image) => {
+      const match = image.url?.match(/[?&]sourceRepairPhotoId=(\d+)/);
+      return match ? [Number(match[1])] : [];
+    }));
+    return candidatePhotos
+      .filter((photo) => paths.has(photo.storageKey) || sourceIds.has(photo.id))
       .map((photo) => photo.id);
-  }, [data.images, data.repair.photos]);
+  }, [candidatePhotos, data.images]);
   const initialPrimary = useMemo(() => {
-    const primaryPath = data.images.find((image) => image.isPrimary)?.storagePath;
-    return data.repair.photos.find((photo) => photo.storageKey === primaryPath)?.id ?? initiallySelected[0] ?? null;
-  }, [data.images, data.repair.photos, initiallySelected]);
+    const primary = data.images.find((image) => image.isPrimary);
+    const sourceId = primary?.url?.match(/[?&]sourceRepairPhotoId=(\d+)/)?.[1];
+    const sourcePhotoId = sourceId ? Number(sourceId) : data.repair.photos.find((photo) => photo.storageKey === primary?.storagePath)?.id;
+    return sourcePhotoId && data.repair.photos.some((photo) => photo.id === sourcePhotoId) ? sourcePhotoId : null;
+  }, [data.images, data.repair.photos]);
 
   const [title, setTitle] = useState(data.b2cTitle ?? "");
   const [summary, setSummary] = useState(summaryText(data.b2cSummary));
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<number[]>(initiallySelected);
   const [primaryPhotoId, setPrimaryPhotoId] = useState<number | null>(initialPrimary);
+  const [snapshotImageIds, setSnapshotImageIds] = useState<number[]>(() => data.images.map((image) => image.id));
+  const [primaryImageId, setPrimaryImageId] = useState<number | null>(() => data.images.find((image) => image.isPrimary)?.id ?? null);
   const [editableWorkItems, setEditableWorkItems] = useState<EditableWorkItem[]>(() =>
     data.workItems.map((item) => ({
       id: item.id,
@@ -71,9 +86,15 @@ export function PublicCaseEditor({ data }: { data: PublicCaseEditorData }) {
   const isPublished = data.reviewStatus === "APPROVED" && data.b2cPublishStatus === "PUBLISHED";
 
   const togglePhoto = (photoId: number, selected: boolean) => {
-    setSelectedPhotoIds((current) => selected ? [...current, photoId] : current.filter((id) => id !== photoId));
-    if (!selected && primaryPhotoId === photoId) setPrimaryPhotoId(null);
-    if (selected && primaryPhotoId === null) setPrimaryPhotoId(photoId);
+    setSelectedPhotoIds((current) => selected
+      ? Array.from(new Set([...current, photoId]))
+      : current.filter((id) => id !== photoId));
+    if (!selected) {
+      const snapshotImageId = sourceImageIdByPhotoId.get(photoId);
+      if (snapshotImageId) setSnapshotImageIds((current) => current.filter((id) => id !== snapshotImageId));
+      if (primaryPhotoId === photoId) setPrimaryPhotoId(null);
+    }
+    if (selected && primaryPhotoId === null && primaryImageId === null) setPrimaryPhotoId(photoId);
   };
 
   const submit = async (action: "save" | "publish" | "unpublish") => {
@@ -88,6 +109,8 @@ export function PublicCaseEditor({ data }: { data: PublicCaseEditorData }) {
           b2cSummary: summary,
           photoIds: selectedPhotoIds,
           primaryPhotoId,
+          snapshotImageIds,
+          primaryImageId,
           workItems: editableWorkItems,
         }),
       });
@@ -171,14 +194,17 @@ export function PublicCaseEditor({ data }: { data: PublicCaseEditorData }) {
       <section className="rounded-lg border bg-white p-5">
         <h2 className="mb-1 text-base font-bold">写真</h2>
         <p className="mb-4 text-sm text-zinc-500">元Repairに保存済みの写真だけを選択します。写真なしでも公開できます。</p>
-        {data.repair.photoPostingOptOut ? <p className="text-sm text-amber-700">お客様が事例・SNS掲載を希望していないため、新規の写真候補は表示しません。既存PublicCase画像は変更しません。</p> : data.repair.photos.filter((photo) => photo.publicCaseVisible).length ? <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">{data.repair.photos.filter((photo) => photo.publicCaseVisible).map((photo) => {
+        {data.repair.photoPostingOptOut ? <p className="text-sm text-amber-700">お客様が事例・SNS掲載を希望していないため、新規の写真候補は表示しません。既存PublicCase画像は変更しません。</p> : candidatePhotos.length ? <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">{candidatePhotos.map((photo) => {
           const selected = selectedPhotoIds.includes(photo.id);
-          return <label key={photo.id} className="overflow-hidden rounded border bg-zinc-50 text-sm">
-            <img src={photoUrl(photo.storageKey)} alt={photo.fileName || "Repair photo"} className="aspect-square w-full object-cover" />
-            <span className="flex items-center gap-2 p-2"><input type="checkbox" checked={selected} onChange={(event) => togglePhoto(photo.id, event.target.checked)} /> 使用する</span>
-            {selected ? <span className="flex items-center gap-2 px-2 pb-2"><input type="radio" name="primary-photo" checked={primaryPhotoId === photo.id} onChange={() => setPrimaryPhotoId(photo.id)} /> メイン写真</span> : null}
-          </label>;
+          const checkboxId = `public-case-photo-${photo.id}`;
+          const primaryId = `public-case-primary-${photo.id}`;
+          return <div key={photo.id} className="overflow-hidden rounded border bg-zinc-50 text-sm">
+            <img src={photoUrl(photo)} alt={photo.fileName || "Repair photo"} className="aspect-square w-full object-cover" />
+            <div className="flex items-center gap-2 p-2"><input id={checkboxId} type="checkbox" checked={selected} onChange={(event) => togglePhoto(photo.id, event.target.checked)} /><label htmlFor={checkboxId}>使用する</label></div>
+            {selected ? <div className="flex items-center gap-2 px-2 pb-2"><input id={primaryId} type="radio" name="primary-photo" checked={primaryPhotoId === photo.id || primaryImageId === sourceImageIdByPhotoId.get(photo.id)} onChange={() => { setPrimaryPhotoId(photo.id); setPrimaryImageId(sourceImageIdByPhotoId.get(photo.id) ?? null); }} /><label htmlFor={primaryId}>メイン写真</label></div> : null}
+          </div>;
         })}</div> : <p className="text-sm text-zinc-500">事例公開を許可した元Repair写真はありません。</p>}
+        {data.images.length > 0 ? <div className="mt-5 border-t pt-4"><p className="mb-3 text-sm text-zinc-500">保存済みPublicCase snapshot</p><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">{data.images.map((image, index) => image.url ? <div key={`${image.storagePath ?? "image"}-${index}`} className="overflow-hidden rounded border bg-zinc-50"><img src={image.url} alt="PublicCase snapshot" className="aspect-square w-full object-cover" /></div> : null)}</div></div> : null}
       </section>
     </main>
   );

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { copyRepairPhotoObjectToPublicCase, deleteRepairPhotoObject, isR2PublicCasePhotoKey, isR2RepairPhotoKey } from "@/lib/r2-repair-photos";
 
 type ImagePhoto = {
   id: number;
@@ -24,6 +25,17 @@ function imagePhotoIds(value: unknown): number[] | null {
   if (!Array.isArray(value)) return null;
   const ids = value.filter((id): id is number => Number.isInteger(id) && id > 0);
   return Array.from(new Set(ids));
+}
+
+function publicCaseImageIds(value: unknown): number[] | null {
+  if (!Array.isArray(value)) return null;
+  const ids = value.filter((id): id is number => Number.isInteger(id) && id > 0);
+  return Array.from(new Set(ids));
+}
+
+function sourceRepairPhotoId(url: string | null): number | null {
+  const value = url?.match(/[?&]sourceRepairPhotoId=(\d+)/)?.[1];
+  return value ? Number(value) : null;
 }
 
 function workItemInputs(value: unknown): WorkItemInput[] | null {
@@ -69,12 +81,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!publicCase?.repairId) {
       return NextResponse.json({ error: "通常Repair由来のPublicCaseが見つかりません。" }, { status: 404 });
     }
+    const existingImages = await prisma.publicCaseImage.findMany({
+      where: { publicCaseId }, select: { id: true, storagePath: true, url: true, isPrimary: true, sortOrder: true },
+    });
     const selectedPhotoIds = imagePhotoIds(body.photoIds);
     if (selectedPhotoIds === null) {
       return NextResponse.json({ error: "写真の指定が不正です。" }, { status: 400 });
     }
     if (publicCase.repair?.photoPostingOptOut && selectedPhotoIds.length > 0) {
       return NextResponse.json({ error: "お客様が事例・SNS掲載を希望していないため写真を選択できません。" }, { status: 400 });
+    }
+
+    const retainedImageIds = body.snapshotImageIds === undefined
+      ? existingImages.map((image) => image.id)
+      : publicCaseImageIds(body.snapshotImageIds);
+    if (retainedImageIds === null) {
+      return NextResponse.json({ error: "Invalid saved image IDs." }, { status: 400 });
     }
 
     const editedWorkItems = workItemInputs(body.workItems);
@@ -103,8 +125,38 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: "メイン写真は選択済み写真から指定してください。" }, { status: 400 });
     }
 
+    const primaryImageId = Number.isInteger(body.primaryImageId) ? body.primaryImageId : null;
+    const existingImageIds = new Set(existingImages.map((image) => image.id));
+    if (retainedImageIds.some((id) => !existingImageIds.has(id))) {
+      return NextResponse.json({ error: "Saved image does not belong to this PublicCase." }, { status: 400 });
+    }
+    if (primaryImageId !== null && !retainedImageIds.includes(primaryImageId)) {
+      return NextResponse.json({ error: "Primary image must be a retained snapshot." }, { status: 400 });
+    }
+    const retainedImages = existingImages.filter((image) => retainedImageIds.includes(image.id));
+    const retainedImageIdBySourcePhotoId = new Map(retainedImages.flatMap((image) => {
+      const sourceId = sourceRepairPhotoId(image.url);
+      return sourceId ? [[sourceId, image.id] as const] : [];
+    }));
+    const photosToCopy = orderedPhotos.filter((photo) => !retainedImageIdBySourcePhotoId.has(photo.id));
+
+    const copiedObjectKeys: string[] = [];
+    const publicObjectPathByPhotoId = new Map<number, string>();
+    try {
+      for (const photo of photosToCopy) {
+        if (!isR2RepairPhotoKey(photo.storageKey)) continue;
+        const storagePath = await copyRepairPhotoObjectToPublicCase({ sourceKey: photo.storageKey, publicCaseId });
+        copiedObjectKeys.push(storagePath);
+        publicObjectPathByPhotoId.set(photo.id, storagePath);
+      }
+    } catch (error) {
+      await Promise.all(copiedObjectKeys.map((key) => deleteRepairPhotoObject(key).catch(() => undefined)));
+      throw error;
+    }
+
     const now = new Date();
-    await prisma.$transaction(async (tx) => {
+    let replacedPublicObjectKeys: string[] = [];
+    try { await prisma.$transaction(async (tx) => {
       const existingWorkItems = await tx.publicCaseWorkItem.findMany({
         where: { publicCaseId },
         select: { id: true, sortOrder: true },
@@ -147,26 +199,39 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         });
       }
 
-      await tx.publicCaseImage.deleteMany({ where: { publicCaseId } });
-      if (orderedPhotos.length) {
-        await tx.publicCaseImage.createMany({
-          data: orderedPhotos.map((photo, sortOrder) => ({
+      const oldImages = await tx.publicCaseImage.findMany({ where: { publicCaseId }, select: { id: true, storagePath: true, url: true, isPrimary: true, sortOrder: true } });
+      const deletedImages = oldImages.filter((image) => !retainedImageIds.includes(image.id));
+      replacedPublicObjectKeys = deletedImages.flatMap((image) => isR2PublicCasePhotoKey(image.storagePath) ? [image.storagePath] : []);
+      await tx.publicCaseImage.deleteMany({ where: { publicCaseId, ...(retainedImageIds.length ? { id: { notIn: retainedImageIds } } : {}) } });
+      const createdImageIdByPhotoId = new Map<number, number>();
+      if (photosToCopy.length) {
+        const nextSortOrder = Math.max(-1, ...retainedImages.map((image) => image.sortOrder)) + 1;
+        for (let sortOrder = 0; sortOrder < photosToCopy.length; sortOrder += 1) {
+          const photo = photosToCopy[sortOrder];
+          const storagePath = publicObjectPathByPhotoId.get(photo.id) ?? photo.storageKey;
+          const image = await tx.publicCaseImage.create({ data: {
             publicCaseId,
-            storagePath: photo.storageKey,
-            url: /^https?:|^data:/i.test(photo.storageKey)
-              ? photo.storageKey
-              : `https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev/${photo.storageKey.replace(/^\/+/, "")}`,
+            storagePath,
+            url: /^https?:|^data:/i.test(storagePath) ? storagePath : null,
             altText: photo.fileName,
-            isPrimary: primaryPhotoId === photo.id || (primaryPhotoId === null && sortOrder === 0),
+            isPrimary: false,
             reviewStatus:
               action === "publish" ||
               (action === "save" && publicCase.reviewStatus === "APPROVED" && publicCase.b2cPublishStatus === "PUBLISHED")
                 ? "APPROVED"
                 : "DRAFT",
-            sortOrder,
-          })),
-        });
+            sortOrder: nextSortOrder + sortOrder,
+          } });
+          createdImageIdByPhotoId.set(photo.id, image.id);
+          if (isR2PublicCasePhotoKey(storagePath)) {
+            await tx.publicCaseImage.update({ where: { id: image.id }, data: { url: `/api/public-case-images/${image.id}?sourceRepairPhotoId=${photo.id}` } });
+          }
+        }
       }
+      const primaryImageForSelectedPhoto = primaryPhotoId === null ? null : retainedImageIdBySourcePhotoId.get(primaryPhotoId) ?? createdImageIdByPhotoId.get(primaryPhotoId) ?? null;
+      const primaryTargetId = primaryImageId ?? primaryImageForSelectedPhoto ?? retainedImages.find((image) => image.isPrimary)?.id ?? createdImageIdByPhotoId.values().next().value ?? retainedImages[0]?.id ?? null;
+      await tx.publicCaseImage.updateMany({ where: { publicCaseId }, data: { isPrimary: false } });
+      if (primaryTargetId !== null) await tx.publicCaseImage.update({ where: { id: primaryTargetId }, data: { isPrimary: true } });
 
       const data = {
         b2cTitle: optionalText(body.b2cTitle),
@@ -190,7 +255,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           data: { reviewStatus: "APPROVED" },
         });
       }
-    });
+    }); } catch (error) {
+      await Promise.all(copiedObjectKeys.map((key) => deleteRepairPhotoObject(key).catch(() => undefined)));
+      throw error;
+    }
+    await Promise.all(replacedPublicObjectKeys.map((key) => deleteRepairPhotoObject(key).catch((error) => console.error("PublicCase R2 cleanup failed", error))));
 
     return NextResponse.json({ success: true });
   } catch (error) {

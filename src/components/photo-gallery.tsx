@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Camera, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { CameraCaptureDialog } from "@/components/repairs/CameraCaptureDialog";
-import { getPhotoDisplayUrl } from "@/lib/supabase-storage";
 
 interface PhotoGalleryProps {
     photos: string[];     // storageKey の配列（Base64旧形式・Supabaseパス新形式の両方に対応）
@@ -61,7 +60,9 @@ export function PhotoGallery({ photos, repairId }: PhotoGalleryProps) {
 
                 {/* 写真一覧 */}
                 {photos.map((storageKey, i) => {
-                    const displayUrl = getPhotoDisplayUrl(storageKey);
+                    // This legacy gallery only receives displayable legacy values.
+                    // New private R2 photos are rendered by RepairEntryForm with a photo ID.
+                    const displayUrl = /^(data:|https?:)/i.test(storageKey) ? storageKey : "";
                     return (
                         <div
                             key={i}

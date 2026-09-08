@@ -4,8 +4,6 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Camera, RefreshCw, Check, X, CameraOff, Loader2, RotateCcw } from "lucide-react";
-import { uploadRepairPhoto } from "@/lib/supabase-storage";
-import { saveRepairPhoto } from "@/actions/photo-actions";
 
 // 入力映像の解像度を維持してWebP品質92%で保存する。
 const WEBP_QUALITY = 0.92;
@@ -155,16 +153,20 @@ export function CameraCaptureDialog({
         setPhase('preview');
     };
 
-    // 保存: Supabase Storage → DB
+    // 保存: server-side R2 upload → DB
     const handleSave = async () => {
         if (!capturedBlob) return;
         setPhase('uploading');
         setUploadError(null);
 
         try {
-            const { path } = await uploadRepairPhoto(capturedBlob, repairId);
-            const result = await saveRepairPhoto(repairId, path, category);
-            if (!result.success) throw new Error(result.error ?? '保存に失敗しました');
+            const formData = new FormData();
+            formData.append('file', new File([capturedBlob], `camera-${Date.now()}.webp`, { type: 'image/webp' }));
+            formData.append('repairId', String(repairId));
+            formData.append('category', category);
+            const response = await fetch('/api/upload', { method: 'POST', body: formData });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.success) throw new Error(result.error ?? '保存に失敗しました');
 
             handleClose();
             onSaved();
@@ -236,7 +238,7 @@ export function CameraCaptureDialog({
                             {phase === 'uploading' && (
                                 <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-3">
                                     <Loader2 className="w-10 h-10 text-white animate-spin" />
-                                    <p className="text-white text-sm">Supabase Storageに保存中...</p>
+                                    <p className="text-white text-sm">写真を保存中...</p>
                                 </div>
                             )}
                         </div>

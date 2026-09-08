@@ -95,14 +95,14 @@ function getWatchBrandModelLine(repair: any) {
     .join(" ");
 }
 
-const REPAIR_PHOTO_PUBLIC_BASE_URL = "https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev";
 const CUSTOMER_LINE_URL = "https://lin.ee/3C0XfJW";
 
-function getRepairPhotoUrl(photo?: { storageKey?: string | null } | null) {
+function getRepairPhotoUrl(photo?: { id?: number; storageKey?: string | null } | null, token?: string) {
   const storageKey = photo?.storageKey?.trim();
   if (!storageKey) return null;
   if (/^(https?:|data:|blob:)/i.test(storageKey)) return storageKey;
-  return `${REPAIR_PHOTO_PUBLIC_BASE_URL}/${storageKey.replace(/^\/+/, "")}`;
+  if (/^repairs\/\d+\/\d{6}\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(storageKey) && Number.isInteger(photo?.id) && token) return `/customer/repairs/${encodeURIComponent(token)}/photos/${photo!.id}`;
+  return null;
 }
 
 function receptionPhotosForWatchCard(repair: { photos?: any[] }) {
@@ -161,7 +161,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string
             const { subtotal, taxAmount, total } = getEstimateAmounts(repair);
             const receptionPhotos = receptionPhotosForWatchCard(repair);
             const customerPhotos = photosForCustomerProgress(repair);
-            const primaryPhotoUrl = getRepairPhotoUrl(receptionPhotos[0]);
+            const primaryPhotoUrl = getRepairPhotoUrl(receptionPhotos[0], token);
             const status = getCustomerStatus(repair.status);
             const watchName = getWatchBrandModelLine(repair);
             const identifiers = [
@@ -194,7 +194,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string
 
                 {explanationText && <section className="rounded-xl border border-slate-200 bg-slate-50 p-4"><h2 className="text-lg font-bold">ご案内</h2><div className="mt-3 min-h-32 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-sm leading-7 text-slate-800">{explanationText}</div></section>}
 
-                {customerPhotos.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{customerPhotos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
+                {customerPhotos.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{customerPhotos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo, token); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
 
                 <CustomerRepairActions token={repair.publicToken || token} isBusiness={false} isApproved={repair.approvalStatus === "approved"} showApproval={needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} photoPostingOptOut={repair.photoPostingOptOut} />
               </CustomerRepairAccordionItem>

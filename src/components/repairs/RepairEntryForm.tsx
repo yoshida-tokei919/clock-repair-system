@@ -171,7 +171,6 @@ const STATUS_STEPS: { id: string; label: string }[] = [
 // ステータスバーに横並び表示するメインフロー（保留・キャンセルは除外）
 const MAIN_STATUS_STEPS = STATUS_STEPS.filter(s => s.id !== 'キャンセル' && s.id !== '保留');
 const PART_SEARCH_SITES_STORAGE_KEY = "repair-part-search-sites:v1";
-const REPAIR_PHOTO_PUBLIC_BASE_URL = "https://pub-2775f284e3d34d8095ad7161bcca2432.r2.dev";
 
 const repairPhotoStageFromStatus = (repairStatus: string) => {
     if (repairStatus === "作業中") return "WORK" as const;
@@ -182,11 +181,12 @@ const repairPhotoStageFromStatus = (repairStatus: string) => {
     return null;
 };
 
-function getRepairPhotoSrc(photo?: { storageKey?: string | null } | null): string | null {
+function getRepairPhotoSrc(photo?: { id?: number; storageKey?: string | null } | null): string | null {
     const storageKey = photo?.storageKey?.trim();
     if (!storageKey) return null;
     if (/^(https?:|data:|blob:)/i.test(storageKey)) return storageKey;
-    return `${REPAIR_PHOTO_PUBLIC_BASE_URL}/${storageKey.replace(/^\/+/, "")}`;
+    if (/^repairs\/\d+\/\d{6}\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(storageKey) && Number.isInteger(photo?.id)) return `/api/repair-photos/${photo!.id}`;
+    return null;
 }
 
 // "YYYY/M/D" ↔ "YYYY-MM-DD" 変換ヘルパー
@@ -2178,6 +2178,26 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         void updatePhoto(index, { category });
     };
 
+    const deletePhoto = async (index: number) => {
+        const photo = photos[index];
+        if (!photo || isReadOnly) return;
+        if (!initialData?.id || !Number.isInteger(Number(photo.id))) {
+            setPhotos((items) => items.filter((_, photoIndex) => photoIndex !== index));
+            return;
+        }
+        try {
+            const response = await fetch(`/api/repairs/${initialData.id}/photos`, {
+                method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ photoId: photo.id }),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.success) throw new Error(result.error || "写真を削除できませんでした。");
+            setPhotos((items) => items.filter((_, photoIndex) => photoIndex !== index));
+        } catch (error) {
+            console.error(error);
+            toast({ title: "写真の削除に失敗しました", variant: "destructive" });
+        }
+    };
+
     const updatePhotoPostingOptOut = async (nextPhotoPostingOptOut: boolean) => {
         if (!initialData?.id || isReadOnly || isUpdatingPhotoPostingOptOut) return;
 
@@ -3556,7 +3576,7 @@ ${shopName}
                                         </div>
                                         <div className="absolute right-1 top-1 flex gap-1">
                                             <button type="button" aria-label="写真を拡大" onClick={() => setExpandedPhoto(p)} className="rounded bg-black/60 p-1 text-white hover:text-blue-300"><Eye className="h-3.5 w-3.5" /></button>
-                                            <button type="button" onClick={() => { if (isReadOnly) return; setPhotos(photos.filter((_, x) => x !== i)); }} className="rounded bg-black/60 p-1 text-white hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>
+                                            <button type="button" onClick={() => void deletePhoto(i)} className="rounded bg-black/60 p-1 text-white hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>
                                         </div>
                                     </div>
                                 );
