@@ -111,6 +111,9 @@ export async function POST(_request: Request, { params }: { params: { id: string
     return {
       id: String(repair.id),
       inquiryNumber: repair.inquiryNumber,
+      subtotalAmount: repair.estimate?.totalAmount ?? 0,
+      taxAmount: repair.estimate?.taxAmount ?? 0,
+      totalAmount: (repair.estimate?.totalAmount ?? 0) + (repair.estimate?.taxAmount ?? 0),
       partnerRef: repair.partnerRef || undefined,
       endUserName: repair.endUserName || undefined,
       customerNote: repair.customerNote || "",
@@ -146,6 +149,9 @@ export async function POST(_request: Request, { params }: { params: { id: string
       type: estimateDocument.customer.type,
       address: estimateDocument.customer.address || undefined,
     },
+    subtotalAmount: estimateDocument.totalAmount,
+    taxAmount: estimateDocument.taxAmount,
+    totalAmount: estimateDocument.totalAmount + estimateDocument.taxAmount,
     jobs,
   };
 

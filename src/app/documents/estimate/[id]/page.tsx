@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { EstimatePdfActions } from "@/components/estimates/EstimatePdfActions";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,18 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
 
     if (!estimateDoc) return notFound();
 
+    const isB2C = estimateDoc.customer.type === "individual";
+    const returnHref = estimateDoc.repairs.length === 1 ? `/repairs/${estimateDoc.repairs[0].id}` : "/repairs";
+    const returnLabel = estimateDoc.repairs.length === 1 ? "← 修理案件へ戻る" : "← 修理一覧へ戻る";
+    const returnLink = isB2C ? (
+        <Link
+            href={returnHref}
+            className="mt-2 inline-flex h-8 items-center rounded border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+            {returnLabel}
+        </Link>
+    ) : null;
+
     const [currentPdfFile] = await prisma.$queryRaw<{
         id: number;
         version: number;
@@ -60,6 +73,7 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
                             <h1 className="font-bold text-lg">見積書: {estimateDoc.estimateNumber}</h1>
+                            {returnLink}
                             <p className="mt-1 text-xs text-slate-500">
                                 保存済みPDFを表示しています。管理画面と共有画面は同じPDFファイルを参照します。
                             </p>
@@ -99,6 +113,7 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
             <div className="rounded border border-amber-200 bg-amber-50 p-5 text-amber-950">
                 <h1 className="text-lg font-bold">見積書: {estimateDoc.estimateNumber}</h1>
                 <p className="mt-3 text-sm">保存済みPDFはまだ生成されていません。</p>
+                {returnLink}
                 <p className="mt-1 text-xs text-amber-800">
                     管理画面と共有画面で同じPDFを表示するため、保存済みPDFを生成してから確認してください。
                 </p>

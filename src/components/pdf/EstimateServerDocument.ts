@@ -3,6 +3,9 @@ export interface EstimateServerDocumentProps {
     estimateNumber: string;
     date: string;
     customer: { name: string; address?: string; type?: string };
+    subtotalAmount?: number;
+    taxAmount?: number;
+    totalAmount?: number;
     jobs: {
       id: string;
       inquiryNumber: string;
@@ -10,6 +13,9 @@ export interface EstimateServerDocumentProps {
       endUserName?: string;
       customerNote?: string;
       watch: { brand: string; model: string; ref?: string; serial?: string };
+      subtotalAmount?: number;
+      taxAmount?: number;
+      totalAmount?: number;
       items: {
         name: string;
         price: number;
@@ -40,6 +46,7 @@ export function createEstimateServerDocumentElement(
   };
   const withCustomerHonorific = (value: string, customerType?: string) =>
     customerType === "business" ? withOnchu(value) : withSama(value);
+  const isB2C = data.customer.type === "individual";
   const columns = {
     no: "3%",
     inquiry: "9%",
@@ -167,8 +174,28 @@ export function createEstimateServerDocumentElement(
           el(Text, { wrap: false, style: { width: columns.items, fontSize: 7, borderLeftWidth: 1, borderColor: "#ccc", paddingLeft: 4 } }, "作業明細・交換部品 / 単価"),
           el(Text, { wrap: false, style: { width: columns.total, textAlign: "right", fontSize: 7, fontWeight: "bold" } }, "金額(税抜)")
         ),
+        isB2C
+          ? el(
+              Text,
+              {
+                style: {
+                  position: "absolute",
+                  right: 0,
+                  top: 0,
+                  width: columns.total,
+                  backgroundColor: "#fff",
+                  textAlign: "right",
+                  fontSize: 7,
+                  fontWeight: "bold",
+                },
+              },
+              "金額(税込)"
+            )
+          : null,
         data.jobs.map((job, index) => {
-          const jobTotal = job.items.reduce((sum, item) => sum + item.price, 0);
+          const jobTotal = isB2C
+            ? job.totalAmount ?? 0
+            : job.items.reduce((sum, item) => sum + item.price, 0);
           const watchInfo = `${job.watch.brand}\n${job.watch.model}\nRef: ${
             job.watch.ref || "-"
           }\nSer: ${job.watch.serial || "-"}`;
@@ -216,6 +243,30 @@ export function createEstimateServerDocumentElement(
           );
         })
       ),
+      isB2C
+        ? el(
+            View,
+            { style: { alignSelf: "flex-end", width: "32%", marginTop: 12 } },
+            el(
+              View,
+              { style: { flexDirection: "row", justifyContent: "space-between", marginBottom: 3 } },
+              el(Text, { style: { fontSize: 9 } }, "税抜小計"),
+              el(Text, { style: { fontSize: 9 } }, `¥${(data.subtotalAmount ?? 0).toLocaleString()}`)
+            ),
+            el(
+              View,
+              { style: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 } },
+              el(Text, { style: { fontSize: 9 } }, "消費税（10%）"),
+              el(Text, { style: { fontSize: 9 } }, `¥${(data.taxAmount ?? 0).toLocaleString()}`)
+            ),
+            el(
+              View,
+              { style: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderColor: "#333", paddingTop: 4 } },
+              el(Text, { style: { fontSize: 11, fontWeight: "bold" } }, "税込合計"),
+              el(Text, { style: { fontSize: 11, fontWeight: "bold" } }, `¥${(data.totalAmount ?? 0).toLocaleString()}`)
+            )
+          )
+        : null,
       el(
         Text,
         { style: styles.footer },
