@@ -4,18 +4,27 @@
 
 ## 現在Task
 
-Task156: Repair写真を Cloudflare R2 private storage へ正式移行する。
+Task157: completed
 
 ## Task境界
 
-- RepairPhoto の新規アップロードを private R2 object と opaque な `storageKey` へ移行する。
-- private 写真は権限確認済みサーバー経由の短命 signed URL で表示する。
-- 公開事例に選択した写真は R2 内で PublicCase 用 object に copy し、公開画像 route から表示する。
-- 既存 RepairPhoto の Base64 データは移行・削除しない。
-- production DB、Railway、production R2 は変更しない。
+- Task155 の以下2 migration を production へ適用し、pending migration 0 を確認した。
+  - `20260908_add_repair_photo_posting_opt_out`
+  - `20260908_add_repair_photo_sharing`
+- RepairPhoto private R2 rollout を production で検証した。
+- production code は `08c223c4d6f46f310115509db6c98996d9237449`。
+- Railway deployment は `ff2aac25-45be-45fc-9f4b-cebfa15f6d2d`。
+
+## 現在状態
+
+- Task157 completed
+- production safety checkpoint、public schema restore rehearsal、migration checksum investigation 完了
+- R2 production rollout verified
+- production smoke test passed: private R2 upload、customer visibility、B2C sharing、PublicCase snapshot copy、source deletion、reload 表示を確認
+- recovery tag: `production-pre-task157-20260909`
+- recovery commit: `f7b77b6a1e44852f37285b399dbabff4051c3115`
+- production DB backup: `C:\Users\yoshi\clock-repair-backups\20260909\production-pre-task157.dump`
 
 ## 対象外
 
-- PDF、Document、既存 Supabase Storage の対象外データ
-- 既存 RepairPhoto の一括移行・削除
-- production 環境の設定・デプロイ
+- Task157 の実装・migration・R2 rollout・production smoke test は完了済み

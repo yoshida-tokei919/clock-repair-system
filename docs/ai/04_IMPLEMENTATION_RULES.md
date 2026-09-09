@@ -1,5 +1,36 @@
 # IMPLEMENTATION RULES
 
+## Production completion rule
+
+コード変更を伴うTaskは、原則として以下の順で完了する。
+
+実装
+→ local実画面確認
+→ commit
+→ migration/env差分確認
+→ production backup（migrationがある場合）
+→ deploy
+→ production smoke test
+→ production commit/deployment記録
+→ Task完了
+
+`commit`だけではTask完了としない。
+
+例外は以下に限る。
+
+- investigation-only
+- docs-only
+- 明示的に次Taskと一体deployすると事前決定したTask
+
+例外の場合は必ず `Production: pending` を明記する。
+
+- 現在productionのcommitを常に記録する。
+- production deploy成功時はproduction tagを作る。
+- migrationがあるTaskはdeploy前backupを原則必須とする。
+- Railwayへのdeploy sourceを明確化する。
+- CLIから別系統を無記録でdeployしない。
+- 旧release branchを名前だけでproduction sourceと判断しない。
+
 このファイルは、Codex等の実装担当AIが時計修理業務アプリで常時守る共通ルールを定義する。
 
 ## 作業開始
