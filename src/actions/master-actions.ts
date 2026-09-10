@@ -16,6 +16,22 @@ export async function getBrands() {
     });
 }
 
+export async function getWatchBrands(includeType = true) {
+    return await prisma.brand.findMany({
+        where: { isWatchBrand: true, ...(includeType ? {} : { brandKind: { not: 'TYPE' } }) },
+        orderBy: { nameJp: 'asc' },
+        include: { aliases: { select: { alias: true } } },
+    });
+}
+
+export async function getMovementMakers() {
+    return await prisma.brand.findMany({
+        where: { isMovementMaker: true },
+        orderBy: { nameJp: 'asc' },
+        include: { aliases: { select: { alias: true } } },
+    });
+}
+
 export async function upsertBrand(name: string) {
     return await findOrCreateBrand(prisma, name);
 }
@@ -487,11 +503,16 @@ export async function getPartsMatched(
 
         const whereClauses: any[] = [];
 
-        if (brandId) {
+        const watchBrand = brandId
+            ? await prisma.brand.findUnique({ where: { id: brandId }, select: { brandKind: true } })
+            : null;
+
+        if (brandId && watchBrand?.brandKind === 'NORMAL') {
             const exteriorClause: any = {
                 brandId,
                 ...isExteriorWhere,
             };
+            if (modelId) exteriorClause.OR = [{ modelId }, { modelId: null }];
             if (category) exteriorClause.category = category;
             whereClauses.push(exteriorClause);
         }

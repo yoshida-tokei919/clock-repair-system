@@ -3,8 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { findOrCreateBrand, findOrCreateCaliber, normalizeMasterName } from '@/lib/master-normalize'
 
 export async function GET() {
-  const [brands, models, calibers, suppliers, partCategories, partNames, partGrades] = await Promise.all([
+  const [brands, watchBrands, movementMakers, models, calibers, suppliers, partCategories, partNames, partGrades] = await Promise.all([
     prisma.brand.findMany({ orderBy: { name: 'asc' } }),
+    prisma.brand.findMany({ where: { isWatchBrand: true }, orderBy: { name: 'asc' } }),
+    prisma.brand.findMany({ where: { isMovementMaker: true }, orderBy: { name: 'asc' } }),
     prisma.model.findMany({ orderBy: { name: 'asc' } }),
     prisma.caliber.findMany({ orderBy: { name: 'asc' } }),
     prisma.supplier.findMany({ orderBy: { id: 'asc' } }),
@@ -53,6 +55,8 @@ export async function GET() {
 
   return NextResponse.json({
     brands,
+    watchBrands,
+    movementMakers,
     models,
     calibers,
     suppliers,
@@ -76,7 +80,10 @@ export async function POST(req: Request) {
   }
 
   if (type === 'brand') {
-    const brand = await findOrCreateBrand(prisma, name)
+    const brand = await findOrCreateBrand(prisma, name, {
+      isWatchBrand: body.isWatchBrand === false ? false : undefined,
+      isMovementMaker: body.isMovementMaker === true ? true : undefined,
+    })
     return NextResponse.json(brand)
   }
 

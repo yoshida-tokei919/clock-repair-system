@@ -1,11 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { filterCalibersForMaker, filterModelsForBrand } from '@/lib/brand-drilldown'
 
 type MasterData = {
-  brands: { id: number; name: string }[]
-  models: { id: number; name: string }[]
-  calibers: { id: number; name: string }[]
+  brands: { id: number; name: string; nameJp?: string | null }[]
+  watchBrands: { id: number; name: string; nameJp?: string | null }[]
+  movementMakers: { id: number; name: string; nameJp?: string | null }[]
+  models: { id: number; name: string; brandId: number }[]
+  calibers: { id: number; name: string; brandId: number | null }[]
   suppliers: { id: number; name: string }[]
   partCategories: StandardPartCategory[]
   partNames: StandardPartName[]
@@ -142,6 +145,8 @@ export default function PartsForm({ partId }: { partId?: number }) {
   const [form, setForm] = useState<FormData>(INITIAL)
   const [master, setMaster] = useState<MasterData>({
     brands: [],
+    watchBrands: [],
+    movementMakers: [],
     models: [],
     calibers: [],
     suppliers: [],
@@ -248,6 +253,39 @@ export default function PartsForm({ partId }: { partId?: number }) {
     partName.partType === standardPartType &&
     (!selectedPartCategoryId || partName.categoryId === selectedPartCategoryId)
   )
+  const exteriorModels = filterModelsForBrand(master.models, Number(form.brandId) || null)
+  const movementCalibers = filterCalibersForMaker(master.calibers, Number(form.movementMakerId) || null)
+  const baseMovementCalibers = filterCalibersForMaker(master.calibers, Number(form.baseMakerId) || null)
+
+  const handleExteriorBrandChange = (brandId: string) => {
+    setForm(current => ({
+      ...current,
+      brandId,
+      modelId: current.modelId && master.models.some(model => model.id === Number(current.modelId) && model.brandId === Number(brandId))
+        ? current.modelId
+        : '',
+    }))
+  }
+
+  const handleMovementMakerChange = (movementMakerId: string) => {
+    setForm(current => ({
+      ...current,
+      movementMakerId,
+      caliberId: current.caliberId && master.calibers.some(caliber => caliber.id === Number(current.caliberId) && caliber.brandId === Number(movementMakerId))
+        ? current.caliberId
+        : '',
+    }))
+  }
+
+  const handleBaseMakerChange = (baseMakerId: string) => {
+    setForm(current => ({
+      ...current,
+      baseMakerId,
+      baseCaliberId: current.baseCaliberId && master.calibers.some(caliber => caliber.id === Number(current.baseCaliberId) && caliber.brandId === Number(baseMakerId))
+        ? current.baseCaliberId
+        : '',
+    }))
+  }
 
   const handlePartTypeChange = (partType: string) => {
     setSelectedPartCategoryId('')
@@ -282,7 +320,7 @@ export default function PartsForm({ partId }: { partId?: number }) {
     if (grade) set('grade', grade.nameJa)
   }
 
-  const addMaster = async (payload: { type: 'brand' | 'model' | 'caliber'; name: string; brandId?: number }) => {
+  const addMaster = async (payload: { type: 'brand' | 'model' | 'caliber'; name: string; brandId?: number; isWatchBrand?: boolean; isMovementMaker?: boolean }) => {
     const res = await fetch('/api/master-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -299,7 +337,7 @@ export default function PartsForm({ partId }: { partId?: number }) {
     const name = newBrand.trim()
     if (!name) return
     try {
-      const b = await addMaster({ type: 'brand', name })
+      const b = await addMaster({ type: 'brand', name, isWatchBrand: false, isMovementMaker: true })
       await refreshMaster()
       set('brandId', String(b.id))
       setNewBrand('')
@@ -361,7 +399,7 @@ export default function PartsForm({ partId }: { partId?: number }) {
     const name = newMovMaker.trim()
     if (!name) return
     try {
-      const b = await addMaster({ type: 'brand', name })
+      const b = await addMaster({ type: 'brand', name, isWatchBrand: false, isMovementMaker: true })
       await refreshMaster()
       set('movementMakerId', String(b.id))
       setNewMovMaker('')
@@ -445,7 +483,7 @@ export default function PartsForm({ partId }: { partId?: number }) {
               <label className="label-sm">Cal.（キャリバー）</label>
               <select className="input-base" value={form.caliberId} onChange={e => set('caliberId', e.target.value)}>
                 <option value="">選択してください</option>
-                {master.calibers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {movementCalibers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <InlineAdd
                 value={newCal} onChange={setNewCal}
@@ -457,7 +495,7 @@ export default function PartsForm({ partId }: { partId?: number }) {
               <label className="label-sm">ベースCal.</label>
               <select className="input-base" value={form.baseCaliberId} onChange={e => set('baseCaliberId', e.target.value)}>
                 <option value="">なし</option>
-                {master.calibers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {baseMovementCalibers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <InlineAdd
                 value={newBaseCal} onChange={setNewBaseCal}
@@ -467,9 +505,9 @@ export default function PartsForm({ partId }: { partId?: number }) {
             </div>
             <div>
               <label className="label-sm">ムーブメント製造元</label>
-              <select className="input-base" value={form.movementMakerId} onChange={e => set('movementMakerId', e.target.value)}>
+              <select className="input-base" value={form.movementMakerId} onChange={e => handleMovementMakerChange(e.target.value)}>
                 <option value="">選択してください</option>
-                {master.brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {master.movementMakers.map(b => <option key={b.id} value={b.id}>{b.nameJp || b.name}</option>)}
               </select>
               <InlineAdd
                 value={newMovMaker} onChange={setNewMovMaker}
@@ -479,9 +517,9 @@ export default function PartsForm({ partId }: { partId?: number }) {
             </div>
             <div>
               <label className="label-sm">ベースムーブメント製造元</label>
-              <select className="input-base" value={form.baseMakerId} onChange={e => set('baseMakerId', e.target.value)}>
+              <select className="input-base" value={form.baseMakerId} onChange={e => handleBaseMakerChange(e.target.value)}>
                 <option value="">なし</option>
-                {master.brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {master.movementMakers.map(b => <option key={b.id} value={b.id}>{b.nameJp || b.name}</option>)}
               </select>
               <InlineAdd
                 value={newBaseMaker} onChange={setNewBaseMaker}
@@ -500,9 +538,9 @@ export default function PartsForm({ partId }: { partId?: number }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label-sm">ブランド</label>
-              <select className="input-base" value={form.brandId} onChange={e => set('brandId', e.target.value)}>
+              <select className="input-base" value={form.brandId} onChange={e => handleExteriorBrandChange(e.target.value)}>
                 <option value="">選択してください</option>
-                {master.brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {master.watchBrands.map(b => <option key={b.id} value={b.id}>{b.nameJp || b.name}</option>)}
               </select>
               <InlineAdd
                 value={newBrand} onChange={setNewBrand}
@@ -514,7 +552,7 @@ export default function PartsForm({ partId }: { partId?: number }) {
               <label className="label-sm">モデル</label>
               <select className="input-base" value={form.modelId} onChange={e => set('modelId', e.target.value)}>
                 <option value="">選択してください</option>
-                {master.models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                {exteriorModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
               <InlineAdd
                 value={newModel} onChange={setNewModel}

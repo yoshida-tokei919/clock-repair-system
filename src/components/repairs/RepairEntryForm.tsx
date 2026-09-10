@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getShippingFeeByAddress } from "@/lib/shipping";
+import { matchesBrandSearch } from "@/lib/master-normalize";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -61,7 +62,7 @@ import {
 
 // --- ACTIONS (Server) ---
 import {
-    getBrands, getModels, getCalibers, getCalibersForModel, getCalibersForRef,
+    getWatchBrands, getMovementMakers, getModels, getCalibers, getCalibersForModel, getCalibersForRef,
     getPricingRules, getPartsMatched, upsertBrand, upsertModel, upsertCaliber,
     getRefsByModel, upsertRef, getRepairWorkCategories, getRepairWorkActions, getInternalPartNameMasters,
     getExternalRepairPricingRules
@@ -381,6 +382,8 @@ const AdvancedCombobox: React.FC<{
         phone?: string | null,
         lineId?: string | null,
         address?: string | null,
+        searchText?: string,
+        searchKeys?: string[],
     }) => void;
     value: string;
     onChange: (v: string) => void;
@@ -415,10 +418,13 @@ const AdvancedCombobox: React.FC<{
         phone?: string | null,
         lineId?: string | null,
         address?: string | null,
+        searchText?: string,
+        searchKeys?: string[],
     }[];
     disabled?: boolean;
+    requireSelection?: boolean;
     className?: string;
-}> = ({ value, onChange, onSearchChange, onSelectOption, onUpsert, placeholder, options, disabled, className }) => {
+}> = ({ value, onChange, onSearchChange, onSelectOption, onUpsert, placeholder, options, disabled, requireSelection = false, className }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
@@ -430,7 +436,9 @@ const AdvancedCombobox: React.FC<{
         const low = search.toLowerCase();
         return options.filter(opt =>
             (opt.label || "").toLowerCase().includes(low) ||
-            (opt.value || "").toLowerCase().includes(low)
+            (opt.value || "").toLowerCase().includes(low) ||
+            (opt.searchText || "").toLowerCase().includes(low) ||
+            matchesBrandSearch(search, opt.searchKeys ?? [opt.searchText, opt.label, opt.value])
         );
     }, [options, search]);
 
@@ -470,7 +478,7 @@ const AdvancedCombobox: React.FC<{
                     onChange={(e) => {
                         const val = e.target.value;
                         setSearch(val);
-                        onChange(val); // Real-time value update for free input
+                        if (!requireSelection) onChange(val);
                         if (!isOpen) setIsOpen(true);
                         if (onSearchChange) onSearchChange(val);
                     }}
@@ -1222,6 +1230,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
     // --- 5. MASTERS & OPTIONS ---
     const [brandOpts, setBrandOpts] = useState<any[]>([]);
+    const [movementMakerOpts, setMovementMakerOpts] = useState<any[]>([]);
     const [modelOpts, setModelOpts] = useState<any[]>([]);
     const [refOpts, setRefOpts] = useState<any[]>([]);
     const [calOpts, setCalOpts] = useState<any[]>([]);
@@ -1263,8 +1272,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, []);
 
     const movementMakerId = useMemo(
-        () => getOptionIdByValue(brandOpts, movementMaker),
-        [brandOpts, getOptionIdByValue, movementMaker]
+        () => getOptionIdByValue(movementMakerOpts, movementMaker),
+        [movementMakerOpts, getOptionIdByValue, movementMaker]
     );
     const selectedBrandId = useMemo(
         () => getOptionIdByValue(brandOpts, brand),
@@ -1283,8 +1292,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         [masterCalOpts, getOptionIdByValue, movementCaliber]
     );
     const baseMovementMakerId = useMemo(
-        () => getOptionIdByValue(brandOpts, baseMovementMaker),
-        [baseMovementMaker, brandOpts, getOptionIdByValue]
+        () => getOptionIdByValue(movementMakerOpts, baseMovementMaker),
+        [baseMovementMaker, movementMakerOpts, getOptionIdByValue]
     );
     const baseMovementCaliberId = useMemo(
         () => getOptionIdByValue(masterCalOpts, baseMovementCaliber),
@@ -1303,25 +1312,35 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
     const handleMovementMakerChange = useCallback((nextMaker: string) => {
         setMovementMaker(nextMaker);
-        const nextMakerId = getOptionIdByValue(brandOpts, nextMaker);
+        const nextMakerId = getOptionIdByValue(movementMakerOpts, nextMaker);
         if (!nextMakerId || !movementCaliber) return;
 
         const nextCalOptions = masterCalOpts.filter((option) => option.brandId === nextMakerId);
         if (!isValueInOptions(movementCaliber, nextCalOptions)) {
             setMovementCaliber("");
         }
-    }, [brandOpts, getOptionIdByValue, isValueInOptions, masterCalOpts, movementCaliber]);
+    }, [movementMakerOpts, getOptionIdByValue, isValueInOptions, masterCalOpts, movementCaliber]);
 
     const handleBaseMovementMakerChange = useCallback((nextMaker: string) => {
         setBaseMovementMaker(nextMaker);
-        const nextMakerId = getOptionIdByValue(brandOpts, nextMaker);
+        const nextMakerId = getOptionIdByValue(movementMakerOpts, nextMaker);
         if (!nextMakerId || !baseMovementCaliber) return;
 
         const nextCalOptions = masterCalOpts.filter((option) => option.brandId === nextMakerId);
         if (!isValueInOptions(baseMovementCaliber, nextCalOptions)) {
             setBaseMovementCaliber("");
         }
-    }, [baseMovementCaliber, brandOpts, getOptionIdByValue, isValueInOptions, masterCalOpts]);
+    }, [baseMovementCaliber, movementMakerOpts, getOptionIdByValue, isValueInOptions, masterCalOpts]);
+
+    const handleWatchBrandChange = useCallback((nextBrand: string) => {
+        setBrand(nextBrand);
+        const nextBrandId = getOptionIdByValue(brandOpts, nextBrand);
+        if (model && (!nextBrandId || !modelOpts.some((option) => option.brandId === nextBrandId && isValueInOptions(model, [option])))) {
+            setModel("");
+            setRefName("");
+            setCaliber("");
+        }
+    }, [brandOpts, getOptionIdByValue, isValueInOptions, model, modelOpts]);
 
     // --- 6. DIALOGS ---
     const [quickRegOpen, setQuickRegOpen] = useState(false);
@@ -1589,7 +1608,14 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
     // --- INITIAL LOAD ---
     useEffect(() => {
-        getBrands().then(d => setBrandOpts(d.map(b => ({ label: b.name, value: b.name, id: b.id }))));
+        const toBrandOption = (b: any) => ({
+            label: b.nameJp || b.name,
+            value: b.name,
+            id: b.id,
+            searchKeys: [b.name, b.nameEn, b.nameJp, ...(b.aliases ?? []).map((alias: any) => alias.alias)].filter(Boolean),
+        });
+        getWatchBrands().then(d => setBrandOpts(d.map(toBrandOption)));
+        getMovementMakers().then(d => setMovementMakerOpts(d.map(toBrandOption)));
         getCalibers().then(d => setMasterCalOpts(d.map((c: any) => ({ label: c.name, value: c.name, id: c.id, brandId: c.brandId ?? null }))));
     }, []);
 
@@ -1598,7 +1624,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     useEffect(() => {
         if (!brand) return;
         const b = brandOpts.find(o => o.value === brand);
-        if (b) getModels(b.id).then(d => setModelOpts(d.map((m: any) => ({ label: m.nameJp || m.name, value: m.name, id: m.id }))));
+        if (b) getModels(b.id).then(d => setModelOpts(d.map((m: any) => ({ label: m.nameJp || m.name, value: m.name, id: m.id, brandId: m.brandId }))));
     }, [brand, brandOpts]);
 
     // 2. Model -> Refs & Calibers
@@ -1792,9 +1818,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     m?.id,
                     c?.id,
                     undefined,
-                    brandOpts.find(o => o.value === movementMaker || o.label === movementMaker)?.id,
+                    movementMakerOpts.find(o => o.value === movementMaker || o.label === movementMaker)?.id,
                     masterCalOpts.find(o => o.value === movementCaliber || o.label === movementCaliber)?.id,
-                    brandOpts.find(o => o.value === baseMovementMaker || o.label === baseMovementMaker)?.id,
+                    movementMakerOpts.find(o => o.value === baseMovementMaker || o.label === baseMovementMaker)?.id,
                     masterCalOpts.find(o => o.value === baseMovementCaliber || o.label === baseMovementCaliber)?.id,
                     newItemName
                 ).then(parts => {
@@ -1831,7 +1857,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         return () => {
             cancelled = true;
         };
-    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, isAddingLaborItem, newItemName, newWorkCategoryId, newTargetPartNameId, newWorkActionId, newWorkDetailLabel, newWorkCategorySnapshot, newTargetPartNameSnapshot, newWorkActionSnapshot, customerTypeSelection, getOptionIdByValue, cleanOptionalText]);
+    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, movementMakerOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, isAddingLaborItem, newItemName, newWorkCategoryId, newTargetPartNameId, newWorkActionId, newWorkDetailLabel, newWorkCategorySnapshot, newTargetPartNameSnapshot, newWorkActionSnapshot, customerTypeSelection, getOptionIdByValue, cleanOptionalText]);
 
     useEffect(() => {
         if (!isAddingLaborItem) return;
@@ -2872,7 +2898,7 @@ ${shopName}
                             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
                                 <div className="space-y-2">
                                     <FormRow label="ブランド">
-                                        <AdvancedCombobox value={brand} onChange={setBrand} options={brandOpts} placeholder="ブランド名..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
+                                        <AdvancedCombobox value={brand} onChange={handleWatchBrandChange} options={brandOpts} placeholder="ブランド名..." requireSelection />
                                     </FormRow>
                                     <FormRow label="モデル">
                                         <AdvancedCombobox value={model} onChange={setModel} options={modelOpts} placeholder="モデル名..." />
@@ -2897,7 +2923,7 @@ ${shopName}
                                             ) : (
                                                 <div className="space-y-1">
                                                     <FormRow label="メーカー">
-                                                        <AdvancedCombobox value={movementMaker} onChange={handleMovementMakerChange} options={brandOpts} placeholder="OMEGA / ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
+                                                        <AdvancedCombobox value={movementMaker} onChange={handleMovementMakerChange} options={movementMakerOpts} placeholder="OMEGA / ETA..." requireSelection />
                                                     </FormRow>
                                                     <FormRow label="Cal">
                                                         <AdvancedCombobox value={movementCaliber} onChange={setMovementCaliber} options={filteredMovementCalOpts} placeholder="1120..." />
@@ -2924,7 +2950,7 @@ ${shopName}
                                             ) : (
                                                 <div className="space-y-1">
                                                     <FormRow label="メーカー">
-                                                        <AdvancedCombobox value={baseMovementMaker} onChange={handleBaseMovementMakerChange} options={brandOpts} placeholder="ETA..." onUpsert={(v) => setBrandOpts([...brandOpts, { label: v, value: v }])} />
+                                                        <AdvancedCombobox value={baseMovementMaker} onChange={handleBaseMovementMakerChange} options={movementMakerOpts} placeholder="ETA..." requireSelection />
                                                     </FormRow>
                                                     <FormRow label="Cal">
                                                         <AdvancedCombobox value={baseMovementCaliber} onChange={setBaseMovementCaliber} options={filteredBaseMovementCalOpts} placeholder="2892.A2..." />

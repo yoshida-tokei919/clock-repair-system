@@ -76,6 +76,12 @@ model LineUser {
 }
 
 // 2. Watch Metadata (Smart Input)
+enum BrandKind {
+  NORMAL
+  TYPE
+  UNKNOWN
+}
+
 model Brand {
   id          Int       @id @default(autoincrement())
   name        String    @unique // Legacy support (Internal ID or English)
@@ -83,6 +89,9 @@ model Brand {
   nameJp      String    @map("name_jp") // Japanese (e.g. ロレックス)
   kana        String?
   initialChar String?
+  brandKind       BrandKind @default(NORMAL)
+  isWatchBrand    Boolean   @default(true)
+  isMovementMaker Boolean   @default(false)
   
   models      Model[]
   calibers    Caliber[]
@@ -93,6 +102,18 @@ model Brand {
   parts              PartsMaster[] @relation("PartsBrand")
   movementMakerParts PartsMaster[] @relation("PartsMovementMaker")
   baseMakerParts     PartsMaster[] @relation("PartsBaseMaker")
+  aliases            BrandAlias[]
+}
+
+model BrandAlias {
+  id              Int    @id @default(autoincrement())
+  brandId         Int
+  alias           String
+  normalizedAlias String @unique
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId])
 }
 
 model Model {
