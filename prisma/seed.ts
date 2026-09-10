@@ -1,5 +1,6 @@
 // prisma/seed.ts
 import { PrismaClient, RepairWorkType } from '@prisma/client'
+import { findOrCreateBrand } from '../src/lib/master-normalize'
 import { seedPartStandardMasters } from '../scripts/seed-part-standard-masters'
 
 const prisma = new PrismaClient()
@@ -179,10 +180,10 @@ async function main() {
     ]
 
     for (const b of brands) {
-        await prisma.brand.upsert({
-            where: { name: b.name },
-            update: {},
-            create: b,
+        const brand = await findOrCreateBrand(prisma, b.name)
+        await prisma.brand.update({
+            where: { id: brand.id },
+            data: { nameEn: b.nameEn, nameJp: b.nameJp },
         })
     }
 

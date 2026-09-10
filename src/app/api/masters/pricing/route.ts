@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 
 // GET /api/masters/pricing
 export async function GET(request: Request) {
@@ -46,11 +47,7 @@ export async function POST(request: Request) {
         // Lookup IDs
         let bId = null;
         if (brandName) {
-            const b = await prisma.brand.upsert({
-                where: { name: brandName },
-                create: { name: brandName, nameJp: brandName },
-                update: {}
-            });
+            const b = await findOrCreateBrand(prisma, brandName);
             bId = b.id;
         }
 
@@ -66,12 +63,7 @@ export async function POST(request: Request) {
 
         let cId = null;
         if (caliberName) {
-            const c = await prisma.caliber.findFirst({ where: { name: caliberName } });
-            if (c) cId = c.id;
-            else {
-                const newC = await prisma.caliber.create({ data: { name: caliberName, brandId: bId } });
-                cId = newC.id;
-            }
+            cId = (await findOrCreateCaliber(prisma, caliberName, bId)).id;
         }
 
         const rule = await prisma.pricingRule.create({

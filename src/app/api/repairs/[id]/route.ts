@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
-import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
+import { findOrCreateBrand, findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
@@ -60,7 +60,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             // 1. Update Watch Details (Smart Match)
             if (body.watch) {
                 const brandNameInput = body.watch.brand;
-                const brand = brandNameInput ? await findOrCreateBrand(tx as any, brandNameInput) : null;
+                const brand = brandNameInput ? await resolveBrand(tx as any, brandNameInput) : null;
                 if (!brand) {
                     throw new Error("ブランド名が�E力されてぁE��せん");
                 }
@@ -97,9 +97,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 }
 
                 const movementMakerInput = (body.watch.movementMaker || "").trim();
-                movementMakerId = movementMakerInput
-                    ? (await findOrCreateBrand(tx as any, movementMakerInput)).id
-                    : null;
+                if (movementMakerInput) {
+                    const resolvedMovementMaker = await resolveBrand(tx as any, movementMakerInput);
+                    if (!resolvedMovementMaker) throw new Error("ムーブメントメーカーは候補から選択してください。");
+                    movementMakerId = (await findOrCreateBrand(tx as any, movementMakerInput, { isWatchBrand: false, isMovementMaker: true })).id;
+                } else {
+                    movementMakerId = null;
+                }
 
                 const movementCaliberInput = (body.watch.movementCaliber || "").trim();
                 movementCaliberId = movementCaliberInput
@@ -107,9 +111,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     : null;
 
                 const baseMovementMakerInput = (body.watch.baseMovementMaker || "").trim();
-                baseMovementMakerId = baseMovementMakerInput
-                    ? (await findOrCreateBrand(tx as any, baseMovementMakerInput)).id
-                    : null;
+                if (baseMovementMakerInput) {
+                    const resolvedBaseMovementMaker = await resolveBrand(tx as any, baseMovementMakerInput);
+                    if (!resolvedBaseMovementMaker) throw new Error("ベースムーブメントメーカーは候補から選択してください。");
+                    baseMovementMakerId = (await findOrCreateBrand(tx as any, baseMovementMakerInput, { isWatchBrand: false, isMovementMaker: true })).id;
+                } else {
+                    baseMovementMakerId = null;
+                }
 
                 const baseMovementCaliberInput = (body.watch.baseMovementCaliber || "").trim();
                 baseMovementCaliberId = baseMovementCaliberInput

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { findOrCreateBrand } from "@/lib/master-normalize";
 
 // PUT /api/masters/pricing/[id]
 export async function PUT(
@@ -16,11 +17,7 @@ export async function PUT(
         // Lookup IDs (Same logic as POST)
         let bId = null;
         if (brandName) {
-            const b = await prisma.brand.upsert({
-                where: { name: brandName },
-                create: { name: brandName, nameJp: brandName },
-                update: {}
-            });
+            const b = await findOrCreateBrand(prisma, brandName);
             bId = b.id;
         }
         let mId = null;
