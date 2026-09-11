@@ -210,11 +210,24 @@ export async function getRepairIntakeInviteState(token: string, db: DbClient = p
           linkedCustomer: { select: { name: true, zipCode: true, phone: true, email: true } },
         },
       },
+      repairs: {
+        select: { id: true, inquiryNumber: true },
+        orderBy: { id: "asc" },
+      },
     },
   });
   if (!invite) throw new RepairIntakeError("INVALID_TOKEN", "This intake link is invalid.");
 
-  assertInviteState(invite, new Date());
+  const now = new Date();
+  if (invite.expiresAt <= now) throw new RepairIntakeError("EXPIRED_TOKEN", "This intake link has expired.");
+  if (invite.usedAt) {
+    return {
+      completed: true,
+      repairs: invite.repairs,
+      count: invite.repairs.length,
+    };
+  }
+
   const customer = invite.customer ?? invite.lineUser?.linkedCustomer ?? null;
   return {
     valid: true,
@@ -317,6 +330,7 @@ export async function submitRepairIntake(token: string, payload: unknown) {
           inquiryNumber,
           customerId: customer.id,
           watchId: watch.id,
+          repairIntakeInviteId: invite.id,
           status: REPAIR_INTAKE_STATUS,
           receptionDate: null,
           returnRecipientName: customerInput.name,

@@ -5,7 +5,6 @@ import { FormEvent, type ReactNode, useEffect, useState } from "react";
 import { getWatchBrands } from "@/actions/master-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { RepairIntakeShippingAddress } from "@/lib/repair-intake-shipping";
 
 type CustomerForm = {
   name: string;
@@ -21,7 +20,7 @@ type CustomerForm = {
 type WatchForm = {
   key: number;
   timepieceType: "WRISTWATCH" | "POCKET_WATCH" | "WALL_CLOCK" | "TABLE_CLOCK" | "OTHER";
-  driveType: "QUARTZ" | "MECHANICAL" | "UNKNOWN";
+  driveType: "" | "QUARTZ" | "MECHANICAL" | "UNKNOWN";
   brandId: string;
   modelName: string;
   brandQuery: string;
@@ -36,7 +35,14 @@ type BrandOption = {
 type TokenState = {
   valid: true;
   prefill: { name: string; postalCode: string | null; phone: string | null; email: string | null } | null;
+} | {
+  completed: true;
+  repairs: Array<{ id: number; inquiryNumber: string }>;
+  count: number;
+  shippingAddress: ShippingAddress | null;
 };
+
+type ShippingAddress = { recipient: string; address: string };
 
 const EMPTY_CUSTOMER: CustomerForm = {
   name: "", postalCode: "", prefecture: "", city: "", street: "", building: "", phone: "", email: "",
@@ -45,7 +51,7 @@ const EMPTY_CUSTOMER: CustomerForm = {
 let watchKey = 1;
 function newWatch(): WatchForm {
   return {
-    key: watchKey++, timepieceType: "WRISTWATCH", driveType: "UNKNOWN", brandId: "", modelName: "", brandQuery: "",
+    key: watchKey++, timepieceType: "WRISTWATCH", driveType: "", brandId: "", modelName: "", brandQuery: "",
   };
 }
 
@@ -58,6 +64,7 @@ const timepieceOptions = [
 ] as const;
 
 const driveOptions = [
+  ["", "選択してください"],
   ["QUARTZ", "クォーツ"],
   ["MECHANICAL", "機械式"],
   ["UNKNOWN", "わからない"],
@@ -69,7 +76,7 @@ function messageForTokenError(code?: string) {
   return "この送付受付リンクは利用できません。LINEからご確認ください。";
 }
 
-export function RepairIntakeForm({ token, shippingAddress }: { token: string; shippingAddress: RepairIntakeShippingAddress | null }) {
+export function RepairIntakeForm({ token }: { token: string }) {
   const [customer, setCustomer] = useState<CustomerForm>(EMPTY_CUSTOMER);
   const [watches, setWatches] = useState<WatchForm[]>([newWatch()]);
   const [brands, setBrands] = useState<BrandOption[]>([]);
@@ -77,6 +84,7 @@ export function RepairIntakeForm({ token, shippingAddress }: { token: string; sh
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedRepairs, setCompletedRepairs] = useState<Array<{ id: number; inquiryNumber: string }>>([]);
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -93,6 +101,12 @@ export function RepairIntakeForm({ token, shippingAddress }: { token: string; sh
         return;
       }
       const state = await response.json() as TokenState;
+      if ("completed" in state) {
+        setCompletedRepairs(state.repairs);
+        setShippingAddress(state.shippingAddress);
+        setPageState("complete");
+        return;
+      }
       setCustomer((current) => ({
         ...current,
         name: current.name || state.prefill?.name || "",
@@ -121,7 +135,7 @@ export function RepairIntakeForm({ token, shippingAddress }: { token: string; sh
   function validate() {
     const required = [customer.name, customer.postalCode, customer.prefecture, customer.city, customer.street, customer.phone];
     if (required.some((value) => !value.trim())) return "お客様情報の必須項目を入力してください。";
-    if (watches.some((watch) => !watch.brandId)) return "すべての時計でブランドを選択してください。";
+    if (watches.some((watch) => !watch.brandId || !watch.driveType)) return "すべての時計でブランドと駆動方式を選択してください。";
     return null;
   }
 
@@ -145,13 +159,24 @@ export function RepairIntakeForm({ token, shippingAddress }: { token: string; sh
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         const code = body.code as string | undefined;
-        if (code === "USED_TOKEN") setPageState("used");
+        if (code === "USED_TOKEN") {
+          const stateResponse = await fetch(`/api/customer/intake/${encodeURIComponent(token)}`, { cache: "no-store" });
+          const state = await stateResponse.json().catch(() => ({}));
+          if (stateResponse.ok && state.completed) {
+            setCompletedRepairs(state.repairs || []);
+            setShippingAddress(state.shippingAddress || null);
+            setPageState("complete");
+            return;
+          }
+          setPageState("used");
+        }
         else if (code === "EXPIRED_TOKEN") setPageState("expired");
         const serverMessage = typeof body.error === "string" ? body.error : null;
         setError(code ? messageForTokenError(code) : serverMessage || "送信に失敗しました。");
         return;
       }
       setCompletedRepairs(body.repairs || []);
+      setShippingAddress(body.shippingAddress || null);
       setPageState("complete");
     } catch {
       setError("送信に失敗しました。通信状態を確認して、もう一度お試しください。");
@@ -165,7 +190,7 @@ export function RepairIntakeForm({ token, shippingAddress }: { token: string; sh
     return <PageFrame><section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950"><h1 className="text-lg font-bold">送付受付リンクについて</h1><p className="mt-2">{error}</p></section></PageFrame>;
   }
   if (pageState === "complete") {
-    return <PageFrame><section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950"><h1 className="text-xl font-bold">送付受付が完了しました</h1><p className="mt-2 text-sm">時計を発送する際は、下記の受付番号を控えてください。</p><ul className="mt-4 space-y-2">{completedRepairs.map((repair) => <li key={repair.id} className="rounded-md bg-white px-3 py-2 font-mono font-bold">{repair.inquiryNumber}</li>)}</ul></section>{shippingAddress && <ShippingAddress address={shippingAddress} />}</PageFrame>;
+    return <PageFrame><section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950"><h1 className="text-xl font-bold">送付受付が完了しました</h1><p className="mt-2 text-sm">時計を発送する際は、下記の受付番号を控えてください。</p><p className="mt-2 text-sm">時計点数: {completedRepairs.length}点</p><ul className="mt-4 space-y-2">{completedRepairs.map((repair) => <li key={repair.id} className="rounded-md bg-white px-3 py-2 font-mono font-bold">{repair.inquiryNumber}</li>)}</ul></section>{shippingAddress && <ShippingAddress address={shippingAddress} />}</PageFrame>;
   }
 
   return <PageFrame>
@@ -185,5 +210,5 @@ function WatchFields({ watch, index, brands, canRemove, onChange, onRemove }: { 
 }
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) { return <label className="block text-sm font-medium text-zinc-700"><span>{label}{required && <span className="ml-1 text-red-600">必須</span>}</span><span className="mt-1.5 block">{children}</span></label>; }
-function ShippingAddress({ address }: { address: RepairIntakeShippingAddress }) { return <section className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950"><h2 className="font-bold">発送先</h2><p className="mt-2 font-medium">{address.recipient}</p><p className="whitespace-pre-wrap">{address.address}</p><p className="mt-3 text-xs">時計と受付番号が分かるメモを同封して発送してください。</p></section>; }
+function ShippingAddress({ address }: { address: ShippingAddress }) { return <section className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950"><h2 className="font-bold">発送先</h2><p className="mt-2 font-medium">{address.recipient}</p><p className="whitespace-pre-wrap">{address.address}</p><p className="mt-3 text-xs">時計と受付番号が分かるメモを同封して発送してください。</p></section>; }
 function PageFrame({ children }: { children: ReactNode }) { return <main className="min-h-screen bg-zinc-50 px-4 py-6 sm:px-6 sm:py-10"><div className="mx-auto max-w-2xl rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200 sm:p-8">{children}</div><style jsx global>{`.form-select { width: 100%; height: 2.25rem; border: 1px solid hsl(var(--input)); border-radius: 0.375rem; background: white; padding: 0 0.75rem; font-size: 0.875rem; } .form-select:focus { outline: none; box-shadow: 0 0 0 1px hsl(var(--ring)); }`}</style></main>; }

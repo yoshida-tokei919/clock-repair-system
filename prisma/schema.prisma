@@ -215,6 +215,7 @@ model RepairIntakeInvite {
 
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   lineUser LineUser? @relation(fields: [lineUserId], references: [id], onDelete: SetNull)
+  repairs  Repair[]
 
   @@index([customerId])
   @@index([lineUserId])
@@ -230,6 +231,7 @@ model Repair {
   inquiryNumber        String    @unique // T-001
   customerId           Int
   watchId              Int
+  repairIntakeInviteId Int?
   movementMakerId      Int?
   movementCaliberId    Int?
   baseMovementMakerId  Int?
@@ -273,6 +275,7 @@ model Repair {
 
   customer Customer          @relation(fields: [customerId], references: [id])
   watch    Watch             @relation(fields: [watchId], references: [id])
+  repairIntakeInvite RepairIntakeInvite? @relation(fields: [repairIntakeInviteId], references: [id], onDelete: SetNull)
   movementMaker        Brand?   @relation("RepairMovementMaker", fields: [movementMakerId], references: [id])
   movementCaliber      Caliber? @relation("RepairMovementCaliber", fields: [movementCaliberId], references: [id])
   baseMovementMaker    Brand?   @relation("RepairBaseMovementMaker", fields: [baseMovementMakerId], references: [id])
@@ -296,6 +299,8 @@ model Repair {
 
   warrantyId Int?
   warranty   Warranty? @relation(fields: [warrantyId], references: [id])
+
+  @@index([repairIntakeInviteId])
 }
 
 model RepairStatusLog {
