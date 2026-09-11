@@ -35,17 +35,16 @@ export default async function EstimateDocumentPage({ params }: { params: { id: s
 
     if (!estimateDoc) return notFound();
 
-    const isB2C = estimateDoc.customer.type === "individual";
     const returnHref = estimateDoc.repairs.length === 1 ? `/repairs/${estimateDoc.repairs[0].id}` : "/repairs";
     const returnLabel = estimateDoc.repairs.length === 1 ? "← 修理案件へ戻る" : "← 修理一覧へ戻る";
-    const returnLink = isB2C ? (
+    const returnLink = (
         <Link
             href={returnHref}
             className="mt-2 inline-flex h-8 items-center rounded border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
             {returnLabel}
         </Link>
-    ) : null;
+    );
 
     const [currentPdfFile] = await prisma.$queryRaw<{
         id: number;
