@@ -199,16 +199,34 @@ export async function createRepairIntakeInvite(
 export async function getRepairIntakeInviteState(token: string, db: DbClient = prisma) {
   const invite = await db.repairIntakeInvite.findUnique({
     where: { token },
-    select: { expiresAt: true, usedAt: true, customerId: true, lineUserId: true },
+    select: {
+      expiresAt: true,
+      usedAt: true,
+      customerId: true,
+      lineUserId: true,
+      customer: { select: { name: true, zipCode: true, phone: true, email: true } },
+      lineUser: {
+        select: {
+          linkedCustomer: { select: { name: true, zipCode: true, phone: true, email: true } },
+        },
+      },
+    },
   });
   if (!invite) throw new RepairIntakeError("INVALID_TOKEN", "This intake link is invalid.");
 
   assertInviteState(invite, new Date());
+  const customer = invite.customer ?? invite.lineUser?.linkedCustomer ?? null;
   return {
     valid: true,
     expiresAt: invite.expiresAt,
     usedAt: invite.usedAt,
     hasLinkedCustomer: invite.customerId !== null || invite.lineUserId !== null,
+    prefill: customer ? {
+      name: customer.name,
+      postalCode: customer.zipCode,
+      phone: customer.phone,
+      email: customer.email,
+    } : null,
   };
 }
 

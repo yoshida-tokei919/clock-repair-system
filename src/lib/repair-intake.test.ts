@@ -30,6 +30,8 @@ test("accepts only an unused, unexpired intake invite", async () => {
         usedAt: null,
         customerId: 12,
         lineUserId: null,
+        customer: { name: "Test Customer", zipCode: "100-0001", phone: "0312345678", email: "test@example.com" },
+        lineUser: null,
       }),
     },
   };
@@ -37,6 +39,12 @@ test("accepts only an unused, unexpired intake invite", async () => {
   const result = await getRepairIntakeInviteState("valid-token", db as never);
   assert.equal(result.valid, true);
   assert.equal(result.hasLinkedCustomer, true);
+  assert.deepEqual(result.prefill, {
+    name: "Test Customer",
+    postalCode: "100-0001",
+    phone: "0312345678",
+    email: "test@example.com",
+  });
 });
 
 test("rejects expired and already-used intake invites", async () => {
