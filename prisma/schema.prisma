@@ -183,6 +183,13 @@ model Repair {
   status               String    // 'reception', 'diagnosing', etc.
   approvalStatus       String    @default("pending")
   approvalDate         DateTime?
+  returnRecipientName  String?
+  returnPostalCode     String?
+  returnPrefecture     String?
+  returnCity           String?
+  returnStreet         String?
+  returnBuilding       String?
+  returnPhone          String?
   
   // Scheduling & Priority Logic
   priorityScore        Int       @default(0)
