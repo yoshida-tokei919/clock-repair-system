@@ -5,6 +5,11 @@ import { FormEvent, type ReactNode, useEffect, useState } from "react";
 import { getWatchBrands } from "@/actions/master-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  getIntakeBrandOptions,
+  searchIntakeBrandOptions,
+  type IntakeBrandOption,
+} from "@/lib/repair-intake-brand-search";
 
 type CustomerForm = {
   name: string;
@@ -24,12 +29,6 @@ type WatchForm = {
   brandId: string;
   modelName: string;
   brandQuery: string;
-};
-
-type BrandOption = {
-  id: number;
-  label: string;
-  searchText: string;
 };
 
 type TokenState = {
@@ -79,12 +78,13 @@ function messageForTokenError(code?: string) {
 export function RepairIntakeForm({ token }: { token: string }) {
   const [customer, setCustomer] = useState<CustomerForm>(EMPTY_CUSTOMER);
   const [watches, setWatches] = useState<WatchForm[]>([newWatch()]);
-  const [brands, setBrands] = useState<BrandOption[]>([]);
+  const [brands, setBrands] = useState<IntakeBrandOption[]>([]);
   const [pageState, setPageState] = useState<"loading" | "ready" | "invalid" | "expired" | "used" | "complete">("loading");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedRepairs, setCompletedRepairs] = useState<Array<{ id: number; inquiryNumber: string }>>([]);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
+  const [postalLookupMessage, setPostalLookupMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -114,11 +114,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
         phone: current.phone || state.prefill?.phone || "",
         email: current.email || state.prefill?.email || "",
       }));
-      setBrands(rawBrands.map((brand: any) => ({
-        id: brand.id,
-        label: brand.nameJp || brand.nameEn || brand.name,
-        searchText: [brand.name, brand.nameEn, brand.nameJp, ...(brand.aliases || []).map((alias: { alias: string }) => alias.alias)].filter(Boolean).join(" ").toLocaleLowerCase(),
-      })));
+      setBrands(getIntakeBrandOptions(rawBrands));
       setPageState("ready");
     }).catch(() => {
       if (!active) return;
@@ -130,6 +126,30 @@ export function RepairIntakeForm({ token }: { token: string }) {
 
   function updateWatch(key: number, patch: Partial<WatchForm>) {
     setWatches((current) => current.map((watch) => watch.key === key ? { ...watch, ...patch } : watch));
+  }
+
+  async function lookupPostalCode() {
+    const postalCode = customer.postalCode
+      .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
+      .replace(/[^0-9]/g, "");
+    if (!/^\d{7}$/.test(postalCode)) return;
+
+    setPostalLookupMessage("住所を検索しています。");
+    try {
+      const response = await fetch(`/api/postal-code?zipcode=${postalCode}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "住所を取得できませんでした。");
+      setCustomer((current) => ({
+        ...current,
+        postalCode,
+        prefecture: current.prefecture || result.prefecture,
+        city: current.city || result.city,
+        street: current.street || result.street,
+      }));
+      setPostalLookupMessage("住所を自動入力しました。");
+    } catch (lookupError) {
+      setPostalLookupMessage(lookupError instanceof Error ? lookupError.message : "住所を自動入力できませんでした。");
+    }
   }
 
   function validate() {
@@ -196,17 +216,17 @@ export function RepairIntakeForm({ token }: { token: string }) {
   return <PageFrame>
     <header className="border-b border-zinc-200 pb-5"><h1 className="text-2xl font-bold tracking-tight text-zinc-900">時計修理 送付受付</h1><p className="mt-2 text-sm leading-6 text-zinc-600">お客様情報と時計情報をご入力ください。時計1本ごとに受付番号を発行します。</p></header>
     <form className="mt-6 space-y-8" onSubmit={submit} noValidate>
-      <section><h2 className="text-lg font-bold text-zinc-900">お客様情報</h2><p className="mt-1 text-xs text-zinc-500">返送先として保存されます。</p><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="お名前" required><Input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} autoComplete="name" /></Field><Field label="電話番号" required><Input value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} autoComplete="tel" inputMode="tel" /></Field><Field label="郵便番号" required><Input value={customer.postalCode} onChange={(e) => setCustomer({ ...customer, postalCode: e.target.value })} placeholder="000-0000" autoComplete="postal-code" inputMode="numeric" /></Field><Field label="メールアドレス"><Input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} autoComplete="email" type="email" /></Field><Field label="都道府県" required><Input value={customer.prefecture} onChange={(e) => setCustomer({ ...customer, prefecture: e.target.value })} autoComplete="address-level1" /></Field><Field label="市区町村" required><Input value={customer.city} onChange={(e) => setCustomer({ ...customer, city: e.target.value })} autoComplete="address-level2" /></Field></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="町名・番地" required><Input value={customer.street} onChange={(e) => setCustomer({ ...customer, street: e.target.value })} autoComplete="address-line1" /></Field><Field label="建物名・部屋番号"><Input value={customer.building} onChange={(e) => setCustomer({ ...customer, building: e.target.value })} autoComplete="address-line2" /></Field></div></section>
-      <section><div className="flex items-end justify-between gap-3"><div><h2 className="text-lg font-bold text-zinc-900">時計情報</h2><p className="mt-1 text-xs text-zinc-500">ブランドは候補から選択してください。型番は任意です。</p></div><Button type="button" variant="outline" onClick={() => setWatches((current) => [...current, newWatch()])}>時計を追加</Button></div><div className="mt-4 space-y-4">{watches.map((watch, index) => <WatchFields key={watch.key} watch={watch} index={index} brands={brands} canRemove={watches.length > 1} onChange={(patch) => updateWatch(watch.key, patch)} onRemove={() => setWatches((current) => current.filter((item) => item.key !== watch.key))} />)}</div></section>
+      <section><h2 className="text-lg font-bold text-zinc-900">お客様情報</h2><p className="mt-1 text-xs text-zinc-500">返送先として保存されます。</p><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="お名前" required><Input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} autoComplete="name" /></Field><Field label="電話番号" required><Input value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} autoComplete="tel" inputMode="tel" /></Field><Field label="郵便番号" required><Input value={customer.postalCode} onChange={(e) => setCustomer({ ...customer, postalCode: e.target.value })} onBlur={() => void lookupPostalCode()} placeholder="000-0000" autoComplete="postal-code" inputMode="numeric" />{postalLookupMessage && <p className="mt-1 text-xs text-zinc-500">{postalLookupMessage}</p>}</Field><Field label="メールアドレス"><Input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} autoComplete="email" type="email" /></Field><Field label="都道府県" required><Input value={customer.prefecture} onChange={(e) => setCustomer({ ...customer, prefecture: e.target.value })} autoComplete="address-level1" /></Field><Field label="市区町村" required><Input value={customer.city} onChange={(e) => setCustomer({ ...customer, city: e.target.value })} autoComplete="address-level2" /></Field></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="町名・番地" required><Input value={customer.street} onChange={(e) => setCustomer({ ...customer, street: e.target.value })} autoComplete="address-line1" /></Field><Field label="建物名・部屋番号"><Input value={customer.building} onChange={(e) => setCustomer({ ...customer, building: e.target.value })} autoComplete="address-line2" /></Field></div></section>
+      <section><div className="flex items-end justify-between gap-3"><div><h2 className="text-lg font-bold text-zinc-900">時計情報</h2><p className="mt-1 text-xs text-zinc-500">ブランド名の一部を入力すると候補を絞り込めます。<br />日本語・英字どちらでも検索できます。</p></div><Button type="button" variant="outline" onClick={() => setWatches((current) => [...current, newWatch()])}>＋ 次の時計を追加</Button></div><div className="mt-4 space-y-4">{watches.map((watch, index) => <WatchFields key={watch.key} watch={watch} index={index} brands={brands} canRemove={watches.length > 1} onChange={(patch) => updateWatch(watch.key, patch)} onRemove={() => setWatches((current) => current.filter((item) => item.key !== watch.key))} />)}</div></section>
       {error && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>{isSubmitting ? "送付受付中…" : "送付受付を送信"}</Button>
     </form>
   </PageFrame>;
 }
 
-function WatchFields({ watch, index, brands, canRemove, onChange, onRemove }: { watch: WatchForm; index: number; brands: BrandOption[]; canRemove: boolean; onChange: (patch: Partial<WatchForm>) => void; onRemove: () => void }) {
-  const matches = brands.filter((brand) => brand.searchText.includes(watch.brandQuery.toLocaleLowerCase())).slice(0, 100);
-  return <article className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"><div className="mb-4 flex items-center justify-between"><h3 className="font-semibold text-zinc-800">時計 {index + 1}</h3>{canRemove && <Button type="button" variant="ghost" size="sm" onClick={onRemove}>削除</Button>}</div><div className="grid gap-4 sm:grid-cols-2"><Field label="時計の種類" required><select className="form-select" value={watch.timepieceType} onChange={(e) => onChange({ timepieceType: e.target.value as WatchForm["timepieceType"] })}>{timepieceOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field><Field label="駆動方式" required><select className="form-select" value={watch.driveType} onChange={(e) => onChange({ driveType: e.target.value as WatchForm["driveType"] })}>{driveOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field></div><div className="mt-4"><Field label="ブランド" required><Input value={watch.brandQuery} onChange={(e) => onChange({ brandQuery: e.target.value, brandId: "" })} placeholder="例：ROLEX、ロレックス" /><select className="form-select mt-2" value={watch.brandId} onChange={(e) => onChange({ brandId: e.target.value })}><option value="">候補から選択してください</option>{matches.map((brand) => <option key={brand.id} value={brand.id}>{brand.label}</option>)}</select></Field></div><div className="mt-4"><Field label="型番・モデル名"><Input value={watch.modelName} onChange={(e) => onChange({ modelName: e.target.value })} placeholder="例：16233、Seamaster（任意）" /></Field></div></article>;
+function WatchFields({ watch, index, brands, canRemove, onChange, onRemove }: { watch: WatchForm; index: number; brands: IntakeBrandOption[]; canRemove: boolean; onChange: (patch: Partial<WatchForm>) => void; onRemove: () => void }) {
+  const matches = searchIntakeBrandOptions(brands, watch.brandQuery).slice(0, 100);
+  return <article className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"><div className="mb-4 flex items-center justify-between"><h3 className="font-semibold text-zinc-800">時計 {index + 1}</h3>{canRemove && <Button type="button" variant="ghost" size="sm" onClick={onRemove}>削除</Button>}</div><div className="grid gap-4 sm:grid-cols-2"><Field label="時計の種類" required><select className="form-select" value={watch.timepieceType} onChange={(e) => onChange({ timepieceType: e.target.value as WatchForm["timepieceType"] })}>{timepieceOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field><Field label="駆動方式" required><select className="form-select" value={watch.driveType} onChange={(e) => onChange({ driveType: e.target.value as WatchForm["driveType"] })}>{driveOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field></div><div className="mt-4"><Field label="ブランド" required><Input value={watch.brandQuery} onChange={(e) => onChange({ brandQuery: e.target.value, brandId: "" })} placeholder="例：ROLEX、ロレックス" /><select className="form-select mt-2" value={watch.brandId} onChange={(e) => onChange({ brandId: e.target.value })}><option value="">候補から選択してください</option>{matches.map((brand) => <option key={brand.id} value={brand.id}>{brand.label}</option>)}</select><span className="mt-1 block text-xs text-zinc-500">時計にブランド名の記載がない、または分からない場合は「不明」を選択してください。</span></Field></div><div className="mt-4"><Field label="型番・モデル名"><Input value={watch.modelName} onChange={(e) => onChange({ modelName: e.target.value })} placeholder="例：16233、Seamaster（任意）" /></Field></div></article>;
 }
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) { return <label className="block text-sm font-medium text-zinc-700"><span>{label}{required && <span className="ml-1 text-red-600">必須</span>}</span><span className="mt-1.5 block">{children}</span></label>; }
