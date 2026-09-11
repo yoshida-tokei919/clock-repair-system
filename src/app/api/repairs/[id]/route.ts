@@ -125,7 +125,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     : null;
 
                 // Reference Handling
-                if (body.watch.ref) {
+                if (body.watch.ref && modelId) {
                     const wr = await tx.watchReference.findFirst({
                         where: { modelId: modelId, name: body.watch.ref }
                     });

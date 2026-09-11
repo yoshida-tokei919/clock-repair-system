@@ -44,7 +44,7 @@ export default async function KanbanPage() {
         },
         watch: {
             brand: r.watch.brand.nameJp || r.watch.brand.name || "不明",
-            model: r.watch.model.nameJp || r.watch.model.name || "不明",
+            model: r.watch.model?.nameJp || r.watch.model?.name || r.watch.modelNameInput || "モデル未設定",
         },
         endUserName: r.endUserName, // Added
         status: r.status,

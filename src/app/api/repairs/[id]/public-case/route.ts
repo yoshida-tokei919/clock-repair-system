@@ -94,9 +94,16 @@ export async function POST(
         throw new Error("修理案件が見つかりません。");
       }
 
+      const watchModel = repair.watch.model;
+      // Intake repairs may legitimately have no canonical Model yet. They are
+      // not eligible to become a PublicCase until staff resolves one.
+      if (!watchModel) {
+        return { missingModel: true };
+      }
+
       const brandName = text(repair.watch.brand.name);
       const brandDisplayName = text(repair.watch.brand.nameJp) ?? brandName;
-      const modelName = text(repair.watch.model.nameJp) ?? text(repair.watch.model.name);
+      const modelName = text(watchModel.nameJp) ?? text(watchModel.name);
       const ref = text(repair.watch.reference?.name);
       const caliber =
         text(repair.movementCaliber?.name) ??
@@ -229,7 +236,7 @@ export async function POST(
             repairId: repair.id,
             inquiryNumber: repair.inquiryNumber,
             brandId: repair.watch.brand.id,
-            modelId: repair.watch.model.id,
+            modelId: watchModel.id,
             referenceId: repair.watch.reference?.id ?? null,
             watchCaliberId: repair.watch.caliber?.id ?? null,
             movementCaliber: text(repair.movementCaliber?.name),
@@ -244,6 +251,9 @@ export async function POST(
       return { publicCaseId: publicCase.id, created: true };
     });
 
+    if (result.missingModel) {
+      return NextResponse.json({ error: "A canonical watch model is required before creating a PublicCase." }, { status: 409 });
+    }
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
     // 同時実行時はDBの一意制約を最終防衛線にし、既存下書きを返す。

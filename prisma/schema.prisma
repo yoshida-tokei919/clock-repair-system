@@ -54,6 +54,7 @@ model Customer {
   invoicePdfFiles   InvoicePdfFile[]
   warranties        Warranty[]
   lineUsers         LineUser[]
+  repairIntakeInvites RepairIntakeInvite[]
 }
 
 // LINE webhook users are retained before, and independently from, any Customer UI link.
@@ -70,6 +71,7 @@ model LineUser {
   updatedAt        DateTime  @updatedAt
 
   linkedCustomer Customer? @relation(fields: [linkedCustomerId], references: [id], onDelete: SetNull)
+  repairIntakeInvites RepairIntakeInvite[]
 
   @@index([linkedCustomerId])
   @@index([lastReceivedAt])
@@ -79,6 +81,20 @@ model LineUser {
 enum BrandKind {
   NORMAL
   TYPE
+  UNKNOWN
+}
+
+enum TimepieceType {
+  WRISTWATCH
+  POCKET_WATCH
+  WALL_CLOCK
+  TABLE_CLOCK
+  OTHER
+}
+
+enum WatchDriveType {
+  QUARTZ
+  MECHANICAL
   UNKNOWN
 }
 
@@ -163,14 +179,18 @@ model Caliber {
 model Watch {
   id           Int      @id @default(autoincrement())
   brandId      Int
-  modelId      Int
+  modelId      Int?
+  // Customer-entered text from an intake form. It is not a Model master record.
+  modelNameInput String?
   referenceId  Int?
   caliberId    Int?
+  timepieceType TimepieceType?
+  driveType    WatchDriveType?
   serialNumber String? // Optional for vintage/unknown
   customerId   Int
   
   brand       Brand    @relation(fields: [brandId], references: [id])
-  model       Model    @relation(fields: [modelId], references: [id])
+  model       Model?   @relation(fields: [modelId], references: [id])
   reference   WatchReference? @relation(fields: [referenceId], references: [id])
   caliber     Caliber? @relation(fields: [caliberId], references: [id])
   customer    Customer @relation(fields: [customerId], references: [id])
@@ -182,6 +202,23 @@ model Watch {
   @@index([brandId, serialNumber]) // Replaced unique constraint with index
   @@index([serialNumber])
   @@index([brandId, modelId])
+}
+
+model RepairIntakeInvite {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  customerId Int?
+  lineUserId Int?
+  createdAt  DateTime @default(now())
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lineUser LineUser? @relation(fields: [lineUserId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([lineUserId])
+  @@index([expiresAt])
 }
 
 model Repair {

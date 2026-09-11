@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         const component = (
             <TagDocument
                 repairId={repair.inquiryNumber}
-                modelName={`${repair.watch.brand.name} ${repair.watch.model.name}`
+                modelName={`${repair.watch.brand.name} ${repair.watch.model?.name || repair.watch.modelNameInput || "モデル未設定"}`
                 }
                 customerName={repair.customer.name}
                 qrCodeDataUrl={qrCodeDataUrl}
