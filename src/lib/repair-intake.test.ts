@@ -2,10 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  REPAIR_INTAKE_STATUS,
   RepairIntakeError,
   generateRepairIntakeToken,
   getRepairIntakeInviteState,
 } from "./repair-intake";
+
+test("uses shipment-waiting as the intake repair status", () => {
+  assert.equal(REPAIR_INTAKE_STATUS, "送付待ち");
+});
 
 test("generates URL-safe, high-entropy repair intake tokens", () => {
   const tokens = new Set(Array.from({ length: 100 }, () => generateRepairIntakeToken()));

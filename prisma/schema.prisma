@@ -237,7 +237,7 @@ model Repair {
   partnerRef           String?   // Manual Partner Mgmt No
   accessories          String?   // JSON or CSV of checked items
   
-  receptionDate        DateTime  @default(now())
+  receptionDate        DateTime? @default(now())
   status               String    // 'reception', 'diagnosing', etc.
   approvalStatus       String    @default("pending")
   approvalDate         DateTime?

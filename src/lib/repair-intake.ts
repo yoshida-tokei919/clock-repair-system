@@ -4,7 +4,7 @@ import { BrandKind, Prisma, TimepieceType, WatchDriveType, type PrismaClient } f
 
 import { prisma } from "@/lib/prisma";
 
-export const REPAIR_INTAKE_STATUS = "送付受付";
+export const REPAIR_INTAKE_STATUS = "送付待ち";
 const INTAKE_TOKEN_BYTES = 32;
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
@@ -300,6 +300,7 @@ export async function submitRepairIntake(token: string, payload: unknown) {
           customerId: customer.id,
           watchId: watch.id,
           status: REPAIR_INTAKE_STATUS,
+          receptionDate: null,
           returnRecipientName: customerInput.name,
           returnPostalCode: customerInput.postalCode,
           returnPrefecture: customerInput.prefecture,

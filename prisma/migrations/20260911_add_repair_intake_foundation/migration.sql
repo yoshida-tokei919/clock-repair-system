@@ -14,6 +14,10 @@ ALTER TABLE "Watch"
   ADD CONSTRAINT "Watch_modelId_fkey"
   FOREIGN KEY ("modelId") REFERENCES "Model"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+-- A repair submitted for shipment has not yet been physically received.
+-- Existing creation flows retain the CURRENT_TIMESTAMP default.
+ALTER TABLE "Repair" ALTER COLUMN "receptionDate" DROP NOT NULL;
+
 CREATE TABLE "RepairIntakeInvite" (
   "id" SERIAL NOT NULL,
   "token" TEXT NOT NULL,
