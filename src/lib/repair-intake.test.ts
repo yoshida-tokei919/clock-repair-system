@@ -9,6 +9,7 @@ import {
   createLineUserRepairIntakeInvite,
   generateRepairIntakeToken,
   getRepairIntakeInviteState,
+  normalizePostalCode,
   repairIntakeErrorResponse,
 } from "./repair-intake";
 
@@ -23,6 +24,14 @@ test("generates URL-safe, high-entropy repair intake tokens", () => {
   for (const token of Array.from(tokens)) {
     assert.match(token, /^[A-Za-z0-9_-]{43}$/);
   }
+});
+
+test("normalizes accepted postal-code formats to seven ASCII digits", () => {
+  assert.equal(normalizePostalCode("1234567"), "1234567");
+  assert.equal(normalizePostalCode("123-4567"), "1234567");
+  assert.equal(normalizePostalCode("１２３－４５６７"), "1234567");
+  assert.equal(normalizePostalCode("123456"), null);
+  assert.equal(normalizePostalCode("12345678"), null);
 });
 
 test("reuses an active B2C invite instead of issuing another token", async () => {
@@ -143,7 +152,7 @@ test("accepts only an unused, unexpired intake invite", async () => {
         usedAt: null,
         customerId: 12,
         lineUserId: null,
-        customer: { name: "Test Customer", zipCode: "100-0001", phone: "0312345678", email: "test@example.com" },
+        customer: { name: "Test Customer", zipCode: "100-0001", prefecture: "東京都", city: "千代田区", street: "丸の内1-1", building: "テストビル", phone: "0312345678", email: "test@example.com" },
         lineUser: null,
         repairs: [],
       }),
@@ -156,6 +165,10 @@ test("accepts only an unused, unexpired intake invite", async () => {
   assert.deepEqual(result.prefill, {
     name: "Test Customer",
     postalCode: "100-0001",
+    prefecture: "東京都",
+    city: "千代田区",
+    street: "丸の内1-1",
+    building: "テストビル",
     phone: "0312345678",
     email: "test@example.com",
   });

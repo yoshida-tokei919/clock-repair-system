@@ -27,6 +27,10 @@ model Customer {
   kana         String?
   companyName  String?
   zipCode      String?
+  prefecture   String?
+  city         String?
+  street       String?
+  building     String?
   address      String?
   phone        String?
   email        String?

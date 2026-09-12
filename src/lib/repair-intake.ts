@@ -30,6 +30,8 @@ export type RepairIntakeCustomerInput = {
   email?: unknown;
 };
 
+export type RepairIntakeReturnAddressInput = RepairIntakeCustomerInput;
+
 export type RepairIntakeWatchInput = {
   timepieceType?: unknown;
   driveType?: unknown;
@@ -66,6 +68,14 @@ function optionalText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+export function normalizePostalCode(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value
+    .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
+    .replace(/[^0-9]/g, "");
+  return /^\d{7}$/.test(normalized) ? normalized : null;
+}
+
 function parseEnum<T extends string>(value: unknown, allowed: readonly T[], field: string): T {
   if (typeof value !== "string" || !allowed.includes(value as T)) {
     throw new RepairIntakeError("INVALID_INPUT", `${field} is invalid.`);
@@ -86,9 +96,13 @@ function parseCustomerInput(value: unknown): ParsedCustomerInput {
     throw new RepairIntakeError("INVALID_INPUT", "customer is required.");
   }
   const customer = value as RepairIntakeCustomerInput;
+  const postalCode = normalizePostalCode(customer.postalCode);
+  if (!postalCode) {
+    throw new RepairIntakeError("INVALID_INPUT", "customer.postalCode must be seven digits.");
+  }
   return {
     name: requiredText(customer.name, "customer.name"),
-    postalCode: requiredText(customer.postalCode, "customer.postalCode"),
+    postalCode,
     prefecture: requiredText(customer.prefecture, "customer.prefecture"),
     city: requiredText(customer.city, "customer.city"),
     street: requiredText(customer.street, "customer.street"),
@@ -265,10 +279,10 @@ export async function getRepairIntakeInviteState(token: string, db: DbClient = p
       usedAt: true,
       customerId: true,
       lineUserId: true,
-      customer: { select: { name: true, zipCode: true, phone: true, email: true } },
+      customer: { select: { name: true, zipCode: true, prefecture: true, city: true, street: true, building: true, phone: true, email: true } },
       lineUser: {
         select: {
-          linkedCustomer: { select: { name: true, zipCode: true, phone: true, email: true } },
+          linkedCustomer: { select: { name: true, zipCode: true, prefecture: true, city: true, street: true, building: true, phone: true, email: true } },
         },
       },
       repairs: {
@@ -298,6 +312,10 @@ export async function getRepairIntakeInviteState(token: string, db: DbClient = p
     prefill: customer ? {
       name: customer.name,
       postalCode: customer.zipCode,
+      prefecture: customer.prefecture,
+      city: customer.city,
+      street: customer.street,
+      building: customer.building,
       phone: customer.phone,
       email: customer.email,
     } : null,
@@ -305,8 +323,13 @@ export async function getRepairIntakeInviteState(token: string, db: DbClient = p
 }
 
 export async function submitRepairIntake(token: string, payload: unknown) {
-  const body = payload && typeof payload === "object" ? payload as { customer?: unknown; watches?: unknown } : null;
+  const body = payload && typeof payload === "object" ? payload as { customer?: unknown; watches?: unknown; returnAddressSameAsCustomer?: unknown; returnAddress?: unknown } : null;
   const customerInput = parseCustomerInput(body?.customer);
+  if (typeof body?.returnAddressSameAsCustomer !== "boolean") {
+    throw new RepairIntakeError("INVALID_INPUT", "returnAddressSameAsCustomer must be a boolean.");
+  }
+  const returnAddressSameAsCustomer = body.returnAddressSameAsCustomer;
+  const returnAddressInput = returnAddressSameAsCustomer ? customerInput : parseCustomerInput(body?.returnAddress);
   const watchesInput = parseWatchInputs(body?.watches);
 
   return prisma.$transaction(async (tx) => {
@@ -341,6 +364,10 @@ export async function submitRepairIntake(token: string, payload: unknown) {
       prefix: "C",
       isPartner: false,
       zipCode: customerInput.postalCode,
+      prefecture: customerInput.prefecture,
+      city: customerInput.city,
+      street: customerInput.street,
+      building: customerInput.building,
       address: formatCustomerAddress(customerInput),
       phone: customerInput.phone,
       email: customerInput.email,
@@ -394,13 +421,13 @@ export async function submitRepairIntake(token: string, payload: unknown) {
           repairIntakeInviteId: invite.id,
           status: REPAIR_INTAKE_STATUS,
           receptionDate: null,
-          returnRecipientName: customerInput.name,
-          returnPostalCode: customerInput.postalCode,
-          returnPrefecture: customerInput.prefecture,
-          returnCity: customerInput.city,
-          returnStreet: customerInput.street,
-          returnBuilding: customerInput.building,
-          returnPhone: customerInput.phone,
+          returnRecipientName: returnAddressInput.name,
+          returnPostalCode: returnAddressInput.postalCode,
+          returnPrefecture: returnAddressInput.prefecture,
+          returnCity: returnAddressInput.city,
+          returnStreet: returnAddressInput.street,
+          returnBuilding: returnAddressInput.building,
+          returnPhone: returnAddressInput.phone,
         },
       });
       await tx.repairStatusLog.create({ data: { repairId: repair.id, status: REPAIR_INTAKE_STATUS } });
