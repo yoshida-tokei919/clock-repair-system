@@ -53,6 +53,11 @@ function normalizePostalCode(value: string) {
   return normalized.replace(/[-‐‑‒–—―－−]/g, "");
 }
 
+function postalCodeForCompleteAddress(address: { postalCode: string | null; prefecture: string | null; city: string | null; street: string | null }) {
+  if (!address.prefecture?.trim() || !address.city?.trim() || !address.street?.trim()) return null;
+  return normalizePostalCode(address.postalCode || "");
+}
+
 let watchKey = 1;
 function newWatch(): WatchForm {
   return {
@@ -119,7 +124,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
         setPageState("complete");
         return;
       }
-      customerAddressPostalCode.current = normalizePostalCode(state.prefill?.postalCode || "");
+      customerAddressPostalCode.current = state.prefill ? postalCodeForCompleteAddress(state.prefill) : null;
       setCustomer((current) => ({
         ...current,
         name: current.name || state.prefill?.name || "",
@@ -158,7 +163,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
         email: "",
       });
       hasCopiedCustomerToReturnAddress.current = true;
-      returnAddressPostalCode.current = normalizePostalCode(customer.postalCode);
+      returnAddressPostalCode.current = postalCodeForCompleteAddress(customer);
     }
     setReturnAddressSameAsCustomer(checked);
   }
