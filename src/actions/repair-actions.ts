@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { getRepairStatusTransition } from "@/lib/repair-status-transition";
 
 export async function updateRepairStatus(repairId: number, newStatus: string, note?: string) {
     try {
@@ -12,13 +13,15 @@ export async function updateRepairStatus(repairId: number, newStatus: string, no
 
             const isApprovalStatus = ['作業中', '部品待ち(未注文)', '部品待ち(注文済み)', '作業完了', '納品済み'].includes(newStatus);
             const shouldSetApprovalDate = isApprovalStatus && !current.approvalDate;
+            const statusTransition = getRepairStatusTransition(current.status, newStatus);
 
             // 2. Update Repair Status
             await tx.repair.update({
                 where: { id: repairId },
                 data: {
                     status: newStatus,
-                    approvalDate: shouldSetApprovalDate ? new Date() : undefined
+                    approvalDate: shouldSetApprovalDate ? new Date() : undefined,
+                    ...statusTransition,
                 }
             });
 
@@ -78,6 +81,7 @@ export async function getRepairStats() {
 
         // Initialize with 0
         const stats: Record<string, number> = {
+            '送付待ち': 0,
             '受付': 0,
             '見積中': 0,
             '承認待ち': 0,

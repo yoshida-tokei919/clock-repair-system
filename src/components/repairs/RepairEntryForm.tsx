@@ -155,6 +155,7 @@ function FormRow({
 
 // §12 確定ステータス定義（2026/04/22）
 const STATUS_STEPS: { id: string; label: string }[] = [
+    { id: "送付待ち",         label: "送付待ち" },
     { id: "受付",             label: "受付" },
     { id: "見積中",           label: "見積中" },
     { id: "承認待ち",         label: "承認待ち" },
@@ -2514,7 +2515,10 @@ ${shopName}
                 <div className="flex items-stretch w-full overflow-x-auto">
                     {MAIN_STATUS_STEPS.map((step, idx) => {
                         const isCurrent = status === step.id;
-                        const hasDate = !!statusLog[step.id];
+                        const displayDate = status === "送付待ち" && step.id === "受付"
+                            ? undefined
+                            : statusLog[step.id];
+                        const hasDate = !!displayDate;
                         const isEditing = editingDateFor === step.id;
                         return (
                             <React.Fragment key={step.id}>
@@ -2535,6 +2539,8 @@ ${shopName}
                                         type="button"
                                         onClick={() => {
                                             if (isReadOnly) return;
+                                            if (status === "送付待ち" && step.id !== "受付") return;
+                                            if (step.id === "送付待ち" && status !== "受付") return;
                                             setStatus(step.id);
                                             if (!statusLog[step.id]) {
                                                 setStatusLog(prev => ({
@@ -2555,7 +2561,7 @@ ${shopName}
                                             <input
                                                 type="date"
                                                 className="text-xs border border-blue-300 rounded px-1 py-0.5 w-full max-w-[110px] text-center"
-                                                defaultValue={toInputDate(statusLog[step.id] || '')}
+                                                defaultValue={toInputDate(displayDate || '')}
                                                 onChange={e => {
                                                     setStatusLog(prev => ({
                                                         ...prev,
@@ -2576,7 +2582,7 @@ ${shopName}
                                                         : "text-zinc-400 hover:text-blue-600 hover:bg-blue-50"
                                                 )}
                                             >
-                                                {statusLog[step.id] || "―"}
+                                                {displayDate || "―"}
                                             </button>
                                         )}
                                     </div>

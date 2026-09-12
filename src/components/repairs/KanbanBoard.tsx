@@ -14,6 +14,7 @@ interface KanbanBoardProps {
 }
 
 const COLUMNS = [
+    { id: '送付待ち',         title: '送付待ち',         color: 'bg-slate-50 text-slate-700 border-slate-200' },
     { id: '受付',             title: '受付',             color: 'bg-slate-100' },
     { id: '見積中',           title: '見積中',           color: 'bg-yellow-50 text-yellow-800 border-yellow-100' },
     { id: '承認待ち',         title: '承認待ち',         color: 'bg-yellow-100 text-yellow-900 border-yellow-200' },

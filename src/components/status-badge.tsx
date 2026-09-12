@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 
 export const getStatusBadge = (status: string) => {
     switch (status) {
+        case '送付待ち':         return <Badge className="bg-slate-500 hover:bg-slate-600">送付待ち</Badge>;
         case '受付':             return <Badge className="bg-blue-500 hover:bg-blue-600">受付</Badge>;
         case '見積中':           return <Badge className="bg-amber-500 hover:bg-amber-600">見積中</Badge>;
         case '承認待ち':         return <Badge className="bg-yellow-500 hover:bg-yellow-600">承認待ち</Badge>;

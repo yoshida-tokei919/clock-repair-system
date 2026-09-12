@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const STATUS_OPTIONS = [
+  '送付待ち',
   '受付',
   '見積中',
   '承認待ち',
@@ -33,6 +34,9 @@ export function StatusUpdateForm({ repairId, currentStatus }: { repairId: number
   const [isPending, setIsPending] = useState(false);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const router = useRouter();
+  const availableStatuses = currentStatus === '送付待ち'
+    ? ['受付']
+    : STATUS_OPTIONS.filter(s => s !== '送付待ち' || currentStatus === '受付');
 
   const handleUpdate = async () => {
     if (status === currentStatus) return;
@@ -77,7 +81,7 @@ export function StatusUpdateForm({ repairId, currentStatus }: { repairId: number
           onChange={(e) => setStatus(e.target.value)}
           className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {STATUS_OPTIONS.map(s => (
+          {availableStatuses.map(s => (
             <option key={s} value={s}>{s}</option>
           ))}
         </select>

@@ -16,6 +16,7 @@ import {
     repairPhotoStage,
 } from "@/lib/repair-photo-sharing";
 import { enforceRepairPhotoPostingOptOut } from "@/lib/repair-photo-posting-opt-out";
+import { getRepairStatusTransition } from "@/lib/repair-status-transition";
 
 function normalizeCustomerType(value?: string | null): "business" | "individual" | null {
     if (value === "business") return "business";
@@ -184,7 +185,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             // 3. Update Repair Fields
             const hasEstimateItems = Array.isArray(body.estimate?.items) && body.estimate.items.length > 0;
             const requestedStatus = body.status ?? repairRecord.status;
-            const dbStatus = requestedStatus === "受付" && hasEstimateItems ? "見積中" : requestedStatus;
+            const dbStatus = requestedStatus === "受付" && hasEstimateItems && repairRecord.status !== "送付待ち"
+                ? "見積中"
+                : requestedStatus;
+            const statusTransition = dbStatus !== repairRecord.status
+                ? getRepairStatusTransition(repairRecord.status, dbStatus)
+                : {};
             const rawEndUserName = body.customer?.endUserName ?? body.request?.endUserName ?? null;
             const endUserName = rawEndUserName && String(rawEndUserName).trim() ? String(rawEndUserName).trim() : null;
             const photoPostingOptOut = typeof body.photoPostingOptOut === "boolean"
@@ -195,6 +201,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 where: { id },
                 data: {
                     status: dbStatus,
+                    ...statusTransition,
                     movementMakerId,
                     movementCaliberId,
                     baseMovementMakerId,
@@ -246,14 +253,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                         changedAt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
                     }
                 }
-                const existingStatusLog = await tx.repairStatusLog.findFirst({
-                    where: { repairId: id, status: dbStatus }
+                await tx.repairStatusLog.create({
+                    data: { repairId: id, status: dbStatus, changedAt }
                 });
-                if (!existingStatusLog) {
-                    await tx.repairStatusLog.create({
-                        data: { repairId: id, status: dbStatus, changedAt }
-                    });
-                }
             }
 
             // 4. Update Estimates

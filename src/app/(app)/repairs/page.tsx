@@ -116,6 +116,7 @@ export default async function RepairsPage({
                         className="flex h-10 w-[180px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="all">全てのステータス</option>
+                        <option value="送付待ち">送付待ち</option>
                         <option value="受付">受付</option>
                         <option value="見積中">見積中</option>
                         <option value="承認待ち">承認待ち</option>

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const STATUS_OPTIONS = [
+  '送付待ち',
   '受付',
   '見積中',
   '承認待ち',
@@ -29,6 +30,7 @@ const STATUS_OPTIONS = [
 ]
 
 const STATUS_COLOR: Record<string, string> = {
+  '送付待ち':           'bg-slate-500 hover:bg-slate-600',
   '受付':             'bg-blue-500 hover:bg-blue-600',
   '見積中':           'bg-amber-500 hover:bg-amber-600',
   '承認待ち':         'bg-yellow-500 hover:bg-yellow-600',
@@ -60,6 +62,9 @@ export function RepairListStatusSelect({ id, currentStatus }: Props) {
   const [isPending, setIsPending] = useState(false);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const router = useRouter();
+  const availableStatuses = status === '送付待ち'
+    ? ['受付']
+    : STATUS_OPTIONS.filter(s => s !== '送付待ち' || status === '受付');
 
   const handleSelect = async (newStatus: string) => {
     if (newStatus === status) return;
@@ -109,7 +114,7 @@ export function RepairListStatusSelect({ id, currentStatus }: Props) {
           </Badge>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          {STATUS_OPTIONS.map(s => (
+          {availableStatuses.map(s => (
             <DropdownMenuItem key={s} onClick={() => handleSelect(s)}>{s}</DropdownMenuItem>
           ))}
         </DropdownMenuContent>
