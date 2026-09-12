@@ -240,9 +240,9 @@ export async function createLineUserRepairIntakeInvite(
     where: { id: lineUserId },
     select: { id: true, linkedCustomerId: true },
   });
-  if (!lineUser) throw new RepairIntakeError("LINE_USER_NOT_FOUND", "LINE user was not found.");
+  if (!lineUser) throw new RepairIntakeError("LINE_USER_NOT_FOUND", "LINEユーザーが見つかりません。");
   if (lineUser.linkedCustomerId !== null) {
-    throw new RepairIntakeError("LINE_USER_ALREADY_LINKED", "This LINE user is already linked to a customer.");
+    throw new RepairIntakeError("LINE_USER_ALREADY_LINKED", "このLINEユーザーはすでに顧客へ紐付けられています。");
   }
 
   const activeInvite = await db.repairIntakeInvite.findFirst({

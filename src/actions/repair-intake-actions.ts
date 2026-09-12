@@ -28,9 +28,9 @@ export async function createCustomerRepairIntakeInviteAction(customerId: number)
 
 export async function createLineUserRepairIntakeInviteAction(lineUserId: number) {
   const session = await getServerSession(authOptions);
-  if (!session?.user) return { success: false as const, error: "Staff login is required." };
+  if (!session?.user) return { success: false as const, error: "認証情報を確認できません。再ログインしてください。" };
   if (!Number.isInteger(lineUserId) || lineUserId <= 0) {
-    return { success: false as const, error: "LINE user information is invalid." };
+    return { success: false as const, error: "LINEユーザー情報が正しくありません。" };
   }
 
   try {
@@ -40,7 +40,7 @@ export async function createLineUserRepairIntakeInviteAction(lineUserId: number)
   } catch (error) {
     return {
       success: false as const,
-      error: error instanceof RepairIntakeError ? error.message : "Unable to issue a repair intake link.",
+      error: error instanceof RepairIntakeError ? error.message : "送付受付リンクを発行できませんでした。",
     };
   }
 }

@@ -57,7 +57,7 @@ export function CustomerRepairIntakeInviteButton({ customerId, lineUserId, class
       <DialogContent>
         <DialogHeader>
           <DialogTitle>修理受付リンク</DialogTitle>
-          <DialogDescription>{invite?.reused ? "有効な修理受付リンクを表示しています。" : "LINEでお客様へ送る初回修理受付リンクです。"}</DialogDescription>
+          <DialogDescription>{invite?.reused ? "有効な修理受付リンクを表示しています。" : lineUserId != null ? "LINEで初回のお客様へ送る修理受付リンクです。" : "LINEでお客様へ送る修理受付リンクです。"}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <Input value={url} readOnly aria-label="修理受付リンク" onFocus={(event) => event.currentTarget.select()} />
