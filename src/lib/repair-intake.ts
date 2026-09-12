@@ -5,13 +5,14 @@ import { BrandKind, Prisma, TimepieceType, WatchDriveType, type PrismaClient } f
 import { prisma } from "@/lib/prisma";
 
 export const REPAIR_INTAKE_STATUS = "送付待ち";
+export const REPAIR_INTAKE_INVITE_TTL_DAYS = 7;
 const INTAKE_TOKEN_BYTES = 32;
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
 export class RepairIntakeError extends Error {
   constructor(
-    public readonly code: "INVALID_TOKEN" | "EXPIRED_TOKEN" | "USED_TOKEN" | "INVALID_INPUT" | "INVALID_BRAND",
+    public readonly code: "INVALID_TOKEN" | "EXPIRED_TOKEN" | "USED_TOKEN" | "INVALID_INPUT" | "INVALID_BRAND" | "CUSTOMER_NOT_FOUND" | "B2B_CUSTOMER",
     message: string,
   ) {
     super(message);
@@ -194,6 +195,36 @@ export async function createRepairIntakeInvite(
     }
   }
   throw new Error("Unable to allocate a unique repair intake token.");
+}
+
+/**
+ * Returns the current usable staff-issued invite for a B2C customer, or creates one.
+ * Used and expired rows remain as history; only an unused, future-dated invite is reused.
+ */
+export async function createCustomerRepairIntakeInvite(
+  customerId: number,
+  db: Pick<PrismaClient, "customer" | "repairIntakeInvite"> = prisma,
+  now = new Date(),
+) {
+  const customer = await db.customer.findUnique({
+    where: { id: customerId },
+    select: { id: true, type: true },
+  });
+  if (!customer) throw new RepairIntakeError("CUSTOMER_NOT_FOUND", "Customer not found.");
+  if (customer.type !== "individual") {
+    throw new RepairIntakeError("B2B_CUSTOMER", "Repair intake links are available only for B2C customers.");
+  }
+
+  const activeInvite = await db.repairIntakeInvite.findFirst({
+    where: { customerId, usedAt: null, expiresAt: { gt: now } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (activeInvite) return { invite: activeInvite, reused: true };
+
+  const expiresAt = new Date(now);
+  expiresAt.setDate(expiresAt.getDate() + REPAIR_INTAKE_INVITE_TTL_DAYS);
+  const invite = await createRepairIntakeInvite({ customerId, expiresAt }, db as DbClient);
+  return { invite, reused: false };
 }
 
 export async function getRepairIntakeInviteState(token: string, db: DbClient = prisma) {

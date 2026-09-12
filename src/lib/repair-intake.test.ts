@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   REPAIR_INTAKE_STATUS,
+  REPAIR_INTAKE_INVITE_TTL_DAYS,
   RepairIntakeError,
+  createCustomerRepairIntakeInvite,
   generateRepairIntakeToken,
   getRepairIntakeInviteState,
   repairIntakeErrorResponse,
@@ -20,6 +22,45 @@ test("generates URL-safe, high-entropy repair intake tokens", () => {
   for (const token of Array.from(tokens)) {
     assert.match(token, /^[A-Za-z0-9_-]{43}$/);
   }
+});
+
+test("reuses an active B2C invite instead of issuing another token", async () => {
+  const activeInvite = { id: 8, token: "active", expiresAt: new Date("2026-09-20T00:00:00Z"), usedAt: null, createdAt: new Date() };
+  const db = {
+    customer: { findUnique: async () => ({ id: 12, type: "individual" }) },
+    repairIntakeInvite: {
+      findFirst: async () => activeInvite,
+      create: async () => { throw new Error("should not create"); },
+    },
+  };
+
+  const result = await createCustomerRepairIntakeInvite(12, db as never, new Date("2026-09-13T00:00:00Z"));
+  assert.equal(result.reused, true);
+  assert.equal(result.invite.token, "active");
+});
+
+test("issues a seven-day invite only for B2C customers", async () => {
+  const created: { value: { data: { customerId: number | null; expiresAt: Date } } | null } = { value: null };
+  const db = {
+    customer: { findUnique: async () => ({ id: 12, type: "individual" }) },
+    repairIntakeInvite: {
+      findFirst: async () => null,
+      create: async (args: { data: { customerId: number | null; expiresAt: Date } }) => {
+        created.value = args;
+        return { id: 9, token: "new", ...args.data, usedAt: null, createdAt: new Date() };
+      },
+    },
+  };
+  const now = new Date("2026-09-13T12:00:00Z");
+  const result = await createCustomerRepairIntakeInvite(12, db as never, now);
+  assert.equal(result.reused, false);
+  assert.equal(created.value?.data.customerId, 12);
+  assert.equal(created.value?.data.expiresAt.getTime(), now.getTime() + REPAIR_INTAKE_INVITE_TTL_DAYS * 86_400_000);
+
+  await assert.rejects(
+    () => createCustomerRepairIntakeInvite(99, { ...db, customer: { findUnique: async () => ({ id: 99, type: "business" }) } } as never, now),
+    (error: unknown) => error instanceof RepairIntakeError && error.code === "B2B_CUSTOMER",
+  );
 });
 
 test("accepts only an unused, unexpired intake invite", async () => {

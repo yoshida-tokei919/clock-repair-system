@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
+import { CustomerRepairIntakeInviteButton } from "@/components/repairs/CustomerRepairIntakeInviteButton";
 
 type LineUser = Awaited<ReturnType<typeof getLineUsers>>[number];
 type Customer = Awaited<ReturnType<typeof searchCustomersForLineUser>>[number];
@@ -93,7 +94,7 @@ export default function LineUsersPage() {
 
         <Card className="p-5 xl:sticky xl:top-16">
           {!selected ? <p className="text-sm text-zinc-500">未紐付けのLINEユーザーを選択すると、顧客の検索・紐付け、または新規顧客登録を行えます。</p> : selected.linkedCustomerId !== null ? (
-            <div className="space-y-2"><p className="font-bold">すでに紐付け済みです</p><p className="text-sm text-zinc-500">解除・付け替えは今回の対象外です。</p></div>
+            <div className="space-y-4"><p className="font-bold">すでに紐付け済みです</p><p className="text-sm text-zinc-500">解除・付け替えは今回の対象外です。</p>{selected.linkedCustomer?.type === "individual" && <CustomerRepairIntakeInviteButton customerId={selected.linkedCustomerId} className="w-full" />}</div>
           ) : <div className="space-y-4">
             <div><p className="font-bold">{selected.displayName || "表示名未取得"}</p><p className="text-xs text-zinc-500 break-all mt-1">{selected.lineUserId}</p></div>
             <div className="border-t pt-4 space-y-2">

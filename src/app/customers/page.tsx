@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
+import { CustomerRepairIntakeInviteButton } from "@/components/repairs/CustomerRepairIntakeInviteButton";
 
 export default function CustomerListPage() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -127,6 +128,12 @@ export default function CustomerListPage() {
                   <MapPin className="w-3 h-3" /> {c.address || "-"}
                 </div>
               </div>
+
+              {c.type === "individual" && (
+                <div className="mt-4">
+                  <CustomerRepairIntakeInviteButton customerId={c.id} className="w-full" />
+                </div>
+              )}
 
               <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Link href={`/customers/${c.id}/edit`}>
