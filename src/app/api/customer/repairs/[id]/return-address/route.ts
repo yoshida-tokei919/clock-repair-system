@@ -17,11 +17,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const repair = await prisma.repair.findUnique({
     where: { id: repairId },
-    select: { id: true, approvalStatus: true, customer: { select: { type: true } } },
+    select: { id: true, status: true, approvalStatus: true, customer: { select: { type: true } } },
   });
   if (!repair) return NextResponse.json({ error: "修理案件が見つかりません。" }, { status: 404 });
   if (repair.customer.type !== "individual") return NextResponse.json({ error: "返送先はB2C案件でのみ変更できます。" }, { status: 403 });
   if (repair.approvalStatus !== "pending") return NextResponse.json({ error: "承認後は返送先を変更できません。" }, { status: 409 });
+  if (repair.status !== "承認待ち") return NextResponse.json({ error: "承認待ちの案件のみ返送先を変更できます。" }, { status: 409 });
 
   const updated = await prisma.repair.updateMany({
     where: pendingReturnAddressUpdateWhere(repair.id),

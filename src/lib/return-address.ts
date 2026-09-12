@@ -67,7 +67,7 @@ export function returnAddressResponse(address: ReturnAddress) {
 }
 
 export function pendingReturnAddressUpdateWhere(repairId: number) {
-  return { id: repairId, approvalStatus: "pending" };
+  return { id: repairId, approvalStatus: "pending", status: "承認待ち" };
 }
 
 export function parseRepairReturnAddress(repair: {

@@ -29,6 +29,7 @@ test("normalizes a valid return-address postal code and preserves the optional b
 
 test("rejects a return address without required fields or a valid postal code", () => {
   assert.throws(() => parseReturnAddress({ ...completeAddress, postalCode: "abc123-4567xyz" }));
+  assert.throws(() => parseReturnAddress({ ...completeAddress, postalCode: "123ー4567" }));
   assert.throws(() => parseReturnAddress({ ...completeAddress, phone: "  " }));
 });
 
@@ -47,5 +48,5 @@ test("returns only the sanitized address fields and conditionally updates pendin
     recipientName: "Customer", postalCode: "1234567", prefecture: "東京都", city: "千代田区",
     street: "丸の内1-1", building: "時計ビル", phone: "0312345678",
   });
-  assert.deepEqual(pendingReturnAddressUpdateWhere(17), { id: 17, approvalStatus: "pending" });
+  assert.deepEqual(pendingReturnAddressUpdateWhere(17), { id: 17, approvalStatus: "pending", status: "承認待ち" });
 });
