@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { createEstimateItemFromPart } from "@/lib/estimate-item";
 import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
+import { getRepairStatusForSave } from "@/lib/repair-status-transition";
 import {
     PART_INPUT_TYPES,
     type PartInputType,
@@ -591,6 +592,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
     // --- 1. CORE DATA ---
     const [status, setStatus] = useState<string>(initialData?.status || "受付");
+    const [persistedStatus, setPersistedStatus] = useState<string>(initialData?.status || "受付");
     const [statusLog, setStatusLog] = useState<Record<string, string>>(initialData?.statusLog ?? {});
     const [customerId, setCustomerId] = useState<number | null>(initialData?.customer?.id || null);
     const [customerTypeSelection, setCustomerTypeSelection] = useState<CustomerTypeSelection>(
@@ -1955,7 +1957,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         setIsSaving(true);
         try {
             const hasEstimateItems = lineItems.length > 0;
-            const nextStatus = status === "受付" && hasEstimateItems ? "見積中" : status;
+            const nextStatus = getRepairStatusForSave(persistedStatus, status, hasEstimateItems);
             const nextStatusLog = { ...statusLog };
             if (hasEstimateItems && (nextStatus === "見積中" || status === "見積中")) {
                 if (!nextStatusLog["受付"]) {
@@ -2051,7 +2053,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             if (mode === 'create') {
                 router.push(`/repairs/${json.repair.id}`);
             } else {
-                setStatus(nextStatus);
+                const savedStatus = typeof json.repair?.status === "string" ? json.repair.status : nextStatus;
+                setStatus(savedStatus);
+                setPersistedStatus(savedStatus);
                 setStatusLog(prev => ({ ...prev, ...nextStatusLog }));
                 if (mode === 'view') setIsEditingEnabled(false);
                 router.refresh();

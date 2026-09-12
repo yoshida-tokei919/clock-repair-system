@@ -1,10 +1,33 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    ESTIMATING_STATUS,
+    getRepairStatusForSave,
     getRepairStatusTransition,
     RECEPTION_STATUS,
     SHIPPING_WAITING_STATUS,
 } from "./repair-status-transition";
+
+test("送付待ちから受付への保存は見積明細があっても受付のままにする", () => {
+    assert.equal(
+        getRepairStatusForSave(SHIPPING_WAITING_STATUS, RECEPTION_STATUS, true),
+        RECEPTION_STATUS,
+    );
+});
+
+test("受付の保存は見積明細があれば従来どおり見積中にする", () => {
+    assert.equal(
+        getRepairStatusForSave(RECEPTION_STATUS, RECEPTION_STATUS, true),
+        ESTIMATING_STATUS,
+    );
+});
+
+test("送付待ちから受付への保存は見積明細がなくても受付のままにする", () => {
+    assert.equal(
+        getRepairStatusForSave(SHIPPING_WAITING_STATUS, RECEPTION_STATUS, false),
+        RECEPTION_STATUS,
+    );
+});
 
 test("送付待ちから受付では受付日を設定する", () => {
     const transition = getRepairStatusTransition(SHIPPING_WAITING_STATUS, RECEPTION_STATUS);
