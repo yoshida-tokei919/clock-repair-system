@@ -12,7 +12,7 @@ type DbClient = PrismaClient | Prisma.TransactionClient;
 
 export class RepairIntakeError extends Error {
   constructor(
-    public readonly code: "INVALID_TOKEN" | "EXPIRED_TOKEN" | "USED_TOKEN" | "INVALID_INPUT" | "INVALID_BRAND" | "CUSTOMER_NOT_FOUND" | "B2B_CUSTOMER",
+    public readonly code: "INVALID_TOKEN" | "EXPIRED_TOKEN" | "USED_TOKEN" | "INVALID_INPUT" | "INVALID_BRAND" | "CUSTOMER_NOT_FOUND" | "B2B_CUSTOMER" | "LINE_USER_NOT_FOUND" | "LINE_USER_ALREADY_LINKED",
     message: string,
   ) {
     super(message);
@@ -224,6 +224,36 @@ export async function createCustomerRepairIntakeInvite(
   const expiresAt = new Date(now);
   expiresAt.setDate(expiresAt.getDate() + REPAIR_INTAKE_INVITE_TTL_DAYS);
   const invite = await createRepairIntakeInvite({ customerId, expiresAt }, db as DbClient);
+  return { invite, reused: false };
+}
+
+/**
+ * Returns the current usable staff-issued invite for an unlinked LINE user, or
+ * creates one. The database primary key is used instead of LINE's external ID.
+ */
+export async function createLineUserRepairIntakeInvite(
+  lineUserId: number,
+  db: Pick<PrismaClient, "lineUser" | "repairIntakeInvite"> = prisma,
+  now = new Date(),
+) {
+  const lineUser = await db.lineUser.findUnique({
+    where: { id: lineUserId },
+    select: { id: true, linkedCustomerId: true },
+  });
+  if (!lineUser) throw new RepairIntakeError("LINE_USER_NOT_FOUND", "LINE user was not found.");
+  if (lineUser.linkedCustomerId !== null) {
+    throw new RepairIntakeError("LINE_USER_ALREADY_LINKED", "This LINE user is already linked to a customer.");
+  }
+
+  const activeInvite = await db.repairIntakeInvite.findFirst({
+    where: { lineUserId, usedAt: null, expiresAt: { gt: now } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (activeInvite) return { invite: activeInvite, reused: true };
+
+  const expiresAt = new Date(now);
+  expiresAt.setDate(expiresAt.getDate() + REPAIR_INTAKE_INVITE_TTL_DAYS);
+  const invite = await createRepairIntakeInvite({ lineUserId, expiresAt }, db as DbClient);
   return { invite, reused: false };
 }
 

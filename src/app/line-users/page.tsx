@@ -98,6 +98,11 @@ export default function LineUsersPage() {
           ) : <div className="space-y-4">
             <div><p className="font-bold">{selected.displayName || "表示名未取得"}</p><p className="text-xs text-zinc-500 break-all mt-1">{selected.lineUserId}</p></div>
             <div className="border-t pt-4 space-y-2">
+              <p className="text-sm font-semibold">初回B2C修理受付</p>
+              <p className="text-xs text-zinc-500">顧客を作成・紐付けずに、LINEで送る受付リンクを発行します。受付完了時に顧客が作成され、このLINEユーザーに紐付きます。</p>
+              <CustomerRepairIntakeInviteButton lineUserId={selected.id} className="w-full" />
+            </div>
+            <div className="border-t pt-4 space-y-2">
               <p className="text-sm font-semibold">既存顧客へ紐付け</p>
               <div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" /><Input className="pl-9" value={query} onChange={(event) => void searchCustomers(event.target.value)} placeholder="氏名・会社名・管理番号・電話番号" /></div>
               {customers.length > 0 && <div className="border rounded-md divide-y max-h-52 overflow-y-auto">{customers.map((customer) => <button type="button" key={customer.id} onClick={() => setSelectedCustomer(customer)} className={`block w-full text-left p-3 text-sm hover:bg-zinc-50 ${selectedCustomer?.id === customer.id ? "bg-blue-50" : ""}`}><div className="font-medium">{customerName(customer)}</div><div className="text-xs text-zinc-500 mt-1">{customer.type === "business" && customer.prefix ? `${customer.prefix}-` : ""}{customer.id} {customer.phone ? `・${customer.phone}` : ""}{customer.lineId ? "・LINE登録済み" : ""}</div></button>)}</div>}

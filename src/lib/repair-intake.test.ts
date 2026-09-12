@@ -6,6 +6,7 @@ import {
   REPAIR_INTAKE_INVITE_TTL_DAYS,
   RepairIntakeError,
   createCustomerRepairIntakeInvite,
+  createLineUserRepairIntakeInvite,
   generateRepairIntakeToken,
   getRepairIntakeInviteState,
   repairIntakeErrorResponse,
@@ -60,6 +61,50 @@ test("issues a seven-day invite only for B2C customers", async () => {
   await assert.rejects(
     () => createCustomerRepairIntakeInvite(99, { ...db, customer: { findUnique: async () => ({ id: 99, type: "business" }) } } as never, now),
     (error: unknown) => error instanceof RepairIntakeError && error.code === "B2B_CUSTOMER",
+  );
+});
+
+test("issues a seven-day customer-less invite for an unlinked LINE user", async () => {
+  const created: { value: { data: { customerId: number | null; lineUserId: number | null; expiresAt: Date } } | null } = { value: null };
+  const db = {
+    lineUser: { findUnique: async () => ({ id: 41, linkedCustomerId: null }) },
+    repairIntakeInvite: {
+      findFirst: async () => null,
+      create: async (args: { data: { customerId: number | null; lineUserId: number | null; expiresAt: Date } }) => {
+        created.value = args;
+        return { id: 10, token: "line-new", ...args.data, usedAt: null, createdAt: new Date() };
+      },
+    },
+  };
+  const now = new Date("2026-09-13T12:00:00Z");
+  const result = await createLineUserRepairIntakeInvite(41, db as never, now);
+
+  assert.equal(result.reused, false);
+  assert.equal(created.value?.data.customerId, null);
+  assert.equal(created.value?.data.lineUserId, 41);
+  assert.equal(created.value?.data.expiresAt.getTime(), now.getTime() + REPAIR_INTAKE_INVITE_TTL_DAYS * 86_400_000);
+});
+
+test("reuses an active invite for an unlinked LINE user", async () => {
+  const activeInvite = { id: 10, token: "line-active", expiresAt: new Date("2026-09-20T00:00:00Z"), usedAt: null, createdAt: new Date() };
+  const db = {
+    lineUser: { findUnique: async () => ({ id: 41, linkedCustomerId: null }) },
+    repairIntakeInvite: { findFirst: async () => activeInvite, create: async () => { throw new Error("should not create"); } },
+  };
+  const result = await createLineUserRepairIntakeInvite(41, db as never, new Date("2026-09-13T00:00:00Z"));
+  assert.equal(result.reused, true);
+  assert.equal(result.invite.token, "line-active");
+});
+
+test("rejects missing and already linked LINE users", async () => {
+  const invites = { findFirst: async () => null, create: async () => { throw new Error("should not create"); } };
+  await assert.rejects(
+    () => createLineUserRepairIntakeInvite(41, { lineUser: { findUnique: async () => null }, repairIntakeInvite: invites } as never),
+    (error: unknown) => error instanceof RepairIntakeError && error.code === "LINE_USER_NOT_FOUND",
+  );
+  await assert.rejects(
+    () => createLineUserRepairIntakeInvite(41, { lineUser: { findUnique: async () => ({ id: 41, linkedCustomerId: 12 }) }, repairIntakeInvite: invites } as never),
+    (error: unknown) => error instanceof RepairIntakeError && error.code === "LINE_USER_ALREADY_LINKED",
   );
 });
 

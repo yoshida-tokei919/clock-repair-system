@@ -3,22 +3,30 @@
 import { useState } from "react";
 import { Clipboard, Link as LinkIcon, Loader2 } from "lucide-react";
 
-import { createCustomerRepairIntakeInviteAction } from "@/actions/repair-intake-actions";
+import { createCustomerRepairIntakeInviteAction, createLineUserRepairIntakeInviteAction } from "@/actions/repair-intake-actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 
 type Invite = { token: string; expiresAt: string; reused: boolean };
+type Props = { customerId?: number; lineUserId?: number; className?: string };
 
-export function CustomerRepairIntakeInviteButton({ customerId, className }: { customerId: number; className?: string }) {
+export function CustomerRepairIntakeInviteButton({ customerId, lineUserId, className }: Props) {
   const [pending, setPending] = useState(false);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [open, setOpen] = useState(false);
 
   const createInvite = async () => {
+    if ((customerId == null && lineUserId == null) || (customerId != null && lineUserId != null)) {
+      toast({ title: "受付リンクを発行できません", description: "顧客またはLINEユーザーのいずれか一方を指定してください。", variant: "destructive" });
+      return;
+    }
+
     setPending(true);
-    const result = await createCustomerRepairIntakeInviteAction(customerId);
+    const result = customerId != null
+      ? await createCustomerRepairIntakeInviteAction(customerId)
+      : await createLineUserRepairIntakeInviteAction(lineUserId!);
     setPending(false);
     if (!result.success) {
       toast({ title: "受付リンクを発行できません", description: result.error, variant: "destructive" });
@@ -28,9 +36,7 @@ export function CustomerRepairIntakeInviteButton({ customerId, className }: { cu
     setOpen(true);
   };
 
-  const url = invite && typeof window !== "undefined"
-    ? `${window.location.origin}/customer/intake/${invite.token}`
-    : "";
+  const url = invite && typeof window !== "undefined" ? `${window.location.origin}/customer/intake/${invite.token}` : "";
   const expiresAt = invite ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" }).format(new Date(invite.expiresAt)) : "";
 
   const copy = async () => {
@@ -45,16 +51,16 @@ export function CustomerRepairIntakeInviteButton({ customerId, className }: { cu
   return <>
     <Button type="button" variant="outline" className={className} disabled={pending} onClick={() => void createInvite()}>
       {pending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LinkIcon className="w-4 h-4 mr-2" />}
-      受付リンクを発行
+      修理受付リンクを発行
     </Button>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>受付リンクを発行</DialogTitle>
-          <DialogDescription>{invite?.reused ? "有効な受付リンクを表示しています。" : "LINEでお客様へ送付する受付リンクです。"}</DialogDescription>
+          <DialogTitle>修理受付リンク</DialogTitle>
+          <DialogDescription>{invite?.reused ? "有効な修理受付リンクを表示しています。" : "LINEでお客様へ送る初回修理受付リンクです。"}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <Input value={url} readOnly aria-label="受付リンク" onFocus={(event) => event.currentTarget.select()} />
+          <Input value={url} readOnly aria-label="修理受付リンク" onFocus={(event) => event.currentTarget.select()} />
           <p className="text-sm text-zinc-600">有効期限: {expiresAt}</p>
         </div>
         <DialogFooter>
