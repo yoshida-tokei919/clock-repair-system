@@ -6,6 +6,7 @@ export type IntakeBrandSource = {
   nameEn: string | null;
   nameJp: string | null;
   brandKind: "NORMAL" | "TYPE" | "UNKNOWN";
+  isWatchBrand: boolean;
   aliases?: Array<{ alias: string }>;
 };
 
@@ -21,12 +22,12 @@ export type IntakeBrandOption = {
 export function getIntakeBrandOptions(brands: IntakeBrandSource[]): IntakeBrandOption[] {
   return brands
     .filter((brand): brand is IntakeBrandSource & { brandKind: "NORMAL" | "UNKNOWN" } =>
-      brand.brandKind === "NORMAL" || brand.brandKind === "UNKNOWN",
+      brand.isWatchBrand && (brand.brandKind === "NORMAL" || brand.brandKind === "UNKNOWN"),
     )
     .map((brand) => ({
       id: brand.id,
       name: brand.name,
-      label: brand.nameJp || brand.nameEn || brand.name,
+      label: brand.nameEn || brand.name,
       brandKind: brand.brandKind,
       searchValues: [brand.name, brand.nameEn, brand.nameJp, ...(brand.aliases ?? []).map((alias) => alias.alias)].filter(
         (value): value is string => Boolean(value),
