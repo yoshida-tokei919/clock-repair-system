@@ -48,9 +48,9 @@ const EMPTY_CUSTOMER: CustomerForm = {
 };
 
 function normalizePostalCode(value: string) {
-  return value
-    .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
-    .replace(/[^0-9]/g, "");
+  const normalized = value.replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0));
+  if (!/^\d{7}$/.test(normalized) && !/^\d{3}[-‐‑‒–—―－−]\d{4}$/.test(normalized)) return null;
+  return normalized.replace(/[-‐‑‒–—―－−]/g, "");
 }
 
 let watchKey = 1;
@@ -161,7 +161,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
 
   async function lookupPostalCode() {
     const postalCode = normalizePostalCode(customer.postalCode);
-    if (!/^\d{7}$/.test(postalCode)) return;
+    if (!postalCode) return;
 
     setPostalLookupMessage("住所を検索しています。");
     try {
@@ -183,7 +183,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
 
   async function lookupReturnPostalCode() {
     const postalCode = normalizePostalCode(returnAddress.postalCode);
-    if (!/^\d{7}$/.test(postalCode)) return;
+    if (!postalCode) return;
     setReturnPostalLookupMessage("住所を検索しています。");
     try {
       const response = await fetch(`/api/postal-code?zipcode=${postalCode}`);
@@ -204,11 +204,11 @@ export function RepairIntakeForm({ token }: { token: string }) {
   function validate() {
     const required = [customer.name, customer.postalCode, customer.prefecture, customer.city, customer.street, customer.phone];
     if (required.some((value) => !value.trim())) return "お客様情報の必須項目を入力してください。";
-    if (!/^\d{7}$/.test(normalizePostalCode(customer.postalCode))) return "お客様の郵便番号は7桁で入力してください。";
+    if (!normalizePostalCode(customer.postalCode)) return "お客様の郵便番号は7桁で入力してください。";
     if (!returnAddressSameAsCustomer) {
       const returnRequired = [returnAddress.name, returnAddress.postalCode, returnAddress.prefecture, returnAddress.city, returnAddress.street, returnAddress.phone];
       if (returnRequired.some((value) => !value.trim())) return "返送先情報の必須項目を入力してください。";
-      if (!/^\d{7}$/.test(normalizePostalCode(returnAddress.postalCode))) return "返送先の郵便番号は7桁で入力してください。";
+      if (!normalizePostalCode(returnAddress.postalCode)) return "返送先の郵便番号は7桁で入力してください。";
     }
     if (watches.some((watch) => !watch.brandId || !watch.driveType)) return "すべての時計でブランドと駆動方式を選択してください。";
     return null;
