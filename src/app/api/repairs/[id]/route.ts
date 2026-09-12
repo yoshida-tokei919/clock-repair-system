@@ -36,9 +36,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     try {
         const id = parseInt(params.id);
         const body = await req.json();
-        console.log("Updating Repair:", id, body);
 
-        // Increased timeout to 20 seconds to prevent "Transaction already closed" due to timeouts
+        // Repair updates can include estimate and parts-master synchronization.
+        // Keep the interactive transaction open long enough for those writes.
         const result = await prisma.$transaction(async (tx) => {
             const repairRecord = await tx.repair.findUnique({
                 where: { id },
@@ -476,7 +476,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
             return updatedRepair;
         }, {
-            timeout: 5000
+            maxWait: 5000,
+            timeout: 20000,
         });
 
         return NextResponse.json({ success: true, repair: result });
