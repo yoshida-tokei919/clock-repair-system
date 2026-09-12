@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { assertApprovalReturnAddress } from "@/lib/return-address";
 import type { RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 import { addStatusLogIfMissing, findRepairIdByIdOrToken, getApprovedRepairStatus } from "../_workflow";
 
@@ -17,6 +18,7 @@ export async function POST(
     const repair = await tx.repair.findUnique({
       where: { id: repairId },
       include: {
+        customer: { select: { type: true } },
         estimate: { include: { items: true } },
         orderRequests: {
           where: { status: { in: ["pending", "ordered", "received"] } },
@@ -31,6 +33,14 @@ export async function POST(
 
     if (repair.status === "キャンセル") {
       throw new Error("キャンセル済みの案件は承認できません。");
+    }
+
+    if (repair.customer.type === "individual") {
+      try {
+        assertApprovalReturnAddress(repair.customer.type, repair);
+      } catch {
+        throw new Error("返送先を確認・入力してから承認してください。");
+      }
     }
 
     const hasPartItems = (repair.estimate?.items ?? []).some(
