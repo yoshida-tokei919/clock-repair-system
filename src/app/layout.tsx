@@ -12,6 +12,9 @@ export const metadata: Metadata = {
     alternates: {
         canonical: "/",
     },
+    formatDetection: {
+        telephone: false,
+    },
 };
 
 import { Toaster } from "@/components/ui/toaster"
