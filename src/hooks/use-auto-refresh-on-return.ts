@@ -16,14 +16,17 @@ export function useAutoRefreshOnReturn() {
             }
         };
         const handlePageShow = () => router.refresh();
+        const handlePopState = () => router.refresh();
 
         window.addEventListener("focus", handleFocus);
         window.addEventListener("pageshow", handlePageShow);
+        window.addEventListener("popstate", handlePopState);
         document.addEventListener("visibilitychange", handleVisibility);
 
         return () => {
             window.removeEventListener("focus", handleFocus);
             window.removeEventListener("pageshow", handlePageShow);
+            window.removeEventListener("popstate", handlePopState);
             document.removeEventListener("visibilitychange", handleVisibility);
         };
     }, [router]);

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from '@/lib/repair-parts-status'
+import { canApplyPartsOrderStatus, getRepairStatusAfterOrderAssignment, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from '@/lib/repair-parts-status'
 
 async function addStatusLogIfLatestChanged(repairId: number, status: string) {
   const latest = await prisma.repairStatusLog.findFirst({
@@ -40,20 +40,21 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
   if (order.repairId) {
     if (status === 'assigned') {
-      const activeOrders = await prisma.orderRequest.count({
+      const activeOrders = await prisma.orderRequest.findMany({
         where: {
           repairId: order.repairId,
           status: { in: ['pending', 'ordered', 'received'] },
         },
+        select: { status: true },
       })
 
-      if (activeOrders === 0) {
+      if (activeOrders.length === 0) {
         const repairForStatus = await prisma.repair.findUnique({
           where: { id: order.repairId },
           select: { status: true },
         })
 
-        if (repairForStatus?.status === '部品入荷済み') {
+        if (getRepairStatusAfterOrderAssignment(repairForStatus?.status, activeOrders.map(order => order.status as RepairPartsOrderStatus))) {
           await prisma.repair.update({
             where: { id: order.repairId },
             data: { status: '作業待ち' },

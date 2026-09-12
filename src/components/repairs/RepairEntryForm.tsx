@@ -29,7 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { createEstimateItemFromPart } from "@/lib/estimate-item";
-import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
+import { canApplyPartsOrderStatus, getRepairStatusFromActiveOrderStatuses } from "@/lib/repair-parts-status";
 import { getRepairStatusForSave } from "@/lib/repair-status-transition";
 import {
     PART_INPUT_TYPES,
@@ -656,7 +656,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         b2cDisplayNameSnapshot?: string | null;
         sourceAreaSnapshot?: string | null;
     }
-    type OrderListItem = { id?: number; partId: number; quantity: number; status: 'pending' | 'ordered' | 'received' };
+    type OrderListItem = { id?: number; partId: number; quantity: number; status: 'pending' | 'ordered' | 'received' | 'assigned' };
     const [lineItems, setLineItems] = useState<LineItem[]>(() => {
         if (!initialData?.estimate?.items) return [];
         return initialData.estimate.items.map((i: any) => (
@@ -708,6 +708,21 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             status: order.status,
         })).filter((order: OrderListItem) => Boolean(order.partId))
     );
+
+    useEffect(() => {
+        const serverStatus = initialData?.status;
+        if (!initialData?.id || typeof serverStatus !== 'string') return;
+
+        setStatus(serverStatus);
+        setPersistedStatus(serverStatus);
+        setStatusLog(initialData.statusLog ?? {});
+        setOrderList((initialData.orderRequests ?? []).map((order: any) => ({
+            id: order.id,
+            partId: order.partsMasterId,
+            quantity: order.quantity,
+            status: order.status,
+        })).filter((order: OrderListItem) => Boolean(order.partId)));
+    }, [initialData?.id, initialData?.status, initialData?.statusLog, initialData?.orderRequests]);
 
     // Inputs for adding new items
     const [addItemCategory, setAddItemCategory] = useState<AddItemCategory>('internal');
@@ -1922,26 +1937,16 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const grandTotal = totalAmount + taxAmount;
 
     useEffect(() => {
-        const partLabels = lineItems
-            .map((item, idx) => item.category.includes('part') ? getStatusLabelForLineItem(item, idx) : null)
-            .filter(Boolean);
+        if (!canApplyPartsOrderStatus(status)) return;
 
-        if (partLabels.length === 0 || !canApplyPartsOrderStatus(status)) return;
-
-        const nextStatus = getRepairStatusFromOrderStatuses(
-            partLabels.map(label => (
-                label === '発注リスト追加済み'
-                    ? 'pending'
-                    : label === '注文済み'
-                        ? 'ordered'
-                        : 'received'
-            ) as RepairPartsOrderStatus)
+        const nextStatus = getRepairStatusFromActiveOrderStatuses(
+            orderList.map(order => order.status)
         );
 
         if (nextStatus && status !== nextStatus) {
             setStatus(nextStatus);
         }
-    }, [getStatusLabelForLineItem, lineItems, status]);
+    }, [orderList, status]);
 
     // --- ACTIONS ---
     const handleSave = async () => {
