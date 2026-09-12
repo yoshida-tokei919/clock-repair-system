@@ -568,9 +568,27 @@ interface Props {
     initialData?: any;
     mode?: 'create' | 'edit' | 'view';
 }
+
+function getServerStateSyncKey(initialData: any): string {
+    return JSON.stringify({
+        repairId: initialData?.id ?? null,
+        status: initialData?.status ?? null,
+        statusLog: Object.entries(initialData?.statusLog ?? {})
+            .sort(([left], [right]) => left.localeCompare(right)),
+        orderRequests: (initialData?.orderRequests ?? [])
+            .map((order: any) => ({
+                id: order.id ?? null,
+                partsMasterId: order.partsMasterId ?? null,
+                quantity: order.quantity ?? null,
+                status: order.status ?? null,
+            }))
+            .sort((left: { id: number | null }, right: { id: number | null }) => (left.id ?? 0) - (right.id ?? 0)),
+    });
+}
+
 export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const router = useRouter();
-    useAutoRefreshOnReturn();
+    useAutoRefreshOnReturn({ refreshOnFocus: false, refreshOnVisibility: false });
     const [isSaving, setIsSaving] = useState(false);
     const [isCreatingPublicCase, setIsCreatingPublicCase] = useState(false);
     const [isEditingEnabled, setIsEditingEnabled] = useState(mode !== 'view');
@@ -708,11 +726,15 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             status: order.status,
         })).filter((order: OrderListItem) => Boolean(order.partId))
     );
+    const serverStateSyncKey = getServerStateSyncKey(initialData);
+    const lastSyncedServerStateKeyRef = useRef(serverStateSyncKey);
 
     useEffect(() => {
         const serverStatus = initialData?.status;
         if (!initialData?.id || typeof serverStatus !== 'string') return;
+        if (lastSyncedServerStateKeyRef.current === serverStateSyncKey) return;
 
+        lastSyncedServerStateKeyRef.current = serverStateSyncKey;
         setStatus(serverStatus);
         setPersistedStatus(serverStatus);
         setStatusLog(initialData.statusLog ?? {});
@@ -722,7 +744,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             quantity: order.quantity,
             status: order.status,
         })).filter((order: OrderListItem) => Boolean(order.partId)));
-    }, [initialData?.id, initialData?.status, initialData?.statusLog, initialData?.orderRequests]);
+    }, [initialData?.id, serverStateSyncKey]);
 
     // Inputs for adding new items
     const [addItemCategory, setAddItemCategory] = useState<AddItemCategory>('internal');

@@ -3,15 +3,25 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export function useAutoRefreshOnReturn() {
+type AutoRefreshOnReturnOptions = {
+    refreshOnFocus?: boolean;
+    refreshOnVisibility?: boolean;
+};
+
+export function useAutoRefreshOnReturn({
+    refreshOnFocus = true,
+    refreshOnVisibility = true,
+}: AutoRefreshOnReturnOptions = {}) {
     const router = useRouter();
 
     useEffect(() => {
         router.refresh();
 
-        const handleFocus = () => router.refresh();
+        const handleFocus = () => {
+            if (refreshOnFocus) router.refresh();
+        };
         const handleVisibility = () => {
-            if (document.visibilityState === "visible") {
+            if (refreshOnVisibility && document.visibilityState === "visible") {
                 router.refresh();
             }
         };
@@ -29,5 +39,5 @@ export function useAutoRefreshOnReturn() {
             window.removeEventListener("popstate", handlePopState);
             document.removeEventListener("visibilitychange", handleVisibility);
         };
-    }, [router]);
+    }, [refreshOnFocus, refreshOnVisibility, router]);
 }
