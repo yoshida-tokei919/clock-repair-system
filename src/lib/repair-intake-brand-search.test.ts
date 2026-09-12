@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { CANONICAL_BRANDS } from "./canonical-brands";
+import { normalizeBrandName } from "./master-normalize";
 import { getIntakeBrandOptions, searchIntakeBrandOptions } from "./repair-intake-brand-search";
 
 const brands = getIntakeBrandOptions([
@@ -50,7 +51,10 @@ test("uses exactly the canonical B2C brand population", () => {
     aliases: brand.aliases.map((alias) => ({ alias })),
   })));
   assert.equal(options.length, 292);
-  assert.equal(options.at(-1)?.name, "UNKNOWN");
+  assert.equal(options[0]?.name, "UNKNOWN");
+  assert.deepEqual(options.slice(1).map((brand) => brand.name), [...options.slice(1)]
+    .sort((left, right) => normalizeBrandName(left.sortName).localeCompare(normalizeBrandName(right.sortName), "en"))
+    .map((brand) => brand.name));
   assert.equal(options.some((brand) => brand.name === "ETA"), false);
   assert.equal(options.some((brand) => brand.name.endsWith(" TYPE")), false);
 });

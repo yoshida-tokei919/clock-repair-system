@@ -35,8 +35,8 @@ export function getIntakeBrandOptions(brands: IntakeBrandSource[]): IntakeBrandO
       sortName: brand.nameEn || brand.name,
     }))
     .sort((left, right) => {
-      if (left.brandKind === "UNKNOWN") return right.brandKind === "UNKNOWN" ? 0 : 1;
-      if (right.brandKind === "UNKNOWN") return -1;
+      if (left.brandKind === "UNKNOWN") return right.brandKind === "UNKNOWN" ? 0 : -1;
+      if (right.brandKind === "UNKNOWN") return 1;
       return normalizeBrandName(left.sortName).localeCompare(normalizeBrandName(right.sortName), "en");
     });
 }
