@@ -86,6 +86,8 @@ export function RepairIntakeForm({ token }: { token: string }) {
   const [returnAddressSameAsCustomer, setReturnAddressSameAsCustomer] = useState(true);
   const [returnAddress, setReturnAddress] = useState<CustomerForm>(EMPTY_CUSTOMER);
   const hasCopiedCustomerToReturnAddress = useRef(false);
+  const customerAddressPostalCode = useRef<string | null>(null);
+  const returnAddressPostalCode = useRef<string | null>(null);
   const [watches, setWatches] = useState<WatchForm[]>([newWatch()]);
   const [brands, setBrands] = useState<IntakeBrandOption[]>([]);
   const [pageState, setPageState] = useState<"loading" | "ready" | "invalid" | "expired" | "used" | "complete">("loading");
@@ -117,6 +119,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
         setPageState("complete");
         return;
       }
+      customerAddressPostalCode.current = normalizePostalCode(state.prefill?.postalCode || "");
       setCustomer((current) => ({
         ...current,
         name: current.name || state.prefill?.name || "",
@@ -155,6 +158,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
         email: "",
       });
       hasCopiedCustomerToReturnAddress.current = true;
+      returnAddressPostalCode.current = normalizePostalCode(customer.postalCode);
     }
     setReturnAddressSameAsCustomer(checked);
   }
@@ -168,13 +172,15 @@ export function RepairIntakeForm({ token }: { token: string }) {
       const response = await fetch(`/api/postal-code?zipcode=${postalCode}`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "住所を取得できませんでした。");
+      const shouldRefreshAddress = customerAddressPostalCode.current !== postalCode;
       setCustomer((current) => ({
         ...current,
         postalCode,
-        prefecture: current.prefecture || result.prefecture,
-        city: current.city || result.city,
-        street: current.street || result.street,
+        prefecture: shouldRefreshAddress ? result.prefecture : current.prefecture,
+        city: shouldRefreshAddress ? result.city : current.city,
+        street: shouldRefreshAddress ? result.street : current.street,
       }));
+      customerAddressPostalCode.current = postalCode;
       setPostalLookupMessage("住所を自動入力しました。");
     } catch (lookupError) {
       setPostalLookupMessage(lookupError instanceof Error ? lookupError.message : "住所を自動入力できませんでした。");
@@ -189,12 +195,14 @@ export function RepairIntakeForm({ token }: { token: string }) {
       const response = await fetch(`/api/postal-code?zipcode=${postalCode}`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "住所を取得できませんでした。");
+      const shouldRefreshAddress = returnAddressPostalCode.current !== postalCode;
       setReturnAddress((current) => ({
         ...current, postalCode,
-        prefecture: current.prefecture || result.prefecture,
-        city: current.city || result.city,
-        street: current.street || result.street,
+        prefecture: shouldRefreshAddress ? result.prefecture : current.prefecture,
+        city: shouldRefreshAddress ? result.city : current.city,
+        street: shouldRefreshAddress ? result.street : current.street,
       }));
+      returnAddressPostalCode.current = postalCode;
       setReturnPostalLookupMessage("住所を自動入力しました。");
     } catch (lookupError) {
       setReturnPostalLookupMessage(lookupError instanceof Error ? lookupError.message : "住所を取得できませんでした。");
