@@ -22,6 +22,8 @@ type Props = {
   messages?: CustomerMessage[];
   customerName?: string;
   photoPostingOptOut?: boolean;
+  approvalDisabled?: boolean;
+  approvalDisabledMessage?: string;
 };
 
 function MiniToast({ message, onClose }: { message: string; onClose: () => void }) {
@@ -203,7 +205,7 @@ function getBusinessMessageSenderName(message: CustomerMessage, partnerName?: st
   return `${name || "取引先"} 様`;
 }
 
-export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, messages = [], customerName, photoPostingOptOut = false }: Props) {
+export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, messages = [], customerName, photoPostingOptOut = false, approvalDisabled = false, approvalDisabledMessage = "" }: Props) {
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
@@ -244,7 +246,7 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
   };
 
   const handleApprove = async () => {
-    if (approved || loading) return;
+    if (approved || loading || approvalDisabled) return;
     try {
       await postAction("approve");
       setApproved(true);
@@ -361,11 +363,12 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
             <button
               type="button"
               onClick={handleApprove}
-              disabled={approved || !!loading}
+              disabled={approved || !!loading || approvalDisabled}
               className="h-12 w-full rounded-lg bg-blue-600 px-4 text-base font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {approved ? "承認済み" : "この内容で進める"}
             </button>
+            {approvalDisabledMessage && <p className="mt-2 text-sm text-slate-600">{approvalDisabledMessage}</p>}
           </div>
 
           <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">

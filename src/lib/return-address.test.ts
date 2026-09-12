@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assertApprovalReturnAddress, parseReturnAddress, returnAddressData } from "./return-address";
+import { assertApprovalReturnAddress, parseReturnAddress, pendingReturnAddressUpdateWhere, returnAddressData, returnAddressResponse } from "./return-address";
 
 const completeAddress = {
   recipientName: "Customer",
@@ -39,4 +39,13 @@ test("requires a completed snapshot for B2C approval but does not apply that gua
   };
   assert.throws(() => assertApprovalReturnAddress("individual", emptySnapshot));
   assert.doesNotThrow(() => assertApprovalReturnAddress("business", emptySnapshot));
+});
+
+test("returns only the sanitized address fields and conditionally updates pending repairs", () => {
+  const address = parseReturnAddress(completeAddress);
+  assert.deepEqual(returnAddressResponse(address), {
+    recipientName: "Customer", postalCode: "1234567", prefecture: "東京都", city: "千代田区",
+    street: "丸の内1-1", building: "時計ビル", phone: "0312345678",
+  });
+  assert.deepEqual(pendingReturnAddressUpdateWhere(17), { id: 17, approvalStatus: "pending" });
 });

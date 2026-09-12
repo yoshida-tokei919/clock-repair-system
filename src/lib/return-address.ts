@@ -20,25 +20,25 @@ export type ReturnAddress = {
   phone: string;
 };
 
-function requiredText(value: unknown, label: string) {
-  if (typeof value !== "string" || !value.trim()) throw new Error(`${label} is required.`);
+function requiredText(value: unknown, message: string) {
+  if (typeof value !== "string" || !value.trim()) throw new Error(message);
   return value.trim();
 }
 
 export function parseReturnAddress(value: unknown): ReturnAddress {
-  if (!value || typeof value !== "object") throw new Error("Return address is required.");
+  if (!value || typeof value !== "object") throw new Error("返送先を入力してください。");
   const address = value as ReturnAddressInput;
   const postalCode = normalizePostalCode(address.postalCode);
-  if (!postalCode) throw new Error("Postal code must be seven digits.");
+  if (!postalCode) throw new Error("郵便番号は7桁で入力してください。");
 
   return {
-    recipientName: requiredText(address.recipientName, "Recipient name"),
+    recipientName: requiredText(address.recipientName, "お名前を入力してください。"),
     postalCode,
-    prefecture: requiredText(address.prefecture, "Prefecture"),
-    city: requiredText(address.city, "City"),
-    street: requiredText(address.street, "Street"),
+    prefecture: requiredText(address.prefecture, "都道府県を入力してください。"),
+    city: requiredText(address.city, "市区町村を入力してください。"),
+    street: requiredText(address.street, "町名・番地を入力してください。"),
     building: typeof address.building === "string" && address.building.trim() ? address.building.trim() : null,
-    phone: requiredText(address.phone, "Phone"),
+    phone: requiredText(address.phone, "電話番号を入力してください。"),
   };
 }
 
@@ -52,6 +52,22 @@ export function returnAddressData(address: ReturnAddress) {
     returnBuilding: address.building,
     returnPhone: address.phone,
   };
+}
+
+export function returnAddressResponse(address: ReturnAddress) {
+  return {
+    recipientName: address.recipientName,
+    postalCode: address.postalCode,
+    prefecture: address.prefecture,
+    city: address.city,
+    street: address.street,
+    building: address.building ?? "",
+    phone: address.phone,
+  };
+}
+
+export function pendingReturnAddressUpdateWhere(repairId: number) {
+  return { id: repairId, approvalStatus: "pending" };
 }
 
 export function parseRepairReturnAddress(repair: {

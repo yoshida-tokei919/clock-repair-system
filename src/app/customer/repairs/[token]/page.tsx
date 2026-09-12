@@ -11,7 +11,7 @@ import {
   PdfLinkButton,
 } from "./CustomerRepairActions";
 import { CustomerExportTools, CustomerGuideAmountInput } from "./CustomerExportTools";
-import { CustomerReturnAddress } from "./CustomerReturnAddress";
+import { CustomerB2CApprovalPanel } from "./CustomerB2CApprovalPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -197,8 +197,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string
 
                 {customerPhotos.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{customerPhotos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo, token); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
 
-                <CustomerReturnAddress token={repair.publicToken || token} disabled={repair.approvalStatus !== "pending"} address={{ recipientName: repair.returnRecipientName || "", postalCode: repair.returnPostalCode || "", prefecture: repair.returnPrefecture || "", city: repair.returnCity || "", street: repair.returnStreet || "", building: repair.returnBuilding || "", phone: repair.returnPhone || "" }} />
-                <CustomerRepairActions token={repair.publicToken || token} isBusiness={false} isApproved={repair.approvalStatus === "approved"} showApproval={needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} photoPostingOptOut={repair.photoPostingOptOut} />
+                <CustomerB2CApprovalPanel token={repair.publicToken || token} isApproved={repair.approvalStatus === "approved"} showApproval={needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} photoPostingOptOut={repair.photoPostingOptOut} address={{ recipientName: repair.returnRecipientName || "", postalCode: repair.returnPostalCode || "", prefecture: repair.returnPrefecture || "", city: repair.returnCity || "", street: repair.returnStreet || "", building: repair.returnBuilding || "", phone: repair.returnPhone || "" }} />
               </CustomerRepairAccordionItem>
             );
           })}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { parseReturnAddress, returnAddressData } from "@/lib/return-address";
+import { parseReturnAddress, pendingReturnAddressUpdateWhere, returnAddressData, returnAddressResponse } from "@/lib/return-address";
 import { findRepairIdByIdOrToken } from "../_workflow";
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -23,9 +23,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (repair.customer.type !== "individual") return NextResponse.json({ error: "返送先はB2C案件でのみ変更できます。" }, { status: 403 });
   if (repair.approvalStatus !== "pending") return NextResponse.json({ error: "承認後は返送先を変更できません。" }, { status: 409 });
 
-  const updated = await prisma.repair.update({
-    where: { id: repair.id },
+  const updated = await prisma.repair.updateMany({
+    where: pendingReturnAddressUpdateWhere(repair.id),
     data: returnAddressData(address),
   });
-  return NextResponse.json({ success: true, repair: updated });
+  if (updated.count !== 1) return NextResponse.json({ error: "承認後は返送先を変更できません。" }, { status: 409 });
+  return NextResponse.json({ success: true, address: returnAddressResponse(address) });
 }
