@@ -38,13 +38,30 @@ export function CustomerRepairIntakeInviteButton({ customerId, lineUserId, class
 
   const url = invite && typeof window !== "undefined" ? `${window.location.origin}/customer/intake/${invite.token}` : "";
   const expiresAt = invite ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" }).format(new Date(invite.expiresAt)) : "";
+  const lineMessage = url ? `修理品の送付受付に必要な情報をご入力ください。
 
-  const copy = async () => {
+下記リンクから、お名前・ご住所・時計の情報をご入力いただけます。
+入力完了後、時計の送付先をご案内いたします。
+
+${url}
+
+※リンクの有効期限は7日間です。` : "";
+
+  const copyUrl = async () => {
     try {
       await navigator.clipboard.writeText(url);
       toast({ title: "受付リンクをコピーしました" });
     } catch {
       toast({ title: "コピーできませんでした", description: "リンクを選択してコピーしてください。", variant: "destructive" });
+    }
+  };
+
+  const copyLineMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(lineMessage);
+      toast({ title: "受付案内文をコピーしました" });
+    } catch {
+      toast({ title: "コピーできませんでした", description: "案内文を選択してコピーしてください。", variant: "destructive" });
     }
   };
 
@@ -61,11 +78,16 @@ export function CustomerRepairIntakeInviteButton({ customerId, lineUserId, class
         </DialogHeader>
         <div className="space-y-3">
           <Input value={url} readOnly aria-label="修理受付リンク" onFocus={(event) => event.currentTarget.select()} />
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-zinc-700">LINE送信用案内文</p>
+            <textarea value={lineMessage} readOnly aria-label="LINE送信用案内文" onFocus={(event) => event.currentTarget.select()} className="min-h-44 w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-6 shadow-sm" />
+          </div>
           <p className="text-sm text-zinc-600">有効期限: {expiresAt}</p>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>閉じる</Button>
-          <Button type="button" onClick={() => void copy()}><Clipboard className="w-4 h-4 mr-2" />コピー</Button>
+          <Button type="button" variant="outline" onClick={() => void copyUrl()}><Clipboard className="w-4 h-4 mr-2" />URLのみコピー</Button>
+          <Button type="button" onClick={() => void copyLineMessage()}><Clipboard className="w-4 h-4 mr-2" />案内文をコピー</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
