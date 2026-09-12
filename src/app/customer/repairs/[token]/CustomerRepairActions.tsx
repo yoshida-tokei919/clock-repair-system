@@ -26,8 +26,17 @@ type Props = {
   approvalDisabled?: boolean;
   approvalDisabledMessage?: string;
   approvalAddress?: { recipientName: string; postalCode: string; prefecture: string; city: string; street: string; building: string; phone: string };
+  approvalDialogOpen?: boolean;
+  onApprovalDialogOpenChange?: (open: boolean) => void;
   onEditReturnAddress?: () => void;
 };
+
+function isCompleteApprovalAddress(address?: Props["approvalAddress"]) {
+  if (!address) return false;
+  const postalCode = address.postalCode.replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0));
+  const validPostalCode = /^\d{7}$/.test(postalCode) || /^\d{3}[-‐‑‒–—―－−]\d{4}$/.test(postalCode);
+  return Boolean(address.recipientName.trim() && validPostalCode && address.prefecture.trim() && address.city.trim() && address.street.trim() && address.phone.trim());
+}
 
 function MiniToast({ message, onClose }: { message: string; onClose: () => void }) {
   if (!message) return null;
@@ -208,13 +217,19 @@ function getBusinessMessageSenderName(message: CustomerMessage, partnerName?: st
   return `${name || "取引先"} 様`;
 }
 
-export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, messages = [], customerName, photoPostingOptOut = false, approvalDisabled = false, approvalDisabledMessage = "", approvalAddress, onEditReturnAddress }: Props) {
+export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, messages = [], customerName, photoPostingOptOut = false, approvalDisabled = false, approvalDisabledMessage = "", approvalAddress, approvalDialogOpen: controlledApprovalDialogOpen, onApprovalDialogOpenChange, onEditReturnAddress }: Props) {
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
   const [approved, setApproved] = useState(isApproved);
   const [postingOptOut, setPostingOptOut] = useState(photoPostingOptOut);
-  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [uncontrolledApprovalDialogOpen, setUncontrolledApprovalDialogOpen] = useState(false);
+  const approvalDialogOpen = controlledApprovalDialogOpen ?? uncontrolledApprovalDialogOpen;
+  const setApprovalDialogOpen = (open: boolean) => {
+    if (controlledApprovalDialogOpen === undefined) setUncontrolledApprovalDialogOpen(open);
+    onApprovalDialogOpenChange?.(open);
+  };
+  const completeApprovalAddress = isCompleteApprovalAddress(approvalAddress);
 
   const postAction = async (path: string, body?: unknown) => {
     setLoading(path);
@@ -250,7 +265,7 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
   };
 
   const handleApprove = async () => {
-    if (approved || loading || approvalDisabled) return;
+    if (approved || loading || approvalDisabled || (!isBusiness && !completeApprovalAddress)) return;
     try {
       await postAction("approve");
       setApproved(true);
@@ -368,12 +383,11 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
             <button
               type="button"
               onClick={() => setApprovalDialogOpen(true)}
-              disabled={approved || !!loading || approvalDisabled}
+              disabled={approved || !!loading}
               className="h-12 w-full rounded-lg bg-blue-600 px-4 text-base font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {approved ? "承認済み" : "この内容で進める"}
             </button>
-            {approvalDisabledMessage && <p className="mt-2 text-sm text-slate-600">{approvalDisabledMessage}</p>}
           </div>
 
           <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
@@ -382,16 +396,16 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
                 <DialogTitle>返送先の確認</DialogTitle>
                 <DialogDescription>返送先を確認してから承認してください。</DialogDescription>
               </DialogHeader>
-              {approvalAddress ? <div className="rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-800"><p className="font-bold">{approvalAddress.recipientName}</p><p>〒{approvalAddress.postalCode}</p><p>{[approvalAddress.prefecture, approvalAddress.city, approvalAddress.street, approvalAddress.building].filter(Boolean).join("")}</p><p>TEL {approvalAddress.phone}</p></div> : <p className="text-sm text-slate-600">返送先が未登録です。</p>}
+              {completeApprovalAddress ? <div className="rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-800"><p className="font-bold">{approvalAddress?.recipientName}</p><p>〒{approvalAddress?.postalCode}</p><p>{[approvalAddress?.prefecture, approvalAddress?.city, approvalAddress?.street, approvalAddress?.building].filter(Boolean).join("")}</p><p>TEL {approvalAddress?.phone}</p></div> : <p className="text-sm leading-6 text-slate-600">返送先が登録されていません。<br />承認前に返送先をご入力ください。</p>}
               <DialogFooter className="gap-2 sm:flex-col sm:items-stretch">
-                <button type="button" onClick={() => { setApprovalDialogOpen(false); onEditReturnAddress?.(); }} className="h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">返送先を変更する</button>
-                <button type="button" onClick={() => void handleApprove()} disabled={approved || !!loading || approvalDisabled} className="h-11 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50">この返送先で承認する</button>
+                <button type="button" onClick={() => { setApprovalDialogOpen(false); onEditReturnAddress?.(); }} className="h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">{completeApprovalAddress ? "返送先を変更する" : "返送先を入力する"}</button>
+                <button type="button" onClick={() => void handleApprove()} disabled={approved || !!loading || approvalDisabled || !completeApprovalAddress} className="h-11 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50">この返送先で承認する</button>
                 <button type="button" onClick={() => setApprovalDialogOpen(false)} className="h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">キャンセル</button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
-          {lineUrl && <a href={lineUrl} target="_blank" rel="noopener noreferrer" className="mt-4 flex h-12 items-center justify-center rounded-lg border border-[#06c755] bg-white px-4 text-base font-bold text-[#078a3f] hover:bg-[#f0fbf4]">LINEで連絡する</a>}
+          {lineUrl && <a href={lineUrl} target="_blank" rel="noopener noreferrer" className="mt-4 flex h-12 items-center justify-center rounded-lg border border-[#06c755] bg-white px-4 text-base font-bold text-[#078a3f] hover:bg-[#f0fbf4]">LINEで相談する</a>}
 
           <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
             <input type="checkbox" checked={postingOptOut} disabled={!!loading} onChange={(event) => void handlePostingOptOut(event.target.checked)} className="mt-1" />
