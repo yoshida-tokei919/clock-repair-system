@@ -13,7 +13,9 @@ export function getRepairStatusTransition(
         throw new Error("送付待ちへ戻せるのは受付の案件のみです。");
     }
 
-    if (newStatus === RECEPTION_STATUS) return { receptionDate: new Date() };
+    if (currentStatus === SHIPPING_WAITING_STATUS && newStatus === RECEPTION_STATUS) {
+        return { receptionDate: new Date() };
+    }
     if (newStatus === SHIPPING_WAITING_STATUS) return { receptionDate: null };
     return {};
 }

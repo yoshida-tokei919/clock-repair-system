@@ -2541,8 +2541,15 @@ ${shopName}
                                             if (isReadOnly) return;
                                             if (status === "送付待ち" && step.id !== "受付") return;
                                             if (step.id === "送付待ち" && status !== "受付") return;
+                                            const isShippingReceptionTransition = status === "送付待ち" && step.id === "受付";
+                                            const isReceptionShippingTransition = status === "受付" && step.id === "送付待ち";
                                             setStatus(step.id);
-                                            if (!statusLog[step.id]) {
+                                            if (isShippingReceptionTransition || isReceptionShippingTransition) {
+                                                setStatusLog(prev => ({
+                                                    ...prev,
+                                                    [step.id]: new Date().toLocaleDateString('ja-JP')
+                                                }));
+                                            } else if (!statusLog[step.id]) {
                                                 setStatusLog(prev => ({
                                                     ...prev,
                                                     [step.id]: new Date().toLocaleDateString('ja-JP')
