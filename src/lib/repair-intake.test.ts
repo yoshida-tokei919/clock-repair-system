@@ -63,6 +63,32 @@ test("issues a seven-day invite only for B2C customers", async () => {
   );
 });
 
+async function assertNewInviteWhenNoActiveInvite() {
+  let createCount = 0;
+  const db = {
+    customer: { findUnique: async () => ({ id: 12, type: "individual" }) },
+    repairIntakeInvite: {
+      findFirst: async () => null,
+      create: async (args: { data: { customerId: number | null; expiresAt: Date } }) => {
+        createCount += 1;
+        return { id: 9, token: "new", ...args.data, usedAt: null, createdAt: new Date() };
+      },
+    },
+  };
+
+  const result = await createCustomerRepairIntakeInvite(12, db as never, new Date("2026-09-13T12:00:00Z"));
+  assert.equal(result.reused, false);
+  assert.equal(createCount, 1);
+}
+
+test("issues a new invite when only used staff-issued invites exist", async () => {
+  await assertNewInviteWhenNoActiveInvite();
+});
+
+test("issues a new invite when only expired staff-issued invites exist", async () => {
+  await assertNewInviteWhenNoActiveInvite();
+});
+
 test("accepts only an unused, unexpired intake invite", async () => {
   const now = Date.now();
   const db = {

@@ -210,9 +210,9 @@ export async function createCustomerRepairIntakeInvite(
     where: { id: customerId },
     select: { id: true, type: true },
   });
-  if (!customer) throw new RepairIntakeError("CUSTOMER_NOT_FOUND", "Customer not found.");
+  if (!customer) throw new RepairIntakeError("CUSTOMER_NOT_FOUND", "顧客が見つかりません。");
   if (customer.type !== "individual") {
-    throw new RepairIntakeError("B2B_CUSTOMER", "Repair intake links are available only for B2C customers.");
+    throw new RepairIntakeError("B2B_CUSTOMER", "送付受付リンクはB2C顧客のみ発行できます。");
   }
 
   const activeInvite = await db.repairIntakeInvite.findFirst({

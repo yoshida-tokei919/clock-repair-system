@@ -8,9 +8,9 @@ import { createCustomerRepairIntakeInvite, RepairIntakeError } from "@/lib/repai
 
 export async function createCustomerRepairIntakeInviteAction(customerId: number) {
   const session = await getServerSession(authOptions);
-  if (!session?.user) return { success: false as const, error: "Unauthorized" };
+  if (!session?.user) return { success: false as const, error: "認証情報を確認できません。再ログインしてください。" };
   if (!Number.isInteger(customerId) || customerId <= 0) {
-    return { success: false as const, error: "Invalid customer." };
+    return { success: false as const, error: "顧客情報が正しくありません。" };
   }
 
   try {
@@ -21,7 +21,7 @@ export async function createCustomerRepairIntakeInviteAction(customerId: number)
   } catch (error) {
     return {
       success: false as const,
-      error: error instanceof RepairIntakeError ? error.message : "Unable to create the repair intake link.",
+      error: error instanceof RepairIntakeError ? error.message : "送付受付リンクを発行できませんでした。",
     };
   }
 }
