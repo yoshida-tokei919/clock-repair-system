@@ -70,10 +70,9 @@ function optionalText(value: unknown) {
 
 export function normalizePostalCode(value: unknown) {
   if (typeof value !== "string") return null;
-  const normalized = value
-    .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
-    .replace(/[^0-9]/g, "");
-  return /^\d{7}$/.test(normalized) ? normalized : null;
+  const normalized = value.replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0));
+  if (!/^\d{7}$/.test(normalized) && !/^\d{3}[-‐‑‒–—―－−]\d{4}$/.test(normalized)) return null;
+  return normalized.replace(/[-‐‑‒–—―－−]/g, "");
 }
 
 function parseEnum<T extends string>(value: unknown, allowed: readonly T[], field: string): T {
@@ -133,6 +132,42 @@ function parseWatchInputs(value: unknown): ParsedWatchInput[] {
 
 function formatCustomerAddress(customer: ParsedCustomerInput) {
   return [customer.prefecture, customer.city, customer.street, customer.building].filter(Boolean).join("");
+}
+
+export function structuredCustomerAddressData(customer: ParsedCustomerInput) {
+  return {
+    zipCode: customer.postalCode,
+    prefecture: customer.prefecture,
+    city: customer.city,
+    street: customer.street,
+    building: customer.building,
+    address: formatCustomerAddress(customer),
+  };
+}
+
+export function returnAddressSnapshotData(address: ParsedCustomerInput) {
+  return {
+    returnRecipientName: address.name,
+    returnPostalCode: address.postalCode,
+    returnPrefecture: address.prefecture,
+    returnCity: address.city,
+    returnStreet: address.street,
+    returnBuilding: address.building,
+    returnPhone: address.phone,
+  };
+}
+
+export function parseRepairIntakePayload(payload: unknown) {
+  const body = payload && typeof payload === "object" ? payload as { customer?: unknown; watches?: unknown; returnAddressSameAsCustomer?: unknown; returnAddress?: unknown } : null;
+  const customer = parseCustomerInput(body?.customer);
+  if (typeof body?.returnAddressSameAsCustomer !== "boolean") {
+    throw new RepairIntakeError("INVALID_INPUT", "returnAddressSameAsCustomer must be a boolean.");
+  }
+  return {
+    customer,
+    returnAddress: body.returnAddressSameAsCustomer ? customer : parseCustomerInput(body.returnAddress),
+    watches: parseWatchInputs(body?.watches),
+  };
 }
 
 function extractInquirySequence(inquiryNumber: string, prefix: string) {
@@ -323,14 +358,7 @@ export async function getRepairIntakeInviteState(token: string, db: DbClient = p
 }
 
 export async function submitRepairIntake(token: string, payload: unknown) {
-  const body = payload && typeof payload === "object" ? payload as { customer?: unknown; watches?: unknown; returnAddressSameAsCustomer?: unknown; returnAddress?: unknown } : null;
-  const customerInput = parseCustomerInput(body?.customer);
-  if (typeof body?.returnAddressSameAsCustomer !== "boolean") {
-    throw new RepairIntakeError("INVALID_INPUT", "returnAddressSameAsCustomer must be a boolean.");
-  }
-  const returnAddressSameAsCustomer = body.returnAddressSameAsCustomer;
-  const returnAddressInput = returnAddressSameAsCustomer ? customerInput : parseCustomerInput(body?.returnAddress);
-  const watchesInput = parseWatchInputs(body?.watches);
+  const { customer: customerInput, returnAddress: returnAddressInput, watches: watchesInput } = parseRepairIntakePayload(payload);
 
   return prisma.$transaction(async (tx) => {
     const now = new Date();
@@ -363,12 +391,7 @@ export async function submitRepairIntake(token: string, payload: unknown) {
       type: "individual",
       prefix: "C",
       isPartner: false,
-      zipCode: customerInput.postalCode,
-      prefecture: customerInput.prefecture,
-      city: customerInput.city,
-      street: customerInput.street,
-      building: customerInput.building,
-      address: formatCustomerAddress(customerInput),
+      ...structuredCustomerAddressData(customerInput),
       phone: customerInput.phone,
       email: customerInput.email,
     };
@@ -421,13 +444,7 @@ export async function submitRepairIntake(token: string, payload: unknown) {
           repairIntakeInviteId: invite.id,
           status: REPAIR_INTAKE_STATUS,
           receptionDate: null,
-          returnRecipientName: returnAddressInput.name,
-          returnPostalCode: returnAddressInput.postalCode,
-          returnPrefecture: returnAddressInput.prefecture,
-          returnCity: returnAddressInput.city,
-          returnStreet: returnAddressInput.street,
-          returnBuilding: returnAddressInput.building,
-          returnPhone: returnAddressInput.phone,
+          ...returnAddressSnapshotData(returnAddressInput),
         },
       });
       await tx.repairStatusLog.create({ data: { repairId: repair.id, status: REPAIR_INTAKE_STATUS } });

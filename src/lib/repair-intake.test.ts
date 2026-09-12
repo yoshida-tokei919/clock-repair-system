@@ -10,7 +10,10 @@ import {
   generateRepairIntakeToken,
   getRepairIntakeInviteState,
   normalizePostalCode,
+  parseRepairIntakePayload,
   repairIntakeErrorResponse,
+  returnAddressSnapshotData,
+  structuredCustomerAddressData,
 } from "./repair-intake";
 
 test("uses shipment-waiting as the intake repair status", () => {
@@ -32,6 +35,38 @@ test("normalizes accepted postal-code formats to seven ASCII digits", () => {
   assert.equal(normalizePostalCode("１２３－４５６７"), "1234567");
   assert.equal(normalizePostalCode("123456"), null);
   assert.equal(normalizePostalCode("12345678"), null);
+  assert.equal(normalizePostalCode("abc123-4567xyz"), null);
+});
+
+const customerInput = {
+  name: "Customer", postalCode: "１２３－４５６７", prefecture: "東京都", city: "千代田区", street: "丸の内1-1", building: "時計ビル", phone: "0312345678", email: "customer@example.com",
+};
+const returnAddressInput = {
+  name: "Return recipient", postalCode: "987-6543", prefecture: "大阪府", city: "大阪市", street: "北区2-2", building: "返送ビル", phone: "0612345678",
+};
+const watchesInput = [
+  { timepieceType: "WRISTWATCH", driveType: "QUARTZ", brandId: 1 },
+  { timepieceType: "WALL_CLOCK", driveType: "MECHANICAL", brandId: 2 },
+];
+
+test("uses the customer address for each return snapshot when the checkbox is on", () => {
+  const parsed = parseRepairIntakePayload({ customer: customerInput, returnAddressSameAsCustomer: true, watches: watchesInput });
+  assert.deepEqual(structuredCustomerAddressData(parsed.customer), {
+    zipCode: "1234567", prefecture: "東京都", city: "千代田区", street: "丸の内1-1", building: "時計ビル", address: "東京都千代田区丸の内1-1時計ビル",
+  });
+  const snapshots = parsed.watches.map(() => returnAddressSnapshotData(parsed.returnAddress));
+  assert.equal(snapshots.length, 2);
+  assert.deepEqual(snapshots, [
+    { returnRecipientName: "Customer", returnPostalCode: "1234567", returnPrefecture: "東京都", returnCity: "千代田区", returnStreet: "丸の内1-1", returnBuilding: "時計ビル", returnPhone: "0312345678" },
+    { returnRecipientName: "Customer", returnPostalCode: "1234567", returnPrefecture: "東京都", returnCity: "千代田区", returnStreet: "丸の内1-1", returnBuilding: "時計ビル", returnPhone: "0312345678" },
+  ]);
+});
+
+test("uses the separate return address when the checkbox is off", () => {
+  const parsed = parseRepairIntakePayload({ customer: customerInput, returnAddressSameAsCustomer: false, returnAddress: returnAddressInput, watches: watchesInput });
+  assert.deepEqual(returnAddressSnapshotData(parsed.returnAddress), {
+    returnRecipientName: "Return recipient", returnPostalCode: "9876543", returnPrefecture: "大阪府", returnCity: "大阪市", returnStreet: "北区2-2", returnBuilding: "返送ビル", returnPhone: "0612345678",
+  });
 });
 
 test("reuses an active B2C invite instead of issuing another token", async () => {
@@ -171,6 +206,22 @@ test("accepts only an unused, unexpired intake invite", async () => {
     building: "テストビル",
     phone: "0312345678",
     email: "test@example.com",
+  });
+});
+
+test("does not infer structured prefill fields from a legacy address string", async () => {
+  const db = {
+    repairIntakeInvite: {
+      findUnique: async () => ({
+        expiresAt: new Date(Date.now() + 60_000), usedAt: null, customerId: 12, lineUserId: null,
+        customer: { name: "Legacy Customer", zipCode: "100-0001", prefecture: null, city: null, street: null, building: null, address: "東京都千代田区丸の内1-1", phone: "0312345678", email: null },
+        lineUser: null, repairs: [],
+      }),
+    },
+  };
+  const result = await getRepairIntakeInviteState("legacy-token", db as never);
+  assert.deepEqual(result.prefill, {
+    name: "Legacy Customer", postalCode: "100-0001", prefecture: null, city: null, street: null, building: null, phone: "0312345678", email: null,
   });
 });
 

@@ -38,14 +38,25 @@ export function CustomerRepairIntakeInviteButton({ customerId, lineUserId, class
 
   const url = invite && typeof window !== "undefined" ? `${window.location.origin}/customer/intake/${invite.token}` : "";
   const expiresAt = invite ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" }).format(new Date(invite.expiresAt)) : "";
-  const lineMessage = url ? `修理品の送付受付に必要な情報をご入力ください。
+  const lineMessage = !url ? "" : customerId != null ? `このたびもお問い合わせいただきありがとうございます。
+
+下記リンクから、修理品の送付受付をお願いいたします。
+
+ご登録済みのお客様情報は可能な範囲で入力済みです。
+内容をご確認いただき、変更がある場合は修正してください。
+
+${url}
+
+入力完了後、時計の送付先をご案内いたします。
+
+※リンクの有効期限は7日間です。` : `修理品の送付受付に必要な情報をご入力ください。
 
 下記リンクから、お名前・ご住所・時計の情報をご入力いただけます。
 入力完了後、時計の送付先をご案内いたします。
 
 ${url}
 
-※リンクの有効期限は7日間です。` : "";
+※リンクの有効期限は7日間です。`;
 
   const copyUrl = async () => {
     try {
