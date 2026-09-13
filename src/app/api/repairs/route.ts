@@ -41,7 +41,6 @@ function requireCustomerType(value?: string | null): "business" | "individual" {
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        console.log("Received Repair Create Request:", body);
 
         const result = await prisma.$transaction(async (tx) => {
             // 1. Customer Handling
@@ -594,7 +593,8 @@ export async function POST(req: Request) {
             // 6. Return Data
             return { repair: finalRepair, stockWarnings };
         }, {
-            timeout: 5000
+            maxWait: 5000,
+            timeout: 20000,
         });
 
         return NextResponse.json({ success: true, repair: result.repair, stockWarnings: result.stockWarnings });
