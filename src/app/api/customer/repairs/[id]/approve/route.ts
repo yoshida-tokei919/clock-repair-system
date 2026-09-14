@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { assertApprovalReturnAddress } from "@/lib/return-address";
-import type { RepairPartsOrderStatus } from "@/lib/repair-parts-status";
-import { addStatusLogIfMissing, findRepairIdByIdOrToken, getApprovedRepairStatus } from "../_workflow";
+import { reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
+import { findRepairIdByIdOrToken } from "../_workflow";
 
 export async function POST(
   _request: Request,
@@ -43,19 +43,10 @@ export async function POST(
       }
     }
 
-    const hasPartItems = (repair.estimate?.items ?? []).some(
-      (item) => item.type === "part" || !!item.partsMasterId
-    );
-    const nextStatus = getApprovedRepairStatus({
-      hasPartItems,
-      orderStatuses: repair.orderRequests.map((order) => order.status as RepairPartsOrderStatus),
-    });
-
     const approvalDate = new Date();
     const updateResult = await tx.repair.updateMany({
       where: { id: repair.id, approvalStatus: { not: "approved" } },
       data: {
-        status: nextStatus,
         approvalStatus: "approved",
         approvalDate,
       },
@@ -65,7 +56,9 @@ export async function POST(
       throw new Error("この案件はすでに承認済みです。");
     }
 
-    await addStatusLogIfMissing(tx, repair.id, nextStatus);
+    await reconcileRepairPartAllocations(tx, repair.id, {
+      allowAdvanceFromApproval: true,
+    });
 
     return tx.repair.findUniqueOrThrow({ where: { id: repair.id } });
   });

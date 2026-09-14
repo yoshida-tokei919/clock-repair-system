@@ -30,6 +30,23 @@ export function getRepairStatusAfterOrderAssignment(
         : null
 }
 
+const PARTS_FLOW_REPAIR_STATUSES = new Set([
+    '部品待ち(未注文)',
+    '部品待ち(注文済み)',
+    '部品入荷済み',
+])
+
+export function getRepairStatusAfterPartsFlowCompletion(
+    repairStatus: string | null | undefined,
+    activeOrderStatuses: readonly OrderRequestStatus[]
+): '作業待ち' | null {
+    return !!repairStatus
+        && PARTS_FLOW_REPAIR_STATUSES.has(repairStatus)
+        && getRepairStatusFromActiveOrderStatuses(activeOrderStatuses) === null
+        ? '作業待ち'
+        : null
+}
+
 const PARTS_STATUS_ENABLED_REPAIR_STATUSES = new Set([
     '部品待ち(未注文)',
     '部品待ち(注文済み)',

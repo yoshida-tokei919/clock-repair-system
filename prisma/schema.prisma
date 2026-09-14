@@ -290,6 +290,7 @@ model Repair {
   estimate      Estimate?
   repairLineItems RepairLineItem[]
   orderRequests OrderRequest[]
+  partAllocations RepairPartAllocation[]
   publicCases   PublicCase[]
   
   deliveryNoteId Int?
@@ -765,11 +766,38 @@ model PartsMaster {
   standardPartName PartNameMaster?  @relation(fields: [standardPartNameId], references: [id])
   gradeMaster      PartGradeMaster? @relation(fields: [gradeId],            references: [id])
   orderRequests OrderRequest[]
+  repairPartAllocations RepairPartAllocation[]
   estimateItems EstimateItem[]
   repairLineItems RepairLineItem[]
 
   @@index([standardPartNameId])
   @@index([gradeId])
+}
+
+enum RepairPartAllocationState {
+  RESERVED
+  CONSUMED
+  RELEASED
+}
+
+// Repair-specific inventory reservation. PartsMaster.stockQuantity is the
+// unreserved physical stock; this record is the durable allocation ledger.
+model RepairPartAllocation {
+  id            Int                       @id @default(autoincrement())
+  repairId      Int
+  partsMasterId Int
+  quantity      Int
+  state         RepairPartAllocationState @default(RESERVED)
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  releasedAt    DateTime?
+
+  repair      Repair      @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  partsMaster PartsMaster @relation(fields: [partsMasterId], references: [id])
+
+  @@unique([repairId, partsMasterId])
+  @@index([repairId, state])
+  @@index([partsMasterId, state])
 }
 
 // 7. Documents (Bulk Generation)

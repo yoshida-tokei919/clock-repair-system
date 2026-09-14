@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
 
 export async function findRepairIdByIdOrToken(value: string) {
   const numericId = Number(value);
@@ -38,17 +37,4 @@ export async function addStatusLogIfMissing(
       data: { repairId, status, changedAt },
     });
   }
-}
-
-export function getApprovedRepairStatus(input: {
-  hasPartItems: boolean;
-  orderStatuses: RepairPartsOrderStatus[];
-}) {
-  if (!input.hasPartItems) return "作業待ち";
-
-  if (input.orderStatuses.length === 0) {
-    return "部品待ち(未注文)";
-  }
-
-  return getRepairStatusFromOrderStatuses(input.orderStatuses) || "部品待ち(未注文)";
 }

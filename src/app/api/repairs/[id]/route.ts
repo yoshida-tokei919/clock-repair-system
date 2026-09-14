@@ -1,7 +1,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
+import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { findOrCreateBrand, findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
@@ -244,7 +244,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                         data: { repairId: id, status: dbStatus, changedAt }
                     });
                 }
-            } else if (dbStatus !== repairRecord.status) {
+            } else if (
+                dbStatus !== repairRecord.status
+                && !["部品待ち(未注文)", "部品待ち(注文済み)", "部品入荷済み", "作業待ち"].includes(dbStatus)
+            ) {
                 const logDateStr = body.statusLog?.[dbStatus];
                 let changedAt = new Date();
                 if (logDateStr) {
@@ -331,7 +334,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                                     latestCostYen: item.cost ?? existingMaster.latestCostYen,
                                     markupRate: existingMaster.markupRate,
                                     retailPrice: item.price ?? existingMaster.retailPrice,
-                                    stockQuantity: item.stockQuantity ?? existingMaster.stockQuantity,
+                                    // A repair form carries a display snapshot only. Never let it
+                                    // overwrite live unreserved stock during a repair save.
+                                    stockQuantity: existingMaster.stockQuantity,
                                     minStockAlert: existingMaster.minStockAlert,
                                     minStockAlertEnabled: existingMaster.minStockAlertEnabled,
                                     location: existingMaster.location,
@@ -391,24 +396,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                             items: repairLineItemInputs,
                         });
 
-                        const pendingOrderQuantities = new Map<number, number>();
-                        for (const item of syncedEstimateItems) {
-                            if (item.type !== 'part' || !item.partsMasterId) continue;
-                            const partId = Number(item.partsMasterId);
-                            const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
-                            pendingOrderQuantities.set(partId, (pendingOrderQuantities.get(partId) ?? 0) + quantity);
-                        }
-
-                        for (const [partsMasterId, quantity] of Array.from(pendingOrderQuantities.entries())) {
-                            await tx.orderRequest.updateMany({
-                                where: {
-                                    repairId: id,
-                                    partsMasterId,
-                                    status: 'pending',
-                                },
-                                data: { quantity },
-                            });
-                        }
                     } else {
                         await replaceRepairLineItems(id, [], tx);
                     }
@@ -453,26 +440,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 }));
             }
 
-            const repairOrders = await tx.orderRequest.findMany({
-                where: {
-                    repairId: id,
-                    status: { in: ['pending', 'ordered', 'received'] }
-                },
-                select: { status: true }
-            });
-            const aggregatedRepairStatus = getRepairStatusFromOrderStatuses(
-                repairOrders.map(order => order.status as RepairPartsOrderStatus)
-            );
-            if (
-                aggregatedRepairStatus &&
-                aggregatedRepairStatus !== updatedRepair.status &&
-                canApplyPartsOrderStatus(updatedRepair.status)
-            ) {
-                updatedRepair = await tx.repair.update({
-                    where: { id },
-                    data: { status: aggregatedRepairStatus }
-                });
-            }
+            const reconciliation = await reconcileRepairPartAllocations(tx, id, { requestedStatus: dbStatus });
+            await addConfirmedRepairStatusLog(tx, id, reconciliation.status);
+            updatedRepair = await tx.repair.findUniqueOrThrow({ where: { id } });
 
             return updatedRepair;
         }, {

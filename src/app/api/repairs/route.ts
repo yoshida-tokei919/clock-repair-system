@@ -1,7 +1,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { canApplyPartsOrderStatus, getRepairStatusFromOrderStatuses, type RepairPartsOrderStatus } from "@/lib/repair-parts-status";
+import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { findOrCreateBrand, findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
@@ -344,7 +344,13 @@ export async function POST(req: Request) {
             });
 
             // 5. initial Log & History logs
-            const logEntries = Object.entries(body.statusLog || {});
+            const partsDerivedStatuses = new Set([
+                "部品待ち(未注文)",
+                "部品待ち(注文済み)",
+                "部品入荷済み",
+                "作業待ち",
+            ]);
+            const logEntries = Object.entries(body.statusLog || {}).filter(([status]) => !partsDerivedStatuses.has(status));
             const loggedStatuses = new Set<string>();
             for (const [sId, dateStr] of logEntries) {
                 await tx.repairStatusLog.create({
@@ -370,7 +376,7 @@ export async function POST(req: Request) {
                 loggedStatuses.add("受付");
             }
 
-            if (dbStatus !== "受付" && !loggedStatuses.has(dbStatus)) {
+            if (dbStatus !== "受付" && !partsDerivedStatuses.has(dbStatus) && !loggedStatuses.has(dbStatus)) {
                 await tx.repairStatusLog.create({
                     data: {
                         repairId: repair.id,
@@ -442,7 +448,9 @@ export async function POST(req: Request) {
                             latestCostYen: item.cost ?? existingMaster.latestCostYen,
                             markupRate: existingMaster.markupRate,
                             retailPrice: item.price ?? existingMaster.retailPrice,
-                            stockQuantity: item.stockQuantity ?? existingMaster.stockQuantity,
+                            // A repair form carries a display snapshot only. Never let it
+                            // overwrite live unreserved stock during a repair save.
+                            stockQuantity: existingMaster.stockQuantity,
                             minStockAlert: existingMaster.minStockAlert,
                             minStockAlertEnabled: existingMaster.minStockAlertEnabled,
                             location: existingMaster.location,
@@ -523,72 +531,14 @@ export async function POST(req: Request) {
             }
 
             // 7. 蝨ｨ蠎ｫ繝√ぉ繝・・ｽ・ｽ・ｽE・ｽEartsMasterId 縺後≠繧矩Κ蜩・ｿｽE縺ｿ・ｽE・ｽE
-            const stockWarnings: { partName: string; required: number; stock: number; orderRequestId: number }[] = [];
-            const requiredByPart = new Map<number, number>();
-            for (const item of estimateItems.filter((i: any) => i.partsMasterId)) {
-                const partId = Number(item.partsMasterId);
-                requiredByPart.set(partId, (requiredByPart.get(partId) ?? 0) + (item.quantity || 1));
-            }
-            for (const [partId, required] of Array.from(requiredByPart.entries())) {
-                const master = await tx.partsMaster.findUnique({ where: { id: partId } });
-                if (!master) continue;
-                if (master.stockQuantity < required) {
-                    const shortage = required - master.stockQuantity;
-                    // 蝨ｨ蠎ｫ荳崎ｶｳ 竊・OrderRequest 菴懶ｿｽE・ｽE・ｽ驥崎､・・ｽ・ｽ豁｢・ｽE・ｽE
-                    const existing = await tx.orderRequest.findFirst({
-                        where: { partsMasterId: master.id, repairId: repair.id, status: { in: ['pending', 'ordered'] } }
-                    });
-                    const orderRequest = existing
-                        ? await tx.orderRequest.update({
-                            where: { id: existing.id },
-                            data: { quantity: shortage }
-                        })
-                        : await tx.orderRequest.create({
-                        data: {
-                            partsMasterId: master.id,
-                            partNameJp: master.nameJp,
-                            partNameEn: master.nameEn ?? null,
-                            partRefs: master.partRefs ?? null,
-                            cousinsNumber: master.cousinsNumber ?? null,
-                            quantity: shortage,
-                            supplierId: master.supplierId ?? null,
-                            searchWordJp: master.nameJp,
-                            searchWordEn: master.nameEn ?? null,
-                            repairId: repair.id,
-                            status: 'pending',
-                        }
-                    });
-                    stockWarnings.push({
-                        partName: master.nameJp,
-                        required,
-                        stock: master.stockQuantity,
-                        orderRequestId: orderRequest.id,
-                    });
-                } else {
-                    // 蝨ｨ蠎ｫ縺ゅｊ 竊・蠑輔″蠖薙※・ｽE・ｽ蝨ｨ蠎ｫ謨ｰ -1・ｽE・ｽE
-                    await tx.partsMaster.update({
-                        where: { id: master.id },
-                        data: { stockQuantity: { decrement: required } }
-                    });
-                }
-            }
-
-            const repairOrders = await tx.orderRequest.findMany({
-                where: {
-                    repairId: repair.id,
-                    status: { in: ['pending', 'ordered', 'received'] }
-                },
-                select: { status: true }
+            const reconciliation = await reconcileRepairPartAllocations(tx, repair.id, {
+                requestedStatus: dbStatus,
             });
-            const aggregatedRepairStatus = getRepairStatusFromOrderStatuses(
-                repairOrders.map(order => order.status as RepairPartsOrderStatus)
-            );
-            const finalRepair = aggregatedRepairStatus && canApplyPartsOrderStatus(repair.status)
-                ? await tx.repair.update({
-                    where: { id: repair.id },
-                    data: { status: aggregatedRepairStatus }
-                })
-                : repair;
+            await addConfirmedRepairStatusLog(tx, repair.id, reconciliation.status);
+            const finalRepair = reconciliation.status === repair.status
+                ? repair
+                : await tx.repair.findUniqueOrThrow({ where: { id: repair.id } });
+            const stockWarnings: never[] = [];
 
             // 6. Return Data
             return { repair: finalRepair, stockWarnings };
