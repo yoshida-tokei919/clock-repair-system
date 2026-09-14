@@ -56,13 +56,16 @@ export interface InvoiceDocumentProps {
       amount: number;
     }[];
     taxRate: number;
+    subtotalAmount?: number;
+    taxAmount?: number;
     bankInfo?: string;
   };
 }
 
 export function InvoiceDocument({ data }: InvoiceDocumentProps) {
-  const subTotal = data.items.reduce((sum, item) => sum + item.amount, 0);
-  const tax = Math.floor(subTotal * data.taxRate);
+  const calculatedSubtotal = data.items.reduce((sum, item) => sum + item.amount, 0);
+  const subTotal = data.subtotalAmount ?? calculatedSubtotal;
+  const tax = data.taxAmount ?? Math.floor(subTotal * data.taxRate);
   const grandTotal = subTotal + tax;
 
   return (

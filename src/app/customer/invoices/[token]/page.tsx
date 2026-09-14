@@ -1,3 +1,4 @@
+import { hasConsistentInvoiceSnapshots } from "@/lib/invoice-repair-snapshots";
 import { notFound } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
@@ -52,31 +53,26 @@ function formatBillingMonth(billingMonth: string | null, deliveryGroups: Deliver
 function buildDeliveryGroups(invoice: NonNullable<Awaited<ReturnType<typeof findInvoiceForSharePage>>>) {
   const deliveryGroups = new Map<string, DeliveryGroup>();
 
-  for (const repair of invoice.repairs) {
-    const groupKey = repair.deliveryNoteId
-      ? `delivery-note-id:${repair.deliveryNoteId}`
-      : repair.deliveryNote?.slipNumber
-        ? `delivery-note-slip:${repair.deliveryNote.slipNumber}`
+  const rows = hasConsistentInvoiceSnapshots(invoice) ? invoice.repairSnapshots : [];
+  for (const row of rows) {
+    const groupKey = row.deliveryNoteId
+      ? `delivery-note-id:${row.deliveryNoteId}`
+      : row.deliverySlipNumber
+        ? `delivery-note-slip:${row.deliverySlipNumber}`
         : "unlinked-delivery-note";
-
-    const repairAmount = (repair.estimate?.items || []).reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0
-    );
-    const groupDate = repair.deliveryNote?.issuedDate || repair.deliveryDateActual || invoice.issuedDate;
+    const groupDate = row.deliveryIssuedDate || row.deliveryDateActual || invoice.issuedDate;
     const existing = deliveryGroups.get(groupKey);
-
     if (existing) {
       existing.repairCount += 1;
-      existing.amount += repairAmount;
+      existing.amount += row.subtotalAmount;
       if (groupDate < existing.date) existing.date = groupDate;
     } else {
       deliveryGroups.set(groupKey, {
         key: groupKey,
-        slipNumber: repair.deliveryNote?.slipNumber || "未紐付け",
+        slipNumber: row.deliverySlipNumber || "未紐付け",
         date: groupDate,
         repairCount: 1,
-        amount: repairAmount,
+        amount: row.subtotalAmount,
       });
     }
   }
@@ -89,12 +85,7 @@ function findInvoiceForSharePage(invoiceId: number) {
     where: { id: invoiceId },
     include: {
       customer: true,
-      repairs: {
-        include: {
-          estimate: { include: { items: true } },
-          deliveryNote: true,
-        },
-      },
+      repairSnapshots: true,
     },
   });
 }
@@ -161,6 +152,10 @@ export default async function CustomerInvoicePage({ params }: { params: { token:
               <dt className="text-xs font-bold text-slate-500">支払期限</dt>
               <dd className="mt-1 font-semibold">{formatDate(invoice.paymentDueDate)}</dd>
             </div>
+            <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
+              <dt className="text-xs font-bold text-slate-500">請求総額（税込）</dt>
+              <dd className="mt-1 font-semibold">{formatCurrency(invoice.grossTotalAmount)}</dd>
+            </div>
           </dl>
         </section>
 
@@ -201,7 +196,7 @@ export default async function CustomerInvoicePage({ params }: { params: { token:
           <div className="mt-4 space-y-2">
             {deliveryGroups.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                明細はありません。
+                発行時の明細は保存済みPDFをご確認ください。
               </div>
             ) : (
               deliveryGroups.map((group) => (

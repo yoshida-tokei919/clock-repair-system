@@ -53,6 +53,14 @@ export async function POST(
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Invoice" WHERE "id" = ${invoice.id} FOR UPDATE`;
+    const current = await tx.invoice.findUnique({
+      where: { id: invoice.id },
+      select: { status: true, paymentAllocations: { select: { id: true } } },
+    });
+    if (!current || current.status !== "issued" || current.paymentAllocations.length > 0) {
+      return null;
+    }
     const updatedInvoice = await tx.invoice.update({
       where: { id: invoice.id },
       data: { status: "void" },
@@ -66,6 +74,13 @@ export async function POST(
 
     return { updatedInvoice, releasedRepairCount: releasedRepairs.count };
   });
+
+  if (!result) {
+    return NextResponse.json(
+      { ok: false, error: "支払いが存在する、または発行状態ではない請求書は取消できません" },
+      { status: 409 },
+    );
+  }
 
   return NextResponse.json({
     ok: true,

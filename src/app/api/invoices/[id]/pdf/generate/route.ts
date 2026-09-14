@@ -1,3 +1,4 @@
+import { hasConsistentInvoiceSnapshots } from "@/lib/invoice-repair-snapshots";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import path from "path";
@@ -56,30 +57,25 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     }
   >();
 
-  for (const repair of invoice.repairs) {
-    const groupKey = repair.deliveryNoteId
-      ? `delivery-note-id:${repair.deliveryNoteId}`
-      : repair.deliveryNote?.slipNumber
-        ? `delivery-note-slip:${repair.deliveryNote.slipNumber}`
+  const rows = hasConsistentInvoiceSnapshots(invoice) ? invoice.repairSnapshots : [];
+  for (const row of rows) {
+    const groupKey = row.deliveryNoteId
+      ? `delivery-note-id:${row.deliveryNoteId}`
+      : row.deliverySlipNumber
+        ? `delivery-note-slip:${row.deliverySlipNumber}`
         : "unlinked-delivery-note";
-
-    const repairAmount = (repair.estimate?.items || []).reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0
-    );
-    const groupDate = repair.deliveryNote?.issuedDate || repair.deliveryDateActual || invoice.issuedDate;
+    const groupDate = row.deliveryIssuedDate || row.deliveryDateActual || invoice.issuedDate;
     const existing = deliveryGroups.get(groupKey);
-
     if (existing) {
       existing.repairCount += 1;
-      existing.amount += repairAmount;
+      existing.amount += row.subtotalAmount;
       if (groupDate < existing.date) existing.date = groupDate;
     } else {
       deliveryGroups.set(groupKey, {
-        slipNumber: repair.deliveryNote?.slipNumber || "未紐付け",
+        slipNumber: row.deliverySlipNumber || "未紐付け",
         date: groupDate,
         repairCount: 1,
-        amount: repairAmount,
+        amount: row.subtotalAmount,
       });
     }
   }
@@ -103,6 +99,8 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     },
     items: invoiceItems,
     taxRate: 0.1,
+    subtotalAmount: invoice.totalAmount,
+    taxAmount: invoice.taxAmount,
     bankInfo: "三井住友銀行　店番411\n普通 3602468\nヨシダ シュウヘイ",
   } satisfies InvoiceDocumentProps["data"];
 }
@@ -112,14 +110,7 @@ function findInvoiceForPdf(invoiceId: number) {
     where: { id: invoiceId },
     include: {
       customer: true,
-      repairs: {
-        include: {
-          watch: { include: { brand: true, model: true, reference: true } },
-          estimate: { include: { items: true } },
-          invoice: true,
-          deliveryNote: true,
-        },
-      },
+      repairSnapshots: true,
     },
   });
 }
@@ -141,6 +132,13 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   if (!invoice) {
     return NextResponse.json({ ok: false, error: "Invoice not found" }, { status: 404 });
+  }
+
+  if (!hasConsistentInvoiceSnapshots(invoice)) {
+    return NextResponse.json(
+      { ok: false, error: "発行時明細が未保存、または確定額と一致しないため再生成できません。保存済みPDFをご確認ください。" },
+      { status: 409 },
+    );
   }
 
   let pdfBuffer: Buffer;

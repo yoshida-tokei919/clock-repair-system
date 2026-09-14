@@ -56,6 +56,7 @@ model Customer {
   estimateDocuments EstimateDocument[]
   estimatePdfFiles  EstimatePdfFile[]
   invoicePdfFiles   InvoicePdfFile[]
+  payments          Payment[]
   warranties        Warranty[]
   lineUsers         LineUser[]
   repairIntakeInvites RepairIntakeInvite[]
@@ -831,14 +832,115 @@ model Invoice {
   customer      Customer @relation(fields: [customerId], references: [id])
   
   repairs       Repair[]
+  repairSnapshots InvoiceRepairSnapshot[]
+  paymentAllocations PaymentAllocation[]
   pdfFiles      InvoicePdfFile[] @relation("InvoicePdfFiles")
   currentPdfFile InvoicePdfFile? @relation("CurrentInvoicePdfFile", fields: [currentPdfFileId], references: [id], onDelete: SetNull)
   
-  totalAmount   Int      @default(0)
-  taxAmount     Int      @default(0)
+  totalAmount   Int      @default(0) // Issued pre-tax subtotal, integer JPY (existing meaning)
+  taxAmount     Int      @default(0) // Issued tax, integer JPY
+  grossTotalAmount Int   // Issued payable total; INSERT trigger fills NULL for old writers
   status        String   @default("issued") // issued, paid
   paymentDueDate DateTime?
   sentAt        DateTime?
+}
+
+// Immutable per-repair amounts and delivery details captured when an Invoice is issued.
+// New invoice rendering must use these rows rather than the editable EstimateItem rows.
+model InvoiceRepairSnapshot {
+  id                Int      @id @default(autoincrement())
+  invoiceId         Int
+  repairId          Int
+  inquiryNumber     String
+  deliveryNoteId    Int?
+  deliverySlipNumber String?
+  deliveryIssuedDate DateTime?
+  deliveryDateActual DateTime?
+  subtotalAmount    Int
+  createdAt         DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceId, repairId])
+  @@index([repairId])
+  @@index([invoiceId, deliveryNoteId])
+}
+
+enum PaymentProvider {
+  STRIPE
+  MANUAL
+}
+
+enum PaymentMethod {
+  CARD
+  PAYPAY
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum PaymentAttemptStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+// A receipt or payment-in-progress. Its allocations determine which invoices it settles.
+model Payment {
+  id         Int             @id @default(autoincrement())
+  customerId Int
+  amount     Int
+  currency   String          @default("JPY")
+  provider   PaymentProvider
+  method     PaymentMethod?
+  status     PaymentStatus   @default(PENDING)
+  paidAt     DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  customer    Customer            @relation(fields: [customerId], references: [id])
+  allocations PaymentAllocation[]
+  attempts    PaymentAttempt[]
+
+  @@index([customerId, status])
+  @@index([status, paidAt])
+}
+
+model PaymentAllocation {
+  id              Int      @id @default(autoincrement())
+  paymentId       Int      @unique
+  invoiceId       Int
+  allocatedAmount Int
+  createdAt       DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+}
+
+// Provider-specific attempts are separate because one Payment can require retries.
+model PaymentAttempt {
+  id                    Int                  @id @default(autoincrement())
+  paymentId             Int
+  provider              PaymentProvider
+  status                PaymentAttemptStatus @default(PENDING)
+  idempotencyKey        String               @unique
+  externalTransactionId String?              @unique
+  checkoutSessionId     String?              @unique
+  paymentIntentId       String?              @unique
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, status])
 }
 
 

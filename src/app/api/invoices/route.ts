@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+    buildInvoiceRepairSnapshotData,
+    calculateIssuedInvoiceAmounts,
+    calculateInvoiceRepairSubtotal,
+} from "@/lib/invoice-repair-snapshots";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/invoices — 請求書一覧
@@ -38,19 +43,26 @@ export async function POST(req: NextRequest) {
     const invoiceNumber = `${prefix}I-${String(newSeq).padStart(3, "0")}`;
 
     // 対象修理の合計金額を計算
+    const uniqueRepairIds = Array.from(new Set(repairIds));
     const repairs = await prisma.repair.findMany({
-        where: { id: { in: repairIds } },
-        include: { estimate: { include: { items: true } } },
+        where: { id: { in: uniqueRepairIds } },
+        include: {
+            estimate: { include: { items: true } },
+            deliveryNote: { select: { slipNumber: true, issuedDate: true } },
+        },
     });
 
+    if (
+        repairs.length !== uniqueRepairIds.length
+        || repairs.some((repair) => repair.customerId !== customerId || repair.invoiceId !== null)
+    ) {
+        return NextResponse.json({ error: "請求対象の案件を確認してください" }, { status: 400 });
+    }
+
     const subtotal = repairs.reduce((sum, r) => {
-        const repairTotal = (r.estimate?.items || []).reduce(
-            (s, i) => s + i.unitPrice * i.quantity,
-            0
-        );
-        return sum + repairTotal;
+        return sum + calculateInvoiceRepairSubtotal(r);
     }, 0);
-    const taxAmount = Math.floor(subtotal * 0.1);
+    const amounts = calculateIssuedInvoiceAmounts(subtotal);
 
     // トランザクションで請求書作成・修理紐付け・SEQ更新
     const invoice = await prisma.$transaction(async (tx) => {
@@ -58,12 +70,18 @@ export async function POST(req: NextRequest) {
             data: {
                 invoiceNumber,
                 customerId,
-                totalAmount: subtotal,
-                taxAmount,
+                ...amounts,
                 paymentDueDate: paymentDueDate ? new Date(paymentDueDate) : null,
-                repairs: { connect: repairIds.map((id) => ({ id })) },
+                repairSnapshots: { create: buildInvoiceRepairSnapshotData(repairs) },
             },
         });
+        const claimed = await tx.repair.updateMany({
+            where: { id: { in: uniqueRepairIds }, customerId, invoiceId: null },
+            data: { invoiceId: created.id },
+        });
+        if (claimed.count !== uniqueRepairIds.length) {
+            throw new Error("請求対象が変更されました。再読み込みしてください");
+        }
         await tx.customer.update({
             where: { id: customerId },
             data: { seqInvoice: newSeq },

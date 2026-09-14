@@ -1,6 +1,11 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import {
+    buildInvoiceRepairSnapshotData,
+    calculateIssuedInvoiceAmounts,
+    calculateInvoiceRepairSubtotal,
+} from "@/lib/invoice-repair-snapshots";
 import { revalidatePath } from "next/cache";
 
 export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty') {
@@ -11,7 +16,8 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
             where: { id: { in: repairIds } },
             include: {
                 customer: true,
-                estimate: { include: { items: true } }
+                estimate: { include: { items: true } },
+                deliveryNote: { select: { slipNumber: true, issuedDate: true } },
             }
         });
 
@@ -35,7 +41,9 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
             // Calculate Totals from all selected repairs
             let totalAmount = 0;
             customerRepairs.forEach(r => {
-                const subtotal = r.estimate?.items.reduce((s, i) => s + (i.unitPrice * i.quantity), 0) || 0;
+                const subtotal = type === "invoice"
+                    ? calculateInvoiceRepairSubtotal(r)
+                    : r.estimate?.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0) || 0;
                 totalAmount += subtotal;
             });
             const taxAmount = Math.floor(totalAmount * 0.1);
@@ -67,6 +75,9 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 await prisma.customer.update({ where: { id: customerId }, data: { seqDelivery: seq } });
                 documentId = note.id;
             } else if (type === 'invoice') {
+                if (customerRepairs.some(r => r.invoiceId !== null)) {
+                    throw new Error("発行済み請求書のある案件は再請求できません");
+                }
                 const lastInvoice = await prisma.invoice.findFirst({
                     where: { invoiceNumber: { startsWith: prefix } },
                     orderBy: { id: 'desc' }
@@ -81,17 +92,26 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 dueDate.setMonth(dueDate.getMonth() + 2);
                 dueDate.setDate(0);
 
-                const invoice = await prisma.invoice.create({
+                const invoice = await prisma.$transaction(async (tx) => {
+                  const created = await tx.invoice.create({
                     data: {
                         invoiceNumber: docNumber,
                         customerId: customerId,
-                        totalAmount,
-                        taxAmount,
+                        ...calculateIssuedInvoiceAmounts(totalAmount),
                         paymentDueDate: dueDate,
-                        repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
+                        repairSnapshots: { create: buildInvoiceRepairSnapshotData(customerRepairs) },
                     }
+                  });
+                  const claimed = await tx.repair.updateMany({
+                    where: { id: { in: customerRepairs.map(r => r.id) }, customerId, invoiceId: null },
+                    data: { invoiceId: created.id },
+                  });
+                  if (claimed.count !== customerRepairs.length) {
+                    throw new Error("請求対象が変更されました。再読み込みしてください");
+                  }
+                  await tx.customer.update({ where: { id: customerId }, data: { seqInvoice: seq } });
+                  return created;
                 });
-                await prisma.customer.update({ where: { id: customerId }, data: { seqInvoice: seq } });
                 documentId = invoice.id;
             } else if (type === 'estimate') {
                 const lastEstimate = await prisma.estimateDocument.findFirst({
