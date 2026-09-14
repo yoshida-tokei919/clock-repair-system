@@ -617,6 +617,8 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
 .footer-logo-img { height: 35px; width: auto; margin-bottom: 15px; opacity: 0.8;} 
 .footer-name { font-size: 1.2rem; color: var(--white); margin-bottom: 20px;}
 .copyright { font-size: 0.85rem;}
+.footer-links { margin: 0 0 12px; font-size: 0.9rem; }
+.footer-links a { color: rgba(255,255,255,0.72); text-decoration: underline; text-underline-offset: 3px; }
 
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
@@ -1027,6 +1029,7 @@ const HTML_FLOW_FOOTER = `
     <div class="container">
         <img src="/img/logo.png" alt="ヨシダ時計修理工房 ロゴ" class="footer-logo-img">
         <div class="footer-name">ヨシダ時計修理工房</div>
+        <p class="footer-links"><a href="/commercial-disclosure">特定商取引法に基づく表記</a></p>
         <p class="copyright">&copy; 2026 ヨシダ時計修理工房 All rights reserved.</p>
     </div>
 </footer>

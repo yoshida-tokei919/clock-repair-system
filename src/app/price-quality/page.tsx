@@ -15,69 +15,69 @@ const priceRows = [
     quartzMaker: "-",
     quartzShop: "-",
     mechanicalMaker: "88,000円〜",
-    mechanicalShop: "30,000円〜",
+    mechanicalShop: "33,000円〜",
     chronoMaker: "100,000円〜",
-    chronoShop: "50,000円〜",
+    chronoShop: "55,000円〜",
     note: "モデル・年代で変動あり",
   },
   {
     brand: "OMEGA",
     quartzMaker: "70,000円〜",
-    quartzShop: "16,000円〜",
+    quartzShop: "18,000円〜",
     mechanicalMaker: "90,000円〜",
-    mechanicalShop: "25,000円〜",
+    mechanicalShop: "27,000円〜",
     chronoMaker: "115,000円〜",
-    chronoShop: "40,000円〜",
+    chronoShop: "44,000円〜",
     note: "コーアクシャルは高め",
   },
   {
     brand: "TAG Heuer",
     quartzMaker: "35,000円〜",
-    quartzShop: "16,000円〜",
+    quartzShop: "18,000円〜",
     mechanicalMaker: "55,000円〜",
-    mechanicalShop: "25,000円〜",
+    mechanicalShop: "27,000円〜",
     chronoMaker: "85,000円〜",
-    chronoShop: "40,000円〜",
+    chronoShop: "44,000円〜",
     note: "正規会員価格あり(約3割安)",
   },
   {
     brand: "BREITLING",
     quartzMaker: "50,000円〜",
-    quartzShop: "16,000円〜",
+    quartzShop: "18,000円〜",
     mechanicalMaker: "80,000円〜",
-    mechanicalShop: "30,000円〜",
+    mechanicalShop: "33,000円〜",
     chronoMaker: "120,000円〜",
-    chronoShop: "40,000円〜",
+    chronoShop: "44,000円〜",
     note: "正規会員価格あり(半額)",
   },
   {
     brand: "IWC",
     quartzMaker: "50,000円〜",
-    quartzShop: "16,000円〜",
+    quartzShop: "18,000円〜",
     mechanicalMaker: "70,000円〜",
-    mechanicalShop: "30,000円〜",
+    mechanicalShop: "33,000円〜",
     chronoMaker: "95,000円〜",
-    chronoShop: "50,000円〜",
+    chronoShop: "55,000円〜",
     note: "-",
   },
   {
     brand: "Cartier",
     quartzMaker: "45,000円〜",
-    quartzShop: "20,000円〜",
+    quartzShop: "22,000円〜",
     mechanicalMaker: "55,000円〜",
-    mechanicalShop: "30,000円〜",
+    mechanicalShop: "33,000円〜",
     chronoMaker: "80,000円〜",
-    chronoShop: "50,000円〜",
+    chronoShop: "55,000円〜",
     note: "-",
   },
   {
     brand: "Grand Seiko",
     quartzMaker: "40,000円〜",
-    quartzShop: "16,000円〜",
+    quartzShop: "18,000円〜",
     mechanicalMaker: "55,000円〜",
-    mechanicalShop: "25,000円〜",
+    mechanicalShop: "27,000円〜",
     chronoMaker: "85,000円〜",
-    chronoShop: "40,000円〜",
+    chronoShop: "44,000円〜",
     note: "スプリングドライブは6万円〜",
   },
 ];
@@ -132,8 +132,7 @@ export default function PriceQualityPage() {
           <h2>価格比較の目安</h2>
         </div>
         <p className="price-note">
-          以下は修理内容や状態によって変動するため、あくまで目安です。
-          正式な金額は、実物確認後のお見積りとなります。
+          表示価格はすべて当工房の税込基本料金です。時計の状態、必要な処置、交換部品等により料金は変動します。正式な料金は、実物確認後のお見積りで確定します。
         </p>
         <div className="price-table-wrap" aria-label="価格比較の目安">
           <table className="price-table">
@@ -210,7 +209,10 @@ export default function PriceQualityPage() {
       </section>
 
       <footer className="price-footer">
-        <Link href="/">トップへ戻る</Link>
+        <div className="price-footer-links">
+          <Link href="/">トップへ戻る</Link>
+          <Link href="/commercial-disclosure">特定商取引法に基づく表記</Link>
+        </div>
       </footer>
 
       <style
@@ -466,6 +468,13 @@ export default function PriceQualityPage() {
           text-align: center;
           font-size: 0.92rem;
           font-weight: 700;
+        }
+
+        .price-footer-links {
+          display: flex;
+          justify-content: center;
+          gap: 20px;
+          flex-wrap: wrap;
         }
 
         @media (max-width: 640px) {
