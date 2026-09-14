@@ -334,6 +334,9 @@ export async function POST(req: Request) {
                     baseMovementCaliberId,
                     partnerRef,
                     status: dbStatus,
+                    // New repairs created by the Task166F-aware API opt in
+                    // explicitly; the database default remains fail-safe.
+                    partsAllocationLegacy: false,
                     accessories: JSON.stringify(body.request.accessories || []),
                     workSummary: body.request.diagnosis,
                     internalNotes: body.request.internalNotes,

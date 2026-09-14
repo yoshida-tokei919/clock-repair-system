@@ -54,9 +54,19 @@ export function canAllocateRepairParts({
     return !PRE_ALLOCATION_REPAIR_STATUSES.has(status);
 }
 
+/** Legacy repairs have no trustworthy allocation ledger and must not be reconciled. */
+export function shouldReconcileRepairPartAllocations(partsAllocationLegacy: boolean): boolean {
+    return !partsAllocationLegacy;
+}
+
 /** Only assignment transfers physical stock into a repair reservation. */
 export function shouldAllocateForOrderStatus(status: string): boolean {
     return status === "assigned";
+}
+
+/** A physical receipt reaches stock exactly once, for both legacy and new repairs. */
+export function shouldReceiveOrderIntoStock(previousStatus: string, nextStatus: string): boolean {
+    return previousStatus !== "received" && nextStatus === "received";
 }
 
 /**
@@ -123,6 +133,7 @@ export type ReconcileResult = {
     status: string;
     activeOrderStatuses: RepairPartsOrderStatus[];
     allRequiredPartsAllocated: boolean;
+    skippedForLegacy: boolean;
 };
 
 export async function addConfirmedRepairStatusLog(
@@ -187,9 +198,18 @@ export async function reconcileRepairPartAllocations(
 ): Promise<ReconcileResult> {
     const repair = await tx.repair.findUnique({
         where: { id: repairId },
-        select: { status: true, approvalStatus: true, customer: { select: { type: true } } },
+        select: { status: true, approvalStatus: true, partsAllocationLegacy: true, customer: { select: { type: true } } },
     });
     if (!repair) throw new Error("Repair not found");
+
+    if (!shouldReconcileRepairPartAllocations(repair.partsAllocationLegacy)) {
+        return {
+            status: repair.status,
+            activeOrderStatuses: [],
+            allRequiredPartsAllocated: false,
+            skippedForLegacy: true,
+        };
+    }
 
     if (!canAllocateRepairParts({
         status: options.requestedStatus ?? repair.status,
@@ -205,6 +225,7 @@ export async function reconcileRepairPartAllocations(
             status: repair.status,
             activeOrderStatuses: activeOrders.map(order => order.status as RepairPartsOrderStatus),
             allRequiredPartsAllocated: false,
+            skippedForLegacy: false,
         };
     }
 
@@ -375,7 +396,7 @@ export async function reconcileRepairPartAllocations(
         await addConfirmedRepairStatusLog(tx, repairId, nextStatus);
     }
 
-    return { status: nextStatus, activeOrderStatuses, allRequiredPartsAllocated };
+    return { status: nextStatus, activeOrderStatuses, allRequiredPartsAllocated, skippedForLegacy: false };
 }
 
 /**
@@ -388,9 +409,13 @@ export async function syncRepairPartsStatusFromActiveOrders(
 ) {
     const repair = await tx.repair.findUnique({
         where: { id: repairId },
-        select: { status: true, approvalStatus: true, customer: { select: { type: true } } },
+        select: { status: true, approvalStatus: true, partsAllocationLegacy: true, customer: { select: { type: true } } },
     });
     if (!repair) throw new Error("Repair not found");
+
+    if (!shouldReconcileRepairPartAllocations(repair.partsAllocationLegacy)) {
+        return [];
+    }
 
     if (!canAllocateRepairParts({
         status: repair.status,

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canAllocateRepairParts, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
+import {
+  canApplyPartsOrderStatus,
+  getRepairStatusFromOrderStatuses,
+  type RepairPartsOrderStatus,
+} from "@/lib/repair-parts-status";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -31,10 +36,10 @@ export async function POST(req: Request) {
   const result = await prisma.$transaction(async (tx) => {
     const repair = await tx.repair.findUnique({
       where: { id: normalizedRepairId },
-      select: { status: true, approvalStatus: true, customer: { select: { type: true } } },
+      select: { status: true, approvalStatus: true, partsAllocationLegacy: true, customer: { select: { type: true } } },
     });
     if (!repair) throw new Error("Repair not found");
-    if (!canAllocateRepairParts({
+    if (!repair.partsAllocationLegacy && !canAllocateRepairParts({
       status: repair.status,
       approvalStatus: repair.approvalStatus,
       customerType: repair.customer.type,
@@ -71,7 +76,22 @@ export async function POST(req: Request) {
       });
     }
 
-    await reconcileRepairPartAllocations(tx, normalizedRepairId);
+    if (repair.partsAllocationLegacy) {
+      // This remains a user-created legacy order. Keep the pre-Task166F
+      // parts-status synchronization, but never derive allocation work from it.
+      const activeOrders = await tx.orderRequest.findMany({
+        where: { repairId: normalizedRepairId, status: { in: ["pending", "ordered", "received"] } },
+        select: { status: true },
+      });
+      const nextStatus = getRepairStatusFromOrderStatuses(
+        activeOrders.map(order => order.status as RepairPartsOrderStatus),
+      );
+      if (nextStatus && nextStatus !== repair.status && canApplyPartsOrderStatus(repair.status)) {
+        await tx.repair.update({ where: { id: normalizedRepairId }, data: { status: nextStatus } });
+      }
+    } else {
+      await reconcileRepairPartAllocations(tx, normalizedRepairId);
+    }
     const order = await tx.orderRequest.findUniqueOrThrow({
       where: { id: pending.id },
       include: {

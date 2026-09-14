@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import test from "node:test";
 import {
     getRepairPartAllocationPlan,
     getRequiredAllocationForReceivedOrder,
     canAllocateRepairParts,
+    shouldReconcileRepairPartAllocations,
     shouldAllocateForOrderStatus,
+    shouldReceiveOrderIntoStock,
 } from "./repair-part-allocation";
 
 test("stock 2 / required 1 reserves exactly one", () => {
@@ -101,4 +105,47 @@ test("pre-allocation B2B statuses remain ineligible while work phases remain eli
         approvalStatus: null,
         customerType: "business",
     }), true);
+});
+
+test("legacy ordered -> received adds stock once without entering allocation", () => {
+    assert.equal(shouldReceiveOrderIntoStock("ordered", "received"), true);
+    assert.equal(shouldReconcileRepairPartAllocations(true), false);
+});
+
+test("legacy re-saving received does not add stock twice", () => {
+    assert.equal(shouldReceiveOrderIntoStock("received", "received"), false);
+});
+
+test("legacy received -> assigned preserves the status flow without allocation", () => {
+    assert.equal(shouldAllocateForOrderStatus("assigned"), true);
+    assert.equal(shouldReconcileRepairPartAllocations(true), false);
+});
+
+test("non-legacy repairs retain the Task166F allocation path", () => {
+    assert.equal(shouldReconcileRepairPartAllocations(false), true);
+    assert.equal(shouldReceiveOrderIntoStock("ordered", "received"), true);
+    assert.deepEqual(getRepairPartAllocationPlan({ requiredQuantity: 1, reservedQuantity: 0, availableStock: 1 }), {
+        reserveQuantity: 1, releaseQuantity: 0, nextReservedQuantity: 1, orderShortage: 0,
+    });
+});
+
+test("legacy guard migration marks existing repairs without touching allocation data", () => {
+    const sql = readFileSync(
+        resolve(process.cwd(), "prisma/migrations/20260914_add_repair_parts_allocation_legacy_guard/migration.sql"),
+        "utf8",
+    );
+
+    assert.match(sql, /ADD COLUMN "partsAllocationLegacy" BOOLEAN NOT NULL DEFAULT true/);
+    assert.doesNotMatch(sql, /UPDATE[\s\S]*"Repair"/);
+    assert.doesNotMatch(sql, /"PartsMaster"|"OrderRequest"|"RepairPartAllocation"|"RepairStatusLog"/);
+});
+
+test("Task166F-aware Repair creation opts out of the fail-safe legacy default", () => {
+    const schema = readFileSync(resolve(process.cwd(), "prisma/schema.prisma"), "utf8");
+    const repairCreateRoute = readFileSync(resolve(process.cwd(), "src/app/api/repairs/route.ts"), "utf8");
+    const repairIntake = readFileSync(resolve(process.cwd(), "src/lib/repair-intake.ts"), "utf8");
+
+    assert.match(schema, /partsAllocationLegacy\s+Boolean\s+@default\(true\)/);
+    assert.match(repairCreateRoute, /partsAllocationLegacy:\s*false/);
+    assert.match(repairIntake, /partsAllocationLegacy:\s*false/);
 });

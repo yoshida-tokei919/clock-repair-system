@@ -443,6 +443,8 @@ export async function submitRepairIntake(token: string, payload: unknown) {
           watchId: watch.id,
           repairIntakeInviteId: invite.id,
           status: REPAIR_INTAKE_STATUS,
+          // This intake path is Task166F-aware, so it opts into allocation.
+          partsAllocationLegacy: false,
           receptionDate: null,
           ...returnAddressSnapshotData(returnAddressInput),
         },

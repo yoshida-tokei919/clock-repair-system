@@ -246,6 +246,9 @@ model Repair {
   receptionDate        DateTime? @default(now())
   status               String    // 'reception', 'diagnosing', etc.
   approvalStatus       String    @default("pending")
+  // Default safely excludes repairs until a Task166F-aware creation path
+  // explicitly opts them into allocation management.
+  partsAllocationLegacy Boolean  @default(true)
   approvalDate         DateTime?
   returnRecipientName  String?
   returnPostalCode     String?
