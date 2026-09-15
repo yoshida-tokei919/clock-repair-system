@@ -131,6 +131,7 @@ export default async function CustomerInvoicePage({
   const pdfHref = `/customer/invoices/${token}/invoice.pdf`;
   const billingMonth = formatBillingMonth(tokenRow.billingMonth, deliveryGroups);
   const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
+  const isPaid = paymentSummary.outstandingBalance === 0;
   const canPayOnline = invoice.customer.type === "individual"
     && invoice.status === "issued"
     && paymentSummary.outstandingBalance > 0;
@@ -145,12 +146,12 @@ export default async function CustomerInvoicePage({
           <p className="mt-2 text-sm text-slate-600">請求書の内容をご確認ください。</p>
         </header>
 
-        {checkoutState === "success" ? (
+        {(!isPaid || invoice.customer.type === "business") && checkoutState === "success" ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
             決済結果を確認しています。お支払い済みの表示への更新には少し時間がかかる場合があります。
           </div>
         ) : null}
-        {checkoutState === "cancel" ? (
+        {(!isPaid || invoice.customer.type === "business") && checkoutState === "cancel" ? (
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             お支払いは完了していません。ご都合のよいときに、あらためてお手続きください。
           </div>
@@ -190,7 +191,7 @@ export default async function CustomerInvoicePage({
           </dl>
         </section>
 
-        {invoice.customer.type === "individual" ? (
+        {invoice.customer.type === "individual" && !isPaid ? (
           <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
             <h2 className="text-base font-bold text-slate-900">銀行振込のご案内</h2>
             <dl className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3 text-sm">
@@ -242,7 +243,7 @@ export default async function CustomerInvoicePage({
                   ))}
                 </div>
               </>
-            ) : paymentSummary.outstandingBalance === 0 ? (
+            ) : isPaid ? (
               <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
                 お支払い済みです。
               </p>
@@ -266,7 +267,7 @@ export default async function CustomerInvoicePage({
                       <p className="mt-1 font-semibold text-slate-900">{repair.inquiryNumber}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-bold text-slate-500">修理料金</p>
+                      <p className="text-xs font-bold text-slate-500">修理料金（税抜）</p>
                       <p className="mt-1 font-mono font-bold text-blue-700">{formatCurrency(repair.subtotalAmount)}</p>
                     </div>
                   </div>

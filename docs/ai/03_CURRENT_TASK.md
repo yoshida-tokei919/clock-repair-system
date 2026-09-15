@@ -2,33 +2,30 @@
 
 ## 現在Task
 
-Task169M: in progress
+Task171: in progress
 
 ## 目的
 
-B2C請求共有ページを個人顧客向けに整理し、Stripe Hosted Checkoutのsandbox/test modeを接続する。
+Stripe決済状態を業務UIへ連動し、管理側で支払状況を確認・運用できるMVPを整える。
 
-## Task境界
+## 前Task
 
-- B2C共有画面のみ整理
-- B2B共有画面は変更しない
-- Invoice.grossTotalAmountを支払額の正本とする
-- Stripe Hosted Checkoutを使用
-- Payment / PaymentAllocation / PaymentAttemptを既存schemaで使用
-- success URLだけではSUCCEEDEDにしない
-- WebhookはTask170
-- PayPayはまだ実装しない
-- schema / migrationは原則変更しない
+Task170: 完了
+
+確認済み:
+
+- Stripe Checkout sandbox決済成功
+- checkout.session.completed Webhook受信
+- HTTP 200
+- Payment = SUCCEEDED
+- PaymentAttempt = SUCCEEDED
+- paidAt保存
+- paymentIntentId保存
+- B2C共有画面で「お支払い済みです」表示
+- 支払済み時はオンライン決済・銀行振込案内を非表示
+
+Production: pending
 
 ## 次Task
 
-Task170: Stripe Webhook
-
-## 対象外
-
-- Webhook
-- refund
-- partial payment UI
-- B2B決済UI
-- PayPay
-- Stripe production化
+Task171: 決済UI・業務連動
