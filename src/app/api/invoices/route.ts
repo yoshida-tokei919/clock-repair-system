@@ -5,6 +5,7 @@ import {
     calculateInvoiceRepairSubtotal,
 } from "@/lib/invoice-repair-snapshots";
 import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/lib/invoice-numbering";
+import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/invoices — 請求書一覧
@@ -12,12 +13,31 @@ export async function GET() {
     const invoices = await prisma.invoice.findMany({
         orderBy: { issuedDate: "desc" },
         include: {
-            customer: { select: { id: true, name: true, companyName: true } },
+            customer: { select: { id: true, name: true, companyName: true, type: true } },
             repairs: { select: { id: true } },
+            paymentAllocations: {
+                select: {
+                    allocatedAmount: true,
+                    payment: { select: { status: true } },
+                },
+            },
         },
     });
 
-    return NextResponse.json(invoices);
+    return NextResponse.json(invoices.map((invoice) => {
+        if (invoice.customer.type !== "individual") return invoice;
+
+        const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
+        const paymentStatus = invoice.status === "void" || invoice.status === "canceled"
+            ? "void"
+            : paymentSummary.outstandingBalance <= 0
+                ? "paid"
+                : invoice.paymentAllocations.some(({ payment }) => payment.status === "PENDING")
+                    ? "pending"
+                    : "unpaid";
+
+        return { ...invoice, paymentStatus };
+    }));
 }
 
 // POST /api/invoices — 新規請求書作成（月次合算）

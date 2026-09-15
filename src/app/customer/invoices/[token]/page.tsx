@@ -31,6 +31,13 @@ function formatCurrency(amount: number) {
   return `¥${amount.toLocaleString()}`;
 }
 
+function paymentMethodLabel(payment: { provider: string; method: string | null } | undefined) {
+  if (payment?.provider === "STRIPE" && payment.method === "CARD") return "カード";
+  if (payment?.provider === "STRIPE" && payment.method === "PAYPAY") return "PayPay";
+  if (payment?.provider === "MANUAL" && payment.method === "BANK_TRANSFER") return "銀行振込";
+  return "—";
+}
+
 function formatBillingMonth(billingMonth: string | null, deliveryGroups: DeliveryGroup[]) {
   if (billingMonth) {
     const match = billingMonth.match(/^(\d{4})-(\d{1,2})$/);
@@ -89,7 +96,10 @@ function findInvoiceForSharePage(invoiceId: number) {
       customer: true,
       repairSnapshots: true,
       paymentAllocations: {
-        select: { allocatedAmount: true, payment: { select: { status: true } } },
+        select: {
+          allocatedAmount: true,
+          payment: { select: { status: true, provider: true, method: true, paidAt: true } },
+        },
       },
     },
   });
@@ -132,6 +142,10 @@ export default async function CustomerInvoicePage({
   const billingMonth = formatBillingMonth(tokenRow.billingMonth, deliveryGroups);
   const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
   const isPaid = paymentSummary.outstandingBalance === 0;
+  const latestSucceededPayment = invoice.paymentAllocations
+    .filter(({ payment }) => payment.status === "SUCCEEDED")
+    .map(({ payment }) => payment)
+    .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0))[0];
   const canPayOnline = invoice.customer.type === "individual"
     && invoice.status === "issued"
     && paymentSummary.outstandingBalance > 0;
@@ -218,7 +232,7 @@ export default async function CustomerInvoicePage({
 
         {invoice.customer.type === "individual" ? (
           <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-            <h2 className="text-base font-bold text-slate-900">オンライン決済</h2>
+            <h2 className="text-base font-bold text-slate-900">お支払い状況</h2>
             {canPayOnline ? (
               <>
                 <p className="mt-3 text-sm text-slate-600">
@@ -244,9 +258,19 @@ export default async function CustomerInvoicePage({
                 </div>
               </>
             ) : isPaid ? (
-              <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
-                お支払い済みです。
-              </p>
+              <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+                <p className="font-semibold">お支払い済みです。</p>
+                <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-bold text-emerald-700">お支払い額（税込）</dt>
+                    <dd className="mt-1 font-semibold">{formatCurrency(invoice.grossTotalAmount)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-bold text-emerald-700">支払方法</dt>
+                    <dd className="mt-1 font-semibold">{paymentMethodLabel(latestSucceededPayment)}</dd>
+                  </div>
+                </dl>
+              </div>
             ) : (
               <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
                 現在、この請求ではオンライン決済をご利用いただけません。

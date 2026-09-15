@@ -28,7 +28,9 @@ type Invoice = {
     issuedDate: string;
     totalAmount: number;
     taxAmount: number;
+    grossTotalAmount: number;
     status: string;
+    paymentStatus?: "paid" | "pending" | "unpaid" | "void";
     paymentDueDate: string | null;
     customer: { id: number; name: string; companyName: string | null };
     repairs: { id: number }[];
@@ -49,13 +51,15 @@ function fmtDate(iso: string) {
 
 function invoiceStatusLabel(status: string) {
     if (status === "paid") return "入金済み";
-    if (status === "void") return "取消済み";
+    if (status === "pending") return "決済処理中";
+    if (status === "void" || status === "canceled") return "取消済み";
     return "未入金";
 }
 
 function invoiceStatusClass(status: string) {
     if (status === "paid") return "bg-green-100 text-green-700";
-    if (status === "void") return "bg-red-100 text-red-700";
+    if (status === "pending") return "bg-blue-100 text-blue-700";
+    if (status === "void" || status === "canceled") return "bg-red-100 text-red-700";
     return "bg-yellow-100 text-yellow-700";
 }
 
@@ -191,16 +195,16 @@ export default function InvoicesPage() {
                                                 </span>
                                             </div>
                                             <span
-                                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${invoiceStatusClass(inv.status)}`}
+                                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${invoiceStatusClass(inv.paymentStatus ?? inv.status)}`}
                                             >
-                                                {invoiceStatusLabel(inv.status)}
+                                                {invoiceStatusLabel(inv.paymentStatus ?? inv.status)}
                                             </span>
                                         </div>
                                         <div className="mt-2 flex gap-4 text-xs text-gray-500">
                                             <span>発行: {fmtDate(inv.issuedDate)}</span>
                                             <span>修理 {inv.repairs.length}件</span>
                                             <span className="font-semibold text-gray-700">
-                                                ¥{(inv.totalAmount + inv.taxAmount).toLocaleString()}
+                                                ¥{inv.grossTotalAmount.toLocaleString()}
                                             </span>
                                         </div>
                                     </Link>

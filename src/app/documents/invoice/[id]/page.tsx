@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { InvoicePdfActions } from "@/components/invoices/InvoicePdfActions";
+import { InvoicePaymentSummary } from "@/components/invoices/InvoicePaymentSummary";
+import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 export const dynamic = "force-dynamic";
 
 function formatPdfGeneratedAt(date: Date) {
@@ -22,10 +24,42 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
         where: { id },
         include: {
             customer: true,
+            paymentAllocations: {
+                select: {
+                    allocatedAmount: true,
+                    payment: { select: { provider: true, method: true, status: true, paidAt: true } },
+                },
+            },
         },
     });
 
     if (!invoice) return notFound();
+
+    const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
+    const paymentStatus = invoice.status === "void" || invoice.status === "canceled"
+        ? "void"
+        : paymentSummary.outstandingBalance <= 0
+            ? "paid"
+            : invoice.paymentAllocations.some(({ payment }) => payment.status === "PENDING")
+                ? "pending"
+                : "unpaid";
+    const latestSucceededPayment = invoice.paymentAllocations
+        .filter(({ payment }) => payment.status === "SUCCEEDED")
+        .map(({ payment }) => payment)
+        .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0))[0] ?? null;
+    const paymentSummaryPanel = (
+        <InvoicePaymentSummary
+            invoiceId={invoice.id}
+            customerType={invoice.customer.type}
+            invoiceStatus={invoice.status}
+            paymentStatus={paymentStatus}
+            grossTotalAmount={invoice.grossTotalAmount}
+            paidAmount={paymentSummary.paidAmount}
+            outstandingBalance={paymentSummary.outstandingBalance}
+            latestSucceededPayment={latestSucceededPayment}
+        />
+    );
+    const canVoidInvoice = invoice.status === "issued" && invoice.paymentAllocations.length === 0;
 
     const [currentPdfFile] = await prisma.$queryRaw<{
         id: number;
@@ -60,7 +94,7 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
                                 保存済みPDFを表示しています。管理画面と共有画面は同じPDFファイルを参照します。
                             </p>
                         </div>
-                        <InvoicePdfActions invoiceId={invoice.id} hasPdf={true} invoiceStatus={invoice.status} />
+                        <InvoicePdfActions invoiceId={invoice.id} hasPdf={true} canVoidInvoice={canVoidInvoice} />
                     </div>
                     {invoice.status === "void" ? (
                         <div className="mt-3 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -68,6 +102,7 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
                             <p className="mt-1">紐づいていた納品書は未請求状態に戻されています。</p>
                         </div>
                     ) : null}
+                    {paymentSummaryPanel}
                     <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600">
                         <div className="flex gap-1">
                             <dt className="font-medium text-slate-800">version:</dt>
@@ -106,7 +141,7 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
                     管理画面と共有画面で同じPDFを表示するため、先に請求書PDFを生成してください。
                 </p>
                 <div className="mt-4">
-                    <InvoicePdfActions invoiceId={invoice.id} hasPdf={false} invoiceStatus={invoice.status} />
+                    <InvoicePdfActions invoiceId={invoice.id} hasPdf={false} canVoidInvoice={canVoidInvoice} />
                 </div>
                 {invoice.status === "void" ? (
                     <div className="mt-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -114,6 +149,7 @@ export default async function InvoiceDocumentPage({ params }: { params: { id: st
                         <p className="mt-1">紐づいていた納品書は未請求状態に戻されています。</p>
                     </div>
                 ) : null}
+                {paymentSummaryPanel}
             </div>
         </div>
     );

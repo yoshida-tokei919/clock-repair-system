@@ -6,17 +6,15 @@ import { useRouter } from "next/navigation";
 type InvoicePdfActionsProps = {
   invoiceId: number;
   hasPdf: boolean;
-  invoiceStatus?: string;
+  canVoidInvoice: boolean;
 };
 
-export function InvoicePdfActions({ invoiceId, hasPdf, invoiceStatus }: InvoicePdfActionsProps) {
+export function InvoicePdfActions({ invoiceId, hasPdf, canVoidInvoice }: InvoicePdfActionsProps) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSendingLine, setIsSendingLine] = useState(false);
   const [isVoiding, setIsVoiding] = useState(false);
-
-  const canVoidInvoice = invoiceStatus !== "paid" && invoiceStatus !== "void";
 
   async function generatePdf() {
     setMessage(null);
