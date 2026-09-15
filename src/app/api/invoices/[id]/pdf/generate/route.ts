@@ -89,6 +89,25 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
       amount: group.amount,
     }));
 
+  const repairsById = new Map(invoice.repairs.map((repair) => [repair.id, repair]));
+  const b2cJobs = rows.map((row) => {
+    const repair = repairsById.get(row.repairId);
+    return {
+      inquiryNumber: row.inquiryNumber,
+      watch: {
+        brand: repair?.watch.brand.name ?? "",
+        model: repair?.watch.model?.name ?? repair?.watch.modelNameInput ?? "",
+        ref: repair?.watch.reference?.name ?? undefined,
+        serial: repair?.watch.serialNumber ?? undefined,
+      },
+      workDescriptions: (repair?.estimate?.items ?? []).map(
+        (item) => item.b2cDisplayNameSnapshot || item.itemName,
+      ),
+      // The issued snapshot is authoritative; do not derive an amount from estimate items.
+      amount: row.subtotalAmount,
+    };
+  });
+
   return {
     invoiceNumber: invoice.invoiceNumber,
     date: invoice.issuedDate.toLocaleDateString("ja-JP"),
@@ -96,12 +115,15 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     customer: {
       name: invoice.customer.name,
       address: invoice.customer.address || undefined,
+      type: invoice.customer.type,
     },
     items: invoiceItems,
     taxRate: 0.1,
     subtotalAmount: invoice.totalAmount,
     taxAmount: invoice.taxAmount,
+    grossTotalAmount: invoice.grossTotalAmount,
     bankInfo: "三井住友銀行　店番411\n普通 3602468\nヨシダ シュウヘイ",
+    b2cJobs,
   } satisfies InvoiceDocumentProps["data"];
 }
 
@@ -111,6 +133,12 @@ function findInvoiceForPdf(invoiceId: number) {
     include: {
       customer: true,
       repairSnapshots: true,
+      repairs: {
+        include: {
+          watch: { include: { brand: true, model: true, reference: true } },
+          estimate: { include: { items: true } },
+        },
+      },
     },
   });
 }

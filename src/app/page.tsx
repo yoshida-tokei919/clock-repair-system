@@ -36,7 +36,7 @@ a { text-decoration: none; color: inherit; transition: 0.3s; }
 header {
     background-color: var(--white);
     border-bottom: 1px solid var(--gray);
-    padding: 10px 0;
+    padding: 0;
     position: fixed;
     width: 100%;
     top: 0;
@@ -51,13 +51,10 @@ header {
     padding: 0 20px;
 }
 
-.logo-wrapper { display: flex; align-items: center; gap: 15px; }
-.logo-img { height: 80px; width: auto; display: block; } 
-.site-name { font-size: 1.5rem; color: var(--primary-color); font-weight: 600; }
+.logo-wrapper { display: flex; align-items: center; gap: 22px; }
+.logo-img { height: 115px; width: auto; display: block; }
+.site-name { font-size: 2.16rem; color: var(--primary-color); font-weight: 600; }
 
-nav ul { list-style: none; display: flex; gap: 18px; padding: 0; margin: 0;}
-nav a { color: var(--text-color); font-size: 0.9rem; font-weight: 500; }
-nav a:hover { color: var(--accent-color); }
 .header-line-link {
     display: inline-flex;
     align-items: center;
@@ -94,6 +91,9 @@ nav a:hover { color: var(--accent-color); }
     font-size: 0.84rem;
     font-weight: 800;
 }
+
+.payment-logo-list { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
+.payment-logo { display: block; width: auto; height: 28px; max-width: 112px; object-fit: contain; }
 
 /* トップページ（背景画像ヒーロー） */
 .hero {
@@ -146,9 +146,10 @@ nav a:hover { color: var(--accent-color); }
 }
 .hero-actions {
     display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     justify-content: flex-start;
-    flex-wrap: wrap;
-    gap: 14px;
+    gap: 12px;
     margin-top: 34px;
 }
 .btn {
@@ -170,6 +171,19 @@ nav a:hover { color: var(--accent-color); }
     font-size: 0.98rem;
     box-shadow: none;
 }
+.hero .header-line-link {
+    min-width: 235px;
+    min-height: 58px;
+    box-sizing: border-box;
+    justify-content: center;
+    gap: 12px;
+    padding: 14px 24px;
+}
+.hero .header-line-icon { width: 28px; height: 28px; }
+.hero .header-line-text-small { font-size: 0.86rem; }
+.hero .header-line-text-main { font-size: 1rem; }
+.hero-secondary-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.hero-secondary-actions .hero-case-btn { min-width: 220px; padding: 17px 30px; font-size: 1.05rem; }
 .hero-case-btn {
     background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
@@ -622,28 +636,31 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
 
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
-    header { padding: 6px 0; }
-    .nav-container { flex-direction: column; align-items: flex-start; padding: 8px 14px 6px; }
-    .logo-wrapper { gap: 10px; }
-    .logo-img { height: 44px; }
-    .site-name { font-size: 1rem; }
-    nav {
-        width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+    header { padding: 3px 0; }
+    .nav-container { flex-direction: column; align-items: flex-start; padding: 3px 14px 2px; }
+    .logo-wrapper { gap: 13px; }
+    .logo-img { height: 58px; }
+    .site-name { font-size: 1.32rem; }
+    .payment-logo-list { width: 100%; justify-content: flex-start; gap: 9px; margin-top: 4px; }
+    .payment-logo {
+        height: 21px;
+        max-width: 62px;
     }
-    nav::-webkit-scrollbar { display: none; }
-    nav ul {
-        flex-wrap: nowrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-top: 8px;
-        width: 100%;
+    .hero {
+        min-height: 560px;
+        margin-top: 116px;
+        background-position: center;
     }
-    nav li { flex: 0 0 auto; }
-    nav a { white-space: nowrap; font-size: 0.82rem; }
+    .hero-inner { padding: 64px 20px 58px; }
+    .hero-title { font-size: 2.35rem; }
+    .hero-lead { font-size: 0.95rem; line-height: 1.9; }
+    .hero-actions { align-items: flex-start; }
+    .hero .header-line-link {
+        width: 100%;
+        min-width: 0;
+        min-height: 60px;
+        padding: 14px 24px;
+    }
     .header-line-link {
         padding: 6px 9px;
         gap: 6px;
@@ -658,15 +675,9 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     .header-line-text-main {
         font-size: 0.78rem;
     }
-    .hero {
-        min-height: 560px;
-        margin-top: 116px;
-        background-position: center;
-    }
-    .hero-inner { padding: 64px 20px 58px; }
-    .hero-title { font-size: 2.35rem; }
-    .hero-lead { font-size: 0.95rem; line-height: 1.9; }
-    .hero-actions { flex-direction: column; align-items: stretch; }
+    .hero-secondary-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 9px; }
+    .hero-secondary-actions .hero-case-btn { min-width: 0; padding: 12px 10px; font-size: 0.92rem; }
+    .hero-secondary-actions .hero-case-btn:last-child { grid-column: 1 / -1; }
     .hero .btn { width: 100%; box-sizing: border-box; }
     .section { padding: 60px 20px; }
     .strengths-section {
@@ -760,13 +771,14 @@ const HTML_HEADER = `
             <img src="/img/logo.png" alt="ヨシダ時計修理工房 ロゴ" class="logo-img">
             <span class="site-name">ヨシダ時計修理工房</span>
         </a>
-        <nav>
-            <ul>
-                <li><a href="#flow">修理の流れ</a></li>
-                <li><a href="https://lin.ee/3C0XfJW" class="header-line-link"><img src="/img/line-brand-icon.png" alt="" aria-hidden="true" class="header-line-icon"><span class="header-line-text"><span class="header-line-text-small">LINEで相談</span><span class="header-line-text-main">簡単見積り</span></span></a></li>
-                <li><a href="/cases/biz" style="color:#b59410; font-weight:bold; border:1px solid #b59410; padding:5px 10px; border-radius:4px;">業者様はこちら</a></li>
-            </ul>
-        </nav>
+        <div class="payment-logo-list" aria-label="利用可能な決済ブランド">
+            <img src="/img/payment-logos/visa.svg" alt="Visa" class="payment-logo">
+            <img src="/img/payment-logos/mastercard.svg" alt="Mastercard" class="payment-logo">
+            <img src="/img/payment-logos/jcb.svg" alt="JCB" class="payment-logo">
+            <img src="/img/payment-logos/american-express.svg" alt="American Express" class="payment-logo">
+            <img src="/img/payment-logos/apple-pay.svg" alt="Apple Pay" class="payment-logo">
+            <img src="/img/payment-logos/google-pay.svg" alt="Google Pay" class="payment-logo">
+        </div>
     </div>
 </header>
 `;
@@ -1064,7 +1076,12 @@ export default async function TopPage() {
                         {"LINE\u3067\u6642\u8a08\u306e\u5199\u771f\u3084\u3001\u5206\u304b\u308b\u7bc4\u56f2\u306e\u60c5\u5831\u3092\u78ba\u8a8d\u3057\u306a\u304c\u3089\u3001\u53d7\u4ed8\u524d\u306b\u3067\u304d\u308b\u9650\u308a\u73fe\u5b9f\u306b\u8fd1\u3044\u6982\u7b97\u3092\u3054\u6848\u5185\u3057\u307e\u3059\u3002"}
                     </p>
                     <div className="hero-actions">
-                        <Link href="/cases/gallery" className="btn hero-case-btn">{"\u4fee\u7406\u4e8b\u4f8b\u3092\u691c\u7d22\u3059\u308b"}</Link>
+                        <a href="https://lin.ee/3C0XfJW" className="header-line-link"><img src="/img/line-brand-icon.png" alt="" aria-hidden="true" className="header-line-icon" /><span className="header-line-text"><span className="header-line-text-small">LINEで相談</span><span className="header-line-text-main">簡単見積り</span></span></a>
+                        <div className="hero-secondary-actions">
+                            <Link href="/cases/gallery" className="btn hero-case-btn">修理事例を探す</Link>
+                            <a href="#flow" className="btn hero-case-btn">修理の流れを見る</a>
+                            <Link href="/cases/biz" className="btn hero-case-btn">業者様はこちら</Link>
+                        </div>
                     </div>
                 </div>
             </section>
