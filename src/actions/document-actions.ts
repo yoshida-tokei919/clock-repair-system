@@ -6,14 +6,16 @@ import {
     calculateIssuedInvoiceAmounts,
     calculateInvoiceRepairSubtotal,
 } from "@/lib/invoice-repair-snapshots";
+import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/lib/invoice-numbering";
 import { revalidatePath } from "next/cache";
 
 export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty') {
     try {
         if (repairIds.length === 0) return { success: false, error: "No repairs selected" };
 
+        const uniqueRepairIds = Array.from(new Set(repairIds));
         const repairs = await prisma.repair.findMany({
-            where: { id: { in: repairIds } },
+            where: { id: { in: uniqueRepairIds } },
             include: {
                 customer: true,
                 estimate: { include: { items: true } },
@@ -22,6 +24,18 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
         });
 
         if (repairs.length === 0) return { success: false, error: "Repairs not found" };
+        if (type === "invoice" && repairs.length !== uniqueRepairIds.length) {
+            return { success: false, error: "請求対象の案件を確認してください" };
+        }
+        if (type === "invoice") {
+            const invoicedRepairs = repairs.filter((repair) => repair.invoiceId !== null);
+            if (invoicedRepairs.length > 0) {
+                return {
+                    success: false,
+                    error: `請求済みの案件が含まれています: ${invoicedRepairs.map((repair) => repair.inquiryNumber).join("、")}`,
+                };
+            }
+        }
 
         const repairsByCustomer: Record<number, typeof repairs> = {};
         for (const r of repairs) {
@@ -75,27 +89,34 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 await prisma.customer.update({ where: { id: customerId }, data: { seqDelivery: seq } });
                 documentId = note.id;
             } else if (type === 'invoice') {
-                if (customerRepairs.some(r => r.invoiceId !== null)) {
-                    throw new Error("発行済み請求書のある案件は再請求できません");
+                const isB2C = customer.type === "individual";
+                if (!isB2C) {
+                    const lastInvoice = await prisma.invoice.findFirst({
+                        where: { invoiceNumber: { startsWith: prefix } },
+                        orderBy: { id: 'desc' }
+                    });
+                    seq = lastInvoice
+                        ? (parseInt(lastInvoice.invoiceNumber.replace(/\D/g, '') || '0', 10) + 1)
+                        : 1;
+                    docNumber = `${prefix}I-${String(seq).padStart(3, '0')}`;
                 }
-                const lastInvoice = await prisma.invoice.findFirst({
-                    where: { invoiceNumber: { startsWith: prefix } },
-                    orderBy: { id: 'desc' }
-                });
-                seq = lastInvoice
-                    ? (parseInt(lastInvoice.invoiceNumber.replace(/\D/g, '') || '0', 10) + 1)
-                    : 1;
-                docNumber = `${prefix}I-${String(seq).padStart(3, '0')}`;
-
-                // Default Due Date: End of next month
-                const dueDate = new Date();
-                dueDate.setMonth(dueDate.getMonth() + 2);
-                dueDate.setDate(0);
 
                 const invoice = await prisma.$transaction(async (tx) => {
+                  const invoiceNumber = isB2C
+                    ? await getNextB2CInvoiceNumberForTransaction(tx)
+                    : docNumber;
+                  const invoiceSeq = isB2C
+                    ? Number.parseInt(invoiceNumber.slice(3), 10)
+                    : seq;
+                  const dueDate = isB2C ? getB2CPaymentDueDate() : (() => {
+                    const date = new Date();
+                    date.setMonth(date.getMonth() + 2);
+                    date.setDate(0);
+                    return date;
+                  })();
                   const created = await tx.invoice.create({
                     data: {
-                        invoiceNumber: docNumber,
+                        invoiceNumber,
                         customerId: customerId,
                         ...calculateIssuedInvoiceAmounts(totalAmount),
                         paymentDueDate: dueDate,
@@ -109,7 +130,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                   if (claimed.count !== customerRepairs.length) {
                     throw new Error("請求対象が変更されました。再読み込みしてください");
                   }
-                  await tx.customer.update({ where: { id: customerId }, data: { seqInvoice: seq } });
+                  await tx.customer.update({ where: { id: customerId }, data: { seqInvoice: invoiceSeq } });
                   return created;
                 });
                 documentId = invoice.id;

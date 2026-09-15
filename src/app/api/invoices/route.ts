@@ -4,6 +4,7 @@ import {
     calculateIssuedInvoiceAmounts,
     calculateInvoiceRepairSubtotal,
 } from "@/lib/invoice-repair-snapshots";
+import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/lib/invoice-numbering";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/invoices — 請求書一覧
@@ -38,9 +39,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "取引先が見つかりません" }, { status: 404 });
     }
 
-    const prefix = customer.prefix || "C";
-    const newSeq = customer.seqInvoice + 1;
-    const invoiceNumber = `${prefix}I-${String(newSeq).padStart(3, "0")}`;
+    const isB2C = customer.type === "individual";
 
     // 対象修理の合計金額を計算
     const uniqueRepairIds = Array.from(new Set(repairIds));
@@ -66,12 +65,25 @@ export async function POST(req: NextRequest) {
 
     // トランザクションで請求書作成・修理紐付け・SEQ更新
     const invoice = await prisma.$transaction(async (tx) => {
+        let newSeq: number;
+        let invoiceNumber: string;
+
+        if (isB2C) {
+            invoiceNumber = await getNextB2CInvoiceNumberForTransaction(tx);
+            newSeq = Number.parseInt(invoiceNumber.slice(3), 10);
+        } else {
+            // Keep the existing B2B per-customer numbering behavior unchanged.
+            const prefix = customer.prefix || "C";
+            newSeq = customer.seqInvoice + 1;
+            invoiceNumber = `${prefix}I-${String(newSeq).padStart(3, "0")}`;
+        }
+
         const created = await tx.invoice.create({
             data: {
                 invoiceNumber,
                 customerId,
                 ...amounts,
-                paymentDueDate: paymentDueDate ? new Date(paymentDueDate) : null,
+                paymentDueDate: isB2C ? getB2CPaymentDueDate() : paymentDueDate ? new Date(paymentDueDate) : null,
                 repairSnapshots: { create: buildInvoiceRepairSnapshotData(repairs) },
             },
         });

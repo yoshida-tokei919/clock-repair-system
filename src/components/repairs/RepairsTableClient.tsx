@@ -67,7 +67,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         );
     };
 
-    const handleBulkAction = async (type: "delivery" | "estimate") => {
+    const handleBulkAction = async (type: "delivery" | "estimate" | "invoice") => {
         if (selectedIds.length === 0) return;
         setIsGenerating(true);
         try {
@@ -77,9 +77,10 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     title: "作成完了",
                     description: `${result.count}件のドキュメントを作成しました。`,
                 });
-                if (result.documentId) {
+                if (result.count === 1 && result.documentId) {
                     if (type === "delivery") router.push(`/documents/delivery/${result.documentId}`);
                     if (type === "estimate") router.push(`/documents/estimate/${result.documentId}`);
+                    if (type === "invoice") router.push(`/documents/invoice/${result.documentId}`);
                 } else {
                     router.refresh();
                 }
@@ -133,6 +134,10 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     <Button size="sm" variant="outline" onClick={() => handleBulkAction("delivery")} disabled={isGenerating}>
                         <Truck className="mr-2 h-4 w-4" />
                         納品書作成
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleBulkAction("invoice")} disabled={isGenerating}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        請求書作成
                     </Button>
                 </div>
             )}
