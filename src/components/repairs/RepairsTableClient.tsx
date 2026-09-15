@@ -258,9 +258,9 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">
-                                        <div className="text-xs text-slate-400">受: {repair.receptionDate?.toLocaleDateString("ja-JP") || "-"}</div>
+                                        <div className="text-xs text-slate-400">受: {repair.receptionDate?.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) || "-"}</div>
                                         {repair.approvalDate && (
-                                            <div className="text-sm font-bold text-blue-600">承: {repair.approvalDate.toLocaleDateString("ja-JP")}</div>
+                                            <div className="text-sm font-bold text-blue-600">承: {repair.approvalDate.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>
                                         )}
                                         <div className="flex gap-1 mt-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
                                             {(repair as any).estimateDocument && (
@@ -304,7 +304,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     {activeMessage && (
                         <div className="space-y-3">
                             <div className="text-xs text-slate-500">
-                                {activeMessage.inquiryNumber} / {activeMessage.createdAt.toLocaleString("ja-JP")}
+                                {activeMessage.inquiryNumber} / {activeMessage.createdAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
                             </div>
                             <div className="whitespace-pre-wrap rounded border bg-slate-50 p-3 text-sm">
                                 {activeMessage.body}
