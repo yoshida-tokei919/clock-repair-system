@@ -2,14 +2,11 @@ import "server-only";
 
 import crypto from "crypto";
 
+export { buildInvoicePdfStorageKey } from "@/lib/invoice-pdf-storage-key";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 const DOCUMENTS_BUCKET = "documents";
 const PDF_CONTENT_TYPE = "application/pdf";
-
-export function buildInvoicePdfStorageKey(invoiceId: number, pdfFileId: number): string {
-  return `invoices/${invoiceId}/${pdfFileId}.pdf`;
-}
 
 export async function uploadInvoicePdf(
   storageKey: string,
