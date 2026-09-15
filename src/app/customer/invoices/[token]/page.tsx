@@ -1,6 +1,8 @@
 import { hasConsistentInvoiceSnapshots } from "@/lib/invoice-repair-snapshots";
 import { notFound } from "next/navigation";
 
+import { InvoiceCheckoutButton } from "@/components/customer/InvoiceCheckoutButton";
+import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -86,11 +88,20 @@ function findInvoiceForSharePage(invoiceId: number) {
     include: {
       customer: true,
       repairSnapshots: true,
+      paymentAllocations: {
+        select: { allocatedAmount: true, payment: { select: { status: true } } },
+      },
     },
   });
 }
 
-export default async function CustomerInvoicePage({ params }: { params: { token: string } }) {
+export default async function CustomerInvoicePage({
+  params,
+  searchParams,
+}: {
+  params: { token: string };
+  searchParams?: { checkout?: string };
+}) {
   const token = params.token?.trim();
   if (!token) return notFound();
 
@@ -119,6 +130,11 @@ export default async function CustomerInvoicePage({ params }: { params: { token:
       : invoice.customer.name;
   const pdfHref = `/customer/invoices/${token}/invoice.pdf`;
   const billingMonth = formatBillingMonth(tokenRow.billingMonth, deliveryGroups);
+  const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
+  const canPayOnline = invoice.customer.type === "individual"
+    && invoice.status === "issued"
+    && paymentSummary.outstandingBalance > 0;
+  const checkoutState = searchParams?.checkout;
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
@@ -129,6 +145,17 @@ export default async function CustomerInvoicePage({ params }: { params: { token:
           <p className="mt-2 text-sm text-slate-600">請求書の内容をご確認ください。</p>
         </header>
 
+        {checkoutState === "success" ? (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            決済結果を確認しています。お支払い済みの表示への更新には少し時間がかかる場合があります。
+          </div>
+        ) : null}
+        {checkoutState === "cancel" ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            お支払いは完了していません。ご都合のよいときに、あらためてお手続きください。
+          </div>
+        ) : null}
+
         <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="text-base font-bold text-slate-900">概要</h2>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -136,14 +163,18 @@ export default async function CustomerInvoicePage({ params }: { params: { token:
               <dt className="text-xs font-bold text-slate-500">請求書番号</dt>
               <dd className="mt-1 font-semibold">{invoice.invoiceNumber}</dd>
             </div>
-            <div className="rounded-lg bg-slate-50 p-3">
-              <dt className="text-xs font-bold text-slate-500">対象月</dt>
-              <dd className="mt-1 font-semibold">{billingMonth}</dd>
-            </div>
-            <div className="rounded-lg bg-slate-50 p-3">
-              <dt className="text-xs font-bold text-slate-500">取引先名</dt>
-              <dd className="mt-1 font-semibold">{customerName}</dd>
-            </div>
+            {invoice.customer.type === "business" ? (
+              <>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <dt className="text-xs font-bold text-slate-500">対象月</dt>
+                  <dd className="mt-1 font-semibold">{billingMonth}</dd>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <dt className="text-xs font-bold text-slate-500">取引先名</dt>
+                  <dd className="mt-1 font-semibold">{customerName}</dd>
+                </div>
+              </>
+            ) : null}
             <div className="rounded-lg bg-slate-50 p-3">
               <dt className="text-xs font-bold text-slate-500">発行日</dt>
               <dd className="mt-1 font-semibold">{formatDate(invoice.issuedDate)}</dd>
@@ -158,6 +189,96 @@ export default async function CustomerInvoicePage({ params }: { params: { token:
             </div>
           </dl>
         </section>
+
+        {invoice.customer.type === "individual" ? (
+          <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+            <h2 className="text-base font-bold text-slate-900">銀行振込のご案内</h2>
+            <dl className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3 text-sm">
+              <div>
+                <dt className="text-xs font-bold text-slate-500">金融機関</dt>
+                <dd className="mt-1 font-semibold">三井住友銀行</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold text-slate-500">店番</dt>
+                <dd className="mt-1 font-semibold">411</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold text-slate-500">口座番号</dt>
+                <dd className="mt-1 font-semibold">普通 3602468</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold text-slate-500">口座名義</dt>
+                <dd className="mt-1 font-semibold">ヨシダ シュウヘイ</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-sm text-slate-600">振込手数料はお客様のご負担となります。</p>
+          </section>
+        ) : null}
+
+        {invoice.customer.type === "individual" ? (
+          <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+            <h2 className="text-base font-bold text-slate-900">オンライン決済</h2>
+            {canPayOnline ? (
+              <>
+                <p className="mt-3 text-sm text-slate-600">
+                  クレジットカード、Apple Pay、Google Payで安全にお支払いいただけます。
+                </p>
+                <InvoiceCheckoutButton token={token} />
+                <div className="mt-4 flex flex-wrap items-center gap-3" aria-label="利用可能な決済ブランド">
+                  {[
+                    ["visa.svg", "Visa"],
+                    ["mastercard.svg", "Mastercard"],
+                    ["jcb.svg", "JCB"],
+                    ["american-express.svg", "American Express"],
+                    ["apple-pay.svg", "Apple Pay"],
+                    ["google-pay.svg", "Google Pay"],
+                  ].map(([fileName, alt]) => (
+                    <img
+                      key={fileName}
+                      src={`/img/payment-logos/${fileName}`}
+                      alt={alt}
+                      className="h-6 w-auto object-contain"
+                    />
+                  ))}
+                </div>
+              </>
+            ) : paymentSummary.outstandingBalance === 0 ? (
+              <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
+                お支払い済みです。
+              </p>
+            ) : (
+              <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+                現在、この請求ではオンライン決済をご利用いただけません。
+              </p>
+            )}
+          </section>
+        ) : null}
+
+        {invoice.customer.type === "individual" ? (
+          <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+            <h2 className="text-base font-bold text-slate-900">今回の修理</h2>
+            <div className="mt-4 space-y-3">
+              {hasConsistentInvoiceSnapshots(invoice) ? invoice.repairSnapshots.map((repair) => (
+                <article key={repair.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold text-slate-500">修理番号</p>
+                      <p className="mt-1 font-semibold text-slate-900">{repair.inquiryNumber}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-slate-500">修理料金</p>
+                      <p className="mt-1 font-mono font-bold text-blue-700">{formatCurrency(repair.subtotalAmount)}</p>
+                    </div>
+                  </div>
+                </article>
+              )) : (
+                <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                  修理内容は請求書PDFでご確認ください。
+                </p>
+              )}
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="text-base font-bold text-slate-900">請求書PDF</h2>
@@ -191,40 +312,42 @@ export default async function CustomerInvoicePage({ params }: { params: { token:
           )}
         </section>
 
-        <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="text-base font-bold text-slate-900">明細</h2>
-          <div className="mt-4 space-y-2">
-            {deliveryGroups.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                発行時の明細は保存済みPDFをご確認ください。
-              </div>
-            ) : (
-              deliveryGroups.map((group) => (
-                <div
-                  key={group.key}
-                  className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-[1fr_1fr_1fr_auto]"
-                >
-                  <div>
-                    <div className="text-xs font-bold text-slate-500">納品書番号</div>
-                    <div className="mt-1 font-semibold">{group.slipNumber}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-500">納品日</div>
-                    <div className="mt-1 font-semibold">{formatDate(group.date)}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-500">納品点数</div>
-                    <div className="mt-1 font-semibold">{group.repairCount}点</div>
-                  </div>
-                  <div className="sm:text-right">
-                    <div className="text-xs font-bold text-slate-500">金額</div>
-                    <div className="mt-1 font-mono font-bold text-blue-700">{formatCurrency(group.amount)}</div>
-                  </div>
+        {invoice.customer.type === "business" ? (
+          <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+            <h2 className="text-base font-bold text-slate-900">明細</h2>
+            <div className="mt-4 space-y-2">
+              {deliveryGroups.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                  発行時の明細は保存済みPDFをご確認ください。
                 </div>
-              ))
-            )}
-          </div>
-        </section>
+              ) : (
+                deliveryGroups.map((group) => (
+                  <div
+                    key={group.key}
+                    className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-[1fr_1fr_1fr_auto]"
+                  >
+                    <div>
+                      <div className="text-xs font-bold text-slate-500">納品書番号</div>
+                      <div className="mt-1 font-semibold">{group.slipNumber}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-500">納品日</div>
+                      <div className="mt-1 font-semibold">{formatDate(group.date)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-500">納品点数</div>
+                      <div className="mt-1 font-semibold">{group.repairCount}点</div>
+                    </div>
+                    <div className="sm:text-right">
+                      <div className="text-xs font-bold text-slate-500">金額</div>
+                      <div className="mt-1 font-mono font-bold text-blue-700">{formatCurrency(group.amount)}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        ) : null}
 
         <footer className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
           ご不明点がございましたら、ヨシダ時計修理工房までお問い合わせください。
