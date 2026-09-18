@@ -13,12 +13,14 @@ function createFakeDb(customerIds: number[] = []) {
   const inquiries: Array<Record<string, unknown>> = [];
   const messages: Array<Record<string, unknown>> = [];
   const operations: string[] = [];
+  const advisoryLockSql: string[] = [];
   let writes = 0;
   let nextInquiryId = 1;
 
   const db = {
     $transaction: async (callback: (transaction: unknown) => Promise<unknown>) => callback(db),
     $executeRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+      advisoryLockSql.push(_strings.join("?"));
       operations.push(`advisory-lock:${values.join(":")}`);
     },
     customer: {
@@ -81,7 +83,7 @@ function createFakeDb(customerIds: number[] = []) {
     },
   } as unknown as LineWebhookDb;
 
-  return { db, records, inquiries, messages, operations, writes: () => writes };
+  return { db, records, inquiries, messages, operations, advisoryLockSql, writes: () => writes };
 }
 
 test("valid follow stores a single LINE user with profile and Customer match", async () => {
@@ -360,6 +362,10 @@ test("acquires the LineUser advisory lock before checking messages or Inquiries"
     "inquiryMessage:findUnique",
     "inquiry:findMany:OPEN",
   ]);
+  assert.match(
+    fake.advisoryLockSql[0] ?? "",
+    /pg_advisory_xact_lock\(\s*\?::int,\s*\?::int\s*\)/,
+  );
 });
 
 test("invalid signature or absent secret causes no database write", async () => {

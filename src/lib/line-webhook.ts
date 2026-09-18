@@ -128,7 +128,10 @@ async function saveInboundTextMessage(
   try {
     await db.$transaction(async (tx) => {
       await tx.$executeRaw`
-        SELECT pg_advisory_xact_lock(${LINE_INQUIRY_ADVISORY_LOCK_NAMESPACE}, ${input.lineUserId})
+        SELECT pg_advisory_xact_lock(
+          ${LINE_INQUIRY_ADVISORY_LOCK_NAMESPACE}::int,
+          ${input.lineUserId}::int
+        )
       `;
 
       const existingMessage = await tx.inquiryMessage.findUnique({
