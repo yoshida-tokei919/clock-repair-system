@@ -9,7 +9,6 @@ export async function POST(request: NextRequest) {
     rawBody,
     signature: request.headers.get("x-line-signature"),
     channelSecret: process.env.LINE_CHANNEL_SECRET,
-    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
     db: prisma,
   });
 

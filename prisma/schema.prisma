@@ -85,6 +85,25 @@ model LineUser {
 }
 
 // LINE相談の親レコード。Repair の作成・変換は後続Taskで扱う。
+enum LineWebhookInboxStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
+
+model LineWebhookInbox {
+  id             Int                    @id @default(autoincrement())
+  webhookEventId String                 @unique
+  eventType      String
+  rawEvent       Json
+  receivedAt     DateTime
+  status         LineWebhookInboxStatus @default(RECEIVED)
+  processedAt    DateTime?
+  lastError      String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+}
+
 enum InquiryStatus {
   OPEN
   AI_PENDING
