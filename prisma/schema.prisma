@@ -77,9 +77,71 @@ model LineUser {
 
   linkedCustomer Customer? @relation(fields: [linkedCustomerId], references: [id], onDelete: SetNull)
   repairIntakeInvites RepairIntakeInvite[]
+  inquiries           Inquiry[]
+  inquiryMessages     InquiryMessage[]
 
   @@index([linkedCustomerId])
   @@index([lastReceivedAt])
+}
+
+// LINE相談の親レコード。Repair の作成・変換は後続Taskで扱う。
+enum InquiryStatus {
+  OPEN
+  AI_PENDING
+  AI_PROCESSED
+  NEEDS_REVIEW
+  WAITING_CUSTOMER
+  READY_FOR_INTAKE
+  CLOSED
+}
+
+enum InquiryMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum InquiryMessageType {
+  TEXT
+  IMAGE
+  FILE
+  OTHER
+}
+
+model Inquiry {
+  id              Int           @id @default(autoincrement())
+  lineUserId      Int
+  status          InquiryStatus @default(OPEN)
+  firstReceivedAt DateTime
+  lastReceivedAt  DateTime
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  lineUser LineUser         @relation(fields: [lineUserId], references: [id], onDelete: Restrict)
+  messages InquiryMessage[]
+
+  @@index([lineUserId, status])
+  @@index([lineUserId, lastReceivedAt])
+}
+
+// LINEの受信・送信履歴。externalMessageId はLINE message IDの冪等キー。
+model InquiryMessage {
+  id                Int                     @id @default(autoincrement())
+  inquiryId         Int
+  lineUserId        Int
+  externalMessageId String                  @unique
+  direction         InquiryMessageDirection
+  messageType       InquiryMessageType
+  body              String?
+  receivedAt        DateTime?
+  sentAt            DateTime?
+  status            String                  @default("received")
+  createdAt         DateTime                @default(now())
+
+  inquiry  Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Restrict)
+  lineUser LineUser @relation(fields: [lineUserId], references: [id], onDelete: Restrict)
+
+  @@index([inquiryId, createdAt])
+  @@index([lineUserId, createdAt])
 }
 
 // 2. Watch Metadata (Smart Input)
