@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { processLineWebhookInboxItem } from "@/lib/line-inquiry-processor";
+import { handleLineInquiryImage } from "@/lib/line-inquiry-image";
+import {
+  claimLineWebhookInboxBatch,
+  processLineWebhookInboxItem,
+} from "@/lib/line-inquiry-processor";
 
 export const dynamic = "force-dynamic";
 
@@ -21,25 +25,22 @@ export async function POST(request: NextRequest) {
   if (!authorized) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
-  const pending = await prisma.lineWebhookInbox.findMany({
-    where: { status: "RECEIVED" },
-    orderBy: { id: "asc" },
-    take: 20,
-    select: { id: true },
-  });
+  const claimedIds = await claimLineWebhookInboxBatch(prisma, { take: 20 });
 
   let processed = 0;
   let skipped = 0;
   const failed: Array<{ id: number; error: string }> = [];
 
-  for (const item of pending) {
+  for (const inboxId of claimedIds) {
     try {
-      const result = await processLineWebhookInboxItem(prisma, item.id);
+      const result = await processLineWebhookInboxItem(prisma, inboxId, {
+        handleImage: (input) => handleLineInquiryImage(prisma, input),
+      });
       if (result === "processed") processed += 1;
       else skipped += 1;
     } catch (error: unknown) {
       failed.push({
-        id: item.id,
+        id: inboxId,
         error: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
       });
     }
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     ok: failed.length === 0,
-    scanned: pending.length,
+    scanned: claimedIds.length,
     processed,
     skipped,
     failed,

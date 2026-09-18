@@ -13,6 +13,50 @@ export type LineInquiryProcessorDb = Pick<
 >;
 
 const LINE_INQUIRY_ADVISORY_LOCK_NAMESPACE = 726_001;
+const LINE_INBOX_MAX_ATTEMPTS = 5;
+const LINE_INBOX_STALE_PROCESSING_MS = 10 * 60 * 1000;
+
+function claimableInboxWhere(now: Date): Prisma.LineWebhookInboxWhereInput {
+  const staleBefore = new Date(now.getTime() - LINE_INBOX_STALE_PROCESSING_MS);
+  return {
+    attemptCount: { lt: LINE_INBOX_MAX_ATTEMPTS },
+    OR: [
+      { status: { in: ["RECEIVED", "FAILED"] } },
+      { status: "PROCESSING", lastAttemptAt: { lt: staleBefore } },
+    ],
+  };
+}
+
+export async function claimLineWebhookInboxBatch(
+  db: LineInquiryProcessorDb,
+  input: { take?: number; now?: Date } = {},
+) {
+  const take = input.take ?? 20;
+  const now = input.now ?? new Date();
+  const where = claimableInboxWhere(now);
+
+  const candidates = await db.lineWebhookInbox.findMany({
+    where,
+    orderBy: { id: "asc" },
+    take,
+    select: { id: true },
+  });
+
+  const claimed: number[] = [];
+  for (const candidate of candidates) {
+    const result = await db.lineWebhookInbox.updateMany({
+      where: { id: candidate.id, ...where },
+      data: {
+        status: "PROCESSING",
+        attemptCount: { increment: 1 },
+        lastAttemptAt: now,
+      },
+    });
+    if (result.count === 1) claimed.push(candidate.id);
+  }
+
+  return claimed;
+}
 
 function eventDate(timestamp: unknown, fallback: Date) {
   if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) return fallback;
@@ -67,12 +111,18 @@ async function saveLineUser(
   });
 }
 
-async function saveInboundTextMessage(
+async function saveInboundMessage(
   db: LineInquiryProcessorDb,
-  input: { lineUserId: number; externalMessageId: string; body: string; receivedAt: Date },
+  input: {
+    lineUserId: number;
+    externalMessageId: string;
+    messageType: "TEXT" | "IMAGE";
+    body?: string;
+    receivedAt: Date;
+  },
 ) {
   try {
-    await db.$transaction(async (tx) => {
+    return await db.$transaction(async (tx) => {
       await tx.$executeRaw`
         SELECT pg_advisory_xact_lock(
           ${LINE_INQUIRY_ADVISORY_LOCK_NAMESPACE}::int,
@@ -82,9 +132,9 @@ async function saveInboundTextMessage(
 
       const existingMessage = await tx.inquiryMessage.findUnique({
         where: { externalMessageId: input.externalMessageId },
-        select: { id: true },
+        select: { id: true, inquiryId: true },
       });
-      if (existingMessage) return;
+      if (existingMessage) return existingMessage;
 
       const openInquiries = await tx.inquiry.findMany({
         where: { lineUserId: input.lineUserId, status: "OPEN" },
@@ -117,16 +167,17 @@ async function saveInboundTextMessage(
               select: { id: true },
             });
 
-      await tx.inquiryMessage.create({
+      return tx.inquiryMessage.create({
         data: {
           inquiryId: inquiry.id,
           lineUserId: input.lineUserId,
           externalMessageId: input.externalMessageId,
           direction: "INBOUND",
-          messageType: "TEXT",
-          body: input.body,
+          messageType: input.messageType,
+          body: input.body ?? null,
           receivedAt: input.receivedAt,
         },
+        select: { id: true, inquiryId: true },
       });
     });
   } catch (error: unknown) {
@@ -136,7 +187,11 @@ async function saveInboundTextMessage(
       "code" in error &&
       error.code === "P2002"
     ) {
-      return;
+      const existingMessage = await db.inquiryMessage.findUnique({
+        where: { externalMessageId: input.externalMessageId },
+        select: { id: true, inquiryId: true },
+      });
+      if (existingMessage) return existingMessage;
     }
     throw error;
   }
@@ -146,9 +201,17 @@ function errorMessage(error: unknown) {
   return String(error).slice(0, 1000);
 }
 
+export type LineInquiryImageHandler = (input: {
+  inquiryId: number;
+  inquiryMessageId: number;
+  externalMessageId: string;
+  receivedAt: Date;
+}) => Promise<unknown>;
+
 export async function processLineWebhookInboxItem(
   db: LineInquiryProcessorDb,
   inboxId: number,
+  options: { handleImage?: LineInquiryImageHandler } = {},
 ): Promise<"processed" | "skipped"> {
   const inbox = await db.lineWebhookInbox.findUnique({
     where: { id: inboxId },
@@ -161,7 +224,7 @@ export async function processLineWebhookInboxItem(
     },
   });
 
-  if (!inbox || inbox.status !== "RECEIVED") return "skipped";
+  if (!inbox || inbox.status !== "PROCESSING") return "skipped";
 
   try {
     const event = asLineEvent(inbox.rawEvent);
@@ -184,10 +247,36 @@ export async function processLineWebhookInboxItem(
         event.message.id &&
         typeof event.message.text === "string"
       ) {
-        await saveInboundTextMessage(db, {
+        await saveInboundMessage(db, {
           lineUserId: lineUser.id,
           externalMessageId: event.message.id,
+          messageType: "TEXT",
           body: event.message.text,
+          receivedAt,
+        });
+      }
+
+      if (
+        inbox.eventType === "message" &&
+        event?.message?.type === "image" &&
+        typeof event.message.id === "string" &&
+        event.message.id
+      ) {
+        if (!options.handleImage) {
+          throw new Error("LINE image processor is not configured.");
+        }
+
+        const message = await saveInboundMessage(db, {
+          lineUserId: lineUser.id,
+          externalMessageId: event.message.id,
+          messageType: "IMAGE",
+          receivedAt,
+        });
+
+        await options.handleImage({
+          inquiryId: message.inquiryId,
+          inquiryMessageId: message.id,
+          externalMessageId: event.message.id,
           receivedAt,
         });
       }
