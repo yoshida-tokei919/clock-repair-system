@@ -257,7 +257,7 @@ model Watch {
   customerId   Int
   
   brand       Brand    @relation(fields: [brandId], references: [id])
-  model       Model?   @relation(fields: [modelId], references: [id])
+  model       Model?   @relation(fields: [modelId], references: [id], onDelete: Restrict)
   reference   WatchReference? @relation(fields: [referenceId], references: [id])
   caliber     Caliber? @relation(fields: [caliberId], references: [id])
   customer    Customer @relation(fields: [customerId], references: [id])
