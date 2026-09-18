@@ -10,9 +10,17 @@ function signedBody(body: string, secret = "test-channel-secret") {
 
 function createFakeDb(customerIds: number[] = []) {
   const records = new Map<string, Record<string, unknown>>();
+  const inquiries: Array<Record<string, unknown>> = [];
+  const messages: Array<Record<string, unknown>> = [];
+  const operations: string[] = [];
   let writes = 0;
+  let nextInquiryId = 1;
 
   const db = {
+    $transaction: async (callback: (transaction: unknown) => Promise<unknown>) => callback(db),
+    $executeRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+      operations.push(`advisory-lock:${values.join(":")}`);
+    },
     customer: {
       findMany: async () => customerIds.map((id) => ({ id })),
     },
@@ -34,11 +42,46 @@ function createFakeDb(customerIds: number[] = []) {
         writes += 1;
         const prior = records.get(args.where.lineUserId);
         records.set(args.where.lineUserId, prior ? { ...prior, ...args.update } : args.create);
+        return { id: Array.from(records.keys()).indexOf(args.where.lineUserId) + 1 };
+      },
+    },
+    inquiry: {
+      findMany: async ({ where }: { where: { lineUserId: number; status: string } }) => {
+        operations.push(`inquiry:findMany:${where.status}`);
+        return inquiries
+          .filter((inquiry) => inquiry.lineUserId === where.lineUserId && inquiry.status === where.status)
+          .map((inquiry) => ({ id: inquiry.id }));
+      },
+      findFirst: async ({ where }: { where: { lineUserId: number; status: string } }) => {
+        operations.push(`inquiry:findFirst:${where.status}`);
+        const inquiry = inquiries.find(
+          (candidate) => candidate.lineUserId === where.lineUserId && candidate.status === where.status,
+        );
+        return inquiry ? { id: inquiry.id } : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const inquiry = { id: nextInquiryId++, ...data };
+        inquiries.push(inquiry);
+        return { id: inquiry.id };
+      },
+    },
+    inquiryMessage: {
+      findUnique: async ({ where }: { where: { externalMessageId: string } }) => {
+        operations.push("inquiryMessage:findUnique");
+        const message = messages.find(
+          (candidate) => candidate.externalMessageId === where.externalMessageId,
+        );
+        return message ? { id: message.id } : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const message = { id: messages.length + 1, ...data };
+        messages.push(message);
+        return message;
       },
     },
   } as unknown as LineWebhookDb;
 
-  return { db, records, writes: () => writes };
+  return { db, records, inquiries, messages, operations, writes: () => writes };
 }
 
 test("valid follow stores a single LINE user with profile and Customer match", async () => {
@@ -96,6 +139,227 @@ test("message updates the same user and profile failure retains userId", async (
   assert.equal(fake.writes(), 2);
   assert.equal(fake.records.get("U-repeat")?.lastEventType, "message");
   assert.equal(fake.records.get("U-repeat")?.displayName, undefined);
+});
+
+test("text message creates an OPEN Inquiry and inbound InquiryMessage", async () => {
+  const fake = createFakeDb();
+  const body = JSON.stringify({
+    events: [{
+      type: "message",
+      timestamp: 1_788_688_400_000,
+      source: { userId: "U-text" },
+      message: { id: "line-message-1", type: "text", text: "時計を修理したいです" },
+    }],
+  });
+
+  const result = await processVerifiedLineWebhook({
+    rawBody: body,
+    signature: signedBody(body),
+    channelSecret: "test-channel-secret",
+    channelAccessToken: undefined,
+    db: fake.db,
+    now: () => new Date("2026-09-05T00:00:00.000Z"),
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(fake.inquiries, [{
+    id: 1,
+    lineUserId: 1,
+    status: "OPEN",
+    firstReceivedAt: new Date(1_788_688_400_000),
+    lastReceivedAt: new Date(1_788_688_400_000),
+  }]);
+  assert.deepEqual(fake.messages, [{
+    id: 1,
+    inquiryId: 1,
+    lineUserId: 1,
+    externalMessageId: "line-message-1",
+    direction: "INBOUND",
+    messageType: "TEXT",
+    body: "時計を修理したいです",
+    receivedAt: new Date(1_788_688_400_000),
+  }]);
+});
+
+test("text message reuses exactly one OPEN Inquiry", async () => {
+  const fake = createFakeDb();
+  fake.inquiries.push({ id: 7, lineUserId: 1, status: "OPEN" });
+  const body = JSON.stringify({
+    events: [{
+      type: "message",
+      source: { userId: "U-open" },
+      message: { id: "line-message-open", type: "text", text: "追加の内容です" },
+    }],
+  });
+
+  await processVerifiedLineWebhook({
+    rawBody: body,
+    signature: signedBody(body),
+    channelSecret: "test-channel-secret",
+    channelAccessToken: undefined,
+    db: fake.db,
+    now: () => new Date("2026-09-05T00:00:00.000Z"),
+  });
+
+  assert.equal(fake.inquiries.length, 1);
+  assert.equal(fake.messages[0]?.inquiryId, 7);
+});
+
+test("duplicate message is successful without creating another Inquiry or message", async () => {
+  const fake = createFakeDb();
+  const body = JSON.stringify({
+    events: [{
+      type: "message",
+      source: { userId: "U-duplicate" },
+      message: { id: "line-message-duplicate", type: "text", text: "重複です" },
+    }],
+  });
+  const input = {
+    rawBody: body,
+    signature: signedBody(body),
+    channelSecret: "test-channel-secret",
+    channelAccessToken: undefined,
+    db: fake.db,
+    now: () => new Date("2026-09-05T00:00:00.000Z"),
+  };
+
+  await processVerifiedLineWebhook(input);
+  await processVerifiedLineWebhook(input);
+
+  assert.equal(fake.inquiries.length, 1);
+  assert.equal(fake.messages.length, 1);
+});
+
+test("follow and non-text messages retain LineUser without creating InquiryMessage", async () => {
+  const fake = createFakeDb();
+  const body = JSON.stringify({ events: [
+    { type: "follow", source: { userId: "U-non-text" } },
+    {
+      type: "message",
+      source: { userId: "U-non-text" },
+      message: { id: "line-image-1", type: "image" },
+    },
+  ] });
+
+  await processVerifiedLineWebhook({
+    rawBody: body,
+    signature: signedBody(body),
+    channelSecret: "test-channel-secret",
+    channelAccessToken: undefined,
+    db: fake.db,
+  });
+
+  assert.equal(fake.records.size, 1);
+  assert.equal(fake.messages.length, 0);
+});
+
+test("multiple OPEN Inquiries create one NEEDS_REVIEW instead of selecting an OPEN Inquiry", async () => {
+  const fake = createFakeDb();
+  fake.inquiries.push(
+    { id: 3, lineUserId: 1, status: "OPEN" },
+    { id: 4, lineUserId: 1, status: "OPEN" },
+  );
+  const body = JSON.stringify({
+    events: [{
+      type: "message",
+      source: { userId: "U-many-open" },
+      message: { id: "line-message-many", type: "text", text: "相談です" },
+    }],
+  });
+
+  await processVerifiedLineWebhook({
+    rawBody: body,
+    signature: signedBody(body),
+    channelSecret: "test-channel-secret",
+    channelAccessToken: undefined,
+    db: fake.db,
+    now: () => new Date("2026-09-05T00:00:00.000Z"),
+  });
+
+  assert.equal(fake.inquiries[2]?.status, "NEEDS_REVIEW");
+  assert.equal(fake.messages[0]?.inquiryId, fake.inquiries[2]?.id);
+});
+
+test("multiple OPEN Inquiries reuse the existing NEEDS_REVIEW Inquiry", async () => {
+  const fake = createFakeDb();
+  fake.inquiries.push(
+    { id: 3, lineUserId: 1, status: "OPEN" },
+    { id: 4, lineUserId: 1, status: "OPEN" },
+    { id: 5, lineUserId: 1, status: "NEEDS_REVIEW" },
+  );
+  const body = JSON.stringify({
+    events: [{
+      type: "message",
+      source: { userId: "U-reuse-needs-review" },
+      message: { id: "line-message-reuse", type: "text", text: "確認をお願いします" },
+    }],
+  });
+
+  await processVerifiedLineWebhook({
+    rawBody: body,
+    signature: signedBody(body),
+    channelSecret: "test-channel-secret",
+    channelAccessToken: undefined,
+    db: fake.db,
+  });
+
+  assert.equal(fake.inquiries.length, 3);
+  assert.equal(fake.messages[0]?.inquiryId, 5);
+});
+
+test("multiple text messages with multiple OPEN Inquiries create only one NEEDS_REVIEW", async () => {
+  const fake = createFakeDb();
+  fake.inquiries.push(
+    { id: 3, lineUserId: 1, status: "OPEN" },
+    { id: 4, lineUserId: 1, status: "OPEN" },
+  );
+  const makeBody = (id: string) => JSON.stringify({
+    events: [{
+      type: "message",
+      source: { userId: "U-no-needs-growth" },
+      message: { id, type: "text", text: "続けて相談します" },
+    }],
+  });
+
+  for (const id of ["line-message-a", "line-message-b"]) {
+    const body = makeBody(id);
+    await processVerifiedLineWebhook({
+      rawBody: body,
+      signature: signedBody(body),
+      channelSecret: "test-channel-secret",
+      channelAccessToken: undefined,
+      db: fake.db,
+    });
+  }
+
+  assert.equal(fake.inquiries.filter((inquiry) => inquiry.status === "NEEDS_REVIEW").length, 1);
+  assert.equal(fake.messages.length, 2);
+  assert.equal(fake.messages[0]?.inquiryId, fake.messages[1]?.inquiryId);
+});
+
+test("acquires the LineUser advisory lock before checking messages or Inquiries", async () => {
+  const fake = createFakeDb();
+  const body = JSON.stringify({
+    events: [{
+      type: "message",
+      source: { userId: "U-lock-order" },
+      message: { id: "line-message-lock", type: "text", text: "ロック確認" },
+    }],
+  });
+
+  await processVerifiedLineWebhook({
+    rawBody: body,
+    signature: signedBody(body),
+    channelSecret: "test-channel-secret",
+    channelAccessToken: undefined,
+    db: fake.db,
+  });
+
+  assert.deepEqual(fake.operations.slice(0, 3), [
+    "advisory-lock:726001:1",
+    "inquiryMessage:findUnique",
+    "inquiry:findMany:OPEN",
+  ]);
 });
 
 test("invalid signature or absent secret causes no database write", async () => {
