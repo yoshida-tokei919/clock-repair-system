@@ -86,7 +86,7 @@ function createFakeDb(customerIds: number[] = []) {
   return { db, records, inquiries, messages, operations, advisoryLockSql, writes: () => writes };
 }
 
-test("valid follow stores a single LINE user with profile and Customer match", async () => {
+test("valid follow stores a single LINE user without a profile lookup and with a Customer match", async () => {
   const body = JSON.stringify({ events: [{ type: "follow", source: { userId: "U-follow" } }] });
   const fake = createFakeDb([42]);
   const now = new Date("2026-09-05T00:00:00.000Z");
@@ -98,7 +98,7 @@ test("valid follow stores a single LINE user with profile and Customer match", a
     channelAccessToken: "token-is-not-logged",
     db: fake.db,
     now: () => now,
-    fetcher: async () => Response.json({ displayName: "LINE Display Name" }),
+    fetcher: async () => assert.fail("webhook hot path must not call the LINE profile API"),
   });
 
   assert.equal(result.status, 200);
@@ -109,11 +109,10 @@ test("valid follow stores a single LINE user with profile and Customer match", a
     lastEventType: "follow",
     linkedCustomerId: 42,
     linkedAt: now,
-    displayName: "LINE Display Name",
   });
 });
 
-test("message updates the same user and profile failure retains userId", async () => {
+test("message updates the same user without a profile lookup", async () => {
   const fake = createFakeDb();
   const firstBody = JSON.stringify({ events: [{ type: "follow", source: { userId: "U-repeat" } }] });
   const secondBody = JSON.stringify({ events: [{ type: "message", source: { userId: "U-repeat" } }] });
@@ -141,6 +140,32 @@ test("message updates the same user and profile failure retains userId", async (
   assert.equal(fake.writes(), 2);
   assert.equal(fake.records.get("U-repeat")?.lastEventType, "message");
   assert.equal(fake.records.get("U-repeat")?.displayName, undefined);
+});
+
+test("webhook with a null displayName retains an existing displayName", async () => {
+  const fake = createFakeDb();
+  fake.records.set("U-existing-display-name", {
+    lineUserId: "U-existing-display-name",
+    displayName: "Existing Display Name",
+    linkedCustomerId: null,
+    linkedAt: null,
+  });
+  const body = JSON.stringify({ events: [{
+    type: "message",
+    source: { userId: "U-existing-display-name" },
+    message: { id: "line-message-existing-display-name", type: "text", text: "message" },
+  }] });
+
+  await processVerifiedLineWebhook({
+    rawBody: body,
+    signature: signedBody(body),
+    channelSecret: "test-channel-secret",
+    channelAccessToken: "token",
+    db: fake.db,
+    fetcher: async () => assert.fail("webhook hot path must not call the LINE profile API"),
+  });
+
+  assert.equal(fake.records.get("U-existing-display-name")?.displayName, "Existing Display Name");
 });
 
 test("text message creates an OPEN Inquiry and inbound InquiryMessage", async () => {

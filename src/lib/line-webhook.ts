@@ -234,16 +234,11 @@ export async function processVerifiedLineWebhook(input: {
       continue;
     }
 
-    const displayName = await getLineProfileDisplayName(
-      event.source.userId,
-      input.channelAccessToken,
-      input.fetcher,
-    );
     const now = input.now?.() ?? new Date();
     const lineUser = await saveLineUser(input.db, {
       lineUserId: event.source.userId,
       eventType: event.type,
-      displayName,
+      displayName: null,
       now,
     });
 
