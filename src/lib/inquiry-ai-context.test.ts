@@ -2,9 +2,28 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { InquiryAiContextDb } from "./inquiry-ai-context";
 import {
+  buildInquiryAiInputSnapshot,
+  fingerprintInquiryAiInput,
   getInquiryAiContext,
   listPendingInquiryAiContexts,
 } from "./inquiry-ai-context";
+
+test("input fingerprint is deterministic, body-bound without raw text, and includes only stored files", () => {
+  const base = {
+    inquiryId: 4,
+    messages: [{ id: 1, direction: "INBOUND", messageType: "TEXT", body: "original", receivedAt: new Date("2026-09-18T00:00:00.000Z"), sentAt: null, status: "received", createdAt: new Date("2026-09-18T00:00:00.000Z") }],
+    files: [{ id: 2, inquiryMessageId: 1, mimeType: "image/webp", fileSize: 10, width: 10, height: 10, uploadStatus: "STORED", objectKey: "inquiries/a.webp", createdAt: new Date("2026-09-18T00:00:00.000Z"), updatedAt: new Date("2026-09-18T00:00:00.000Z") }],
+  };
+  const fingerprint = fingerprintInquiryAiInput(buildInquiryAiInputSnapshot(base));
+  assert.equal(fingerprint, fingerprintInquiryAiInput(buildInquiryAiInputSnapshot(base)));
+  assert.notEqual(fingerprint, fingerprintInquiryAiInput(buildInquiryAiInputSnapshot({ ...base, messages: [{ ...base.messages[0], body: "changed" }] })));
+  assert.notEqual(fingerprint, fingerprintInquiryAiInput(buildInquiryAiInputSnapshot({ ...base, files: [{ ...base.files[0], updatedAt: new Date("2026-09-18T00:01:00.000Z") }] })));
+  assert.ok(!JSON.stringify(buildInquiryAiInputSnapshot(base)).includes("original"));
+  const pendingFile = { ...base.files[0], id: 3, objectKey: "inquiries/pending.webp", uploadStatus: "PENDING" };
+  assert.equal(fingerprint, fingerprintInquiryAiInput(buildInquiryAiInputSnapshot({ ...base, files: [...base.files, pendingFile] })));
+  const storedFile = { ...pendingFile, uploadStatus: "STORED" };
+  assert.notEqual(fingerprint, fingerprintInquiryAiInput(buildInquiryAiInputSnapshot({ ...base, files: [...base.files, storedFile] })));
+});
 
 test("pending context filters, orders, and caps the requested limit", async () => {
   let args: any;

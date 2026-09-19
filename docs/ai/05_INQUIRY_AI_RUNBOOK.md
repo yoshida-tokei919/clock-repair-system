@@ -1,5 +1,14 @@
 # Inquiry AI Runbook
 
+## Task 2: structured analysis write
+
+- Task 2 permits Katari to save only structured, provisional analysis through `POST /api/internal/inquiry-ai/{id}/analysis`, using the same internal Bearer authentication as the read APIs.
+- `InquiryMessage` and `InquiryFile` remain immutable source records. The server generates the saved input snapshot from current message/file IDs, timestamps, statuses, and relevant input data; it never trusts a client-provided snapshot.
+- Read context includes `inputFingerprint`. Katari must send it back unchanged. If messages or stored image inputs changed, the API returns `409` and writes nothing; fetch fresh context and analyze again.
+- Candidates are provisional snapshots, never formal Watch or Repair values, and cannot create or update master records. The AI endpoint can only write `PENDING` review status and cannot claim `TECHNICIAN_CONFIRMED`; human confirmation and formal writes are Phase 3 and out of scope.
+- After a successful save, ChatGPT displays the summary, watch count, per-watch candidates, faults, requested work, missing information/photos, and confidence/evidence.
+- Never expose the Bearer token or signed R2 URLs in prompts, logs, Slack, or user-visible output.
+
 ## 目的と正本
 
 - Slackは通知チャネルです。問い合わせの正本はSupabaseに保存された`Inquiry`、`InquiryMessage`、`InquiryFile`です。
@@ -23,11 +32,11 @@
 
 ## このTaskの安全境界
 
-- このTaskはread-onlyです。AI分析の保存、Repair作成、正式値の書き込みはまだ行いません。
+- `InquiryMessage`/`InquiryFile`の原文・原画像データは読み取り専用で不変です。Task 2で許可される書き込みは、最新のinputFingerprintに基づく暫定AI分析のPOST保存だけです。Repair作成、正式なWatch/master値、人手確認済みの書き込みはPhase 3まで禁止し、AIは候補の承認・却下や技術者確認を主張できません。
 - 見積りやAI推論を正式値として扱いません。
 - secret、Bearer token、その他の認証情報を出力・ログ記録しません。内部APIはローカルWindowsの`N8N_INTERNAL_TOKEN`をBearer tokenとして用いますが、値は表示しません。
 - Slack通知にLINE本文を含めません。
 
 ## 将来の拡張
 
-将来Phaseでは、この読み取り手順の下流に、明示的なAI分析・人手レビュー・書き戻しの工程を追加できます。原文、正本データ、正式値の境界はそれぞれ分離したまま維持します。
+Phase 3では、人手レビューと正式なWatch/Repair値への書き戻しを追加します。以後のPhaseで、承認済みの送信メッセージを扱います。原文、正本データ、暫定AI分析、正式値の境界は分離したまま維持します。

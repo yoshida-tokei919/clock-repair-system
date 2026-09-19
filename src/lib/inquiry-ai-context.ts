@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { createHash } from "node:crypto";
 
 export type InquiryAiContextDb = Pick<PrismaClient, "inquiry">;
 export type InquiryFileSignedReadUrl = (key: string, expiresIn?: number) => Promise<string>;
@@ -6,6 +7,80 @@ export type InquiryFileSignedReadUrl = (key: string, expiresIn?: number) => Prom
 const PENDING_STATUSES = ["OPEN", "AI_PENDING", "NEEDS_REVIEW"] as const;
 export const INQUIRY_AI_PENDING_DEFAULT_LIMIT = 20;
 export const INQUIRY_AI_PENDING_MAX_LIMIT = 50;
+
+type FingerprintMessage = {
+  id: number;
+  direction: string;
+  messageType: string;
+  body: string | null;
+  receivedAt: Date | null;
+  sentAt: Date | null;
+  status: string;
+  createdAt: Date;
+};
+
+type FingerprintFile = {
+  id: number;
+  inquiryMessageId?: number | null;
+  mimeType: string | null;
+  fileSize: number | null;
+  width: number | null;
+  height: number | null;
+  uploadStatus: string;
+  objectKey: string;
+  createdAt: Date;
+  updatedAt?: Date;
+};
+
+function iso(value: Date | null | undefined) {
+  return value ? value.toISOString() : null;
+}
+
+function bodyHash(body: string | null) {
+  return body === null ? null : createHash("sha256").update(body).digest("hex");
+}
+
+/** Server-owned, URL-free input record retained with an AI snapshot. */
+export function buildInquiryAiInputSnapshot(input: {
+  inquiryId: number;
+  messages: FingerprintMessage[];
+  files: FingerprintFile[];
+}) {
+  return {
+    inquiryId: input.inquiryId,
+    messages: [...input.messages]
+      .sort((a, b) => a.id - b.id)
+      .map((message) => ({
+        id: message.id,
+        direction: message.direction,
+        messageType: message.messageType,
+        bodyHash: bodyHash(message.body),
+        receivedAt: iso(message.receivedAt),
+        sentAt: iso(message.sentAt),
+        status: message.status,
+        createdAt: iso(message.createdAt),
+      })),
+    files: input.files
+      .filter((file) => file.uploadStatus === "STORED")
+      .sort((a, b) => a.id - b.id)
+      .map((file) => ({
+        id: file.id,
+        inquiryMessageId: file.inquiryMessageId ?? null,
+        mimeType: file.mimeType,
+        fileSize: file.fileSize,
+        width: file.width,
+        height: file.height,
+        uploadStatus: file.uploadStatus,
+        objectKey: file.objectKey,
+        createdAt: iso(file.createdAt),
+        updatedAt: iso(file.updatedAt),
+      })),
+  };
+}
+
+export function fingerprintInquiryAiInput(snapshot: ReturnType<typeof buildInquiryAiInputSnapshot>) {
+  return createHash("sha256").update(JSON.stringify(snapshot)).digest("hex");
+}
 
 function identity(lineUser: {
   displayName: string | null;
@@ -117,11 +192,20 @@ export async function getInquiryAiContext(
           uploadStatus: true,
           objectKey: true,
           createdAt: true,
+          updatedAt: true,
+          inquiryMessageId: true,
         },
       },
     },
   });
   if (!inquiry) return null;
+
+  const inputSnapshot = buildInquiryAiInputSnapshot({
+    inquiryId: inquiry.id,
+    messages: inquiry.messages,
+    files: inquiry.files,
+  });
+  const inputFingerprint = fingerprintInquiryAiInput(inputSnapshot);
 
   const messages = [...inquiry.messages].sort((left, right) => {
     const timestampDifference = conversationTimestamp(left).getTime() - conversationTimestamp(right).getTime();
@@ -149,6 +233,7 @@ export async function getInquiryAiContext(
     status: inquiry.status,
     firstReceivedAt: inquiry.firstReceivedAt,
     lastReceivedAt: inquiry.lastReceivedAt,
+    inputFingerprint,
     ...contextIdentity,
     messages,
     files: await Promise.all(inquiry.files.map(async (file) => ({

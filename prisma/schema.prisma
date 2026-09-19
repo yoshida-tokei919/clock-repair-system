@@ -182,18 +182,57 @@ enum InquiryFileStatus {
   FAILED
 }
 
+enum InquiryAiAnalysisStatus {
+  PENDING
+  COMPLETED
+  NEEDS_REVIEW
+  FAILED
+}
+
+enum InquiryAiConfidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum InquiryAiReviewStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum InquiryAiCandidateField {
+  BRAND
+  MODEL
+  PRODUCT_REF
+  CASE_REF
+  CALIBER
+  MOVEMENT_TYPE
+  ERA
+}
+
+enum InquiryAiSourceType {
+  CUSTOMER_STATED
+  IMAGE_OBSERVED
+  WEB_INFERRED
+  AI_INFERRED
+  TECHNICIAN_CONFIRMED
+}
+
 model Inquiry {
   id              Int           @id @default(autoincrement())
   lineUserId      Int
   status          InquiryStatus @default(OPEN)
   firstReceivedAt DateTime
   lastReceivedAt  DateTime
+  conversationSummary String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
   lineUser LineUser         @relation(fields: [lineUserId], references: [id], onDelete: Restrict)
   messages InquiryMessage[]
   files    InquiryFile[]
+  analyses InquiryAiAnalysis[]
   slackNotifications SlackNotificationOutbox[]
 
   @@index([lineUserId, status])
@@ -245,6 +284,75 @@ model InquiryFile {
   @@unique([provider, providerFileId])
   @@index([inquiryId, createdAt])
   @@index([uploadStatus])
+}
+
+model InquiryAiAnalysis {
+  id                   Int                     @id @default(autoincrement())
+  inquiryId            Int
+  status               InquiryAiAnalysisStatus
+  idempotencyKey       String                  @unique
+  inputFingerprint     String
+  modelProvider        String
+  modelName            String
+  promptVersion        String
+  inputSnapshot        Json
+  conversationSummary  String?
+  watchCount           Int?
+  watchCountConfidence InquiryAiConfidence?
+  unresolvedPoints     Json?
+  errorMessage         String?
+  completedAt          DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  inquiry Inquiry          @relation(fields: [inquiryId], references: [id], onDelete: Restrict)
+  watches InquiryAiWatch[]
+
+  @@index([inquiryId, createdAt])
+  @@index([inquiryId, inputFingerprint])
+}
+
+model InquiryAiWatch {
+  id                     Int                 @id @default(autoincrement())
+  analysisId             Int
+  position               Int
+  label                  String?
+  summary                String?
+  segmentationConfidence InquiryAiConfidence?
+  faults                 Json?
+  requestedWork          Json?
+  supplementalFacts      Json?
+  missingInformation     Json?
+  missingPhotos          Json?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  analysis   InquiryAiAnalysis    @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  candidates InquiryAiCandidate[]
+
+  @@unique([analysisId, position])
+}
+
+model InquiryAiCandidate {
+  id               Int                     @id @default(autoincrement())
+  watchId          Int
+  field            InquiryAiCandidateField
+  rank             Int                     @default(0)
+  value            String
+  confidence       InquiryAiConfidence?
+  evidence         String?
+  observedText     String?
+  sourceType       InquiryAiSourceType
+  sourceMessageIds Json?
+  sourceImageIds   Json?
+  reviewStatus     InquiryAiReviewStatus   @default(PENDING)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  watch InquiryAiWatch @relation(fields: [watchId], references: [id], onDelete: Cascade)
+
+  @@index([watchId, field])
+  @@index([reviewStatus])
 }
 
 // 2. Watch Metadata (Smart Input)

@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { LineProfileDisplayNameResolver } from "./line-profile";
+import { lockLineUserInquiryTransaction } from "./inquiry-transaction-lock";
 
 type LineEvent = {
   type?: unknown;
@@ -13,7 +14,6 @@ export type LineInquiryProcessorDb = Pick<
   "lineWebhookInbox" | "$transaction" | "customer" | "lineUser" | "inquiry" | "inquiryMessage" | "inquiryFile" | "slackNotificationOutbox"
 >;
 
-const LINE_INQUIRY_ADVISORY_LOCK_NAMESPACE = 726_001;
 const LINE_INBOX_MAX_ATTEMPTS = 5;
 const LINE_INBOX_STALE_PROCESSING_MS = 10 * 60 * 1000;
 
@@ -139,12 +139,7 @@ async function saveInboundMessage(
 ) {
   try {
     return await db.$transaction(async (tx) => {
-      await tx.$executeRaw`
-        SELECT pg_advisory_xact_lock(
-          ${LINE_INQUIRY_ADVISORY_LOCK_NAMESPACE}::int,
-          ${input.lineUserId}::int
-        )
-      `;
+      await lockLineUserInquiryTransaction(tx, input.lineUserId);
 
       const existingMessage = await tx.inquiryMessage.findUnique({
         where: { externalMessageId: input.externalMessageId },
@@ -152,29 +147,45 @@ async function saveInboundMessage(
       });
       if (existingMessage) return { ...existingMessage, created: false };
 
-      const openInquiries = await tx.inquiry.findMany({
-        where: { lineUserId: input.lineUserId, status: "OPEN" },
+      const activeInquiries = await tx.inquiry.findMany({
+        where: { lineUserId: input.lineUserId, status: { in: ["OPEN", "AI_PENDING", "AI_PROCESSED", "NEEDS_REVIEW", "WAITING_CUSTOMER", "READY_FOR_INTAKE"] } },
         orderBy: { id: "asc" },
-        select: { id: true },
+        select: { id: true, status: true },
       });
-      const createdNewInquiry = openInquiries.length === 0;
-      const inquiry = openInquiries.length === 1
-        ? { ...openInquiries[0], status: "OPEN" as const }
-        : createdNewInquiry
-          ? await tx.inquiry.create({
-              data: {
-                lineUserId: input.lineUserId,
-                status: "OPEN",
-                firstReceivedAt: input.receivedAt,
-                lastReceivedAt: input.receivedAt,
-              },
+      const createdNewInquiry = activeInquiries.length === 0;
+      let inquiry: { id: number; status: string };
+      if (activeInquiries.length === 1) {
+        inquiry = await tx.inquiry.update({
+            where: { id: activeInquiries[0].id },
+            data: {
+              lastReceivedAt: input.receivedAt,
+              ...(activeInquiries[0].status === "NEEDS_REVIEW" ? {} : { status: "AI_PENDING" }),
+            },
+            select: { id: true, status: true },
+          });
+      } else if (createdNewInquiry) {
+        inquiry = await tx.inquiry.create({
+          data: {
+            lineUserId: input.lineUserId,
+            status: "OPEN",
+            firstReceivedAt: input.receivedAt,
+            lastReceivedAt: input.receivedAt,
+          },
+          select: { id: true, status: true },
+        });
+      } else {
+        const needsReviewInquiry = await tx.inquiry.findFirst({
+          where: { lineUserId: input.lineUserId, status: "NEEDS_REVIEW" },
+          orderBy: { id: "asc" },
+          select: { id: true, status: true },
+        });
+        inquiry = needsReviewInquiry
+          ? await tx.inquiry.update({
+              where: { id: needsReviewInquiry.id },
+              data: { lastReceivedAt: input.receivedAt },
               select: { id: true, status: true },
             })
-          : await tx.inquiry.findFirst({
-              where: { lineUserId: input.lineUserId, status: "NEEDS_REVIEW" },
-              orderBy: { id: "asc" },
-              select: { id: true, status: true },
-            }) ?? await tx.inquiry.create({
+          : await tx.inquiry.create({
               data: {
                 lineUserId: input.lineUserId,
                 status: "NEEDS_REVIEW",
@@ -183,6 +194,7 @@ async function saveInboundMessage(
               },
               select: { id: true, status: true },
             });
+      }
 
       const message = await tx.inquiryMessage.create({
         data: {

@@ -56,6 +56,7 @@ function createFakeDb() {
     }),
     findMany: async () => [],
     findFirst: async () => null,
+    update: async ({ where, data }: { where: { id: number }; data: Record<string, unknown> }) => ({ id: where.id, ...data }),
     create: async ({ data }: { data: Record<string, unknown> }) => {
       const inquiry = { id: 1, ...data };
       inquiries.push(inquiry);
@@ -234,8 +235,10 @@ test("a failed image handler creates no repair-inbox notification, then a succes
 
 test("multiple OPEN inquiries route the message to NEEDS_REVIEW notification", async () => {
   const fake = createFakeDb();
+  let update: any;
   (fake.db as any).inquiry.findMany = async () => [{ id: 1 }, { id: 2 }];
   (fake.db as any).inquiry.findFirst = async () => ({ id: 3, status: "NEEDS_REVIEW" });
+  (fake.db as any).inquiry.update = async (input: any) => { update = input; return { id: 3, status: "NEEDS_REVIEW" }; };
   (fake.db as any).inquiry.findUnique = async () => ({
     id: 3,
     status: "NEEDS_REVIEW",
@@ -244,6 +247,47 @@ test("multiple OPEN inquiries route the message to NEEDS_REVIEW notification", a
 
   await processLineWebhookInboxItem(fake.db, 1);
 
+  assert.equal(fake.notifications[0]?.kind, "NEEDS_REVIEW");
+  assert.equal(update.where.id, 3);
+  assert.ok(update.data.lastReceivedAt instanceof Date);
+  assert.equal("status" in update.data, false);
+});
+
+test("AI_PROCESSED Inquiry is reused and returned to AI_PENDING for a new inbound message", async () => {
+  const fake = createFakeDb();
+  let update: any;
+  (fake.db as any).inquiry.findMany = async () => [{ id: 8, status: "AI_PROCESSED" }];
+  (fake.db as any).inquiry.update = async (input: any) => { update = input; return { id: 8, ...input.data }; };
+  (fake.db as any).inquiry.findUnique = async () => ({ id: 8, status: "AI_PENDING", lineUser: { displayName: null, linkedCustomer: null } });
+
+  await processLineWebhookInboxItem(fake.db, 1);
+
+  assert.equal(fake.inquiries.length, 0);
+  assert.equal(fake.messages[0]?.inquiryId, 8);
+  assert.equal(update.data.status, "AI_PENDING");
+});
+
+test("CLOSED Inquiry is not reused", async () => {
+  const fake = createFakeDb();
+  (fake.db as any).inquiry.findMany = async () => [];
+
+  await processLineWebhookInboxItem(fake.db, 1);
+
+  assert.equal(fake.inquiries.length, 1);
+  assert.equal(fake.inquiries[0]?.status, "OPEN");
+});
+
+test("a single NEEDS_REVIEW Inquiry is reused without changing its review state", async () => {
+  const fake = createFakeDb();
+  let update: any;
+  (fake.db as any).inquiry.findMany = async () => [{ id: 8, status: "NEEDS_REVIEW" }];
+  (fake.db as any).inquiry.update = async (input: any) => { update = input; return { id: 8, ...input.data, status: "NEEDS_REVIEW" }; };
+  (fake.db as any).inquiry.findUnique = async () => ({ id: 8, status: "NEEDS_REVIEW", lineUser: { displayName: null, linkedCustomer: null } });
+
+  await processLineWebhookInboxItem(fake.db, 1);
+
+  assert.equal(fake.messages[0]?.inquiryId, 8);
+  assert.equal("status" in update.data, false);
   assert.equal(fake.notifications[0]?.kind, "NEEDS_REVIEW");
 });
 
