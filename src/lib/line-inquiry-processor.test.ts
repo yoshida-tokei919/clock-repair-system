@@ -46,7 +46,14 @@ function createFakeDb() {
     },
   };
   db.inquiry = {
-    findUnique: async () => ({ id: 1, status: "OPEN" }),
+    findUnique: async () => ({
+      id: 1,
+      status: "OPEN",
+      lineUser: {
+        displayName: (users[users.length - 1]?.displayName as string | undefined) ?? null,
+        linkedCustomer: null,
+      },
+    }),
     findMany: async () => [],
     findFirst: async () => null,
     create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -112,6 +119,45 @@ test("claimed text inbox is persisted into Inquiry and marked PROCESSED", async 
   assert.equal(fake.messages[0]?.body, "テスト相談");
   assert.equal(fake.inbox.status, "PROCESSED");
   assert.ok(fake.inbox.processedAt instanceof Date);
+});
+
+test("a resolved LINE profile name is saved and used for an unregistered notification", async () => {
+  const fake = createFakeDb();
+
+  await processLineWebhookInboxItem(fake.db, 1, {
+    resolveDisplayName: async () => "LINE Display Name",
+  });
+
+  assert.equal(fake.users[0]?.displayName, "LINE Display Name");
+  assert.ok(String(fake.notifications[0]?.text).includes("LINE Display Name（未登録）からお問い合わせが来ています。"));
+  assert.ok(!String(fake.notifications[0]?.text).includes(String(fake.messages[0]?.body)));
+});
+
+test("a failed LINE profile lookup does not fail inbox processing and uses the safe fallback", async () => {
+  const fake = createFakeDb();
+
+  const result = await processLineWebhookInboxItem(fake.db, 1, {
+    resolveDisplayName: async () => { throw new Error("profile unavailable"); },
+  });
+
+  assert.equal(result, "processed");
+  assert.ok(String(fake.notifications[0]?.text).includes("LINE表示名未取得（未登録）からお問い合わせが来ています。"));
+});
+
+test("a linked Customer name is used for the notification identity", async () => {
+  const fake = createFakeDb();
+  (fake.db as any).inquiry.findUnique = async () => ({
+    id: 1,
+    status: "OPEN",
+    lineUser: {
+      displayName: "Ignored LINE name",
+      linkedCustomer: { name: "Official Customer Name" },
+    },
+  });
+
+  await processLineWebhookInboxItem(fake.db, 1);
+
+  assert.ok(String(fake.notifications[0]?.text).includes("Official Customer Nameさま（既存）からお問い合わせが来ています。"));
 });
 
 test("image inbox creates IMAGE message and calls the image handler", async () => {
@@ -190,7 +236,11 @@ test("multiple OPEN inquiries route the message to NEEDS_REVIEW notification", a
   const fake = createFakeDb();
   (fake.db as any).inquiry.findMany = async () => [{ id: 1 }, { id: 2 }];
   (fake.db as any).inquiry.findFirst = async () => ({ id: 3, status: "NEEDS_REVIEW" });
-  (fake.db as any).inquiry.findUnique = async () => ({ id: 3, status: "NEEDS_REVIEW" });
+  (fake.db as any).inquiry.findUnique = async () => ({
+    id: 3,
+    status: "NEEDS_REVIEW",
+    lineUser: { displayName: null, linkedCustomer: null },
+  });
 
   await processLineWebhookInboxItem(fake.db, 1);
 

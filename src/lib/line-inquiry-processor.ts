@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import type { LineProfileDisplayNameResolver } from "./line-profile";
 
 type LineEvent = {
   type?: unknown;
@@ -70,12 +71,17 @@ function asLineEvent(rawEvent: Prisma.JsonValue): LineEvent | null {
 }
 async function saveLineUser(
   db: LineInquiryProcessorDb,
-  input: { lineUserId: string; eventType: string; now: Date },
+  input: {
+    lineUserId: string;
+    eventType: string;
+    now: Date;
+    resolveDisplayName?: LineProfileDisplayNameResolver;
+  },
 ) {
   const [existing, matchingCustomers] = await Promise.all([
     db.lineUser.findUnique({
       where: { lineUserId: input.lineUserId },
-      select: { linkedCustomerId: true, linkedAt: true },
+      select: { linkedCustomerId: true, linkedAt: true, displayName: true },
     }),
     db.customer.findMany({
       where: { lineId: input.lineUserId },
@@ -91,6 +97,14 @@ async function saveLineUser(
     matchingCustomers.length === 1 ? matchingCustomers[0].id : null;
   const linkedCustomerId = existing?.linkedCustomerId ?? matchedCustomerId;
   const linkedAt = existing?.linkedAt ?? (matchedCustomerId ? input.now : null);
+  let displayName: string | null = null;
+  if (!existing?.displayName && input.resolveDisplayName) {
+    try {
+      displayName = await input.resolveDisplayName(input.lineUserId);
+    } catch {
+      console.warn("LINE profile display name lookup failed; continuing inbox processing.");
+    }
+  }
   return db.lineUser.upsert({
     where: { lineUserId: input.lineUserId },
     create: {
@@ -100,6 +114,7 @@ async function saveLineUser(
       lastEventType: input.eventType,
       linkedCustomerId,
       linkedAt,
+      ...(displayName ? { displayName } : {}),
     },
     update: {
       lastReceivedAt: input.now,
@@ -107,6 +122,7 @@ async function saveLineUser(
       ...(existing?.linkedCustomerId === null && matchedCustomerId
         ? { linkedCustomerId: matchedCustomerId, linkedAt }
         : {}),
+      ...(displayName ? { displayName } : {}),
     },
   });
 }
@@ -205,14 +221,21 @@ async function ensureInboundMessageNotification(
     inquiryId: number;
     externalMessageId: string;
     messageType: "TEXT" | "IMAGE";
-    linkedCustomer: boolean;
   },
 ) {
   return db.$transaction(async (tx) => {
     const [inquiry, messageCount, imageCount] = await Promise.all([
       tx.inquiry.findUnique({
         where: { id: input.inquiryId },
-        select: { status: true },
+        select: {
+          status: true,
+          lineUser: {
+            select: {
+              displayName: true,
+              linkedCustomer: { select: { name: true } },
+            },
+          },
+        },
       }),
       tx.inquiryMessage.count({
         where: { inquiryId: input.inquiryId, direction: "INBOUND" },
@@ -240,7 +263,8 @@ async function ensureInboundMessageNotification(
         text: formatInquiryNotification({
           kind,
           inquiryId: input.inquiryId,
-          linkedCustomer: input.linkedCustomer,
+          customerName: inquiry.lineUser.linkedCustomer?.name ?? null,
+          lineDisplayName: inquiry.lineUser.displayName,
           messageCount,
           imageCount,
           inquiryStatus: inquiry.status,
@@ -254,7 +278,8 @@ async function ensureInboundMessageNotification(
 function formatInquiryNotification(input: {
   kind: "NEW_INQUIRY" | "IMAGE_ADDED" | "INQUIRY_UPDATED" | "NEEDS_REVIEW";
   inquiryId: number;
-  linkedCustomer: boolean;
+  customerName: string | null;
+  lineDisplayName: string | null;
   messageCount: number;
   imageCount: number;
   inquiryStatus: string;
@@ -262,7 +287,9 @@ function formatInquiryNotification(input: {
   return [
     `[${input.kind}]`,
     `Inquiry: I-${input.inquiryId}`,
-    `Customer: ${input.linkedCustomer ? "existing customer" : "unlinked"}`,
+    input.customerName
+      ? `${input.customerName}さま（既存）からお問い合わせが来ています。`
+      : `${input.lineDisplayName ?? "LINE表示名未取得"}（未登録）からお問い合わせが来ています。`,
     `Inbound messages: ${input.messageCount}`,
     `Stored images: ${input.imageCount}`,
     `Status: ${input.inquiryStatus}`,
@@ -281,10 +308,15 @@ export type LineInquiryImageHandler = (input: {
   receivedAt: Date;
 }) => Promise<unknown>;
 
+export type LineInquiryProcessorOptions = {
+  handleImage?: LineInquiryImageHandler;
+  resolveDisplayName?: LineProfileDisplayNameResolver;
+};
+
 export async function processLineWebhookInboxItem(
   db: LineInquiryProcessorDb,
   inboxId: number,
-  options: { handleImage?: LineInquiryImageHandler } = {},
+  options: LineInquiryProcessorOptions = {},
 ): Promise<"processed" | "skipped"> {
   const inbox = await db.lineWebhookInbox.findUnique({
     where: { id: inboxId },
@@ -312,6 +344,7 @@ export async function processLineWebhookInboxItem(
         lineUserId: userId,
         eventType: inbox.eventType,
         now: receivedAt,
+        resolveDisplayName: options.resolveDisplayName,
       });
 
       if (
@@ -332,7 +365,6 @@ export async function processLineWebhookInboxItem(
           inquiryId: message.inquiryId,
           externalMessageId: event.message.id,
           messageType: "TEXT",
-          linkedCustomer: Boolean(lineUser.linkedCustomerId),
         });
       }
 
@@ -375,7 +407,6 @@ export async function processLineWebhookInboxItem(
           inquiryId: message.inquiryId,
           externalMessageId: event.message.id,
           messageType: "IMAGE",
-          linkedCustomer: Boolean(lineUser.linkedCustomerId),
         });
       }
     }

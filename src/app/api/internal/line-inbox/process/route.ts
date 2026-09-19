@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleLineInquiryImage } from "@/lib/line-inquiry-image";
+import { resolveLineProfileDisplayName } from "@/lib/line-profile";
 import {
   claimLineWebhookInboxBatch,
   processLineWebhookInboxItem,
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest) {
     try {
       const result = await processLineWebhookInboxItem(prisma, inboxId, {
         handleImage: (input) => handleLineInquiryImage(prisma, input),
+        resolveDisplayName: resolveLineProfileDisplayName,
       });
       if (result === "processed") processed += 1;
       else skipped += 1;

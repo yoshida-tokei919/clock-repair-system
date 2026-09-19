@@ -5,6 +5,8 @@ Before investigating or modifying this repository, read:
 1. `docs/ai/04_IMPLEMENTATION_RULES.md`
 2. `docs/ai/03_CURRENT_TASK.md`
 
+When handling LINE inquiries, Slack inquiry notifications, or AI intake processing, also read `docs/ai/05_INQUIRY_AI_RUNBOOK.md` after the documents above.
+
 Follow the current Task boundary.
 Do not modify files or behavior outside the current Task unless the user explicitly expands the scope.
 
