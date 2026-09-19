@@ -9,7 +9,7 @@
 - Inspect every returned image with Desktop Commander `read_file(localImagePath)`, then create the structured provisional analysis.
 - Use Desktop Commander `write_file` only for the fixed outbox path `%LOCALAPPDATA%\clock-repair-system\inquiry-ai-outbox\I-<id>.json`; then run `save -InquiryId <id>`.
 - On `409` with `error: "stale"`, discard the result, rerun detail, and analyze the latest context. On `401`, stop for an auth mismatch; do not retry by printing tokens. On `503`, stop because the server token configuration is missing.
-- After image inspection or save, run `clear-cache -InquiryId <id>`. Repair creation and formal Watch/master values remain out of scope. Production end-to-end remains pending until Task 2 + Task 3 deployment approval.
+- After image inspection or save, run `clear-cache -InquiryId <id>`. Repair creation and formal Watch/master values remain out of scope. Production end-to-end was verified on 2026-09-19; the same safety boundaries remain mandatory for daily operation.
 
 ## Task 2: structured analysis write
 

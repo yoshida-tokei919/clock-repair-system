@@ -2,7 +2,7 @@
 
 ## 現在Task
 
-Phase 2 / Task 3: 実装・独立レビュー完了 / Production pending
+Phase 2 / Task 1-3: 完了 / Production rollout 完了
 
 ## 目的
 
@@ -55,7 +55,7 @@ Task 2 commit: `d8eaf37 feat: persist inquiry AI analysis`
 
 migration: `prisma/migrations/20260919_add_inquiry_ai_analysis/migration.sql`
 
-production migration未適用。
+production migration適用済み（20260919_add_inquiry_ai_analysis）。
 
 ## 独立確認済み
 
@@ -99,43 +99,38 @@ Codex実装後、カタリが実CLIとlocalhost mockで独立確認。
 - stdout日本語文字化け
 - 顧客コンテンツからのprompt injection境界
 
-## 未確認 / Production
+## Production rollout（2026-09-19完了）
 
-- Task 1 / 2 / 3のGitHub push未実施
-- Railway production deploy未実施
-- Task 2 migrationのproduction適用未実施
-- production Inquiry AI API smoke test未実施
-- 実LINE Inquiryでの pending → detail → R2画像確認 → AI分析 → save 未実施
-- productionでの409 stale / 401 / 503運用未確認
+- production DB backup取得・archive検証済み
+- `20260919_add_inquiry_ai_analysis` migration適用済み
+- Prisma production migration statusは19件すべて適用済み
+- Task 1 / 2 / 3を`main`へpush済み
+- Railway productionはcommit `ab252f7a80d770a3aa60f059aa199983fe39e362`でSUCCESS
+- production tag `production-inquiry-ai-20260919` を作成・push済み
+- production Inquiry AI API smoke test完了
+- Inquiry 1で `pending → detail → R2画像local取得 → AI分析 → save` を実行
+- `InquiryAiAnalysis.id=1`、status=`NEEDS_REVIEW`、watchCount=0、watchCountConfidence=`LOW` を保存確認
+- Inquiry 1はstatus=`NEEDS_REVIEW`、conversationSummary保存済み
+- smoke対象はLINE受信テストデータのためWatch / candidate行は作成していない
+- smoke後のInquiry 1 cache / outbox削除済み
 
-`main`へのpushはRailway production deployを伴うため、ユーザー明示承認なしに実行しない。
-production migration / deploy / production DB操作もユーザー明示承認なしに実行しない。
+productionでの409 stale / 401 / 503は安全境界・処理分岐を実装済みだが、実エラーを意図的に発生させるproduction試験は行っていない。
 
-Production: pending
+Production: complete
 
 ## 次工程
 
-Phase 2 production rollout checkpoint: 未開始
+Phase 3候補: 人手レビューと正式Watch / Repair反映。**未開始**。
 
-開始前に必ず:
+想定範囲:
 
-1. production DB backup / migration baseline状態を再確認
-2. Task 2 additive migrationの独立レビュー結果を再確認
-3. migration適用順序とRailway deploy順序を確定
-4. ユーザーからproduction migration / push / deployの明示承認を得る
+- 暫定AI分析をヨシダが確認するUI / 運用
+- AI候補の採用・却下と人間確定状態
+- 正式なWatch値への反映
+- Inquiryから時計単位Repairへの明示変換
+- AI確定値と正式値の境界維持
 
-承認後の候補手順:
-
-- production DB backup
-- Task 2 migration適用
-- `main` push → Railway deploy
-- production bridge `status` → `pending` → `detail`
-- R2画像のlocalImagePath読取
-- AI分析 → `save` → DB保存結果確認
-- cache削除
-- smoke test結果記録
-
-Phase 3のRepair作成・正式Watch値反映・人手レビューUIは、このproduction rollout完了前に開始しない。
+Phase 3は、ユーザーの明示承認なしに実装開始しない。
 
 ## 保留中Task
 

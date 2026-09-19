@@ -67,3 +67,7 @@ MANUAL_UPLOAD_KEY.txt
 !/docs/data/fmp/generated/import-dry-run/*.sample.json
 .next-dev.log
 WEBページ写真素材/
+
+# local runtime / CLI state
+/server_error.txt
+/supabase/.temp/
