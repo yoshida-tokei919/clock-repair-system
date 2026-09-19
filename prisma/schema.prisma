@@ -109,6 +109,51 @@ model LineWebhookInbox {
   @@index([status, lastAttemptAt])
 }
 
+enum SlackNotificationTarget {
+  REPAIR_INBOX
+  REPAIR_ERRORS
+}
+
+enum SlackNotificationKind {
+  NEW_INQUIRY
+  IMAGE_ADDED
+  INQUIRY_UPDATED
+  NEEDS_REVIEW
+  INBOX_PROCESSING_FAILED
+}
+
+enum SlackNotificationOutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+// Durable internal-notification queue. Slack delivery is intentionally owned by n8n.
+model SlackNotificationOutbox {
+  id              Int                          @id @default(autoincrement())
+  target          SlackNotificationTarget
+  kind            SlackNotificationKind
+  dedupeKey       String                       @unique
+  status          SlackNotificationOutboxStatus @default(PENDING)
+  attemptCount    Int                          @default(0)
+  lastAttemptAt   DateTime?
+  processingToken String?
+  sentAt          DateTime?
+  lastError       String?
+  text            String
+  inquiryId       Int?
+  inboxId         Int?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  inquiry Inquiry? @relation(fields: [inquiryId], references: [id], onDelete: SetNull)
+
+  @@index([status, lastAttemptAt])
+  @@index([inquiryId])
+  @@index([inboxId])
+}
+
 enum InquiryStatus {
   OPEN
   AI_PENDING
@@ -149,6 +194,7 @@ model Inquiry {
   lineUser LineUser         @relation(fields: [lineUserId], references: [id], onDelete: Restrict)
   messages InquiryMessage[]
   files    InquiryFile[]
+  slackNotifications SlackNotificationOutbox[]
 
   @@index([lineUserId, status])
   @@index([lineUserId, lastReceivedAt])

@@ -18,12 +18,15 @@ function createFakeDb() {
     },
     receivedAt: new Date("2026-09-18T00:00:00.000Z"),
     status: "PROCESSING",
+    attemptCount: 1,
     processedAt: null as Date | null,
     lastError: null as string | null,
   };
   const users: Array<Record<string, unknown>> = [];
   const inquiries: Array<Record<string, unknown>> = [];
   const messages: Array<Record<string, unknown>> = [];
+  const notifications: Array<Record<string, unknown>> = [];
+  let storedImageCount = 0;
   const db: any = {};
   db.lineWebhookInbox = {
     findUnique: async ({ where }: { where: { id: number } }) =>
@@ -43,6 +46,7 @@ function createFakeDb() {
     },
   };
   db.inquiry = {
+    findUnique: async () => ({ id: 1, status: "OPEN" }),
     findMany: async () => [],
     findFirst: async () => null,
     create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -53,10 +57,29 @@ function createFakeDb() {
   };
   db.inquiryMessage = {
     findUnique: async () => null,
+    count: async () => messages.length,
     create: async ({ data }: { data: Record<string, unknown> }) => {
       const message = { id: 1, ...data };
       messages.push(message);
       return message;
+    },
+  };
+  db.inquiryFile = {
+    count: async () => storedImageCount,
+    findUnique: async () => ({ uploadStatus: storedImageCount > 0 ? "STORED" : "FAILED" }),
+  };
+  db.slackNotificationOutbox = {
+    create: async ({ data }: { data: Record<string, unknown> }) => {
+      const notification = { id: notifications.length + 1, ...data };
+      notifications.push(notification);
+      return notification;
+    },
+    upsert: async ({ create }: { create: Record<string, unknown> }) => {
+      const existing = notifications.find((notification) => notification.dedupeKey === create.dedupeKey);
+      if (existing) return existing;
+      const notification = { id: notifications.length + 1, ...create };
+      notifications.push(notification);
+      return notification;
     },
   };
   db.$executeRaw = async () => undefined;
@@ -68,6 +91,8 @@ function createFakeDb() {
     users,
     inquiries,
     messages,
+    notifications,
+    setStoredImageCount: (count: number) => { storedImageCount = count; },
   };
 }
 
@@ -81,6 +106,9 @@ test("claimed text inbox is persisted into Inquiry and marked PROCESSED", async 
   assert.equal(fake.inquiries.length, 1);
   assert.equal(fake.messages.length, 1);
   assert.equal(fake.messages[0]?.externalMessageId, "M-test");
+  assert.equal(fake.notifications.length, 1);
+  assert.equal(fake.notifications[0]?.kind, "NEW_INQUIRY");
+  assert.ok(!String(fake.notifications[0]?.text).includes(String(fake.messages[0]?.body)));
   assert.equal(fake.messages[0]?.body, "テスト相談");
   assert.equal(fake.inbox.status, "PROCESSED");
   assert.ok(fake.inbox.processedAt instanceof Date);
@@ -88,20 +116,25 @@ test("claimed text inbox is persisted into Inquiry and marked PROCESSED", async 
 
 test("image inbox creates IMAGE message and calls the image handler", async () => {
   const fake = createFakeDb();
+  (fake.db as any).inquiry.findMany = async () => [{ id: 1 }];
+  fake.messages.push({ id: 99, inquiryId: 1, direction: "INBOUND" });
   (fake.inbox.rawEvent as any).message = { id: "M-image", type: "image" };
   const imageCalls: Array<Record<string, unknown>> = [];
 
   const result = await processLineWebhookInboxItem(fake.db, 1, {
     handleImage: async (input) => {
       imageCalls.push(input);
+      fake.setStoredImageCount(1);
     },
   });
 
   assert.equal(result, "processed");
-  assert.equal(fake.messages.length, 1);
-  assert.equal(fake.messages[0]?.externalMessageId, "M-image");
-  assert.equal(fake.messages[0]?.messageType, "IMAGE");
-  assert.equal(fake.messages[0]?.body, null);
+  assert.equal(fake.messages.length, 2);
+  assert.equal(fake.messages[1]?.externalMessageId, "M-image");
+  assert.equal(fake.messages[1]?.messageType, "IMAGE");
+  assert.equal(fake.notifications[0]?.kind, "IMAGE_ADDED");
+  assert.ok(String(fake.notifications[0]?.text).includes("Stored images: 1"));
+  assert.equal(fake.messages[1]?.body, null);
   assert.equal(imageCalls.length, 1);
   assert.equal(imageCalls[0]?.inquiryId, 1);
   assert.equal(imageCalls[0]?.inquiryMessageId, 1);
@@ -118,6 +151,62 @@ test("already processed inbox is skipped", async () => {
   assert.equal(fake.users.length, 0);
   assert.equal(fake.inquiries.length, 0);
   assert.equal(fake.messages.length, 0);
+});
+
+test("a replayed external message does not enqueue another notification", async () => {
+  const fake = createFakeDb();
+  await processLineWebhookInboxItem(fake.db, 1);
+  (fake.inbox as any).status = "PROCESSING";
+  (fake.db as any).inquiryMessage.findUnique = async () => ({ id: 1, inquiryId: 1 });
+
+  await processLineWebhookInboxItem(fake.db, 1);
+
+  assert.equal(fake.notifications.length, 1);
+});
+
+test("a failed image handler creates no repair-inbox notification, then a successful retry ensures one", async () => {
+  const fake = createFakeDb();
+  (fake.db as any).inquiry.findMany = async () => [{ id: 1 }];
+  (fake.inbox.rawEvent as any).message = { id: "M-image", type: "image" };
+
+  await assert.rejects(
+    () => processLineWebhookInboxItem(fake.db, 1, { handleImage: async () => { throw new Error("R2 failed"); } }),
+  );
+  assert.equal(fake.notifications.filter((item) => item.target === "REPAIR_INBOX").length, 0);
+
+  (fake.inbox as any).status = "PROCESSING";
+  (fake.db as any).inquiryMessage.findUnique = async () => ({ id: 1, inquiryId: 1 });
+  await processLineWebhookInboxItem(fake.db, 1, {
+    handleImage: async () => { fake.setStoredImageCount(1); },
+  });
+
+  const inboxNotifications = fake.notifications.filter((item) => item.target === "REPAIR_INBOX");
+  assert.equal(inboxNotifications.length, 1);
+  assert.equal(inboxNotifications[0]?.kind, "NEW_INQUIRY");
+  assert.ok(String(inboxNotifications[0]?.text).includes("Stored images: 1"));
+});
+
+test("multiple OPEN inquiries route the message to NEEDS_REVIEW notification", async () => {
+  const fake = createFakeDb();
+  (fake.db as any).inquiry.findMany = async () => [{ id: 1 }, { id: 2 }];
+  (fake.db as any).inquiry.findFirst = async () => ({ id: 3, status: "NEEDS_REVIEW" });
+  (fake.db as any).inquiry.findUnique = async () => ({ id: 3, status: "NEEDS_REVIEW" });
+
+  await processLineWebhookInboxItem(fake.db, 1);
+
+  assert.equal(fake.notifications[0]?.kind, "NEEDS_REVIEW");
+});
+
+test("final Inbox processing failure enqueues one repair-errors notification", async () => {
+  const fake = createFakeDb();
+  (fake.inbox as any).rawEvent.message = { id: "M-image", type: "image" };
+  (fake.inbox as any).attemptCount = 5;
+
+  await assert.rejects(() => processLineWebhookInboxItem(fake.db, 1));
+  (fake.inbox as any).status = "PROCESSING";
+  await assert.rejects(() => processLineWebhookInboxItem(fake.db, 1));
+
+  assert.equal(fake.notifications.filter((item) => item.kind === "INBOX_PROCESSING_FAILED").length, 1);
 });
 
 test("claim batch marks eligible inbox rows PROCESSING with an attempt", async () => {
