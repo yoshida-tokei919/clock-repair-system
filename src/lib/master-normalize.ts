@@ -14,6 +14,14 @@ type PrismaLike = {
         create: (args: any) => Promise<any>;
         update: (args: any) => Promise<any>;
     };
+    model: {
+        findMany: (args?: any) => Promise<any[]>;
+        create: (args: any) => Promise<any>;
+    };
+    watchReference: {
+        findMany: (args?: any) => Promise<any[]>;
+        create: (args: any) => Promise<any>;
+    };
 };
 
 const IGNORED_BRAND_PUNCTUATION = /[&＆.・'’‘`´]/g;
@@ -119,4 +127,34 @@ export async function findOrCreateCaliber(db: PrismaLike, rawName: string, brand
     if (existing) return existing;
 
     return await db.caliber.create({ data: { name: normalized, brandId: scopedBrandId } });
+}
+
+// Parent IDs are deliberately required here. Callers decide explicitly whether
+// master creation is allowed; these helpers never create a missing parent.
+export async function findOrCreateModel(db: PrismaLike, brandId: number, rawName: string) {
+    const name = rawName.trim();
+    const normalized = normalizeMasterName(name);
+    if (!normalized) throw new Error("モデル名を入力してください。");
+    const models = await db.model.findMany({
+        where: { brandId },
+        select: { id: true, brandId: true, name: true, nameEn: true, nameJp: true },
+    });
+    const existing = models.find((model) =>
+        [model.name, model.nameEn, model.nameJp].some((value) => normalizeMasterName(value) === normalized)
+    );
+    if (existing) return existing;
+    return db.model.create({ data: { brandId, name, nameJp: name } });
+}
+
+export async function findOrCreateWatchReference(db: PrismaLike, modelId: number, rawName: string) {
+    const name = rawName.trim();
+    const normalized = normalizeMasterName(name);
+    if (!normalized) throw new Error("Refを入力してください。");
+    const references = await db.watchReference.findMany({
+        where: { modelId },
+        select: { id: true, modelId: true, name: true },
+    });
+    const existing = references.find((reference) => normalizeMasterName(reference.name) === normalized);
+    if (existing) return existing;
+    return db.watchReference.create({ data: { modelId, name } });
 }

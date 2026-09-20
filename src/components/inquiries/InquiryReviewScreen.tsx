@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Save } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Plus, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,6 +88,8 @@ type WatchDraft = {
   caliberMakerId: number | null;
   baseCaliberMakerId: number | null;
 };
+
+type RegistrationKind = "BRAND" | "MODEL" | "REFERENCE" | "CASE_REFERENCE" | "CALIBER" | "BASE_CALIBER";
 
 const FIELD_LABELS: Record<InquiryWatchFieldName, string> = {
   BRAND: "ブランド",
@@ -240,6 +242,27 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
     }
   }
 
+  async function registerMaster(watch: ReviewWatch, kind: RegistrationKind, value: string, parentId: number | null) {
+    setSavingWatchId(watch.id);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/inquiries/${inquiryId}/review/master`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ watchId: watch.id, kind, value, parentId, confirm: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "masterを登録できませんでした。");
+      setNotice(`${value}を明示登録し、時計${watch.position}へ紐付けました。`);
+      await load();
+    } catch (registrationError) {
+      setError(registrationError instanceof Error ? registrationError.message : "masterを登録できませんでした。");
+    } finally {
+      setSavingWatchId(null);
+    }
+  }
+
   const summary = useMemo(() => watches.map((watch) => ({
     watch,
     status: drafts[watch.id] ? statusFor(watch, drafts[watch.id]) : null,
@@ -305,33 +328,33 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
                     <section className="space-y-4">
                       <h2 className="font-semibold text-zinc-800">時計情報</h2>
                       <div className="grid gap-4 lg:grid-cols-2">
-                        <MasterSelect label="ブランド（既存master）" value={draft.masterSelections.brandId} options={options.brands.map((brand) => ({ id: brand.id, label: masterLabel(brand) }))} onChange={(id) => {
+                        <div className="space-y-2"><MasterSelect label="ブランド（既存master）" value={draft.masterSelections.brandId} options={options.brands.map((brand) => ({ id: brand.id, label: masterLabel(brand) }))} onChange={(id) => {
                           const item = options.brands.find((brand) => brand.id === id);
                           selectMaster(watch.id, "brandId", id, "BRAND", item ? masterLabel(item) : "", ["modelId", "referenceId", "caseReferenceId"]);
-                        }} />
-                        <MasterSelect label="モデル（既存master）" value={draft.masterSelections.modelId} options={models.map((model) => ({ id: model.id, label: masterLabel(model) }))} disabled={!draft.masterSelections.brandId} emptyLabel="先にブランドを選択" onChange={(id) => {
+                        }} /><ExplicitMasterRegistration kind="BRAND" value={draft.fields.BRAND?.value ?? ""} selectedId={draft.masterSelections.brandId} onConfirm={() => void registerMaster(watch, "BRAND", draft.fields.BRAND?.value ?? "", null)} /></div>
+                        <div className="space-y-2"><MasterSelect label="モデル（既存master）" value={draft.masterSelections.modelId} options={models.map((model) => ({ id: model.id, label: masterLabel(model) }))} disabled={!draft.masterSelections.brandId} emptyLabel="先にブランドを選択" onChange={(id) => {
                           const item = models.find((model) => model.id === id);
                           selectMaster(watch.id, "modelId", id, "MODEL", item ? masterLabel(item) : "", ["referenceId", "caseReferenceId"]);
-                        }} />
-                        <MasterSelect label="Ref（既存master）" value={draft.masterSelections.referenceId} options={references.map((reference) => ({ id: reference.id, label: reference.name }))} disabled={!draft.masterSelections.modelId} emptyLabel="先にモデルを選択" onChange={(id) => {
+                        }} /><ExplicitMasterRegistration kind="MODEL" value={draft.fields.MODEL?.value ?? ""} selectedId={draft.masterSelections.modelId} parentLabel="Brand" parentId={draft.masterSelections.brandId} onConfirm={() => void registerMaster(watch, "MODEL", draft.fields.MODEL?.value ?? "", draft.masterSelections.brandId)} /></div>
+                        <div className="space-y-2"><MasterSelect label="Ref（既存master）" value={draft.masterSelections.referenceId} options={references.map((reference) => ({ id: reference.id, label: reference.name }))} disabled={!draft.masterSelections.modelId} emptyLabel="先にモデルを選択" onChange={(id) => {
                           const item = references.find((reference) => reference.id === id);
                           selectMaster(watch.id, "referenceId", id, "PRODUCT_REF", item?.name ?? "");
-                        }} />
-                        <MasterSelect label="ケースRef（既存master）" value={draft.masterSelections.caseReferenceId} options={references.map((reference) => ({ id: reference.id, label: reference.name }))} disabled={!draft.masterSelections.modelId} emptyLabel="先にモデルを選択" onChange={(id) => {
+                        }} /><ExplicitMasterRegistration kind="REFERENCE" value={draft.fields.PRODUCT_REF?.value ?? ""} selectedId={draft.masterSelections.referenceId} parentLabel="Model" parentId={draft.masterSelections.modelId} onConfirm={() => void registerMaster(watch, "REFERENCE", draft.fields.PRODUCT_REF?.value ?? "", draft.masterSelections.modelId)} /></div>
+                        <div className="space-y-2"><MasterSelect label="ケースRef（既存master）" value={draft.masterSelections.caseReferenceId} options={references.map((reference) => ({ id: reference.id, label: reference.name }))} disabled={!draft.masterSelections.modelId} emptyLabel="先にモデルを選択" onChange={(id) => {
                           const item = references.find((reference) => reference.id === id);
                           selectMaster(watch.id, "caseReferenceId", id, "CASE_REF", item?.name ?? "");
-                        }} />
+                        }} /><ExplicitMasterRegistration kind="CASE_REFERENCE" value={draft.fields.CASE_REF?.value ?? ""} selectedId={draft.masterSelections.caseReferenceId} parentLabel="Model" parentId={draft.masterSelections.modelId} onConfirm={() => void registerMaster(watch, "CASE_REFERENCE", draft.fields.CASE_REF?.value ?? "", draft.masterSelections.modelId)} /></div>
                       </div>
 
                       <div className="grid gap-4 lg:grid-cols-2">
-                        <CaliberSelect title="Cal" makerId={draft.caliberMakerId} caliberId={draft.masterSelections.caliberId} brands={options.brands} calibers={calibers} onMakerChange={(makerId) => updateDraft(watch.id, (current) => ({ ...current, caliberMakerId: makerId, masterSelections: { ...current.masterSelections, caliberId: null } }))} onCaliberChange={(id) => {
+                        <div className="space-y-2"><CaliberSelect title="Cal" makerId={draft.caliberMakerId} caliberId={draft.masterSelections.caliberId} brands={options.brands} calibers={calibers} onMakerChange={(makerId) => updateDraft(watch.id, (current) => ({ ...current, caliberMakerId: makerId, masterSelections: { ...current.masterSelections, caliberId: null } }))} onCaliberChange={(id) => {
                           const item = calibers.find((caliber) => caliber.id === id);
                           selectMaster(watch.id, "caliberId", id, "CALIBER", item ? masterLabel(item) : "");
-                        }} />
-                        <CaliberSelect title="Base Cal" makerId={draft.baseCaliberMakerId} caliberId={draft.masterSelections.baseCaliberId} brands={options.brands} calibers={baseCalibers} onMakerChange={(makerId) => updateDraft(watch.id, (current) => ({ ...current, baseCaliberMakerId: makerId, masterSelections: { ...current.masterSelections, baseCaliberId: null } }))} onCaliberChange={(id) => {
+                        }} /><ExplicitMasterRegistration kind="CALIBER" value={draft.fields.CALIBER?.value ?? ""} selectedId={draft.masterSelections.caliberId} parentLabel="メーカー" parentId={draft.caliberMakerId} onConfirm={() => void registerMaster(watch, "CALIBER", draft.fields.CALIBER?.value ?? "", draft.caliberMakerId)} /></div>
+                        <div className="space-y-2"><CaliberSelect title="Base Cal" makerId={draft.baseCaliberMakerId} caliberId={draft.masterSelections.baseCaliberId} brands={options.brands} calibers={baseCalibers} onMakerChange={(makerId) => updateDraft(watch.id, (current) => ({ ...current, baseCaliberMakerId: makerId, masterSelections: { ...current.masterSelections, baseCaliberId: null } }))} onCaliberChange={(id) => {
                           const item = baseCalibers.find((caliber) => caliber.id === id);
                           selectMaster(watch.id, "baseCaliberId", id, "BASE_CALIBER", item ? masterLabel(item) : "");
-                        }} />
+                        }} /><ExplicitMasterRegistration kind="BASE_CALIBER" value={draft.fields.BASE_CALIBER?.value ?? ""} selectedId={draft.masterSelections.baseCaliberId} parentLabel="メーカー" parentId={draft.baseCaliberMakerId} onConfirm={() => void registerMaster(watch, "BASE_CALIBER", draft.fields.BASE_CALIBER?.value ?? "", draft.baseCaliberMakerId)} /></div>
                       </div>
                     </section>
 
@@ -360,6 +383,16 @@ function MasterSelect({ label, value, options, disabled, emptyLabel, onChange }:
 
 function CaliberSelect({ title, makerId, caliberId, brands, calibers, onMakerChange, onCaliberChange }: { title: string; makerId: number | null; caliberId: number | null; brands: ReviewPayload["masterOptions"]["brands"]; calibers: ReviewPayload["masterOptions"]["calibers"]; onMakerChange: (id: number | null) => void; onCaliberChange: (id: number | null) => void }) {
   return <div className="rounded-md border border-zinc-200 p-4"><p className="mb-3 font-medium text-zinc-800">{title}</p><div className="grid gap-3 sm:grid-cols-2"><MasterSelect label="メーカー" value={makerId} options={brands.map((brand) => ({ id: brand.id, label: masterLabel(brand) }))} onChange={onMakerChange} /><MasterSelect label={title} value={caliberId} options={calibers.map((caliber) => ({ id: caliber.id, label: masterLabel(caliber) }))} disabled={!makerId} emptyLabel="先にメーカーを選択" onChange={onCaliberChange} /></div></div>;
+}
+
+function ExplicitMasterRegistration({ kind, value, selectedId, parentLabel, parentId, onConfirm }: { kind: RegistrationKind; value: string; selectedId: number | null; parentLabel?: string; parentId?: number | null; onConfirm: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const labels: Record<RegistrationKind, string> = { BRAND: "Brand", MODEL: "Model", REFERENCE: "Ref", CASE_REFERENCE: "ケースRef", CALIBER: "Cal", BASE_CALIBER: "Base Cal" };
+  if (selectedId || !value.trim()) return null;
+  const needsParent = kind !== "BRAND";
+  if (needsParent && !parentId) return <p className="text-xs text-zinc-500">新規{labels[kind]}登録には先に{parentLabel}を選択・保存してください。</p>;
+  if (!confirming) return <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(true)}><Plus className="mr-1 h-3.5 w-3.5" />新規{labels[kind]}として登録</Button>;
+  return <div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950"><p className="font-medium">登録内容を確認</p><p className="mt-1">{labels[kind]}: <span className="font-semibold">{value}</span>{parentLabel ? ` ／ ${parentLabel}は選択済み` : ""}</p><p className="mt-1 text-xs">既存の完全一致候補があれば、新規作成せず既存masterを紐付けます。</p><div className="mt-3 flex gap-2"><Button type="button" size="sm" onClick={onConfirm}>確認して登録</Button><Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)}>戻る</Button></div></div>;
 }
 
 function ReviewField({ field, draft, candidates, onChange }: { field: InquiryWatchFieldName; draft?: FieldDraft; candidates: Candidate[]; onChange: (change: Partial<FieldDraft>) => void }) {

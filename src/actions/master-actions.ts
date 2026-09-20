@@ -3,7 +3,7 @@
 import { RepairWorkType, type PricingRule } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
+import { findOrCreateBrand, findOrCreateCaliber, findOrCreateModel, findOrCreateWatchReference } from "@/lib/master-normalize";
 import {
     getExternalPricingRules as getExternalPricingRulesFromDb,
     type ExternalPricingRuleCustomerType,
@@ -47,27 +47,7 @@ export async function getModels(brandId?: number) {
 
 export async function upsertModel(brandName: string, modelName: string) {
     const brand = await upsertBrand(brandName);
-    const model = await prisma.model.findFirst({
-        where: {
-            brandId: brand.id,
-            OR: [
-                { name: modelName },
-                { nameEn: modelName },
-                { nameJp: modelName },
-                { name: { contains: modelName } }
-            ]
-        }
-    });
-
-    if (model) return model;
-
-    return await prisma.model.create({
-        data: {
-            name: modelName,
-            nameJp: modelName,
-            brandId: brand.id
-        }
-    });
+    return findOrCreateModel(prisma, brand.id, modelName);
 }
 
 // --- WatchReference (Ref No) ---
@@ -88,27 +68,12 @@ export async function upsertRef(modelName: string, brandName: string, refName: s
         caliberId = caliber.id;
     }
 
-    const existing = await prisma.watchReference.findFirst({
-        where: { name: refName, modelId: model.id }
-    });
+    const existing = await findOrCreateWatchReference(prisma, model.id, refName);
 
-    if (existing) {
-        if (caliberId && existing.caliberId !== caliberId) {
-            return await prisma.watchReference.update({
-                where: { id: existing.id },
-                data: { caliberId }
-            });
-        }
-        return existing;
+    if (caliberId) {
+        return await prisma.watchReference.update({ where: { id: existing.id }, data: { caliberId } });
     }
-
-    return await prisma.watchReference.create({
-        data: {
-            name: refName,
-            modelId: model.id,
-            caliberId: caliberId
-        }
-    });
+    return existing;
 }
 
 // --- Caliber ---
