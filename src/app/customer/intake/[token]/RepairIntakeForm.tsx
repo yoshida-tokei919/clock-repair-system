@@ -34,6 +34,7 @@ type WatchForm = {
 type TokenState = {
   valid: true;
   prefill: { name: string; postalCode: string | null; prefecture: string | null; city: string | null; street: string | null; building: string | null; phone: string | null; email: string | null } | null;
+  inquiryWatches: Array<{ id: number; position: number; label: string | null; brand: string | null; model: string | null; reference: string | null }>;
 } | {
   completed: true;
   repairs: Array<{ id: number; inquiryNumber: string }>;
@@ -94,6 +95,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
   const customerAddressPostalCode = useRef<string | null>(null);
   const returnAddressPostalCode = useRef<string | null>(null);
   const [watches, setWatches] = useState<WatchForm[]>([newWatch()]);
+  const [inquiryWatches, setInquiryWatches] = useState<Array<{ id: number; position: number; label: string | null; brand: string | null; model: string | null; reference: string | null }>>([]);
   const [brands, setBrands] = useState<IntakeBrandOption[]>([]);
   const [pageState, setPageState] = useState<"loading" | "ready" | "invalid" | "expired" | "used" | "complete">("loading");
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +126,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
         setPageState("complete");
         return;
       }
+      setInquiryWatches(state.inquiryWatches);
       customerAddressPostalCode.current = state.prefill ? postalCodeForCompleteAddress(state.prefill) : null;
       setCustomer((current) => ({
         ...current,
@@ -223,7 +226,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
       if (returnRequired.some((value) => !value.trim())) return "返送先情報の必須項目を入力してください。";
       if (!normalizePostalCode(returnAddress.postalCode)) return "返送先の郵便番号は7桁で入力してください。";
     }
-    if (watches.some((watch) => !watch.brandId || !watch.driveType)) return "すべての時計でブランドと駆動方式を選択してください。";
+    if (inquiryWatches.length === 0 && watches.some((watch) => !watch.brandId || !watch.driveType)) return "すべての時計でブランドと駆動方式を選択してください。";
     return null;
   }
 
@@ -241,9 +244,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
           customer,
           returnAddressSameAsCustomer,
           ...(!returnAddressSameAsCustomer ? { returnAddress } : {}),
-          watches: watches.map(({ timepieceType, driveType, brandId, modelName }) => ({
-            timepieceType, driveType, brandId: Number(brandId), modelName,
-          })),
+          ...(inquiryWatches.length === 0 ? { watches: watches.map(({ timepieceType, driveType, brandId, modelName }) => ({ timepieceType, driveType, brandId: Number(brandId), modelName })) } : {}),
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -284,11 +285,11 @@ export function RepairIntakeForm({ token }: { token: string }) {
   }
 
   return <PageFrame>
-    <header className="border-b border-zinc-200 pb-5"><h1 className="text-2xl font-bold tracking-tight text-zinc-900">時計修理 送付受付</h1><p className="mt-2 text-sm leading-6 text-zinc-600">お客様情報と時計情報をご入力ください。時計1本ごとに受付番号を発行します。</p></header>
+    <header className="border-b border-zinc-200 pb-5"><h1 className="text-2xl font-bold tracking-tight text-zinc-900">時計修理 送付受付</h1><p className="mt-2 text-sm leading-6 text-zinc-600">{inquiryWatches.length > 0 ? "お問い合わせの時計を下でご確認のうえ、お客様情報と返送先をご入力ください。" : "お客様情報と時計情報をご入力ください。時計1本ごとに受付番号を発行します。"}</p></header>
     <form className="mt-6 space-y-8" onSubmit={submit} noValidate>
       <section><h2 className="text-lg font-bold text-zinc-900">お客様情報</h2><p className="mt-1 text-xs text-zinc-500">お客様情報として登録されます。</p><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="お名前" required><Input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} autoComplete="name" /></Field><Field label="電話番号" required><Input value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} autoComplete="tel" inputMode="tel" /></Field><Field label="郵便番号" required><Input value={customer.postalCode} onChange={(e) => setCustomer({ ...customer, postalCode: e.target.value })} onBlur={() => void lookupPostalCode()} placeholder="1234567" autoComplete="postal-code" inputMode="numeric" />{postalLookupMessage && <p className="mt-1 text-xs text-zinc-500">{postalLookupMessage}</p>}</Field><Field label="メールアドレス"><Input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} autoComplete="email" type="email" /></Field><Field label="都道府県" required><Input value={customer.prefecture} onChange={(e) => setCustomer({ ...customer, prefecture: e.target.value })} autoComplete="address-level1" /></Field><Field label="市区町村" required><Input value={customer.city} onChange={(e) => setCustomer({ ...customer, city: e.target.value })} autoComplete="address-level2" /></Field></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="町名・番地" required><Input value={customer.street} onChange={(e) => setCustomer({ ...customer, street: e.target.value })} autoComplete="address-line1" /></Field><Field label="建物名・部屋番号"><Input value={customer.building} onChange={(e) => setCustomer({ ...customer, building: e.target.value })} autoComplete="address-line2" /></Field></div></section>
       <ReturnAddressFields sameAsCustomer={returnAddressSameAsCustomer} setSameAsCustomer={setReturnAddressSameAsCustomerWithInitialCopy} address={returnAddress} setAddress={setReturnAddress} lookupMessage={returnPostalLookupMessage} onLookup={() => void lookupReturnPostalCode()} />
-      <section><div className="flex items-end justify-between gap-3"><div><h2 className="text-lg font-bold text-zinc-900">時計情報</h2><p className="mt-1 text-xs text-zinc-500">ブランド名の一部を入力すると候補を絞り込めます。<br />日本語・英字どちらでも検索できます。</p></div><Button type="button" variant="outline" onClick={() => setWatches((current) => [...current, newWatch()])}>＋ 次の時計を追加</Button></div><div className="mt-4 space-y-4">{watches.map((watch, index) => <WatchFields key={watch.key} watch={watch} index={index} brands={brands} canRemove={watches.length > 1} onChange={(patch) => updateWatch(watch.key, patch)} onRemove={() => setWatches((current) => current.filter((item) => item.key !== watch.key))} />)}</div></section>
+      {inquiryWatches.length > 0 ? <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4"><h2 className="text-lg font-bold text-zinc-900">お預かりする時計（{inquiryWatches.length}点）</h2><p className="mt-1 text-xs text-zinc-500">時計情報はご相談内容に基づき確定しています。追加・変更はできません。</p><ul className="mt-3 space-y-2">{inquiryWatches.map((watch) => <li key={watch.id} className="rounded bg-white p-3 text-sm">時計 {watch.position}: {[watch.brand, watch.model, watch.reference, watch.label].filter(Boolean).join(" / ") || "時計情報確認済み"}</li>)}</ul></section> : <section><div className="flex items-end justify-between gap-3"><div><h2 className="text-lg font-bold text-zinc-900">時計情報</h2><p className="mt-1 text-xs text-zinc-500">ブランド名の一部を入力すると候補を絞り込めます。<br />日本語・英字どちらでも検索できます。</p></div><Button type="button" variant="outline" onClick={() => setWatches((current) => [...current, newWatch()])}>＋ 次の時計を追加</Button></div><div className="mt-4 space-y-4">{watches.map((watch, index) => <WatchFields key={watch.key} watch={watch} index={index} brands={brands} canRemove={watches.length > 1} onChange={(patch) => updateWatch(watch.key, patch)} onRemove={() => setWatches((current) => current.filter((item) => item.key !== watch.key))} />)}</div></section>}
       {error && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>{isSubmitting ? "送付受付中…" : "送付受付を送信"}</Button>
     </form>

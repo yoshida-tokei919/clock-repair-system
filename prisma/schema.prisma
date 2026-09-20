@@ -241,6 +241,12 @@ enum InquiryWatchFieldConfirmationStatus {
   CONFIRMED
 }
 
+enum InquiryWatchDecision {
+  PENDING
+  REQUESTED
+  DECLINED
+}
+
 model Inquiry {
   id              Int           @id @default(autoincrement())
   lineUserId      Int
@@ -256,6 +262,7 @@ model Inquiry {
   files    InquiryFile[]
   analyses InquiryAiAnalysis[]
   reviewWatches InquiryWatch[]
+  repairIntakeInvites RepairIntakeInvite[]
   slackNotifications SlackNotificationOutbox[]
 
   @@index([lineUserId, status])
@@ -410,6 +417,7 @@ model InquiryWatch {
   promotedWatchId Int?     @unique
   promotedRepairId Int?    @unique
   promotedAt      DateTime?
+  decision        InquiryWatchDecision @default(PENDING)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -424,11 +432,13 @@ model InquiryWatch {
   promotedWatch Watch?         @relation("InquiryWatchPromotedWatch", fields: [promotedWatchId], references: [id], onDelete: Restrict)
   promotedRepair Repair?       @relation("InquiryWatchPromotedRepair", fields: [promotedRepairId], references: [id], onDelete: Restrict)
   fieldValues   InquiryWatchFieldValue[]
+  intakeInviteWatches RepairIntakeInviteWatch[]
 
   @@index([inquiryId, createdAt])
   @@unique([inquiryId, position])
   @@index([inquiryId, position])
   @@index([promotedAt])
+  @@index([inquiryId, decision, promotedAt])
 }
 
 // One current, editable value per field. The immutable AI candidate remains
@@ -597,17 +607,36 @@ model RepairIntakeInvite {
   token      String   @unique
   expiresAt  DateTime
   usedAt     DateTime?
+  revokedAt  DateTime?
   customerId Int?
   lineUserId Int?
+  inquiryId  Int?
   createdAt  DateTime @default(now())
 
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   lineUser LineUser? @relation(fields: [lineUserId], references: [id], onDelete: SetNull)
+  inquiry Inquiry? @relation(fields: [inquiryId], references: [id], onDelete: SetNull)
   repairs  Repair[]
+  inquiryWatches RepairIntakeInviteWatch[]
 
   @@index([customerId])
   @@index([lineUserId])
   @@index([expiresAt])
+  @@index([inquiryId, revokedAt])
+}
+
+// The join rows are the immutable, invite-fixed selection for an Inquiry-bound
+// B2C intake. Legacy invites deliberately have no rows here.
+model RepairIntakeInviteWatch {
+  repairIntakeInviteId Int
+  inquiryWatchId Int
+  createdAt DateTime @default(now())
+
+  repairIntakeInvite RepairIntakeInvite @relation(fields: [repairIntakeInviteId], references: [id], onDelete: Cascade)
+  inquiryWatch InquiryWatch @relation(fields: [inquiryWatchId], references: [id], onDelete: Restrict)
+
+  @@id([repairIntakeInviteId, inquiryWatchId])
+  @@index([inquiryWatchId])
 }
 
 model Repair {

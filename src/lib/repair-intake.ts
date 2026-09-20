@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 import { BrandKind, Prisma, TimepieceType, WatchDriveType, type PrismaClient } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
+import { validateInquiryWatchPromotionEligibility } from "@/lib/inquiry-promotion";
 
 export const REPAIR_INTAKE_STATUS = "送付待ち";
 export const REPAIR_INTAKE_INVITE_TTL_DAYS = 7;
@@ -12,7 +14,7 @@ type DbClient = PrismaClient | Prisma.TransactionClient;
 
 export class RepairIntakeError extends Error {
   constructor(
-    public readonly code: "INVALID_TOKEN" | "EXPIRED_TOKEN" | "USED_TOKEN" | "INVALID_INPUT" | "INVALID_BRAND" | "CUSTOMER_NOT_FOUND" | "B2B_CUSTOMER" | "LINE_USER_NOT_FOUND" | "LINE_USER_ALREADY_LINKED",
+    public readonly code: "INVALID_TOKEN" | "EXPIRED_TOKEN" | "USED_TOKEN" | "REVOKED_TOKEN" | "INVALID_INPUT" | "INVALID_BRAND" | "CUSTOMER_NOT_FOUND" | "B2B_CUSTOMER" | "LINE_USER_NOT_FOUND" | "LINE_USER_ALREADY_LINKED" | "INQUIRY_NOT_READY",
     message: string,
   ) {
     super(message);
@@ -212,15 +214,19 @@ function assertInviteState(invite: { expiresAt: Date; usedAt: Date | null }, now
   if (state === "expired") throw new RepairIntakeError("EXPIRED_TOKEN", "This intake link has expired.");
 }
 
+function assertInquiryInviteState(invite: { revokedAt: Date | null }) {
+  if (invite.revokedAt) throw new RepairIntakeError("REVOKED_TOKEN", "この受付リンクは内容変更のため無効になりました。新しいリンクをご利用ください。");
+}
+
 export function generateRepairIntakeToken() {
   return crypto.randomBytes(INTAKE_TOKEN_BYTES).toString("base64url");
 }
 
 export async function createRepairIntakeInvite(
-  input: { expiresAt: Date; customerId?: number | null; lineUserId?: number | null },
+  input: { expiresAt: Date; customerId?: number | null; lineUserId?: number | null; now?: Date },
   db: DbClient = prisma,
 ) {
-  if (input.expiresAt <= new Date()) {
+  if (input.expiresAt <= (input.now ?? new Date())) {
     throw new RepairIntakeError("INVALID_INPUT", "expiresAt must be in the future.");
   }
   if (input.customerId == null && input.lineUserId == null) {
@@ -272,7 +278,7 @@ export async function createCustomerRepairIntakeInvite(
 
   const expiresAt = new Date(now);
   expiresAt.setDate(expiresAt.getDate() + REPAIR_INTAKE_INVITE_TTL_DAYS);
-  const invite = await createRepairIntakeInvite({ customerId, expiresAt }, db as DbClient);
+  const invite = await createRepairIntakeInvite({ customerId, expiresAt, now }, db as DbClient);
   return { invite, reused: false };
 }
 
@@ -302,8 +308,70 @@ export async function createLineUserRepairIntakeInvite(
 
   const expiresAt = new Date(now);
   expiresAt.setDate(expiresAt.getDate() + REPAIR_INTAKE_INVITE_TTL_DAYS);
-  const invite = await createRepairIntakeInvite({ lineUserId, expiresAt }, db as DbClient);
+  const invite = await createRepairIntakeInvite({ lineUserId, expiresAt, now }, db as DbClient);
   return { invite, reused: false };
+}
+
+/** Issues an Inquiry-bound B2C invite. Its join rows are the exact immutable watch set. */
+export async function createInquiryRepairIntakeInvite(
+  inquiryId: number,
+  now = new Date(),
+  db: Pick<PrismaClient, "$transaction"> = prisma,
+) {
+  return db.$transaction(async (tx) => {
+    const inquiry = await tx.inquiry.findUnique({
+      where: { id: inquiryId },
+      select: { id: true, lineUserId: true, lineUser: { select: { linkedCustomer: { select: { id: true, type: true } } } } },
+    });
+    if (!inquiry) throw new RepairIntakeError("INQUIRY_NOT_READY", "お問い合わせが見つかりません。");
+    await lockLineUserInquiryTransaction(tx, inquiry.lineUserId);
+    const linkedCustomer = inquiry.lineUser.linkedCustomer;
+    if (linkedCustomer?.type === "business") {
+      throw new RepairIntakeError("B2B_CUSTOMER", "法人顧客に紐付いたお問い合わせには B2C 受付リンクを発行できません。");
+    }
+    const watches = await tx.inquiryWatch.findMany({
+      where: { inquiryId, decision: "REQUESTED", promotedAt: null },
+      orderBy: { position: "asc" },
+      select: {
+        id: true, position: true, inquiryId: true, brandId: true, modelId: true, referenceId: true,
+        caseReferenceId: true, caliberId: true, baseCaliberId: true, promotedWatchId: true,
+        promotedRepairId: true, promotedAt: true,
+        fieldValues: { select: { field: true, value: true, confirmationStatus: true } },
+      },
+    });
+    if (!watches.length) throw new RepairIntakeError("INQUIRY_NOT_READY", "受付希望の未昇格時計がありません。");
+    for (const watch of watches) await validateInquiryWatchPromotionEligibility(tx, watch);
+
+    const ids = watches.map((watch) => watch.id);
+    const active = await tx.repairIntakeInvite.findMany({
+      where: { inquiryId, usedAt: null, revokedAt: null, expiresAt: { gt: now } },
+      include: { inquiryWatches: { select: { inquiryWatchId: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    const sameSet = (candidate: { inquiryWatches: Array<{ inquiryWatchId: number }> }) =>
+      candidate.inquiryWatches.length === ids.length && candidate.inquiryWatches.every((item) => ids.includes(item.inquiryWatchId));
+    const reusable = active.find(sameSet);
+    if (reusable) return { invite: reusable, reused: true };
+    const staleIds = active.filter((invite) => !sameSet(invite)).map((invite) => invite.id);
+    if (staleIds.length) await tx.repairIntakeInvite.updateMany({ where: { id: { in: staleIds }, usedAt: null, revokedAt: null }, data: { revokedAt: now } });
+
+    const expiresAt = new Date(now);
+    expiresAt.setDate(expiresAt.getDate() + REPAIR_INTAKE_INVITE_TTL_DAYS);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        const invite = await tx.repairIntakeInvite.create({
+          data: { token: generateRepairIntakeToken(), expiresAt, inquiryId, customerId: linkedCustomer?.id ?? null, lineUserId: inquiry.lineUserId,
+            inquiryWatches: { create: ids.map((inquiryWatchId) => ({ inquiryWatchId })) } },
+          include: { inquiryWatches: true },
+        });
+        return { invite, reused: false };
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") continue;
+        throw error;
+      }
+    }
+    throw new Error("Unable to allocate a unique repair intake token.");
+  });
 }
 
 export async function getRepairIntakeInviteState(token: string, db: DbClient = prisma) {
@@ -312,8 +380,10 @@ export async function getRepairIntakeInviteState(token: string, db: DbClient = p
     select: {
       expiresAt: true,
       usedAt: true,
+      revokedAt: true,
       customerId: true,
       lineUserId: true,
+      inquiryId: true,
       customer: { select: { name: true, zipCode: true, prefecture: true, city: true, street: true, building: true, phone: true, email: true } },
       lineUser: {
         select: {
@@ -324,12 +394,14 @@ export async function getRepairIntakeInviteState(token: string, db: DbClient = p
         select: { id: true, inquiryNumber: true },
         orderBy: { id: "asc" },
       },
+      inquiryWatches: { orderBy: { inquiryWatch: { position: "asc" } }, select: { inquiryWatch: { select: { id: true, position: true, label: true, brand: { select: { nameJp: true, nameEn: true, name: true } }, model: { select: { nameJp: true, nameEn: true, name: true } }, reference: { select: { name: true } } } } } },
     },
   });
   if (!invite) throw new RepairIntakeError("INVALID_TOKEN", "This intake link is invalid.");
 
   const now = new Date();
   if (invite.expiresAt <= now) throw new RepairIntakeError("EXPIRED_TOKEN", "This intake link has expired.");
+  assertInquiryInviteState(invite);
   if (invite.usedAt) {
     return {
       completed: true,
@@ -354,20 +426,54 @@ export async function getRepairIntakeInviteState(token: string, db: DbClient = p
       phone: customer.phone,
       email: customer.email,
     } : null,
+    inquiryWatches: invite.inquiryWatches.map(({ inquiryWatch }) => ({
+      id: inquiryWatch.id, position: inquiryWatch.position, label: inquiryWatch.label,
+      brand: inquiryWatch.brand ? inquiryWatch.brand.nameJp || inquiryWatch.brand.nameEn || inquiryWatch.brand.name : null,
+      model: inquiryWatch.model ? inquiryWatch.model.nameJp || inquiryWatch.model.nameEn || inquiryWatch.model.name : null,
+      reference: inquiryWatch.reference?.name ?? null,
+    })),
   };
 }
 
-export async function submitRepairIntake(token: string, payload: unknown) {
-  const { customer: customerInput, returnAddress: returnAddressInput, watches: watchesInput } = parseRepairIntakePayload(payload);
-
-  return prisma.$transaction(async (tx) => {
+export async function submitRepairIntake(
+  token: string,
+  payload: unknown,
+  db: Pick<PrismaClient, "$transaction"> = prisma,
+) {
+  return db.$transaction(async (tx) => {
     const now = new Date();
     const invite = await tx.repairIntakeInvite.findUnique({
       where: { token },
-      include: { lineUser: { select: { id: true, lineUserId: true, linkedCustomerId: true } } },
+      include: {
+        lineUser: { select: { id: true, lineUserId: true, linkedCustomerId: true } },
+        inquiryWatches: {
+          include: {
+            inquiryWatch: {
+              select: {
+                id: true, position: true, inquiryId: true, decision: true, brandId: true, modelId: true,
+                referenceId: true, caseReferenceId: true, caliberId: true, baseCaliberId: true,
+                promotedWatchId: true, promotedRepairId: true, promotedAt: true,
+                fieldValues: { select: { field: true, value: true, confirmationStatus: true } },
+              },
+            },
+          },
+        },
+      },
     });
     if (!invite) throw new RepairIntakeError("INVALID_TOKEN", "This intake link is invalid.");
     assertInviteState(invite, now);
+    assertInquiryInviteState(invite);
+
+    const inquiryBound = invite.inquiryWatches.length > 0;
+    const body = payload && typeof payload === "object" ? payload as { customer?: unknown; returnAddressSameAsCustomer?: unknown; returnAddress?: unknown } : null;
+    const parsed = inquiryBound
+      ? (() => {
+          const customer = parseCustomerInput(body?.customer);
+          if (typeof body?.returnAddressSameAsCustomer !== "boolean") throw new RepairIntakeError("INVALID_INPUT", "returnAddressSameAsCustomer must be a boolean.");
+          return { customer, returnAddress: body!.returnAddressSameAsCustomer ? customer : parseCustomerInput(body!.returnAddress), watches: [] as ParsedWatchInput[] };
+        })()
+      : parseRepairIntakePayload(payload);
+    const { customer: customerInput, returnAddress: returnAddressInput, watches: watchesInput } = parsed;
 
     // Claiming the invite is conditional so concurrent submissions cannot both create repairs.
     const claimed = await tx.repairIntakeInvite.updateMany({
@@ -379,6 +485,21 @@ export async function submitRepairIntake(token: string, payload: unknown) {
       if (current?.usedAt) throw new RepairIntakeError("USED_TOKEN", "This intake link has already been used.");
       if (current && current.expiresAt <= now) throw new RepairIntakeError("EXPIRED_TOKEN", "This intake link has expired.");
       throw new RepairIntakeError("INVALID_TOKEN", "This intake link is invalid.");
+    }
+
+    if (inquiryBound) {
+      const inquiryIds = new Set(invite.inquiryWatches.map((item) => item.inquiryWatch.inquiryId));
+      if (inquiryIds.size !== 1 || invite.inquiryId === null || !inquiryIds.has(invite.inquiryId)) {
+        throw new RepairIntakeError("INQUIRY_NOT_READY", "受付リンクの時計情報が不正です。");
+      }
+      await lockLineUserInquiryTransaction(tx, invite.lineUserId!);
+      for (const item of invite.inquiryWatches) {
+        const watch = item.inquiryWatch;
+        if (watch.decision !== "REQUESTED" || watch.promotedAt || watch.promotedWatchId || watch.promotedRepairId) {
+          throw new RepairIntakeError("INQUIRY_NOT_READY", `時計 ${watch.position} は現在この受付リンクでは受け付けできません。`);
+        }
+        await validateInquiryWatchPromotionEligibility(tx, watch);
+      }
     }
 
     const linkedCustomerId = invite.customerId ?? invite.lineUser?.linkedCustomerId ?? null;
@@ -420,20 +541,19 @@ export async function submitRepairIntake(token: string, payload: unknown) {
       },
       select: { id: true },
     });
-    if (validBrands.length !== uniqueBrandIds.length) {
+    if (!inquiryBound && validBrands.length !== uniqueBrandIds.length) {
       throw new RepairIntakeError("INVALID_BRAND", "Each watch must use an eligible watch brand.");
     }
 
     const repairs = [];
-    for (const watchInput of watchesInput) {
+    const repairInputs = inquiryBound ? invite.inquiryWatches.map(({ inquiryWatch }) => inquiryWatch) : watchesInput;
+    for (const watchInput of repairInputs as any[]) {
       const inquiryNumber = await nextB2cInquiryNumber(tx, customer.id);
       const watch = await tx.watch.create({
         data: {
           customerId: customer!.id,
-          brandId: watchInput.brandId,
-          modelNameInput: watchInput.modelName,
-          timepieceType: watchInput.timepieceType,
-          driveType: watchInput.driveType,
+          brandId: watchInput.brandId!,
+          ...(inquiryBound ? { modelId: watchInput.modelId, referenceId: watchInput.referenceId, caseReferenceId: watchInput.caseReferenceId, caliberId: watchInput.caliberId, baseCaliberId: watchInput.baseCaliberId } : { modelNameInput: watchInput.modelName, timepieceType: watchInput.timepieceType, driveType: watchInput.driveType }),
         },
       });
       const repair = await tx.repair.create({
@@ -450,6 +570,9 @@ export async function submitRepairIntake(token: string, payload: unknown) {
         },
       });
       await tx.repairStatusLog.create({ data: { repairId: repair.id, status: REPAIR_INTAKE_STATUS } });
+      if (inquiryBound) {
+        await tx.inquiryWatch.update({ where: { id: watchInput.id }, data: { promotedWatchId: watch.id, promotedRepairId: repair.id, promotedAt: now } });
+      }
       repairs.push(repair);
     }
 
@@ -459,6 +582,6 @@ export async function submitRepairIntake(token: string, payload: unknown) {
 
 export function repairIntakeErrorResponse(error: unknown) {
   if (!(error instanceof RepairIntakeError)) return null;
-  const status = error.code === "USED_TOKEN" ? 409 : error.code === "INVALID_INPUT" || error.code === "INVALID_BRAND" ? 400 : 404;
+  const status = error.code === "USED_TOKEN" ? 409 : error.code === "INVALID_INPUT" || error.code === "INVALID_BRAND" || error.code === "INQUIRY_NOT_READY" || error.code === "B2B_CUSTOMER" ? 400 : 404;
   return { status, body: { error: error.message, code: error.code } };
 }

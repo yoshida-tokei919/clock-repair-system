@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 
 import { authOptions } from "@/lib/auth";
-import { createCustomerRepairIntakeInvite, createLineUserRepairIntakeInvite, RepairIntakeError } from "@/lib/repair-intake";
+import { createCustomerRepairIntakeInvite, createInquiryRepairIntakeInvite, createLineUserRepairIntakeInvite, RepairIntakeError } from "@/lib/repair-intake";
 
 export async function createCustomerRepairIntakeInviteAction(customerId: number) {
   const session = await getServerSession(authOptions);
@@ -23,6 +23,19 @@ export async function createCustomerRepairIntakeInviteAction(customerId: number)
       success: false as const,
       error: error instanceof RepairIntakeError ? error.message : "送付受付リンクを発行できませんでした。",
     };
+  }
+}
+
+export async function createInquiryRepairIntakeInviteAction(inquiryId: number) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return { success: false as const, error: "ログインしてください。" };
+  if (!Number.isInteger(inquiryId) || inquiryId <= 0) return { success: false as const, error: "お問い合わせ番号が不正です。" };
+  try {
+    const { invite, reused } = await createInquiryRepairIntakeInvite(inquiryId);
+    revalidatePath(`/inquiries/${inquiryId}/review`);
+    return { success: true as const, token: invite.token, expiresAt: invite.expiresAt.toISOString(), reused };
+  } catch (error) {
+    return { success: false as const, error: error instanceof RepairIntakeError ? error.message : "受付リンクを発行できませんでした。" };
   }
 }
 

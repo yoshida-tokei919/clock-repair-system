@@ -84,7 +84,7 @@ function inquirySequence(inquiryNumber: string, prefix: string) {
   return Number.isFinite(value) ? value : 0;
 }
 
-async function validateWatchMasterRelations(tx: Prisma.TransactionClient, watch: PromotionWatch) {
+export async function validateInquiryWatchPromotionEligibility(tx: Prisma.TransactionClient, watch: PromotionWatch) {
   requireResolvedField(watch, "BRAND", true);
   requireResolvedField(watch, "MODEL", false);
   requireResolvedField(watch, "PRODUCT_REF", false);
@@ -192,7 +192,7 @@ export async function promoteInquiryWatches(
 
   // Validate every unpromoted draft before creating any formal record.
   for (const watch of watches) {
-    await validateWatchMasterRelations(tx, watch);
+    await validateInquiryWatchPromotionEligibility(tx, watch);
   }
 
   const prefix = customer.type === "individual" ? "C" : customer.prefix?.trim().toUpperCase();

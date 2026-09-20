@@ -43,6 +43,8 @@ async function getReviewPayload(inquiryId: number) {
             caliberId: true,
             baseCaliberId: true,
             promotedAt: true,
+            promotedRepairId: true,
+            decision: true,
             fieldValues: {
               orderBy: { field: "asc" },
               select: {

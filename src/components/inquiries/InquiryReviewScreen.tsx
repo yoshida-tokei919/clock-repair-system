@@ -53,6 +53,8 @@ type ReviewWatch = {
   caliberId: number | null;
   baseCaliberId: number | null;
   promotedAt: string | null;
+  promotedRepairId: number | null;
+  decision: "PENDING" | "REQUESTED" | "DECLINED";
   fieldValues: FieldValue[];
   sourceAiWatch: { candidates: Candidate[] } | null;
 };
@@ -268,6 +270,24 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
     }
   }
 
+  async function setDecision(watch: ReviewWatch, decision: ReviewWatch["decision"]) {
+    setError(null);
+    const response = await fetch(`/api/inquiries/${inquiryId}/decision`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ watchId: watch.id, decision }) });
+    const data = await response.json();
+    if (!response.ok) { setError(data.error || "受付判断を更新できませんでした。"); return; }
+    await load();
+  }
+
+  async function issueInquiryIntakeInvite() {
+    setError(null);
+    const response = await fetch(`/api/inquiries/${inquiryId}/intake-invite`, { method: "POST" });
+    const data = await response.json();
+    if (!response.ok) { setError(data.error || "受付リンクを発行できませんでした。"); return; }
+    const url = `${window.location.origin}/customer/intake/${data.token}`;
+    await navigator.clipboard?.writeText(url).catch(() => undefined);
+    setNotice(`受付リンクを${data.reused ? "再利用" : "発行"}しました。${url}`);
+  }
+
   async function registerMaster(watch: ReviewWatch, kind: RegistrationKind, value: string, parentId: number | null) {
     setSavingWatchId(watch.id);
     setError(null);
@@ -341,7 +361,9 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
       {error && <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {notice && <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
 
-      <Card>
+      <Card><CardHeader><CardTitle className="text-lg">B2C 受付判断</CardTitle><p className="text-sm text-zinc-600">受付希望のみを固定したリンクでお客様へ案内します。</p></CardHeader><CardContent className="space-y-3"><div className="flex flex-wrap gap-2 text-sm"><Badge>保留 {watches.filter((watch) => watch.decision === "PENDING").length}</Badge><Badge>受付希望 {watches.filter((watch) => watch.decision === "REQUESTED").length}</Badge><Badge variant="secondary">お断り {watches.filter((watch) => watch.decision === "DECLINED").length}</Badge></div>{watches.filter((watch) => !watch.promotedAt).map((watch) => <div key={watch.id} className={`flex flex-wrap items-center justify-between gap-2 rounded border p-3 ${watch.decision === "DECLINED" ? "bg-zinc-50" : ""}`}><span>時計 {watch.position} {watch.label || ""} — {watch.decision}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => void setDecision(watch, "PENDING")}>保留に戻す</Button><Button size="sm" variant="outline" onClick={() => void setDecision(watch, "DECLINED")}>お断り</Button><Button size="sm" onClick={() => void setDecision(watch, "REQUESTED")}>受付希望</Button></div></div>)}{watches.filter((watch) => watch.promotedAt).map((watch) => <p key={watch.id} className="text-sm text-zinc-500">時計 {watch.position}: 昇格済み {watch.promotedRepairId ? `Repair #${watch.promotedRepairId}` : ""}</p>)}<Button disabled={!watches.some((watch) => watch.decision === "REQUESTED" && !watch.promotedAt)} onClick={() => void issueInquiryIntakeInvite()}>お客様用受付リンクを発行</Button></CardContent></Card>
+
+      {false && <Card>
         <CardHeader>
           <CardTitle className="text-lg">正式案件への昇格</CardTitle>
           <p className="text-sm text-zinc-600">顧客と時計を選択後、すべての選択時計を事前検証してから一括で作成します。AI候補や未確認のmasterは昇格しません。</p>
@@ -360,7 +382,7 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
           </div>
           <Button type="button" disabled={promoting || !selectedCustomerId || selectedPromotionWatchIds.length === 0} onClick={() => void promoteSelectedWatches()}>{promoting ? "昇格中…" : `${selectedPromotionWatchIds.length}台を正式案件へ昇格`}</Button>
         </CardContent>
-      </Card>
+      </Card>}
 
       {watches.length === 0 ? (
         <Card><CardContent className="p-6 text-sm text-zinc-500">確認対象の時計がまだありません。AI解析結果を保存すると、ここに確認用の時計が作成されます。</CardContent></Card>
