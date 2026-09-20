@@ -7,7 +7,7 @@ import { lockLineUserInquiryTransaction } from "./inquiry-transaction-lock";
 
 const ANALYSIS_STATUSES = ["COMPLETED", "NEEDS_REVIEW", "FAILED"] as const;
 const CONFIDENCES = ["LOW", "MEDIUM", "HIGH"] as const;
-const FIELDS = ["BRAND", "MODEL", "PRODUCT_REF", "CASE_REF", "CALIBER", "MOVEMENT_TYPE", "ERA"] as const;
+const FIELDS = ["BRAND", "MODEL", "PRODUCT_REF", "CASE_REF", "CALIBER", "BASE_CALIBER", "MOVEMENT_TYPE", "ERA"] as const;
 const SOURCE_TYPES = ["CUSTOMER_STATED", "IMAGE_OBSERVED", "WEB_INFERRED", "AI_INFERRED", "TECHNICIAN_CONFIRMED"] as const;
 const REVIEW_STATUSES = ["PENDING", "ACCEPTED", "REJECTED"] as const;
 

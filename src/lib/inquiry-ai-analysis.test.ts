@@ -134,6 +134,28 @@ test("reanalysis refreshes pending AI values but preserves confirmed values in o
   assert.equal(fake.reviewWatches[0].fieldValues[0].confirmationStatus, "CONFIRMED");
 });
 
+test("reanalysis preserves a pending manual value and accepts a Base Cal candidate", async () => {
+  const fake = createFakeDb();
+  const first = payload(fake);
+  first.watches[0].candidates[0].field = "BASE_CALIBER";
+  first.watches[0].candidates[0].value = "ETA 2892.A2";
+  await saveInquiryAiAnalysis(fake.db, 7, first);
+  assert.equal(fake.reviewWatches[0].fieldValues[0].field, "BASE_CALIBER");
+
+  fake.reviewWatches[0].fieldValues[0].value = "ETA 2824-2";
+  fake.reviewWatches[0].fieldValues[0].source = "MANUAL";
+  fake.reviewWatches[0].fieldValues[0].confirmationStatus = "PENDING";
+  const reanalysis = payload(fake);
+  reanalysis.idempotencyKey = "key-manual-reanalysis";
+  reanalysis.watches[0].candidates[0].field = "BASE_CALIBER";
+  reanalysis.watches[0].candidates[0].value = "ETA 2892.A2";
+  await saveInquiryAiAnalysis(fake.db, 7, reanalysis);
+
+  assert.equal(fake.reviewWatches[0].fieldValues[0].value, "ETA 2824-2");
+  assert.equal(fake.reviewWatches[0].fieldValues[0].source, "MANUAL");
+  assert.equal(fake.reviewWatches[0].fieldValues[0].confirmationStatus, "PENDING");
+});
+
 test("AI analysis cannot claim human review or ungrounded provenance, and current summaries are required", async () => {
   const fake = createFakeDb();
   for (const candidatePatch of [

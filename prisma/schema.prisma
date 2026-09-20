@@ -207,6 +207,7 @@ enum InquiryAiCandidateField {
   PRODUCT_REF
   CASE_REF
   CALIBER
+  BASE_CALIBER
   MOVEMENT_TYPE
   ERA
 }
@@ -225,6 +226,7 @@ enum InquiryWatchField {
   PRODUCT_REF
   CASE_REF
   CALIBER
+  BASE_CALIBER
   MOVEMENT_TYPE
   ERA
 }
@@ -401,6 +403,7 @@ model InquiryWatch {
   referenceId     Int?
   caseReferenceId Int?
   caliberId       Int?
+  baseCaliberId   Int?
 
   // P3-3 will populate these in the same transaction that creates a formal
   // Watch and Repair. Their one-to-one shape prevents ambiguous promotion.
@@ -417,6 +420,7 @@ model InquiryWatch {
   reference     WatchReference? @relation("InquiryWatchReference", fields: [referenceId], references: [id], onDelete: Restrict)
   caseReference WatchReference? @relation("InquiryWatchCaseReference", fields: [caseReferenceId], references: [id], onDelete: Restrict)
   caliber       Caliber?       @relation(fields: [caliberId], references: [id], onDelete: Restrict)
+  baseCaliber   Caliber?       @relation("InquiryWatchBaseCaliber", fields: [baseCaliberId], references: [id], onDelete: Restrict)
   promotedWatch Watch?         @relation("InquiryWatchPromotedWatch", fields: [promotedWatchId], references: [id], onDelete: Restrict)
   promotedRepair Repair?       @relation("InquiryWatchPromotedRepair", fields: [promotedRepairId], references: [id], onDelete: Restrict)
   fieldValues   InquiryWatchFieldValue[]
@@ -549,6 +553,7 @@ model Caliber {
   parts            PartsMaster[] @relation("PartsCaliber")
   baseCaliberParts PartsMaster[] @relation("PartsBaseCaliber")
   inquiryWatches  InquiryWatch[]
+  baseCaliberInquiryWatches InquiryWatch[] @relation("InquiryWatchBaseCaliber")
 }
 
 // 3. Repair & Watch
