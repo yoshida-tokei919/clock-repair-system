@@ -8,6 +8,11 @@
 
 今後の実装・設計では、以下を最重要方針として扱う。
 
+> **2026-09-20 更新**
+> PartsMaster（実部品・在庫マスタ）の「同一性」「購入先」「価格」「適合」「見積時入力」について設計を更新した。
+> 現行の正本は [parts-master-fitment-supplier-estimate-design.md](./parts-master-fitment-supplier-estimate-design.md) とし、本ファイル内の古い例と矛盾する場合は新しい設計を優先する。
+> 特に「仕入先や価格が違えば常に別PartsMaster」「partRef一致を強い同一確定に使う」という古い前提は廃止し、同一性未確認時は分け、確認済み同一品は1 PartsMaster + 複数SupplierOfferで扱う。
+
 ---
 
 ## 1. 基本思想
