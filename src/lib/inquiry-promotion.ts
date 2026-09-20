@@ -28,6 +28,15 @@ type PromotionWatch = {
 
 export class InquiryPromotionInputError extends Error {}
 
+type PromotionMarker = Pick<PromotionWatch, "promotedWatchId" | "promotedRepairId" | "promotedAt">;
+
+export function inquiryWatchPromotionState(watch: PromotionMarker) {
+  const markers = [watch.promotedWatchId !== null, watch.promotedRepairId !== null, watch.promotedAt !== null];
+  if (markers.every(Boolean)) return "PROMOTED" as const;
+  if (markers.every((value) => !value)) return "UNPROMOTED" as const;
+  return "PARTIAL" as const;
+}
+
 function positiveId(value: unknown, name: string) {
   const id = Number(value);
   if (!Number.isInteger(id) || id <= 0) throw new InquiryPromotionInputError(`${name} must be a positive integer.`);
@@ -141,11 +150,48 @@ export async function promoteInquiryWatches(
     throw new InquiryPromotionInputError("One or more selected watches do not belong to this Inquiry.");
   }
 
-  // Validate every selected draft before creating any formal record.
+  const states = watches.map((watch) => inquiryWatchPromotionState(watch));
+  if (states.some((state) => state === "PARTIAL")) {
+    throw new InquiryPromotionInputError("One or more selected watches have an incomplete promotion result.");
+  }
+  if (states.every((state) => state === "PROMOTED")) {
+    const promotedRepairIds = watches.map((watch) => watch.promotedRepairId!);
+    const repairs = await tx.repair.findMany({
+      where: { id: { in: promotedRepairIds } },
+      select: {
+        id: true,
+        watchId: true,
+        customerId: true,
+        inquiryNumber: true,
+        watch: { select: { customerId: true } },
+      },
+    });
+    const repairsById = new Map(repairs.map((repair) => [repair.id, repair]));
+    const promotions = watches.map((watch) => {
+      const repair = repairsById.get(watch.promotedRepairId!);
+      if (!repair || repair.watchId !== watch.promotedWatchId || repair.customerId !== customer.id || repair.watch.customerId !== customer.id) {
+        throw new InquiryPromotionInputError(`Watch ${watch.position} has an inconsistent promotion result.`);
+      }
+      return {
+        inquiryWatchId: watch.id,
+        watchId: watch.promotedWatchId!,
+        repairId: repair.id,
+        inquiryNumber: repair.inquiryNumber,
+      };
+    });
+    return {
+      customerId: customer.id,
+      promotedAt: watches[0].promotedAt!,
+      promotions,
+      deduplicated: true,
+    };
+  }
+  if (states.some((state) => state === "PROMOTED")) {
+    throw new InquiryPromotionInputError("Promoted and unpromoted watches cannot be processed together.");
+  }
+
+  // Validate every unpromoted draft before creating any formal record.
   for (const watch of watches) {
-    if (watch.promotedAt || watch.promotedWatchId || watch.promotedRepairId) {
-      throw new InquiryPromotionInputError(`Watch ${watch.position} has already been promoted.`);
-    }
     await validateWatchMasterRelations(tx, watch);
   }
 
@@ -200,5 +246,5 @@ export async function promoteInquiryWatches(
     results.push({ inquiryWatchId: draft.id, watchId: formalWatch.id, repairId: repair.id, inquiryNumber });
   }
   await tx.customer.update({ where: { id: customer.id }, data: { currentSeq: sequence, prefix } });
-  return { customerId: customer.id, promotedAt, promotions: results };
+  return { customerId: customer.id, promotedAt, promotions: results, deduplicated: false };
 }

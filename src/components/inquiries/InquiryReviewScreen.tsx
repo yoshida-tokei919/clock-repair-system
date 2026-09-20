@@ -310,7 +310,7 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "昇格できませんでした。");
-      setNotice(`${data.promotions.length}台を正式案件として作成しました。`);
+      setNotice(data.deduplicated ? `${data.promotions.length}台はすでに昇格済みです。既存案件を確認しました。` : `${data.promotions.length}台を正式案件として作成しました。`);
       setSelectedPromotionWatchIds([]);
       await load();
     } catch (promotionError) {
