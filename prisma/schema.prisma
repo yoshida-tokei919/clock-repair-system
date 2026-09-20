@@ -531,6 +531,7 @@ model WatchReference {
   model     Model    @relation(fields: [modelId], references: [id])
   caliber   Caliber? @relation(fields: [caliberId], references: [id])
   watches   Watch[]
+  caseReferenceWatches Watch[] @relation("WatchCaseReference")
   inquiryReferenceWatches InquiryWatch[] @relation("InquiryWatchReference")
   inquiryCaseReferenceWatches InquiryWatch[] @relation("InquiryWatchCaseReference")
 }
@@ -547,6 +548,7 @@ model Caliber {
   brand      Brand?  @relation(fields: [brandId], references: [id])
   references WatchReference[]
   watches    Watch[]
+  baseCaliberWatches Watch[] @relation("WatchBaseCaliber")
   movementCaliberRepairs     Repair[] @relation("RepairMovementCaliber")
   baseMovementCaliberRepairs Repair[] @relation("RepairBaseMovementCaliber")
   // PartsMaster への複数FK対応：named relation
@@ -564,7 +566,9 @@ model Watch {
   // Customer-entered text from an intake form. It is not a Model master record.
   modelNameInput String?
   referenceId  Int?
+  caseReferenceId Int?
   caliberId    Int?
+  baseCaliberId Int?
   timepieceType TimepieceType?
   driveType    WatchDriveType?
   serialNumber String? // Optional for vintage/unknown
@@ -573,7 +577,9 @@ model Watch {
   brand       Brand    @relation(fields: [brandId], references: [id])
   model       Model?   @relation(fields: [modelId], references: [id], onDelete: Restrict)
   reference   WatchReference? @relation(fields: [referenceId], references: [id])
+  caseReference WatchReference? @relation("WatchCaseReference", fields: [caseReferenceId], references: [id], onDelete: Restrict)
   caliber     Caliber? @relation(fields: [caliberId], references: [id])
+  baseCaliber Caliber? @relation("WatchBaseCaliber", fields: [baseCaliberId], references: [id], onDelete: Restrict)
   customer    Customer @relation(fields: [customerId], references: [id])
   repairs     Repair[]
   inquiryWatchPromotion InquiryWatch? @relation("InquiryWatchPromotedWatch")

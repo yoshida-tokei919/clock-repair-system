@@ -74,6 +74,16 @@ type ReviewPayload = {
   };
 };
 
+type PromotionCustomer = {
+  id: number;
+  name: string;
+  companyName: string | null;
+  type: string;
+  prefix: string | null;
+  phone: string | null;
+  lineId: string | null;
+};
+
 type FieldDraft = { value: string; confirmationStatus: InquiryWatchConfirmationStatus; source: "AI_CANDIDATE" | "MANUAL" };
 type WatchDraft = {
   fields: Partial<Record<InquiryWatchFieldName, FieldDraft>>;
@@ -147,6 +157,11 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
   const [openWatchId, setOpenWatchId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingWatchId, setSavingWatchId] = useState<number | null>(null);
+  const [promotionCustomers, setPromotionCustomers] = useState<PromotionCustomer[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [selectedPromotionWatchIds, setSelectedPromotionWatchIds] = useState<number[]>([]);
+  const [promoting, setPromoting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -168,6 +183,17 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
   }
 
   useEffect(() => { void load(); }, [inquiryId]);
+
+  async function loadPromotionCustomers(query = "") {
+    const response = await fetch(`/api/inquiries/${inquiryId}/promotion/customers${query ? `?q=${encodeURIComponent(query)}` : ""}`, { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "顧客候補を取得できませんでした。");
+    const choices = [...data.strictMatches, ...data.customers].filter((customer, index, values) => values.findIndex((item) => item.id === customer.id) === index);
+    setPromotionCustomers(choices);
+    setSelectedCustomerId((current) => current !== null && choices.some((customer) => customer.id === current) ? current : null);
+  }
+
+  useEffect(() => { void loadPromotionCustomers().catch((loadError) => setError(loadError instanceof Error ? loadError.message : "顧客候補を取得できませんでした。")); }, [inquiryId]);
 
   const watches = payload?.inquiry.reviewWatches ?? [];
   const options = payload?.masterOptions;
@@ -263,6 +289,37 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
     }
   }
 
+  const togglePromotionWatch = (watchId: number) => {
+    setSelectedPromotionWatchIds((current) => current.includes(watchId) ? current.filter((id) => id !== watchId) : [...current, watchId]);
+  };
+
+  async function promoteSelectedWatches() {
+    if (!selectedCustomerId || selectedPromotionWatchIds.length === 0) {
+      setError("顧客と昇格する時計を選択してください。");
+      return;
+    }
+    if (!window.confirm(`${selectedPromotionWatchIds.length}台の時計を正式なWatch・Repairとして作成します。未保存の編集内容は先に保存してください。`)) return;
+    setPromoting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/inquiries/${inquiryId}/promotion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: selectedCustomerId, watchIds: selectedPromotionWatchIds }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "昇格できませんでした。");
+      setNotice(`${data.promotions.length}台を正式案件として作成しました。`);
+      setSelectedPromotionWatchIds([]);
+      await load();
+    } catch (promotionError) {
+      setError(promotionError instanceof Error ? promotionError.message : "昇格できませんでした。");
+    } finally {
+      setPromoting(false);
+    }
+  }
+
   const summary = useMemo(() => watches.map((watch) => ({
     watch,
     status: drafts[watch.id] ? statusFor(watch, drafts[watch.id]) : null,
@@ -283,6 +340,27 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
 
       {error && <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {notice && <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">正式案件への昇格</CardTitle>
+          <p className="text-sm text-zinc-600">顧客と時計を選択後、すべての選択時計を事前検証してから一括で作成します。AI候補や未確認のmasterは昇格しません。</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>顧客</Label>
+            <div className="flex flex-wrap gap-2"><Input className="max-w-sm" value={customerSearch} placeholder="既存顧客を検索" onChange={(event) => setCustomerSearch(event.target.value)} /><Button type="button" variant="outline" onClick={() => void loadPromotionCustomers(customerSearch).catch((searchError) => setError(searchError instanceof Error ? searchError.message : "顧客を検索できませんでした。"))}>検索</Button></div>
+            <p className="text-xs text-zinc-500">LINE IDが完全一致する既存顧客のみを自動候補にします。新規顧客はこの画面では作成しません。</p>
+            {promotionCustomers.length === 0 ? <p className="rounded border border-dashed p-3 text-sm text-zinc-500">候補がありません。既存顧客を検索して選択してください。</p> : <div className="grid gap-2 sm:grid-cols-2">{promotionCustomers.map((customer) => <label key={customer.id} className={`cursor-pointer rounded border p-3 text-sm ${selectedCustomerId === customer.id ? "border-blue-500 bg-blue-50" : "border-zinc-200"}`}><input className="mr-2" type="radio" name="promotion-customer" checked={selectedCustomerId === customer.id} onChange={() => setSelectedCustomerId(customer.id)} />{customer.companyName || customer.name}<span className="ml-2 text-xs text-zinc-500">#{customer.id}{customer.phone ? ` ・${customer.phone}` : ""}</span></label>)}</div>}
+          </div>
+          <div className="space-y-2">
+            <Label>昇格する時計</Label>
+            {watches.filter((watch) => !watch.promotedAt).map((watch) => <label key={watch.id} className="flex cursor-pointer items-center gap-2 rounded border border-zinc-200 p-3 text-sm"><input type="checkbox" checked={selectedPromotionWatchIds.includes(watch.id)} onChange={() => togglePromotionWatch(watch.id)} />時計{watch.position}{watch.label ? ` ・${watch.label}` : ""}</label>)}
+            {watches.every((watch) => watch.promotedAt) && <p className="text-sm text-zinc-500">すべての時計が昇格済みです。</p>}
+          </div>
+          <Button type="button" disabled={promoting || !selectedCustomerId || selectedPromotionWatchIds.length === 0} onClick={() => void promoteSelectedWatches()}>{promoting ? "昇格中…" : `${selectedPromotionWatchIds.length}台を正式案件へ昇格`}</Button>
+        </CardContent>
+      </Card>
 
       {watches.length === 0 ? (
         <Card><CardContent className="p-6 text-sm text-zinc-500">確認対象の時計がまだありません。AI解析結果を保存すると、ここに確認用の時計が作成されます。</CardContent></Card>
@@ -316,7 +394,7 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
                     <CardTitle className="text-lg">時計{watch.position}{watch.label ? ` · ${watch.label}` : ""}</CardTitle>
                     {watch.summary && <p className="mt-1 text-sm text-zinc-600">{watch.summary}</p>}
                   </div>
-                  <div className="flex items-center gap-2"><Badge className={status.className}>{status.label}</Badge>{isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}</div>
+                  <div className="flex items-center gap-2"><Badge className={watch.promotedAt ? "bg-blue-100 text-blue-800" : status.className}>{watch.promotedAt ? "昇格済み" : status.label}</Badge>{isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}</div>
                 </CardHeader>
                 {isOpen && (
                   <CardContent className="space-y-6">
