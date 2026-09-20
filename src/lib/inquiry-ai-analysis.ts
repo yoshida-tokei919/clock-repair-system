@@ -171,6 +171,92 @@ function assertSources(parsed: ParsedInquiryAiAnalysis, input: Awaited<ReturnTyp
   }
 }
 
+type SavedInquiryAiWatch = {
+  id: number;
+  position: number;
+  label: string | null;
+  summary: string | null;
+  faults: unknown;
+  requestedWork: unknown;
+  supplementalFacts: unknown;
+  missingInformation: unknown;
+  missingPhotos: unknown;
+  candidates: Array<{ id: number; field: string; rank: number; value: string }>;
+};
+
+function preferredAiCandidates(candidates: SavedInquiryAiWatch["candidates"]) {
+  const byField = new Map<string, SavedInquiryAiWatch["candidates"][number]>();
+  for (const candidate of candidates) {
+    const current = byField.get(candidate.field);
+    if (!current || candidate.rank < current.rank || (candidate.rank === current.rank && candidate.id < current.id)) {
+      byField.set(candidate.field, candidate);
+    }
+  }
+  return Array.from(byField.values());
+}
+
+// AI snapshots are immutable. A review draft is stable per Inquiry + position,
+// so reanalysis refreshes pending AI values without replacing manual or
+// confirmed values.
+async function syncInquiryWatchDrafts(tx: any, inquiryId: number, aiWatches: SavedInquiryAiWatch[]) {
+  for (const aiWatch of aiWatches) {
+    const selectedCandidates = preferredAiCandidates(aiWatch.candidates);
+    const draftData = {
+      sourceAiWatchId: aiWatch.id,
+      label: aiWatch.label,
+      summary: aiWatch.summary,
+      faults: aiWatch.faults,
+      requestedWork: aiWatch.requestedWork,
+      supplementalFacts: aiWatch.supplementalFacts,
+      missingInformation: aiWatch.missingInformation,
+      missingPhotos: aiWatch.missingPhotos,
+    };
+    const existing = await tx.inquiryWatch.findUnique({
+      where: { inquiryId_position: { inquiryId, position: aiWatch.position } },
+      include: { fieldValues: true },
+    });
+    if (!existing) {
+      await tx.inquiryWatch.create({
+        data: {
+          inquiryId,
+          position: aiWatch.position,
+          ...draftData,
+          fieldValues: {
+            create: selectedCandidates.map((candidate) => ({
+              field: candidate.field,
+              value: candidate.value,
+              source: "AI_CANDIDATE",
+              sourceAiCandidateId: candidate.id,
+            })),
+          },
+        },
+      });
+      continue;
+    }
+
+    await tx.inquiryWatch.update({ where: { id: existing.id }, data: draftData });
+    for (const candidate of selectedCandidates) {
+      const current = existing.fieldValues.find((value: any) => value.field === candidate.field);
+      if (!current) {
+        await tx.inquiryWatchFieldValue.create({
+          data: {
+            inquiryWatchId: existing.id,
+            field: candidate.field,
+            value: candidate.value,
+            source: "AI_CANDIDATE",
+            sourceAiCandidateId: candidate.id,
+          },
+        });
+      } else if (current.source === "AI_CANDIDATE" && current.confirmationStatus === "PENDING") {
+        await tx.inquiryWatchFieldValue.update({
+          where: { id: current.id },
+          data: { value: candidate.value, sourceAiCandidateId: candidate.id },
+        });
+      }
+    }
+  }
+}
+
 export async function saveInquiryAiAnalysis(db: InquiryAiAnalysisDb, inquiryId: number, payload: unknown) {
   const parsed = parseInquiryAiAnalysisPayload(payload);
   const existing = await db.inquiryAiAnalysis.findUnique({ where: { idempotencyKey: parsed.idempotencyKey } });
@@ -192,13 +278,17 @@ export async function saveInquiryAiAnalysis(db: InquiryAiAnalysisDb, inquiryId: 
       const input = await currentInput(tx, inquiryId);
       if (parsed.inputFingerprint !== input.fingerprint) throw new InquiryAiAnalysisStaleError("AI input context has changed");
       assertSources(parsed, input);
-      const created = await tx.inquiryAiAnalysis.create({ data: {
-        inquiryId, status: parsed.status, idempotencyKey: parsed.idempotencyKey, inputFingerprint: input.fingerprint,
-        modelProvider: parsed.modelProvider, modelName: parsed.modelName, promptVersion: parsed.promptVersion, inputSnapshot: input.snapshot,
-        conversationSummary: parsed.conversationSummary, watchCount: parsed.watchCount, watchCountConfidence: parsed.watchCountConfidence,
-        unresolvedPoints: parsed.unresolvedPoints, errorMessage: parsed.errorMessage, completedAt: new Date(),
-        watches: { create: parsed.watches.map((watch) => ({ ...watch, candidates: { create: watch.candidates } })) },
-      } });
+      const created = await tx.inquiryAiAnalysis.create({
+        data: {
+          inquiryId, status: parsed.status, idempotencyKey: parsed.idempotencyKey, inputFingerprint: input.fingerprint,
+          modelProvider: parsed.modelProvider, modelName: parsed.modelName, promptVersion: parsed.promptVersion, inputSnapshot: input.snapshot,
+          conversationSummary: parsed.conversationSummary, watchCount: parsed.watchCount, watchCountConfidence: parsed.watchCountConfidence,
+          unresolvedPoints: parsed.unresolvedPoints, errorMessage: parsed.errorMessage, completedAt: new Date(),
+          watches: { create: parsed.watches.map(({ candidates, ...watch }) => ({ ...watch, candidates: { create: candidates } })) },
+        },
+        include: { watches: { include: { candidates: true } } },
+      });
+      await syncInquiryWatchDrafts(tx, inquiryId, created.watches);
       await tx.inquiry.update({ where: { id: inquiryId }, data: {
         status: inquiryStatus,
         ...(parsed.status !== "FAILED" && parsed.conversationSummary ? { conversationSummary: parsed.conversationSummary } : {}),

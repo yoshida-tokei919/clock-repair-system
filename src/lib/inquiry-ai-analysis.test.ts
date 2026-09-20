@@ -15,6 +15,7 @@ function createFakeDb() {
     files: [{ id: 22, inquiryMessageId: 11, mimeType: "image/webp", fileSize: 10, width: 1, height: 1, uploadStatus: "STORED", objectKey: "inquiries/7/image.webp", createdAt: new Date("2026-09-18T00:00:00.000Z"), updatedAt: new Date("2026-09-18T00:00:00.000Z") }],
   };
   const analyses: any[] = [];
+  const reviewWatches: any[] = [];
   const updates: any[] = [];
   const calls: string[] = [];
   const db: any = {
@@ -24,12 +25,63 @@ function createFakeDb() {
     },
     inquiryAiAnalysis: {
       findUnique: async ({ where }: any) => analyses.find((analysis) => analysis.idempotencyKey === where.idempotencyKey) ?? null,
-      create: async ({ data }: any) => { calls.push("analysis-create"); const result = { id: analyses.length + 1, ...data }; analyses.push(result); return result; },
+      create: async ({ data }: any) => {
+        calls.push("analysis-create");
+        const analysisId = analyses.length + 1;
+        const watches = data.watches.create.map((watch: any, watchIndex: number) => ({
+          id: analysisId * 100 + watchIndex + 1,
+          ...watch,
+          candidates: watch.candidates.create.map((candidate: any, candidateIndex: number) => ({
+            id: analysisId * 1000 + watchIndex * 100 + candidateIndex + 1,
+            ...candidate,
+          })),
+        }));
+        const result = { id: analysisId, ...data, watches };
+        analyses.push(result);
+        return result;
+      },
+    },
+    inquiryWatch: {
+      findUnique: async ({ where }: any) => {
+        calls.push("review-watch-find");
+        return reviewWatches.find((watch) => watch.inquiryId === where.inquiryId_position.inquiryId && watch.position === where.inquiryId_position.position) ?? null;
+      },
+      create: async ({ data }: any) => {
+        calls.push("review-watch-create");
+        const watch = {
+          id: reviewWatches.length + 1,
+          ...data,
+          fieldValues: data.fieldValues.create.map((value: any, index: number) => ({ id: index + 1, ...value })),
+        };
+        reviewWatches.push(watch);
+        return watch;
+      },
+      update: async ({ where, data }: any) => {
+        calls.push("review-watch-update");
+        const watch = reviewWatches.find((item) => item.id === where.id);
+        Object.assign(watch, data);
+        return watch;
+      },
+    },
+    inquiryWatchFieldValue: {
+      create: async ({ data }: any) => {
+        calls.push("review-field-create");
+        const watch = reviewWatches.find((item) => item.id === data.inquiryWatchId);
+        const value = { id: watch.fieldValues.length + 1, ...data };
+        watch.fieldValues.push(value);
+        return value;
+      },
+      update: async ({ where, data }: any) => {
+        calls.push("review-field-update");
+        const value = reviewWatches.flatMap((watch) => watch.fieldValues).find((item) => item.id === where.id);
+        Object.assign(value, data);
+        return value;
+      },
     },
     $executeRaw: async () => { calls.push("advisory-lock"); },
     $transaction: async (callback: any) => callback(db),
   };
-  return { db, inquiry, analyses, updates, calls };
+  return { db, inquiry, analyses, reviewWatches, updates, calls };
 }
 
 function payload(fake: ReturnType<typeof createFakeDb>, status: "COMPLETED" | "NEEDS_REVIEW" | "FAILED" = "COMPLETED") {
@@ -47,10 +99,39 @@ test("analysis write validates sources, maps nested rows, and updates COMPLETED 
   const result = await saveInquiryAiAnalysis(fake.db, 7, payload(fake));
   assert.equal(result.deduplicated, false);
   assert.equal(fake.analyses.length, 1);
-  assert.equal(fake.analyses[0].watches.create[0].candidates.create[0].value, "Rolex");
+  assert.equal(fake.analyses[0].watches[0].candidates[0].value, "Rolex");
+  assert.deepEqual(fake.reviewWatches[0], {
+    id: 1,
+    inquiryId: 7,
+    position: 1,
+    sourceAiWatchId: 101,
+    label: "Watch 1",
+    summary: undefined,
+    faults: ["stopped"],
+    requestedWork: ["overhaul"],
+    supplementalFacts: undefined,
+    missingInformation: [],
+    missingPhotos: [],
+    fieldValues: [{ id: 1, field: "BRAND", value: "Rolex", source: "AI_CANDIDATE", sourceAiCandidateId: 1001 }],
+  });
   assert.equal(fake.updates[0].status, "AI_PROCESSED");
   assert.equal(fake.updates[0].conversationSummary, "A concise summary");
-  assert.deepEqual(fake.calls.slice(-5), ["lock-target", "advisory-lock", "final-context", "analysis-create", "inquiry-update"]);
+  assert.deepEqual(fake.calls.slice(-7), ["lock-target", "advisory-lock", "final-context", "analysis-create", "review-watch-find", "review-watch-create", "inquiry-update"]);
+});
+
+test("reanalysis refreshes pending AI values but preserves confirmed values in one review draft", async () => {
+  const fake = createFakeDb();
+  await saveInquiryAiAnalysis(fake.db, 7, payload(fake));
+  fake.reviewWatches[0].fieldValues[0].confirmationStatus = "CONFIRMED";
+  const reanalysis = payload(fake);
+  reanalysis.idempotencyKey = "key-reanalysis";
+  reanalysis.watches[0].candidates[0].value = "OMEGA";
+  await saveInquiryAiAnalysis(fake.db, 7, reanalysis);
+
+  assert.equal(fake.reviewWatches.length, 1);
+  assert.equal(fake.reviewWatches[0].sourceAiWatchId, 201);
+  assert.equal(fake.reviewWatches[0].fieldValues[0].value, "Rolex");
+  assert.equal(fake.reviewWatches[0].fieldValues[0].confirmationStatus, "CONFIRMED");
 });
 
 test("AI analysis cannot claim human review or ungrounded provenance, and current summaries are required", async () => {

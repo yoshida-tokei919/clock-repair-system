@@ -219,6 +219,26 @@ enum InquiryAiSourceType {
   TECHNICIAN_CONFIRMED
 }
 
+enum InquiryWatchField {
+  BRAND
+  MODEL
+  PRODUCT_REF
+  CASE_REF
+  CALIBER
+  MOVEMENT_TYPE
+  ERA
+}
+
+enum InquiryWatchFieldValueSource {
+  AI_CANDIDATE
+  MANUAL
+}
+
+enum InquiryWatchFieldConfirmationStatus {
+  PENDING
+  CONFIRMED
+}
+
 model Inquiry {
   id              Int           @id @default(autoincrement())
   lineUserId      Int
@@ -233,6 +253,7 @@ model Inquiry {
   messages InquiryMessage[]
   files    InquiryFile[]
   analyses InquiryAiAnalysis[]
+  reviewWatches InquiryWatch[]
   slackNotifications SlackNotificationOutbox[]
 
   @@index([lineUserId, status])
@@ -329,6 +350,7 @@ model InquiryAiWatch {
 
   analysis   InquiryAiAnalysis    @relation(fields: [analysisId], references: [id], onDelete: Cascade)
   candidates InquiryAiCandidate[]
+  reviewWatches InquiryWatch[] @relation("InquiryWatchSourceAiWatch")
 
   @@unique([analysisId, position])
 }
@@ -350,9 +372,80 @@ model InquiryAiCandidate {
   updatedAt        DateTime                @updatedAt
 
   watch InquiryAiWatch @relation(fields: [watchId], references: [id], onDelete: Cascade)
+  reviewFieldValues InquiryWatchFieldValue[]
 
   @@index([watchId, field])
   @@index([reviewStatus])
+}
+
+// A human-review draft derived from an immutable InquiryAiWatch. It is never a
+// formal Watch or Repair and must remain safe to edit while AI snapshots stay
+// unchanged.
+model InquiryWatch {
+  id              Int      @id @default(autoincrement())
+  inquiryId       Int
+  sourceAiWatchId Int?
+  position        Int
+  label           String?
+  summary         String?
+  faults          Json?
+  requestedWork   Json?
+  supplementalFacts Json?
+  missingInformation Json?
+  missingPhotos   Json?
+
+  // These optional IDs can only be set by a later human confirmation flow.
+  // Creating this draft from AI analysis never creates or updates masters.
+  brandId         Int?
+  modelId         Int?
+  referenceId     Int?
+  caseReferenceId Int?
+  caliberId       Int?
+
+  // P3-3 will populate these in the same transaction that creates a formal
+  // Watch and Repair. Their one-to-one shape prevents ambiguous promotion.
+  promotedWatchId Int?     @unique
+  promotedRepairId Int?    @unique
+  promotedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  inquiry       Inquiry        @relation(fields: [inquiryId], references: [id], onDelete: Restrict)
+  sourceAiWatch InquiryAiWatch? @relation("InquiryWatchSourceAiWatch", fields: [sourceAiWatchId], references: [id], onDelete: Restrict)
+  brand         Brand?         @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  model         Model?         @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  reference     WatchReference? @relation("InquiryWatchReference", fields: [referenceId], references: [id], onDelete: Restrict)
+  caseReference WatchReference? @relation("InquiryWatchCaseReference", fields: [caseReferenceId], references: [id], onDelete: Restrict)
+  caliber       Caliber?       @relation(fields: [caliberId], references: [id], onDelete: Restrict)
+  promotedWatch Watch?         @relation("InquiryWatchPromotedWatch", fields: [promotedWatchId], references: [id], onDelete: Restrict)
+  promotedRepair Repair?       @relation("InquiryWatchPromotedRepair", fields: [promotedRepairId], references: [id], onDelete: Restrict)
+  fieldValues   InquiryWatchFieldValue[]
+
+  @@index([inquiryId, createdAt])
+  @@unique([inquiryId, position])
+  @@index([inquiryId, position])
+  @@index([promotedAt])
+}
+
+// One current, editable value per field. The immutable AI candidate remains
+// available as provenance; manual values have no AI candidate reference.
+model InquiryWatchFieldValue {
+  id                  Int                                  @id @default(autoincrement())
+  inquiryWatchId      Int
+  field               InquiryWatchField
+  value               String
+  source              InquiryWatchFieldValueSource
+  confirmationStatus  InquiryWatchFieldConfirmationStatus @default(PENDING)
+  sourceAiCandidateId Int?                                 @unique
+  confirmedAt         DateTime?
+  createdAt           DateTime                             @default(now())
+  updatedAt           DateTime                             @updatedAt
+
+  inquiryWatch      InquiryWatch       @relation(fields: [inquiryWatchId], references: [id], onDelete: Cascade)
+  sourceAiCandidate InquiryAiCandidate? @relation(fields: [sourceAiCandidateId], references: [id], onDelete: Restrict)
+
+  @@unique([inquiryWatchId, field])
+  @@index([confirmationStatus])
 }
 
 // 2. Watch Metadata (Smart Input)
@@ -397,6 +490,7 @@ model Brand {
   movementMakerParts PartsMaster[] @relation("PartsMovementMaker")
   baseMakerParts     PartsMaster[] @relation("PartsBaseMaker")
   aliases            BrandAlias[]
+  inquiryWatches     InquiryWatch[]
 }
 
 model BrandAlias {
@@ -421,6 +515,7 @@ model Model {
   references WatchReference[]
   watches   Watch[]
   parts     PartsMaster[]
+  inquiryWatches InquiryWatch[]
 }
 
 model WatchReference {
@@ -432,6 +527,8 @@ model WatchReference {
   model     Model    @relation(fields: [modelId], references: [id])
   caliber   Caliber? @relation(fields: [caliberId], references: [id])
   watches   Watch[]
+  inquiryReferenceWatches InquiryWatch[] @relation("InquiryWatchReference")
+  inquiryCaseReferenceWatches InquiryWatch[] @relation("InquiryWatchCaseReference")
 }
 
 model Caliber {
@@ -451,6 +548,7 @@ model Caliber {
   // PartsMaster への複数FK対応：named relation
   parts            PartsMaster[] @relation("PartsCaliber")
   baseCaliberParts PartsMaster[] @relation("PartsBaseCaliber")
+  inquiryWatches  InquiryWatch[]
 }
 
 // 3. Repair & Watch
@@ -473,6 +571,7 @@ model Watch {
   caliber     Caliber? @relation(fields: [caliberId], references: [id])
   customer    Customer @relation(fields: [customerId], references: [id])
   repairs     Repair[]
+  inquiryWatchPromotion InquiryWatch? @relation("InquiryWatchPromotedWatch")
 
   accessories  String?  // JSON or comma-separated list of accessories (Box, Warranty, etc.)
   
@@ -569,6 +668,7 @@ model Repair {
   orderRequests OrderRequest[]
   partAllocations RepairPartAllocation[]
   publicCases   PublicCase[]
+  inquiryWatchPromotion InquiryWatch? @relation("InquiryWatchPromotedRepair")
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
