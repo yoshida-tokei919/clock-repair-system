@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Plus, Save } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Clipboard, Link as LinkIcon, Plus, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   INQUIRY_WATCH_FIELDS,
   type InquiryWatchConfirmationStatus,
@@ -166,6 +167,8 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
   const [promoting, setPromoting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [intakeInvite, setIntakeInvite] = useState<{ token: string; expiresAt: string } | null>(null);
+  const [intakeDialogOpen, setIntakeDialogOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -280,13 +283,49 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
 
   async function issueInquiryIntakeInvite() {
     setError(null);
-    const response = await fetch(`/api/inquiries/${inquiryId}/intake-invite`, { method: "POST" });
-    const data = await response.json();
-    if (!response.ok) { setError(data.error || "受付リンクを発行できませんでした。"); return; }
-    const url = `${window.location.origin}/customer/intake/${data.token}`;
-    await navigator.clipboard?.writeText(url).catch(() => undefined);
-    setNotice(`受付リンクを${data.reused ? "再利用" : "発行"}しました。${url}`);
+    if (intakeInvite) {
+      setIntakeDialogOpen(true);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/inquiries/${inquiryId}/intake-invite`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "\u53d7\u4ed8\u30ea\u30f3\u30af\u3092\u767a\u884c\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
+      setIntakeInvite({ token: data.token, expiresAt: data.expiresAt });
+      setIntakeDialogOpen(true);
+      setNotice(data.reused ? "\u6709\u52b9\u306a\u53d7\u4ed8\u30ea\u30f3\u30af\u3092\u8868\u793a\u3057\u3066\u3044\u307e\u3059\u3002" : "\u53d7\u4ed8\u30ea\u30f3\u30af\u3092\u767a\u884c\u3057\u307e\u3057\u305f\u3002");
+    } catch (inviteError) {
+      setError(inviteError instanceof Error ? inviteError.message : "\u53d7\u4ed8\u30ea\u30f3\u30af\u3092\u767a\u884c\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
+    }
   }
+
+  const intakeUrl = intakeInvite && typeof window !== "undefined" ? `${window.location.origin}/customer/intake/${intakeInvite.token}` : "";
+  const intakeExpiresAt = intakeInvite ? new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" }).format(new Date(intakeInvite.expiresAt)) : "";
+  const intakeLineMessage = intakeUrl ? `\u4fee\u7406\u54c1\u306e\u9001\u4ed8\u53d7\u4ed8\u306b\u5fc5\u8981\u306a\u60c5\u5831\u3092\u3054\u5165\u529b\u304f\u3060\u3055\u3044\u3002
+
+\u4e0b\u8a18\u30ea\u30f3\u30af\u304b\u3089\u3001\u304a\u540d\u524d\u30fb\u3054\u4f4f\u6240\u30fb\u8fd4\u9001\u5148\u7b49\u3092\u3054\u5165\u529b\u304f\u3060\u3055\u3044\u3002
+\u6642\u8a08\u306e\u60c5\u5831\u306f\u3059\u3067\u306b\u78ba\u8a8d\u6e08\u307f\u3067\u3059\u306e\u3067\u3001\u518d\u5165\u529b\u306f\u4e0d\u8981\u3067\u3059\u3002
+
+\u3010\u53d7\u4ed8\u30d5\u30a9\u30fc\u30e0\u3011
+${intakeUrl}` : "";
+
+  const copyIntakeUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(intakeUrl);
+      setNotice("\u53d7\u4ed8\u30ea\u30f3\u30af\u3092\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f\u3002");
+    } catch {
+      setError("\u30b3\u30d4\u30fc\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002\u30ea\u30f3\u30af\u3092\u9078\u629e\u3057\u3066\u30b3\u30d4\u30fc\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
+    }
+  };
+
+  const copyIntakeLineMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(intakeLineMessage);
+      setNotice("\u53d7\u4ed8\u6848\u5185\u6587\u3092\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f\u3002");
+    } catch {
+      setError("\u30b3\u30d4\u30fc\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002\u6848\u5185\u6587\u3092\u9078\u629e\u3057\u3066\u30b3\u30d4\u30fc\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
+    }
+  };
 
   async function registerMaster(watch: ReviewWatch, kind: RegistrationKind, value: string, parentId: number | null) {
     setSavingWatchId(watch.id);
@@ -361,7 +400,29 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
       {error && <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {notice && <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
 
-      <Card><CardHeader><CardTitle className="text-lg">B2C 受付判断</CardTitle><p className="text-sm text-zinc-600">受付希望のみを固定したリンクでお客様へ案内します。</p></CardHeader><CardContent className="space-y-3"><div className="flex flex-wrap gap-2 text-sm"><Badge>保留 {watches.filter((watch) => watch.decision === "PENDING").length}</Badge><Badge>受付希望 {watches.filter((watch) => watch.decision === "REQUESTED").length}</Badge><Badge variant="secondary">お断り {watches.filter((watch) => watch.decision === "DECLINED").length}</Badge></div>{watches.filter((watch) => !watch.promotedAt).map((watch) => <div key={watch.id} className={`flex flex-wrap items-center justify-between gap-2 rounded border p-3 ${watch.decision === "DECLINED" ? "bg-zinc-50" : ""}`}><span>時計 {watch.position} {watch.label || ""} — {watch.decision}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => void setDecision(watch, "PENDING")}>保留に戻す</Button><Button size="sm" variant="outline" onClick={() => void setDecision(watch, "DECLINED")}>お断り</Button><Button size="sm" onClick={() => void setDecision(watch, "REQUESTED")}>受付希望</Button></div></div>)}{watches.filter((watch) => watch.promotedAt).map((watch) => <p key={watch.id} className="text-sm text-zinc-500">時計 {watch.position}: 昇格済み {watch.promotedRepairId ? `Repair #${watch.promotedRepairId}` : ""}</p>)}<Button disabled={!watches.some((watch) => watch.decision === "REQUESTED" && !watch.promotedAt)} onClick={() => void issueInquiryIntakeInvite()}>お客様用受付リンクを発行</Button></CardContent></Card>
+      <Card><CardHeader><CardTitle className="text-lg">B2C 受付判断</CardTitle><p className="text-sm text-zinc-600">受付希望のみを固定したリンクでお客様へ案内します。</p></CardHeader><CardContent className="space-y-3"><div className="flex flex-wrap gap-2 text-sm"><Badge>保留 {watches.filter((watch) => watch.decision === "PENDING").length}</Badge><Badge>受付希望 {watches.filter((watch) => watch.decision === "REQUESTED").length}</Badge><Badge variant="secondary">お断り {watches.filter((watch) => watch.decision === "DECLINED").length}</Badge></div>{watches.filter((watch) => !watch.promotedAt).map((watch) => <div key={watch.id} className={`flex flex-wrap items-center justify-between gap-2 rounded border p-3 ${watch.decision === "DECLINED" ? "bg-zinc-50" : ""}`}><span>時計 {watch.position} {watch.label || ""} — {watch.decision}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => void setDecision(watch, "PENDING")}>保留に戻す</Button><Button size="sm" variant="outline" onClick={() => void setDecision(watch, "DECLINED")}>お断り</Button><Button size="sm" onClick={() => void setDecision(watch, "REQUESTED")}>受付希望</Button></div></div>)}{watches.filter((watch) => watch.promotedAt).map((watch) => <p key={watch.id} className="text-sm text-zinc-500">時計 {watch.position}: 昇格済み {watch.promotedRepairId ? `Repair #${watch.promotedRepairId}` : ""}</p>)}<Button disabled={!intakeInvite && !watches.some((watch) => watch.decision === "REQUESTED" && !watch.promotedAt)} onClick={() => void issueInquiryIntakeInvite()}>{intakeInvite ? <><LinkIcon className="mr-2 h-4 w-4" />{`\u53d7\u4ed8\u30ea\u30f3\u30af\u3092\u78ba\u8a8d`}</> : `\u304a\u5ba2\u69d8\u7528\u53d7\u4ed8\u30ea\u30f3\u30af\u3092\u767a\u884c`}</Button></CardContent></Card>
+
+      <Dialog open={intakeDialogOpen} onOpenChange={setIntakeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{`\u4fee\u7406\u53d7\u4ed8\u30ea\u30f3\u30af`}</DialogTitle>
+            <DialogDescription>{`\u304a\u5ba2\u69d8\u306b LINE \u3067\u9001\u308b\u4fee\u7406\u53d7\u4ed8\u30ea\u30f3\u30af\u3068\u6848\u5185\u6587\u3067\u3059\u3002`}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input value={intakeUrl} readOnly aria-label="\u4fee\u7406\u53d7\u4ed8\u30ea\u30f3\u30af" onFocus={(event) => event.currentTarget.select()} />
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-zinc-700">{`LINE \u9001\u4fe1\u7528\u6848\u5185\u6587`}</p>
+              <textarea value={intakeLineMessage} readOnly aria-label="LINE \u9001\u4fe1\u7528\u6848\u5185\u6587" onFocus={(event) => event.currentTarget.select()} className="min-h-44 w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-6 shadow-sm" />
+            </div>
+            <p className="text-sm text-zinc-600">{`\u6709\u52b9\u671f\u9650: ${intakeExpiresAt}`}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIntakeDialogOpen(false)}>{`\u9589\u3058\u308b`}</Button>
+            <Button type="button" variant="outline" onClick={() => void copyIntakeUrl()}><Clipboard className="mr-2 h-4 w-4" />{`URL\u306e\u307f\u30b3\u30d4\u30fc`}</Button>
+            <Button type="button" onClick={() => void copyIntakeLineMessage()}><Clipboard className="mr-2 h-4 w-4" />{`\u6848\u5185\u6587\u3092\u30b3\u30d4\u30fc`}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {false && <Card>
         <CardHeader>
