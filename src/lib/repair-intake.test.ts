@@ -345,10 +345,11 @@ test("revokes a stale active Inquiry invite before issuing one for the changed w
   assert.deepEqual((result.invite as unknown as { inquiryWatches: { create: Array<{ inquiryWatchId: number }> } }).inquiryWatches.create, [{ inquiryWatchId: 2 }]);
 });
 
-function inquirySubmitDb(watch: Record<string, unknown>) {
+function inquirySubmitDb(watch: Record<string, unknown>, reviewWatches: Record<string, unknown>[] = [watch]) {
   const createdWatches: unknown[] = [];
   const createdRepairs: unknown[] = [];
   const updatedInquiryWatches: unknown[] = [];
+  const updatedInquiries: unknown[] = [];
   const tx = {
     ...promotionMasterTx(),
     $queryRaw: async () => [{ id: 12 }],
@@ -368,12 +369,21 @@ function inquirySubmitDb(watch: Record<string, unknown>) {
     },
     watch: { create: async (args: unknown) => { createdWatches.push(args); return { id: 200 }; } },
     repairStatusLog: { create: async () => undefined },
-    inquiryWatch: { update: async (args: unknown) => { updatedInquiryWatches.push(args); return undefined; } },
+    inquiryWatch: {
+      findMany: async () => reviewWatches,
+      update: async (args: { where: { id: number }; data: Record<string, unknown> }) => {
+        updatedInquiryWatches.push(args);
+        const updated = reviewWatches.find((item) => item.id === args.where.id);
+        if (updated) Object.assign(updated, args.data);
+        return undefined;
+      },
+    },
+    inquiry: { update: async (args: unknown) => { updatedInquiries.push(args); return undefined; } },
     brand: { findUnique: async () => ({ id: 10 }), findMany: async () => [] },
   };
   return {
     db: { $transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx) },
-    createdWatches, createdRepairs, updatedInquiryWatches,
+    createdWatches, createdRepairs, updatedInquiryWatches, updatedInquiries,
   };
 }
 
@@ -385,6 +395,7 @@ test("submits an Inquiry-bound invite without customer watch fields and promotes
   assert.deepEqual(fixture.createdWatches, [{ data: { customerId: 12, brandId: 10, modelId: 20, referenceId: 30, caseReferenceId: 31, caliberId: 40, baseCaliberId: 41 } }]);
   assert.equal((fixture.createdRepairs[0] as { data: { status: string } }).data.status, REPAIR_INTAKE_STATUS);
   assert.equal((fixture.updatedInquiryWatches[0] as { where: { id: number } }).where.id, 1);
+  assert.deepEqual(fixture.updatedInquiries, [{ where: { id: 70 }, data: { status: "CLOSED" } }]);
 });
 
 test("rejects an Inquiry-bound invite when a bound watch is no longer requested", async () => {
@@ -395,4 +406,16 @@ test("rejects an Inquiry-bound invite when a bound watch is no longer requested"
   );
   assert.equal(fixture.createdWatches.length, 0);
   assert.equal(fixture.createdRepairs.length, 0);
+});
+
+test("rejects an Inquiry-bound invite when the post-lock watch decision changed", async () => {
+  for (const decision of ["PENDING", "DECLINED"]) {
+    const fixture = inquirySubmitDb(requestedInquiryWatch(1), [requestedInquiryWatch(1, { decision })]);
+    await assert.rejects(
+      () => submitRepairIntake("bound-token", { customer: customerInput, returnAddressSameAsCustomer: true }, fixture.db as never),
+      (error: unknown) => error instanceof RepairIntakeError && error.code === "INQUIRY_NOT_READY",
+    );
+    assert.equal(fixture.createdWatches.length, 0);
+    assert.equal(fixture.createdRepairs.length, 0);
+  }
 });

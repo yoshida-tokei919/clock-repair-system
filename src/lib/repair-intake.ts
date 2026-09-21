@@ -4,6 +4,7 @@ import { BrandKind, Prisma, TimepieceType, WatchDriveType, type PrismaClient } f
 
 import { prisma } from "@/lib/prisma";
 import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
+import { reconcileInquiryClosure } from "@/lib/inquiry-lifecycle";
 import { validateInquiryWatchPromotionEligibility } from "@/lib/inquiry-promotion";
 
 export const REPAIR_INTAKE_STATUS = "送付待ち";
@@ -493,9 +494,15 @@ export async function submitRepairIntake(
         throw new RepairIntakeError("INQUIRY_NOT_READY", "受付リンクの時計情報が不正です。");
       }
       await lockLineUserInquiryTransaction(tx, invite.lineUserId!);
+      const currentWatches = await tx.inquiryWatch.findMany({
+        where: { id: { in: invite.inquiryWatches.map((item) => item.inquiryWatch.id) } },
+        select: { id: true, inquiryId: true, decision: true, promotedWatchId: true, promotedRepairId: true, promotedAt: true },
+      });
+      const currentWatchesById = new Map(currentWatches.map((watch) => [watch.id, watch]));
       for (const item of invite.inquiryWatches) {
         const watch = item.inquiryWatch;
-        if (watch.decision !== "REQUESTED" || watch.promotedAt || watch.promotedWatchId || watch.promotedRepairId) {
+        const currentWatch = currentWatchesById.get(watch.id);
+        if (!currentWatch || currentWatch.inquiryId !== invite.inquiryId || currentWatch.decision !== "REQUESTED" || currentWatch.promotedAt || currentWatch.promotedWatchId || currentWatch.promotedRepairId) {
           throw new RepairIntakeError("INQUIRY_NOT_READY", `時計 ${watch.position} は現在この受付リンクでは受け付けできません。`);
         }
         await validateInquiryWatchPromotionEligibility(tx, watch);
@@ -575,6 +582,8 @@ export async function submitRepairIntake(
       }
       repairs.push(repair);
     }
+
+    if (inquiryBound) await reconcileInquiryClosure(tx, invite.inquiryId!);
 
     return { customerId: customer.id, repairs: repairs.map((repair) => ({ id: repair.id, inquiryNumber: repair.inquiryNumber })) };
   });
