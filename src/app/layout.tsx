@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-    title: "ヨシダ時計修理工房 | 時計修理・オーバーホール受付システム",
-    description: "創業1919年。長年の技術でお預かりした時計を丁寧に修理。修理状況をリアルタイムで確認できる安心の管理システムです。",
+    title: "時計修理・オーバーホール｜ヨシダ時計修理工房【神戸】",
+    description: "神戸のヨシダ時計修理工房。修理歴20年・1級時計修理技能士が腕時計のオーバーホール・修理に対応。他店で断られた時計も、部品調達・加工・製作を含めて修理の可能性を検討します。LINEで事前に費用感をご相談いただけます。",
     metadataBase: new URL("https://yoshidawatchrepair.com"),
     alternates: {
         canonical: "/",
