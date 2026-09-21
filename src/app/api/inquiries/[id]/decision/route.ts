@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { InquiryWatchDecision } from "@prisma/client";
 
 import { authOptions } from "@/lib/auth";
-import { reconcileInquiryClosure } from "@/lib/inquiry-lifecycle";
+import { reconcileInquiryClosure, reconcileInquiryRepairIntakeInvites } from "@/lib/inquiry-lifecycle";
 import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
 import { prisma } from "@/lib/prisma";
 
@@ -28,6 +28,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (watch.promotedAt) return "PROMOTED" as const;
     await tx.inquiryWatch.update({ where: { id: watch.id }, data: { decision } });
     await reconcileInquiryClosure(tx, inquiryId);
+    await reconcileInquiryRepairIntakeInvites(tx, inquiryId);
     return "UPDATED" as const;
   });
   if (result === "NOT_FOUND") return NextResponse.json({ error: "時計が見つかりません。" }, { status: 404 });

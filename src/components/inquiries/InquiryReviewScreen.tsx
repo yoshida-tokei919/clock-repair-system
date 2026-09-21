@@ -278,6 +278,8 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
     const response = await fetch(`/api/inquiries/${inquiryId}/decision`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ watchId: watch.id, decision }) });
     const data = await response.json();
     if (!response.ok) { setError(data.error || "受付判断を更新できませんでした。"); return; }
+    setIntakeInvite(null);
+    setIntakeDialogOpen(false);
     await load();
   }
 
@@ -371,6 +373,8 @@ ${intakeUrl}` : "";
       if (!response.ok) throw new Error(data.error || "昇格できませんでした。");
       setNotice(data.deduplicated ? `${data.promotions.length}台はすでに昇格済みです。既存案件を確認しました。` : `${data.promotions.length}台を正式案件として作成しました。`);
       setSelectedPromotionWatchIds([]);
+      setIntakeInvite(null);
+      setIntakeDialogOpen(false);
       await load();
     } catch (promotionError) {
       setError(promotionError instanceof Error ? promotionError.message : "昇格できませんでした。");

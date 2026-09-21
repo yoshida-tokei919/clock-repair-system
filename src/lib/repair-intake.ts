@@ -4,7 +4,7 @@ import { BrandKind, Prisma, TimepieceType, WatchDriveType, type PrismaClient } f
 
 import { prisma } from "@/lib/prisma";
 import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
-import { reconcileInquiryClosure } from "@/lib/inquiry-lifecycle";
+import { hasSameInquiryWatchIdSet, reconcileInquiryClosure, reconcileInquiryRepairIntakeInvites } from "@/lib/inquiry-lifecycle";
 import { validateInquiryWatchPromotionEligibility } from "@/lib/inquiry-promotion";
 
 export const REPAIR_INTAKE_STATUS = "送付待ち";
@@ -272,7 +272,7 @@ export async function createCustomerRepairIntakeInvite(
   }
 
   const activeInvite = await db.repairIntakeInvite.findFirst({
-    where: { customerId, usedAt: null, expiresAt: { gt: now } },
+    where: { customerId, usedAt: null, revokedAt: null, inquiryId: null, expiresAt: { gt: now } },
     orderBy: { createdAt: "desc" },
   });
   if (activeInvite) return { invite: activeInvite, reused: true };
@@ -302,7 +302,7 @@ export async function createLineUserRepairIntakeInvite(
   }
 
   const activeInvite = await db.repairIntakeInvite.findFirst({
-    where: { lineUserId, usedAt: null, expiresAt: { gt: now } },
+    where: { lineUserId, usedAt: null, revokedAt: null, inquiryId: null, expiresAt: { gt: now } },
     orderBy: { createdAt: "desc" },
   });
   if (activeInvite) return { invite: activeInvite, reused: true };
@@ -331,7 +331,7 @@ export async function createInquiryRepairIntakeInvite(
       throw new RepairIntakeError("B2B_CUSTOMER", "法人顧客に紐付いたお問い合わせには B2C 受付リンクを発行できません。");
     }
     const watches = await tx.inquiryWatch.findMany({
-      where: { inquiryId, decision: "REQUESTED", promotedAt: null },
+      where: { inquiryId, decision: "REQUESTED", promotedAt: null, promotedWatchId: null, promotedRepairId: null },
       orderBy: { position: "asc" },
       select: {
         id: true, position: true, inquiryId: true, brandId: true, modelId: true, referenceId: true,
@@ -349,11 +349,9 @@ export async function createInquiryRepairIntakeInvite(
       include: { inquiryWatches: { select: { inquiryWatchId: true } } },
       orderBy: { createdAt: "desc" },
     });
-    const sameSet = (candidate: { inquiryWatches: Array<{ inquiryWatchId: number }> }) =>
-      candidate.inquiryWatches.length === ids.length && candidate.inquiryWatches.every((item) => ids.includes(item.inquiryWatchId));
-    const reusable = active.find(sameSet);
+    const reusable = active.find((candidate) => hasSameInquiryWatchIdSet(candidate, ids));
     if (reusable) return { invite: reusable, reused: true };
-    const staleIds = active.filter((invite) => !sameSet(invite)).map((invite) => invite.id);
+    const staleIds = active.filter((invite) => !hasSameInquiryWatchIdSet(invite, ids)).map((invite) => invite.id);
     if (staleIds.length) await tx.repairIntakeInvite.updateMany({ where: { id: { in: staleIds }, usedAt: null, revokedAt: null }, data: { revokedAt: now } });
 
     const expiresAt = new Date(now);
@@ -466,6 +464,13 @@ export async function submitRepairIntake(
     assertInquiryInviteState(invite);
 
     const inquiryBound = invite.inquiryWatches.length > 0;
+    if (inquiryBound) {
+      const inquiryIds = new Set(invite.inquiryWatches.map((item) => item.inquiryWatch.inquiryId));
+      if (inquiryIds.size !== 1 || invite.inquiryId === null || !inquiryIds.has(invite.inquiryId) || invite.lineUserId === null) {
+        throw new RepairIntakeError("INQUIRY_NOT_READY", "受付リンクの時計情報が不正です。");
+      }
+      await lockLineUserInquiryTransaction(tx, invite.lineUserId);
+    }
     const body = payload && typeof payload === "object" ? payload as { customer?: unknown; returnAddressSameAsCustomer?: unknown; returnAddress?: unknown } : null;
     const parsed = inquiryBound
       ? (() => {
@@ -478,12 +483,13 @@ export async function submitRepairIntake(
 
     // Claiming the invite is conditional so concurrent submissions cannot both create repairs.
     const claimed = await tx.repairIntakeInvite.updateMany({
-      where: { id: invite.id, token, usedAt: null, expiresAt: { gt: now } },
+      where: { id: invite.id, token, usedAt: null, revokedAt: null, expiresAt: { gt: now } },
       data: { usedAt: now },
     });
     if (claimed.count !== 1) {
       const current = await tx.repairIntakeInvite.findUnique({ where: { id: invite.id } });
       if (current?.usedAt) throw new RepairIntakeError("USED_TOKEN", "This intake link has already been used.");
+      if (current?.revokedAt) throw new RepairIntakeError("REVOKED_TOKEN", "この受付リンクは内容変更のため無効になりました。新しいリンクをご利用ください。");
       if (current && current.expiresAt <= now) throw new RepairIntakeError("EXPIRED_TOKEN", "This intake link has expired.");
       throw new RepairIntakeError("INVALID_TOKEN", "This intake link is invalid.");
     }
@@ -493,7 +499,6 @@ export async function submitRepairIntake(
       if (inquiryIds.size !== 1 || invite.inquiryId === null || !inquiryIds.has(invite.inquiryId)) {
         throw new RepairIntakeError("INQUIRY_NOT_READY", "受付リンクの時計情報が不正です。");
       }
-      await lockLineUserInquiryTransaction(tx, invite.lineUserId!);
       const currentWatches = await tx.inquiryWatch.findMany({
         where: { id: { in: invite.inquiryWatches.map((item) => item.inquiryWatch.id) } },
         select: { id: true, inquiryId: true, decision: true, promotedWatchId: true, promotedRepairId: true, promotedAt: true },
@@ -583,7 +588,10 @@ export async function submitRepairIntake(
       repairs.push(repair);
     }
 
-    if (inquiryBound) await reconcileInquiryClosure(tx, invite.inquiryId!);
+    if (inquiryBound) {
+      await reconcileInquiryClosure(tx, invite.inquiryId!);
+      await reconcileInquiryRepairIntakeInvites(tx, invite.inquiryId!, now);
+    }
 
     return { customerId: customer.id, repairs: repairs.map((repair) => ({ id: repair.id, inquiryNumber: repair.inquiryNumber })) };
   });

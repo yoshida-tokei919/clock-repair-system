@@ -86,6 +86,33 @@ test("reuses an active B2C invite instead of issuing another token", async () =>
   assert.equal(result.invite.token, "active");
 });
 
+async function assertCustomerInquiryBoundInviteIsNotReused(revokedAt: Date | null) {
+  let created: unknown;
+  const inquiryInvite = { id: 8, token: "inquiry", inquiryId: 70, revokedAt };
+  const db = {
+    customer: { findUnique: async () => ({ id: 12, type: "individual" }) },
+    repairIntakeInvite: {
+      findFirst: async (query: { where: { revokedAt?: null; inquiryId?: null } }) => (
+        query.where.revokedAt === null && query.where.inquiryId === null ? null : inquiryInvite
+      ),
+      create: async (args: unknown) => { created = args; return { id: 9, token: "new", ...(args as { data: object }).data }; },
+    },
+  };
+
+  const result = await createCustomerRepairIntakeInvite(12, db as never, new Date("2026-09-13T00:00:00Z"));
+  assert.equal(result.reused, false);
+  assert.equal((created as { data: { customerId: number; inquiryId?: unknown } }).data.customerId, 12);
+  assert.equal((created as { data: { inquiryId?: unknown } }).data.inquiryId, undefined);
+}
+
+test("customer legacy issuance does not reuse a revoked Inquiry-bound invite", async () => {
+  await assertCustomerInquiryBoundInviteIsNotReused(new Date("2026-09-13T01:00:00Z"));
+});
+
+test("customer legacy issuance does not reuse an active Inquiry-bound invite", async () => {
+  await assertCustomerInquiryBoundInviteIsNotReused(null);
+});
+
 test("issues a seven-day invite only for B2C customers", async () => {
   const created: { value: { data: { customerId: number | null; expiresAt: Date } } | null } = { value: null };
   const db = {
@@ -140,6 +167,33 @@ test("reuses an active invite for an unlinked LINE user", async () => {
   const result = await createLineUserRepairIntakeInvite(41, db as never, new Date("2026-09-13T00:00:00Z"));
   assert.equal(result.reused, true);
   assert.equal(result.invite.token, "line-active");
+});
+
+async function assertLineUserInquiryBoundInviteIsNotReused(revokedAt: Date | null) {
+  let created: unknown;
+  const inquiryInvite = { id: 10, token: "inquiry", inquiryId: 70, revokedAt };
+  const db = {
+    lineUser: { findUnique: async () => ({ id: 41, linkedCustomerId: null }) },
+    repairIntakeInvite: {
+      findFirst: async (query: { where: { revokedAt?: null; inquiryId?: null } }) => (
+        query.where.revokedAt === null && query.where.inquiryId === null ? null : inquiryInvite
+      ),
+      create: async (args: unknown) => { created = args; return { id: 11, token: "line-new", ...(args as { data: object }).data }; },
+    },
+  };
+
+  const result = await createLineUserRepairIntakeInvite(41, db as never, new Date("2026-09-13T00:00:00Z"));
+  assert.equal(result.reused, false);
+  assert.equal((created as { data: { lineUserId: number; inquiryId?: unknown } }).data.lineUserId, 41);
+  assert.equal((created as { data: { inquiryId?: unknown } }).data.inquiryId, undefined);
+}
+
+test("unlinked LINE-user legacy issuance does not reuse a revoked Inquiry-bound invite", async () => {
+  await assertLineUserInquiryBoundInviteIsNotReused(new Date("2026-09-13T01:00:00Z"));
+});
+
+test("unlinked LINE-user legacy issuance does not reuse an active Inquiry-bound invite", async () => {
+  await assertLineUserInquiryBoundInviteIsNotReused(null);
 });
 
 test("rejects missing and already linked LINE users", async () => {
@@ -270,6 +324,22 @@ test("rejects expired intake invites, including previously used invites", async 
   );
 });
 
+test("rejects a revoked intake token through the existing invite state validation", async () => {
+  const db = {
+    repairIntakeInvite: {
+      findUnique: async () => ({
+        expiresAt: new Date(Date.now() + 60_000), usedAt: null, revokedAt: new Date(), customerId: null, lineUserId: 7, inquiryId: 70,
+        customer: null, lineUser: null, repairs: [], inquiryWatches: [],
+      }),
+    },
+  };
+
+  await assert.rejects(
+    () => getRepairIntakeInviteState("revoked-token", db as never),
+    (error: unknown) => error instanceof RepairIntakeError && error.code === "REVOKED_TOKEN",
+  );
+});
+
 test("keeps a used-token POST response as HTTP 409", () => {
   assert.equal(repairIntakeErrorResponse(new RepairIntakeError("USED_TOKEN", "already used"))?.status, 409);
 });
@@ -345,17 +415,34 @@ test("revokes a stale active Inquiry invite before issuing one for the changed w
   assert.deepEqual((result.invite as unknown as { inquiryWatches: { create: Array<{ inquiryWatchId: number }> } }).inquiryWatches.create, [{ inquiryWatchId: 2 }]);
 });
 
-function inquirySubmitDb(watch: Record<string, unknown>, reviewWatches: Record<string, unknown>[] = [watch]) {
+function inquirySubmitDb(
+  watch: Record<string, unknown>,
+  reviewWatches: Record<string, unknown>[] = [watch],
+  options: { revokeAfterLock?: boolean } = {},
+) {
   const createdWatches: unknown[] = [];
   const createdRepairs: unknown[] = [];
   const updatedInquiryWatches: unknown[] = [];
   const updatedInquiries: unknown[] = [];
+  const claimQueries: unknown[] = [];
+  const invite = {
+    id: 90, token: "bound-token", expiresAt: new Date("2026-10-01T00:00:00Z"), usedAt: null as Date | null, revokedAt: null as Date | null,
+    inquiryId: 70, customerId: null, lineUserId: 7, lineUser: { id: 7, linkedCustomerId: null }, inquiryWatches: [{ inquiryWatch: watch }],
+  };
   const tx = {
     ...promotionMasterTx(),
     $queryRaw: async () => [{ id: 12 }],
+    $executeRaw: async () => { if (options.revokeAfterLock) invite.revokedAt = new Date(); },
     repairIntakeInvite: {
-      findUnique: async () => ({ id: 90, token: "bound-token", expiresAt: new Date("2026-10-01T00:00:00Z"), usedAt: null, revokedAt: null, inquiryId: 70, customerId: null, lineUserId: 7, lineUser: { id: 7, linkedCustomerId: null }, inquiryWatches: [{ inquiryWatch: watch }] }),
-      updateMany: async () => ({ count: 1 }),
+      findUnique: async () => invite,
+      findMany: async () => [],
+      updateMany: async (args: { data: { usedAt?: Date } }) => {
+        if (!args.data.usedAt) return { count: 0 };
+        claimQueries.push(args);
+        if (invite.usedAt || invite.revokedAt) return { count: 0 };
+        invite.usedAt = args.data.usedAt;
+        return { count: 1 };
+      },
     },
     customer: {
       findUnique: async () => null,
@@ -378,12 +465,12 @@ function inquirySubmitDb(watch: Record<string, unknown>, reviewWatches: Record<s
         return undefined;
       },
     },
-    inquiry: { update: async (args: unknown) => { updatedInquiries.push(args); return undefined; } },
+    inquiry: { findUnique: async () => ({ status: "CLOSED" }), update: async (args: unknown) => { updatedInquiries.push(args); return undefined; } },
     brand: { findUnique: async () => ({ id: 10 }), findMany: async () => [] },
   };
   return {
     db: { $transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx) },
-    createdWatches, createdRepairs, updatedInquiryWatches, updatedInquiries,
+    createdWatches, createdRepairs, updatedInquiryWatches, updatedInquiries, claimQueries,
   };
 }
 
@@ -418,4 +505,21 @@ test("rejects an Inquiry-bound invite when the post-lock watch decision changed"
     assert.equal(fixture.createdWatches.length, 0);
     assert.equal(fixture.createdRepairs.length, 0);
   }
+});
+
+test("does not claim or submit an Inquiry invite revoked after its lock is acquired", async () => {
+  const fixture = inquirySubmitDb(requestedInquiryWatch(1), undefined, { revokeAfterLock: true });
+  await assert.rejects(
+    () => submitRepairIntake("bound-token", { customer: customerInput, returnAddressSameAsCustomer: true }, fixture.db as never),
+    (error: unknown) => error instanceof RepairIntakeError && error.code === "REVOKED_TOKEN",
+  );
+  assert.equal(fixture.createdWatches.length, 0);
+  assert.equal(fixture.createdRepairs.length, 0);
+});
+
+test("conditionally claims Inquiry invites only while they are not revoked", async () => {
+  const fixture = inquirySubmitDb(requestedInquiryWatch(1));
+  await submitRepairIntake("bound-token", { customer: customerInput, returnAddressSameAsCustomer: true }, fixture.db as never);
+  const claim = fixture.claimQueries[0] as { where: { revokedAt?: null } };
+  assert.equal(claim.where.revokedAt, null);
 });
