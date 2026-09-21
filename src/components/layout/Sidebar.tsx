@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 const NAV_ITEMS = [
   { href: '/admin', label: 'ダッシュボード', icon: '🏠' },
   { href: '/repairs', label: '修理一覧', icon: '🔧' },
+  { href: '/inquiries', label: '\u304a\u554f\u3044\u5408\u308f\u305b', icon: '\uD83D\uDCAC' },
   { href: '/repairs/board', label: 'ボード表示', icon: '📋' },
   { href: '/repairs/new', label: '新規修理登録', icon: '➕' },
   { href: '/parts', label: '部品マスタ', icon: '⚙️' },

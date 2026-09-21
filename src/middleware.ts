@@ -9,6 +9,7 @@ export const config = {
         "/line-users/:path*",
         "/documents/:path*",
         "/admin/:path*",
+        "/inquiries/:path*",
         "/reports/:path*",
         "/parts/:path*",
     ],
