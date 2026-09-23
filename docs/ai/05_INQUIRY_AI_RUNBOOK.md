@@ -1,5 +1,13 @@
 # Inquiry AI Runbook
 
+## LINE Manager mapping worker (read-only; no LINE send)
+
+- `scripts/line_manager_mapping.py` maps a LINE user only from exact immutable evidence: `InquiryMessage.externalMessageId ==` the Manager history inbound `message.id`. Never use a display name, profile, customer name, body, image, or webhook LINE user ID as identity evidence.
+- The worker uses the same `N8N_INTERNAL_TOKEN` Bearer authentication as internal sender routes. It keeps the token out of command arguments, output, logs, prompts, and Slack; missing configuration or malformed responses fail closed.
+- Fixed storage is `%LOCALAPPDATA%\clock-repair-system\linelib-poc\lineoa-storage.json`. It accepts only `https://yoshidawatchrepair.com`, or the explicit local test origin, and only performs `get_chats(bot_id, 25)` and `get_chat_messages(bot_id, chat_id, limit=100)` Manager reads.
+- Dry-run is the default and never calls mapping verification. Use `--apply` only after reviewing the safe count-only result; it can call the internal verify endpoint once at most. The worker never creates an outbox, reply, or LINE send.
+- A candidate is rejected as ambiguous if its exact evidence spans multiple Manager bot/chat destinations, or if one Manager destination exactly matches evidence for multiple LINE users. An inbound event whose `source.chatId` differs from the requested chat is ignored; malformed chat/history/API data otherwise fails closed.
+
 ## LINE Manager auth storage bootstrap and sender local worker (no real sending in this task)
 
 - The internal worker uses the existing `N8N_INTERNAL_TOKEN` Bearer authentication. Missing server configuration returns 503; an invalid token returns 401. Never put the token in command arguments, logs, Slack, prompts, or output.
