@@ -4,7 +4,9 @@ import { ArrowLeft, ImageOff } from "lucide-react";
 import { notFound } from "next/navigation";
 import {
   getB2CPublicCaseDetail,
+  getRelatedB2CPublicCases,
   type B2CPublicCaseDetail,
+  type B2CRelatedPublicCase,
 } from "@/lib/public-cases";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +18,9 @@ function text(value?: string | null): string {
   return (value ?? "").trim();
 }
 
-function getBrandDisplayName(publicCase: B2CPublicCaseDetail): string {
+function getBrandDisplayName(
+  publicCase: Pick<B2CPublicCaseDetail, "brandDisplayName" | "brandName">,
+): string {
   return text(publicCase.brandDisplayName) || text(publicCase.brandName);
 }
 
@@ -44,7 +48,10 @@ function getPartNames(publicCase: B2CPublicCaseDetail): string[] {
   return Array.from(new Set(names));
 }
 
-function getTitle(publicCase: B2CPublicCaseDetail, fallbackWorkName: string): string {
+function getTitle(
+  publicCase: Pick<B2CPublicCaseDetail, "modelName" | "ref" | "caliber">,
+  fallbackWorkName: string,
+): string {
   return (
     text(publicCase.modelName) ||
     (text(publicCase.ref) ? `Ref. ${text(publicCase.ref)}` : "") ||
@@ -58,13 +65,30 @@ function getSummary(publicCase: B2CPublicCaseDetail): string {
   return typeof publicCase.b2cSummary === "string" ? publicCase.b2cSummary.trim() : "";
 }
 
-function getMeta(publicCase: B2CPublicCaseDetail): string {
+function getMeta(publicCase: Pick<B2CPublicCaseDetail, "ref" | "caliber">): string {
   return [
     text(publicCase.ref) ? `Ref. ${text(publicCase.ref)}` : "",
     text(publicCase.caliber) ? `Cal. ${text(publicCase.caliber)}` : "",
   ]
     .filter(Boolean)
     .join(" / ");
+}
+
+function getRelatedWorkDisplayName(publicCase: B2CRelatedPublicCase): string {
+  return (
+    publicCase.workItems
+      .filter((workItem) => workItem.isPublishable)
+      .map((workItem) =>
+        (
+          text(workItem.b2cDisplayName) ||
+          text(workItem.b2bDisplayName) ||
+          text(workItem.normalizedWorkName)
+        )
+          .replace(/技術料/g, "")
+          .trim(),
+      )
+      .find(Boolean) ?? ""
+  );
 }
 
 export async function generateMetadata({
@@ -156,6 +180,7 @@ export default async function PublicCaseDetailPage({
   const title = getTitle(publicCase, primaryWorkName);
   const meta = getMeta(publicCase);
   const summary = getSummary(publicCase);
+  const relatedCases = await getRelatedB2CPublicCases(publicCase);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 md:px-8">
@@ -236,6 +261,48 @@ export default async function PublicCaseDetailPage({
           </div>
         </div>
       </article>
+
+      {relatedCases.length > 0 ? (
+        <section className="mt-12" aria-labelledby="related-cases-heading">
+          <h2
+            id="related-cases-heading"
+            className="mb-6 text-2xl font-bold text-neutral-900"
+          >
+            関連する修理事例
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {relatedCases.map((relatedCase) => {
+              const relatedBrand = getBrandDisplayName(relatedCase);
+              const relatedWorkName = getRelatedWorkDisplayName(relatedCase);
+              const relatedTitle = getTitle(relatedCase, relatedWorkName);
+              const relatedMeta = getMeta(relatedCase);
+
+              return (
+                <Link
+                  key={relatedCase.id}
+                  href={`/cases/gallery/${relatedCase.id}`}
+                  className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-blue-900 hover:shadow-md"
+                >
+                  {relatedBrand ? (
+                    <p className="mb-2 text-sm font-bold text-blue-950">{relatedBrand}</p>
+                  ) : null}
+                  <h3 className="text-lg font-bold leading-snug text-neutral-900">
+                    {relatedTitle}
+                  </h3>
+                  {relatedMeta ? (
+                    <p className="mt-2 text-sm text-neutral-600">{relatedMeta}</p>
+                  ) : null}
+                  {relatedWorkName ? (
+                    <p className="mt-3 text-sm font-semibold text-blue-900">
+                      {relatedWorkName}
+                    </p>
+                  ) : null}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

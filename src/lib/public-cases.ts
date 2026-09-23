@@ -27,6 +27,13 @@ export type B2CPublicCaseDetail = Prisma.PublicCaseGetPayload<{
   };
 }>;
 
+export type B2CRelatedPublicCase = Prisma.PublicCaseGetPayload<{
+  include: {
+    workItems: true;
+    partItems: true;
+  };
+}>;
+
 export type B2BPublicCaseForBizPage = Prisma.PublicCaseGetPayload<{
   include: {
     workItems: true;
@@ -198,6 +205,158 @@ function containsCopyKeyword(publicCase: PublicCaseCopyKeywordCandidate): boolea
   ];
 
   return values.some((value) => String(value ?? "").includes(copyKeyword));
+}
+
+function buildPublicCaseCopyKeywordWhere(): Prisma.PublicCaseWhereInput {
+  const containsCopy = { contains: copyKeyword, not: null };
+  const containsCopyRequired = { contains: copyKeyword };
+  return {
+    OR: [
+      { brandName: containsCopy },
+      { brandNameKana: containsCopy },
+      { brandDisplayName: containsCopy },
+      { modelName: containsCopy },
+      { ref: containsCopy },
+      { caliber: containsCopy },
+      { searchText: containsCopy },
+      {
+        workItems: {
+          some: {
+            OR: [
+              { b2cDisplayName: containsCopy },
+              { b2bDisplayName: containsCopy },
+              { normalizedWorkName: containsCopy },
+            ],
+          },
+        },
+      },
+      {
+        partItems: {
+          some: {
+            OR: [
+              { displayName: containsCopy },
+              { normalizedSourceText: containsCopyRequired },
+            ],
+          },
+        },
+      },
+    ],
+  };
+}
+
+function normalizeRelatedValue(value?: string | null): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function getVisibleRelatedWorkNames(publicCase: Pick<B2CRelatedPublicCase, "workItems">): string[] {
+  return publicCase.workItems
+    .filter((workItem) => workItem.isPublishable)
+    .map((workItem) =>
+      (
+        workItem.b2cDisplayName?.trim() ||
+        workItem.b2bDisplayName?.trim() ||
+        workItem.normalizedWorkName?.trim() ||
+        ""
+      )
+        .replace(/技術料/g, "")
+        .trim()
+        .toLowerCase(),
+    )
+    .filter(Boolean);
+}
+
+export async function getRelatedB2CPublicCases(
+  currentCase: B2CPublicCaseDetail,
+): Promise<B2CRelatedPublicCase[]> {
+  const commonWhere: Prisma.PublicCaseWhereInput = {
+    id: { not: currentCase.id },
+    showPriceB2c: false,
+    NOT: buildPublicCaseCopyKeywordWhere(),
+  };
+  let baseWhere: Prisma.PublicCaseWhereInput;
+  if (
+    currentCase.b2cPublishStatus === "PUBLISHED" &&
+    currentCase.reviewStatus === "APPROVED" &&
+    currentCase.showPriceB2c === false
+  ) {
+    baseWhere = {
+      ...commonWhere,
+      b2cPublishStatus: "PUBLISHED",
+      reviewStatus: "APPROVED",
+    };
+  } else if (
+    isLocalDatabaseUrl() &&
+    currentCase.sourceType === "FMP" &&
+    currentCase.showPriceB2c === false
+  ) {
+    baseWhere = { ...commonWhere, sourceType: "FMP" };
+  } else {
+    return [];
+  }
+
+  const modelName = currentCase.modelName?.trim() ?? "";
+  const caliber = currentCase.caliber?.trim() ?? "";
+  const brandName = currentCase.brandName?.trim() ?? "";
+  const currentWorkNames = new Set(getVisibleRelatedWorkNames(currentCase));
+  const signals: Prisma.PublicCaseWhereInput[] = [];
+
+  if (modelName) {
+    signals.push({ modelName: { contains: modelName, mode: "insensitive" } });
+  }
+  if (caliber) {
+    signals.push({ caliber: { contains: caliber, mode: "insensitive" } });
+  }
+  if (brandName) {
+    signals.push({ brandName: { contains: brandName, mode: "insensitive" } });
+  }
+  if (currentWorkNames.size > 0) {
+    signals.push({
+      workItems: {
+        some: {
+          isPublishable: true,
+        },
+      },
+    });
+  }
+  if (signals.length === 0) {
+    return [];
+  }
+
+  const modelKey = normalizeRelatedValue(modelName);
+  const caliberKey = normalizeRelatedValue(caliber);
+  const brandKey = normalizeRelatedValue(brandName);
+
+  const candidates = await prisma.publicCase.findMany({
+    where: { AND: [baseWhere, { OR: signals }] },
+    include: {
+      workItems: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      partItems: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+    },
+    orderBy: [{ receivedDate: "desc" }, { id: "asc" }],
+    take: 50,
+  });
+
+  return candidates
+    .filter((candidate) => !containsCopyKeyword(candidate))
+    .map((candidate) => {
+      const candidateWorkNames = getVisibleRelatedWorkNames(candidate);
+      const score =
+        (modelKey && normalizeRelatedValue(candidate.modelName) === modelKey ? 8 : 0) +
+        (caliberKey && normalizeRelatedValue(candidate.caliber) === caliberKey ? 4 : 0) +
+        (brandKey && normalizeRelatedValue(candidate.brandName) === brandKey ? 2 : 0) +
+        (candidateWorkNames.some((name) => currentWorkNames.has(name)) ? 1 : 0);
+      return { candidate, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (b.candidate.receivedDate?.getTime() ?? 0) -
+          (a.candidate.receivedDate?.getTime() ?? 0) ||
+        a.candidate.id - b.candidate.id,
+    )
+    .slice(0, 6)
+    .map(({ candidate }) => candidate);
 }
 
 async function findB2CPublicCases(
