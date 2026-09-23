@@ -1,11 +1,7 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "防水確認 | ヨシダ時計修理工房",
-  description:
-    "オーバーホール後の防水検査やパッキン確認について、時計の状態に合わせた確認内容をご案内します。",
-};
+export const metadata = fixedPageSeo["/waterproof-check"].metadata;
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
 
@@ -21,6 +17,7 @@ const checkItems = [
 export default function WaterproofCheckPage() {
   return (
     <main className="waterproof-page">
+      <JsonLd data={breadcrumbJsonLd("/waterproof-check")} />
       <header className="waterproof-header">
         <Link href="/" className="waterproof-brand">
           ヨシダ時計修理工房

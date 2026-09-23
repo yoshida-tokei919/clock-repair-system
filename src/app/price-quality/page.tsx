@@ -1,11 +1,7 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "価格と修理品質 | ヨシダ時計修理工房",
-  description:
-    "状態に応じて必要な作業を見極め、費用と仕上がりのバランスを考えた修理をご提案します。",
-};
+export const metadata = fixedPageSeo["/price-quality"].metadata;
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
 
@@ -85,6 +81,7 @@ const priceRows = [
 export default function PriceQualityPage() {
   return (
     <main className="price-quality-page">
+      <JsonLd data={breadcrumbJsonLd("/price-quality")} />
       <header className="price-header">
         <Link href="/" className="price-brand">
           ヨシダ時計修理工房

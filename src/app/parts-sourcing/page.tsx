@@ -1,11 +1,7 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "部品調達 | ヨシダ時計修理工房",
-  description:
-    "入手困難な時計部品も、国内外の材料店や修理仲間のネットワークからできる限り探します。",
-};
+export const metadata = fixedPageSeo["/parts-sourcing"].metadata;
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
 
@@ -23,6 +19,7 @@ const partExamples = [
 export default function PartsSourcingPage() {
   return (
     <main className="parts-page">
+      <JsonLd data={breadcrumbJsonLd("/parts-sourcing")} />
       <header className="parts-header">
         <Link href="/" className="parts-brand">
           ヨシダ時計修理工房

@@ -1,16 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
 
-export const metadata: Metadata = {
-  title: "特定商取引法に基づく表記 | ヨシダ時計修理工房",
-  description: "ヨシダ時計修理工房の特定商取引法に基づく表記です。",
-};
+export const metadata = fixedPageSeo["/commercial-disclosure"].metadata;
 
 export default function CommercialDisclosurePage() {
   return (
     <main className="disclosure-page">
+      <JsonLd data={breadcrumbJsonLd("/commercial-disclosure")} />
       <header className="disclosure-header">
         <Link href="/" className="brand" aria-label="ヨシダ時計修理工房 トップページ">
           ヨシダ時計修理工房

@@ -1,11 +1,7 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "詳しい流れとポイント | ヨシダ時計修理工房",
-  description:
-    "LINE相談から納品までの流れと、概算、見積り、梱包、交換部品、保証についてのポイントをご案内します。",
-};
+export const metadata = fixedPageSeo["/repair-flow"].metadata;
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
 
@@ -69,6 +65,7 @@ const steps = [
 export default function RepairFlowPage() {
   return (
     <main className="repair-flow-page">
+      <JsonLd data={breadcrumbJsonLd("/repair-flow")} />
       <header className="flow-header">
         <Link href="/" className="flow-brand">
           ヨシダ時計修理工房

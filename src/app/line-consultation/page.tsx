@@ -1,11 +1,7 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "LINEで概算相談 | ヨシダ時計修理工房",
-  description:
-    "時計を送る前に、写真や分かる範囲の情報から修理内容と費用感の目安をご案内します。",
-};
+export const metadata = fixedPageSeo["/line-consultation"].metadata;
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
 
@@ -28,6 +24,7 @@ const photoRequests = [
 export default function LineConsultationPage() {
   return (
     <main className="line-consultation-page">
+      <JsonLd data={breadcrumbJsonLd("/line-consultation")} />
       <header className="consultation-header">
         <Link href="/" className="consultation-brand">
           ヨシダ時計修理工房

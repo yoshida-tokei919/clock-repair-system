@@ -1,17 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "時計郵送時の梱包方法 | ヨシダ時計修理工房",
-  description:
-    "時計を郵送でお送りいただく際の梱包方法と、送料についてご案内します。",
-};
+export const metadata = fixedPageSeo["/packing-guide"].metadata;
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
 
 export default function PackingGuidePage() {
   return (
     <main className="packing-guide-page">
+      <JsonLd data={breadcrumbJsonLd("/packing-guide")} />
       <header className="packing-header">
         <Link href="/" className="packing-brand">
           ヨシダ時計修理工房

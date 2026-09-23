@@ -1,5 +1,6 @@
 import { ArrowRight, ImageOff } from "lucide-react";
 import Link from "next/link";
+import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 import {
   getB2CBrandOptionsForGallery,
   getB2CPublicCasesForGallery,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/public-cases";
 
 export const dynamic = "force-dynamic";
+export const metadata = fixedPageSeo["/cases/gallery"].metadata;
 
 type GallerySearchParams = {
   q?: string | string[];
@@ -141,6 +143,7 @@ export default async function GalleryPage({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 md:px-8">
+      <JsonLd data={breadcrumbJsonLd("/cases/gallery")} />
       <div className="mb-10 text-center">
         <p className="mb-3 text-sm font-semibold tracking-[0.18em] text-blue-900">
           REPAIR CASES

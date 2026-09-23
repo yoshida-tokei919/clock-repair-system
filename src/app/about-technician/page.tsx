@@ -1,11 +1,7 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "技術者について | ヨシダ時計修理工房",
-  description:
-    "修理歴20年、1級時計修理技能士として、時計の状態を確認しながら必要な作業を判断しています。",
-};
+export const metadata = fixedPageSeo["/about-technician"].metadata;
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
 
@@ -26,6 +22,7 @@ const repairPrinciples = [
 export default function AboutTechnicianPage() {
   return (
     <main className="technician-page">
+      <JsonLd data={breadcrumbJsonLd("/about-technician")} />
       <header className="technician-header">
         <Link href="/" className="technician-brand">
           ヨシダ時計修理工房

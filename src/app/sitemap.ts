@@ -15,7 +15,6 @@ const staticPaths = [
   "/packing-guide",
   "/parts-sourcing",
   "/price-quality",
-  "/reassurance",
   "/repair-flow",
   "/waterproof-check",
 ];

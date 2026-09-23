@@ -1,11 +1,7 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "修理の可能性を探す | ヨシダ時計修理工房",
-  description:
-    "他店で断られた時計も、部品調達・製作・代替案を含めて修理の可能性をできる限り探ります。",
-};
+export const metadata = fixedPageSeo["/difficult-repair"].metadata;
 
 const LINE_URL = "https://lin.ee/3C0XfJW";
 
@@ -29,6 +25,7 @@ const consultationExamples = [
 export default function DifficultRepairPage() {
   return (
     <main className="difficult-repair-page">
+      <JsonLd data={breadcrumbJsonLd("/difficult-repair")} />
       <header className="repair-header">
         <Link href="/" className="repair-brand">
           ヨシダ時計修理工房

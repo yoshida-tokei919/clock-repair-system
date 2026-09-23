@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { JsonLd, homeJsonLd } from "@/lib/seo";
 import {
     getLatestB2CPublicCasesForHome,
     type B2CPublicCaseForGallery,
@@ -1061,6 +1062,7 @@ export default async function TopPage() {
 
     return (
         <>
+            <JsonLd data={homeJsonLd} />
             <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
 
             <div dangerouslySetInnerHTML={{ __html: HTML_HEADER }} />
