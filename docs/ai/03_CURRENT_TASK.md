@@ -1,38 +1,52 @@
 # CURRENT TASK
 
-## Task: Inquiry LINE conversation UI + APPROVED outbox creation
+## Task: Inquiry LINE message classification foundation
 
-This Task adds the first app-facing LINE conversation slice for Inquiry review. The Inquiry review screen reads the current Inquiry's saved LINE history, displays inbound images through an authenticated redirect route, and creates only an `APPROVED` `LineManagerSendOutbox` when the technician submits a text reply.
+This Task adds persistent message-to-watch classification for the Inquiry LINE conversation. It builds on local commit `6ef12a1` (Inquiry LINE history + APPROVED outbox UI), which is still Production: pending.
 
-Production: pending. The verified LINE Manager mapping foundation was deployed successfully at `7c8be6b` (`production-line-manager-mapping-20260923`). Production/main later advanced to `cb6165f` through Web/SEO work only; this Task is based on that clean `cb6165f` main and must preserve those Web/SEO changes.
+Production/main remains `cb6165f`; local main currently contains `6ef12a1` on top. Independent read-only schema/migration review is complete with no remaining blocker. This Task must not push, deploy, or apply the migration until the user explicitly approves production work.
 
-### Safety boundary
+### Scope
 
-- No schema, migration, environment, auth-setting, or secret change.
-- No direct LINE/lineoa POST from Next.js.
-- The reply API never creates an OUTBOUND `InquiryMessage`; that source record is created only after existing Manager history reconciliation confirms the real LINE message.
-- `APPROVED`, `CLAIMED`, `PRE_SEND_FAILED`, and `POST_UNCONFIRMED` are pending/in-flight states and must not be presented as sent.
-- Outbound in this Task is text only. Image sending is out of scope.
-- No Repair LINE tab, message-to-watch/Repair classification, or AI conversation summary update in this Task.
-- Raw LINE Manager bot/chat IDs, send IDs, external LINE message IDs, R2 object keys, lease tokens, and signed R2 URLs are not exposed to the browser payload.
+- Add derived classification metadata without modifying LINE source text/body.
+- One `InquiryMessageClassification` per saved `InquiryMessage`.
+- Classification scope is `WATCHES`, `COMMON`, or `UNASSIGNED`.
+- `WATCHES` may link one message to multiple `InquiryWatch` rows through `InquiryMessageWatchLink`.
+- Classification source is `AI` or `MANUAL`; this Task writes `MANUAL` from the review UI.
+- Manual classification sets `confirmedAt` and is the authoritative value that future AI classification must not overwrite.
+- Inquiry LINE GET returns safe classification metadata and InquiryWatch display options.
+- Inquiry LINE PATCH validates that the message and every selected InquiryWatch belong to the same Inquiry, then atomically replaces the watch links.
+- The Inquiry review LINE timeline shows classification badges and an inline editor for 未特定 / 共通 / one or more watches.
 
-### Agreed LINE conversation architecture
+### Schema / migration safety
 
-- One real LINE conversation belongs to the `LineUser`/customer. Do not split the actual LINE chat per Repair.
-- Inquiry and future Repair screens are views over the same source conversation rather than copied chat histories.
-- Future message association is many-to-many so one message may relate to one watch, multiple watches/Repairs, all watches (`COMMON`), or remain unresolved (`UNASSIGNED`).
-- Human-confirmed association overrides later AI classification.
-- Original `InquiryMessage`/LINE content remains the source of truth. AI classification and summaries are derived assistance only.
-- Internal notes and customer LINE replies stay separate in UI and storage.
+- Migration: `20260923_add_inquiry_message_classification`.
+- New tables are server-internal derived metadata; they are not used from the Supabase Data API.
+- The migration adds no Data API GRANT. It explicitly revokes table privileges from `anon` and `authenticated`.
+- Composite foreign keys enforce same-Inquiry message/watch links at the database layer.
+- A CHECK constraint enforces MANUAL ⇔ confirmedAt semantics, and a DB trigger rejects MANUAL → AI overwrite.
+- No production migration has been applied.
+- No RLS/auth/payment/secret/environment change.
+- Independent read-only review was completed after these constraints were added; no schema/migration blocker remains.
+
+### Invariants
+
+- Original `InquiryMessage` remains the source of truth; classification is separate derived metadata.
+- `WATCHES` requires at least one unique InquiryWatch ID.
+- `COMMON` and `UNASSIGNED` must have zero InquiryWatch links.
+- Cross-Inquiry message/watch linkage is rejected.
+- Manual save clears prior links and replaces them atomically.
+- Future AI classification must preserve `source=MANUAL` / `confirmedAt` human decisions.
+- Pending LINE outboxes are not classifiable until reconciliation creates the confirmed OUTBOUND `InquiryMessage`.
 
 ### Planned next LINE conversation Tasks
 
-1. **Current Task**: Inquiry LINE history + text reply UI + `APPROVED` outbox creation.
-2. Message ↔ `InquiryWatch` relation and watch classification, including `COMMON` / `UNASSIGNED`.
-3. Carry watch/message associations through `InquiryWatch` → `Repair` promotion without copying the LINE source history.
-4. Add a LINE tab to Repair pages, showing the Repair-related messages plus common messages and allowing replies through the same conversation.
+1. Inquiry LINE history + text reply UI + `APPROVED` outbox creation — local commit `6ef12a1`, Production pending.
+2. **Current Task**: message ↔ `InquiryWatch` classification foundation and manual confirmation.
+3. Carry message classifications through `InquiryWatch` → `Repair` promotion without copying LINE source history.
+4. Add a LINE tab to Repair pages, showing Repair-related + common messages and allowing replies through the same conversation.
 5. Add Repair-specific current summary, current customer requirements, and important change history.
-6. Continue watch/Repair classification and summary updates for new LINE messages after intake.
+6. Add ongoing AI classification and summary updates for new LINE messages after intake; AI must not overwrite manual classifications.
 
 ## 現在Task
 

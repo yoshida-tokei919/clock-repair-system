@@ -177,6 +177,17 @@ enum InquiryMessageType {
   OTHER
 }
 
+enum InquiryMessageClassificationScope {
+  WATCHES
+  COMMON
+  UNASSIGNED
+}
+
+enum InquiryMessageClassificationSource {
+  AI
+  MANUAL
+}
+
 enum LineManagerSendOutboxStatus {
   APPROVED
   CLAIMED
@@ -297,11 +308,46 @@ model InquiryMessage {
   inquiry  Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Restrict)
   lineUser LineUser      @relation(fields: [lineUserId], references: [id], onDelete: Restrict)
   files    InquiryFile[]
+  classification InquiryMessageClassification?
   lineManagerChatEvidence LineManagerChat? @relation("LineManagerChatEvidence")
   confirmedLineManagerSendOutbox LineManagerSendOutbox? @relation("LineManagerSendOutboxConfirmedInquiryMessage")
 
+  @@unique([id, inquiryId])
   @@index([inquiryId, createdAt])
   @@index([lineUserId, createdAt])
+}
+
+model InquiryMessageClassification {
+  id               Int                                @id @default(autoincrement())
+  inquiryMessageId Int                                @unique
+  inquiryId        Int
+  scope            InquiryMessageClassificationScope
+  source           InquiryMessageClassificationSource
+  confidence       InquiryAiConfidence?
+  evidence         String?
+  confirmedAt      DateTime?
+  createdAt        DateTime                           @default(now())
+  updatedAt        DateTime                           @updatedAt
+
+  message    InquiryMessage                @relation(fields: [inquiryMessageId, inquiryId], references: [id, inquiryId], onDelete: Cascade)
+  watchLinks InquiryMessageWatchLink[]
+
+  @@unique([id, inquiryId])
+  @@unique([inquiryMessageId, inquiryId])
+  @@index([scope, source])
+}
+
+model InquiryMessageWatchLink {
+  classificationId Int
+  inquiryWatchId   Int
+  inquiryId        Int
+  createdAt        DateTime @default(now())
+
+  classification InquiryMessageClassification @relation(fields: [classificationId, inquiryId], references: [id, inquiryId], onDelete: Cascade)
+  inquiryWatch    InquiryWatch                 @relation(fields: [inquiryWatchId, inquiryId], references: [id, inquiryId], onDelete: Restrict)
+
+  @@id([classificationId, inquiryWatchId])
+  @@index([inquiryWatchId])
 }
 
 model InquiryFile {
@@ -503,10 +549,12 @@ model InquiryWatch {
   promotedWatch Watch?         @relation("InquiryWatchPromotedWatch", fields: [promotedWatchId], references: [id], onDelete: Restrict)
   promotedRepair Repair?       @relation("InquiryWatchPromotedRepair", fields: [promotedRepairId], references: [id], onDelete: Restrict)
   fieldValues   InquiryWatchFieldValue[]
+  messageLinks  InquiryMessageWatchLink[]
   intakeInviteWatches RepairIntakeInviteWatch[]
 
   @@index([inquiryId, createdAt])
   @@unique([inquiryId, position])
+  @@unique([id, inquiryId])
   @@index([inquiryId, position])
   @@index([promotedAt])
   @@index([inquiryId, decision, promotedAt])

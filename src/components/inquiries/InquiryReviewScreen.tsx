@@ -86,6 +86,23 @@ type LineFile = {
   uploadStatus: "PENDING" | "STORED" | "FAILED";
 };
 
+type LineClassificationScope = "WATCHES" | "COMMON" | "UNASSIGNED";
+
+type LineClassification = {
+  scope: LineClassificationScope;
+  source: "AI" | "MANUAL";
+  confidence: "LOW" | "MEDIUM" | "HIGH" | null;
+  evidence: string | null;
+  confirmedAt: string | null;
+  watchIds: number[];
+};
+
+type LineWatchOption = {
+  id: number;
+  position: number;
+  label: string | null;
+};
+
 type LineMessage = {
   id: number;
   direction: "INBOUND" | "OUTBOUND";
@@ -95,6 +112,7 @@ type LineMessage = {
   sentAt: string | null;
   createdAt: string;
   status: string;
+  classification: LineClassification | null;
   files: LineFile[];
 };
 
@@ -112,6 +130,7 @@ type LinePayload = {
   inquiryId: number;
   sendAvailable: boolean;
   mappingVerifiedAt: string | null;
+  watchOptions: LineWatchOption[];
   messages: LineMessage[];
   pendingOutboxes: LinePendingOutbox[];
   hasEarlierMessages: boolean;
@@ -573,7 +592,18 @@ ${intakeUrl}` : "";
             ) : lineTimeline.length === 0 ? (
               <p className="py-6 text-center text-sm text-zinc-500">LINE履歴はまだありません。</p>
             ) : (
-              lineTimeline.map((item) => <LineTimelineEntry key={`${item.kind}-${item.id}`} inquiryId={inquiryId} item={item} />)
+              lineTimeline.map((item) => (
+                <LineTimelineEntry
+                  key={`${item.kind}-${item.id}`}
+                  inquiryId={inquiryId}
+                  item={item}
+                  watchOptions={linePayload?.watchOptions ?? []}
+                  onClassificationSaved={async () => {
+                    setNotice("LINEメッセージの関連時計を保存しました。");
+                    await loadLine();
+                  }}
+                />
+              ))
             )}
           </div>
 
@@ -751,7 +781,17 @@ ${intakeUrl}` : "";
 }
 
 
-function LineTimelineEntry({ inquiryId, item }: { inquiryId: number; item: LineTimelineItem }) {
+function LineTimelineEntry({
+  inquiryId,
+  item,
+  watchOptions,
+  onClassificationSaved,
+}: {
+  inquiryId: number;
+  item: LineTimelineItem;
+  watchOptions: LineWatchOption[];
+  onClassificationSaved: () => Promise<void>;
+}) {
   if (item.kind === "outbox") {
     const isError = item.outbox.status === "PRE_SEND_FAILED";
     return (
@@ -776,7 +816,8 @@ function LineTimelineEntry({ inquiryId, item }: { inquiryId: number; item: LineT
   return (
     <div className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[85%] rounded-lg border px-3 py-2 text-sm shadow-sm ${outbound ? "border-emerald-200 bg-emerald-50" : "border-zinc-200 bg-white"}`}>
-        {message.body && <p className="whitespace-pre-wrap break-words text-zinc-900">{message.body}</p>}
+        <LineClassificationBadges classification={message.classification} watchOptions={watchOptions} />
+        {message.body && <p className="mt-1 whitespace-pre-wrap break-words text-zinc-900">{message.body}</p>}
         {message.messageType === "IMAGE" && storedImages.length > 0 && (
           <div className={`space-y-2 ${message.body ? "mt-2" : ""}`}>
             {storedImages.map((file) => (
@@ -801,6 +842,146 @@ function LineTimelineEntry({ inquiryId, item }: { inquiryId: number; item: LineT
           <span>{outbound ? "送信済み" : "受信"}</span>
           <span>{formatLineTime(lineMessageTime(message))}</span>
         </div>
+        <details className="mt-2 border-t border-zinc-200 pt-2">
+          <summary className="cursor-pointer text-xs font-medium text-blue-700">関連を変更</summary>
+          <LineClassificationEditor
+            inquiryId={inquiryId}
+            message={message}
+            watchOptions={watchOptions}
+            onSaved={onClassificationSaved}
+          />
+        </details>
+      </div>
+    </div>
+  );
+}
+
+function LineClassificationBadges({
+  classification,
+  watchOptions,
+}: {
+  classification: LineClassification | null;
+  watchOptions: LineWatchOption[];
+}) {
+  const scope = classification?.scope ?? "UNASSIGNED";
+  const selectedWatches = scope === "WATCHES"
+    ? (classification?.watchIds ?? []).map((id) => watchOptions.find((option) => option.id === id) ?? { id, position: 0, label: null })
+    : [];
+
+  return (
+    <div className="mb-1 flex flex-wrap items-center gap-1">
+      {scope === "UNASSIGNED" && <Badge variant="secondary">未特定</Badge>}
+      {scope === "COMMON" && <Badge variant="outline">共通</Badge>}
+      {selectedWatches.map((watch) => (
+        <Badge key={watch.id} variant="outline">
+          {watch.position > 0 ? `時計${watch.position}${watch.label ? `・${watch.label}` : ""}` : `時計#${watch.id}`}
+        </Badge>
+      ))}
+      {classification?.source === "MANUAL" && <Badge className="bg-zinc-800 text-white">手動確定</Badge>}
+      {classification?.source === "AI" && (
+        <Badge variant="secondary">
+          AI{classification.confidence ? ` ${CONFIDENCE_LABELS[classification.confidence]}` : ""}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function LineClassificationEditor({
+  inquiryId,
+  message,
+  watchOptions,
+  onSaved,
+}: {
+  inquiryId: number;
+  message: LineMessage;
+  watchOptions: LineWatchOption[];
+  onSaved: () => Promise<void>;
+}) {
+  const [scope, setScope] = useState<LineClassificationScope>(message.classification?.scope ?? "UNASSIGNED");
+  const [watchIds, setWatchIds] = useState<number[]>(message.classification?.watchIds ?? []);
+  const [saving, setSaving] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setScope(message.classification?.scope ?? "UNASSIGNED");
+    setWatchIds(message.classification?.watchIds ?? []);
+  }, [message.classification]);
+
+  const changeScope = (nextScope: LineClassificationScope) => {
+    setScope(nextScope);
+    if (nextScope !== "WATCHES") setWatchIds([]);
+  };
+
+  const toggleWatch = (watchId: number) => {
+    setScope("WATCHES");
+    setWatchIds((current) => current.includes(watchId)
+      ? current.filter((id) => id !== watchId)
+      : [...current, watchId]);
+  };
+
+  const save = async () => {
+    if (scope === "WATCHES" && watchIds.length === 0) {
+      setLocalError("時計を1件以上選択してください。");
+      return;
+    }
+
+    setSaving(true);
+    setLocalError(null);
+    try {
+      const response = await fetch(`/api/inquiries/${inquiryId}/line`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: message.id, scope, watchIds }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "関連付けを保存できませんでした。");
+      await onSaved();
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "関連付けを保存できませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 space-y-3 rounded bg-white/80 p-3 text-xs text-zinc-700">
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant={scope === "UNASSIGNED" ? "default" : "outline"} onClick={() => changeScope("UNASSIGNED")}>未特定</Button>
+        <Button type="button" size="sm" variant={scope === "COMMON" ? "default" : "outline"} onClick={() => changeScope("COMMON")}>共通</Button>
+      </div>
+      <div>
+        <p className="mb-2 font-medium">時計に関連</p>
+        {watchOptions.length === 0 ? (
+          <p className="text-zinc-500">時計候補がまだありません。</p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {watchOptions.map((watch) => (
+              <label key={watch.id} className="flex cursor-pointer items-center gap-2 rounded border border-zinc-200 px-2 py-1.5">
+                <input
+                  type="checkbox"
+                  checked={watchIds.includes(watch.id)}
+                  onChange={() => toggleWatch(watch.id)}
+                />
+                <span>時計{watch.position}{watch.label ? ` ・${watch.label}` : ""}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+      {message.classification?.source === "AI" && message.classification.evidence && (
+        <p className="rounded bg-blue-50 p-2 text-blue-900">AI根拠: {message.classification.evidence}</p>
+      )}
+      {localError && <p className="text-red-700">{localError}</p>}
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => void save()}
+          disabled={saving || (scope === "WATCHES" && watchIds.length === 0)}
+        >
+          {saving ? "保存中…" : "この関連を確定"}
+        </Button>
       </div>
     </div>
   );

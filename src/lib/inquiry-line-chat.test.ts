@@ -9,6 +9,8 @@ import {
   InquiryLineChatNotFoundError,
   InquiryLineChatUnavailableError,
   parseInquiryLineReply,
+  parseInquiryMessageClassification,
+  updateInquiryMessageClassification,
 } from "./inquiry-line-chat";
 
 const VALID_UUID = "123e4567-e89b-42d3-a456-426614174000";
@@ -33,7 +35,38 @@ test("reply parser rejects malformed, blank, too long, and invalid UUID", () => 
   }
 });
 
-test("chat payload is bounded, sorted by effective time, and privacy minimized", async () => {
+test("classification parser enforces WATCHES vs COMMON/UNASSIGNED invariants", () => {
+  assert.deepEqual(
+    parseInquiryMessageClassification({ messageId: 11, scope: "WATCHES", watchIds: [3, 4] }),
+    { messageId: 11, scope: "WATCHES", watchIds: [3, 4] },
+  );
+  assert.deepEqual(
+    parseInquiryMessageClassification({ messageId: 11, scope: "COMMON", watchIds: [] }),
+    { messageId: 11, scope: "COMMON", watchIds: [] },
+  );
+  assert.deepEqual(
+    parseInquiryMessageClassification({ messageId: 11, scope: "UNASSIGNED", watchIds: [] }),
+    { messageId: 11, scope: "UNASSIGNED", watchIds: [] },
+  );
+
+  const invalid = [
+    null,
+    {},
+    { messageId: 0, scope: "COMMON", watchIds: [] },
+    { messageId: 1, scope: "BAD", watchIds: [] },
+    { messageId: 1, scope: "WATCHES", watchIds: [] },
+    { messageId: 1, scope: "COMMON", watchIds: [2] },
+    { messageId: 1, scope: "UNASSIGNED", watchIds: [2] },
+    { messageId: 1, scope: "WATCHES", watchIds: [2, 2] },
+    { messageId: 1, scope: "WATCHES", watchIds: ["2"] },
+    { messageId: 1, scope: "WATCHES", watchIds: Array.from({ length: INQUIRY_LINE_CHAT_LIMITS.MAX_CLASSIFICATION_WATCHES + 1 }, (_, i) => i + 1) },
+  ];
+  for (const value of invalid) {
+    assert.throws(() => parseInquiryMessageClassification(value), InquiryLineChatInputError);
+  }
+});
+
+test("chat payload is bounded, sorted by effective time, classification-safe, and privacy minimized", async () => {
   let messageQuery: any;
   let outboxQuery: any;
   const base = Date.parse("2026-09-23T00:00:00Z");
@@ -59,6 +92,17 @@ test("chat payload is bounded, sorted by effective time, and privacy minimized",
         uploadStatus: "STORED",
         objectKey: "secret/object.webp",
       }] : [],
+      classification: id === 200 ? {
+        scope: "WATCHES",
+        source: "AI",
+        confidence: "HIGH",
+        evidence: "ブランド名が明示",
+        confirmedAt: null,
+        watchLinks: [
+          { inquiryWatch: { id: 21, position: 1, label: "secret-label-not-selected" } },
+          { inquiryWatch: { id: 22, position: 2, label: "secret-label-not-selected" } },
+        ],
+      } : null,
     };
   });
   const db: any = {
@@ -74,6 +118,10 @@ test("chat payload is bounded, sorted by effective time, and privacy minimized",
             managerChatId: "secret-chat",
           },
         },
+        reviewWatches: [
+          { id: 21, position: 1, label: "ROLEX" },
+          { id: 22, position: 2, label: "TUDOR" },
+        ],
       }),
     },
     inquiryMessage: {
@@ -113,6 +161,7 @@ test("chat payload is bounded, sorted by effective time, and privacy minimized",
     height: true,
     uploadStatus: true,
   });
+  assert.equal(messageQuery.select.classification.select.watchLinks.select.inquiryWatch.select.id, true);
   assert.equal(outboxQuery.where.inquiryId, 7);
   assert.deepEqual(outboxQuery.where.status.notIn, ["CONFIRMED", "CANCELLED"]);
   assert.equal(outboxQuery.take, 20);
@@ -124,6 +173,18 @@ test("chat payload is bounded, sorted by effective time, and privacy minimized",
   assert.ok(ids.indexOf(2) > ids.indexOf(199));
   assert.ok(ids.indexOf(3) > ids.indexOf(2));
   assert.equal(result.sendAvailable, true);
+  assert.deepEqual(result.watchOptions, [
+    { id: 21, position: 1, label: "ROLEX" },
+    { id: 22, position: 2, label: "TUDOR" },
+  ]);
+  assert.deepEqual(result.messages.find((message: any) => message.id === 200)?.classification, {
+    scope: "WATCHES",
+    source: "AI",
+    confidence: "HIGH",
+    evidence: "ブランド名が明示",
+    confirmedAt: null,
+    watchIds: [21, 22],
+  });
   assert.equal(result.pendingOutboxes.length, 1);
 
   const serialized = JSON.stringify(result);
@@ -144,6 +205,7 @@ test("chat payload is bounded, sorted by effective time, and privacy minimized",
     "sendId",
     "claimToken",
     "lastError",
+    "secret-label-not-selected",
   ]) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
   }
@@ -151,7 +213,7 @@ test("chat payload is bounded, sorted by effective time, and privacy minimized",
 
 test("chat payload reports send unavailable without verified mapping", async () => {
   const db: any = {
-    inquiry: { findUnique: async () => ({ id: 8, lineUser: { lineManagerChat: null } }) },
+    inquiry: { findUnique: async () => ({ id: 8, lineUser: { lineManagerChat: null }, reviewWatches: [] }) },
     inquiryMessage: { findMany: async () => [] },
     lineManagerSendOutbox: { findMany: async () => [] },
   };
@@ -167,6 +229,151 @@ test("chat payload returns null for missing inquiry", async () => {
     lineManagerSendOutbox: { findMany: async () => { throw new Error("must not query outboxes"); } },
   };
   assert.equal(await getInquiryLineChat(db, 9), null);
+});
+
+test("manual classification verifies message and watch ownership then replaces links atomically", async () => {
+  const calls: any[] = [];
+  const now = new Date("2026-09-23T04:00:00Z");
+  const tx: any = {
+    inquiryMessage: {
+      findFirst: async (query: any) => {
+        calls.push(["message", query]);
+        return { id: 55 };
+      },
+    },
+    inquiryWatch: {
+      findMany: async (query: any) => {
+        calls.push(["watches", query]);
+        return [{ id: 7 }, { id: 8 }];
+      },
+    },
+    inquiryMessageClassification: {
+      upsert: async (query: any) => {
+        calls.push(["upsert", query]);
+        return {
+          id: 90,
+          scope: "WATCHES",
+          source: "MANUAL",
+          confidence: null,
+          evidence: null,
+          confirmedAt: now,
+        };
+      },
+    },
+    inquiryMessageWatchLink: {
+      deleteMany: async (query: any) => {
+        calls.push(["deleteMany", query]);
+        return { count: 1 };
+      },
+      createMany: async (query: any) => {
+        calls.push(["createMany", query]);
+        return { count: 2 };
+      },
+    },
+  };
+  const db: any = { $transaction: async (fn: any) => fn(tx) };
+
+  const result = await updateInquiryMessageClassification(
+    db,
+    3,
+    { messageId: 55, scope: "WATCHES", watchIds: [8, 7] },
+    now,
+  );
+
+  assert.deepEqual(calls[0][1].where, { id: 55, inquiryId: 3 });
+  assert.deepEqual(calls[1][1].where, { inquiryId: 3, id: { in: [8, 7] } });
+  assert.deepEqual(calls[2][1].update, {
+    scope: "WATCHES",
+    source: "MANUAL",
+    confidence: null,
+    evidence: null,
+    confirmedAt: now,
+  });
+  assert.deepEqual(calls[2][1].create, {
+    inquiryMessageId: 55,
+    inquiryId: 3,
+    scope: "WATCHES",
+    source: "MANUAL",
+    confirmedAt: now,
+  });
+  assert.deepEqual(calls[3][1], { where: { classificationId: 90 } });
+  assert.deepEqual(calls[4][1].data, [
+    { classificationId: 90, inquiryWatchId: 8, inquiryId: 3 },
+    { classificationId: 90, inquiryWatchId: 7, inquiryId: 3 },
+  ]);
+  assert.deepEqual(result, {
+    scope: "WATCHES",
+    source: "MANUAL",
+    confidence: null,
+    evidence: null,
+    confirmedAt: now,
+    watchIds: [7, 8],
+  });
+});
+
+test("manual classification COMMON clears links without creating watch links", async () => {
+  let createManyCalled = false;
+  const tx: any = {
+    inquiryMessage: { findFirst: async () => ({ id: 55 }) },
+    inquiryWatch: { findMany: async () => { throw new Error("must not query watches"); } },
+    inquiryMessageClassification: {
+      upsert: async () => ({
+        id: 90,
+        scope: "COMMON",
+        source: "MANUAL",
+        confidence: null,
+        evidence: null,
+        confirmedAt: new Date("2026-09-23T04:00:00Z"),
+      }),
+    },
+    inquiryMessageWatchLink: {
+      deleteMany: async () => ({ count: 2 }),
+      createMany: async () => {
+        createManyCalled = true;
+        return { count: 0 };
+      },
+    },
+  };
+  const db: any = { $transaction: async (fn: any) => fn(tx) };
+  const result = await updateInquiryMessageClassification(
+    db,
+    3,
+    { messageId: 55, scope: "COMMON", watchIds: [] },
+  );
+  assert.equal(createManyCalled, false);
+  assert.equal(result.scope, "COMMON");
+  assert.deepEqual(result.watchIds, []);
+});
+
+test("manual classification fails closed for another Inquiry message or watch", async () => {
+  const missingMessageDb: any = {
+    $transaction: async (fn: any) => fn({
+      inquiryMessage: { findFirst: async () => null },
+    }),
+  };
+  await assert.rejects(
+    () => updateInquiryMessageClassification(
+      missingMessageDb,
+      3,
+      { messageId: 55, scope: "UNASSIGNED", watchIds: [] },
+    ),
+    InquiryLineChatNotFoundError,
+  );
+
+  const wrongWatchDb: any = {
+    $transaction: async (fn: any) => fn({
+      inquiryMessage: { findFirst: async () => ({ id: 55 }) },
+      inquiryWatch: { findMany: async () => [{ id: 7 }] },
+    }),
+  };
+  await assert.rejects(
+    () => updateInquiryMessageClassification(
+      wrongWatchDb,
+      3,
+      { messageId: 55, scope: "WATCHES", watchIds: [7, 8] },
+    ),
+    InquiryLineChatInputError,
+  );
 });
 
 test("reply creation rejects missing inquiry and unavailable mapping", async () => {

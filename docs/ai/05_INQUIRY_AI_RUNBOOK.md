@@ -1,5 +1,18 @@
 # Inquiry AI Runbook
 
+## LINE message classification safety
+
+- Message classification is derived metadata stored separately from the immutable `InquiryMessage` source record.
+- Scope values are `WATCHES`, `COMMON`, and `UNASSIGNED`.
+- `WATCHES` may link one message to multiple `InquiryWatch` rows. `COMMON` and `UNASSIGNED` have no watch links.
+- Manual classification is saved as `source=MANUAL` with `confirmedAt`; future AI classification must not overwrite it.
+- The app validates that the target `InquiryMessage` and every selected `InquiryWatch` belong to the same Inquiry before writing.
+- Manual updates run in one transaction: upsert classification, remove prior links, then create the new watch links.
+- Pending LINE Manager outboxes are not source messages and are not classified. They become classifiable only after reconciliation creates the confirmed OUTBOUND `InquiryMessage`.
+- `InquiryMessageClassification` and `InquiryMessageWatchLink` are server-internal tables. The migration grants no browser Data API access and revokes privileges from `anon` and `authenticated`.
+- AI confidence/evidence fields exist for later automation, but the current UI Task writes only manual classifications.
+
+
 ## Inquiry LINE conversation UI / reply safety
 
 - The Inquiry review UI reads only saved `InquiryMessage` source records plus non-terminal LINE Manager outboxes for the same Inquiry.

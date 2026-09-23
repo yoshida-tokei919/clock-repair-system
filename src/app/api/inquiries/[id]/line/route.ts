@@ -8,6 +8,7 @@ import {
   InquiryLineChatInputError,
   InquiryLineChatNotFoundError,
   InquiryLineChatUnavailableError,
+  updateInquiryMessageClassification,
 } from "@/lib/inquiry-line-chat";
 import { LineManagerSendOutboxError } from "@/lib/line-manager-send-outbox";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +18,14 @@ export const dynamic = "force-dynamic";
 function inquiryIdFromParams(value: string) {
   const id = Number(value);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+async function parseJson(request: Request, errorMessage: string) {
+  try {
+    return await request.json();
+  } catch {
+    throw new InquiryLineChatInputError(errorMessage);
+  }
 }
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
@@ -36,6 +45,29 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     }
     console.error("Inquiry LINE history error", error);
     return NextResponse.json({ error: "LINE履歴を取得できませんでした。" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const inquiryId = inquiryIdFromParams(params.id);
+  if (!inquiryId) return NextResponse.json({ error: "Invalid inquiry ID" }, { status: 400 });
+
+  try {
+    const body = await parseJson(request, "Invalid LINE classification body");
+    const classification = await updateInquiryMessageClassification(prisma, inquiryId, body);
+    return NextResponse.json({ ok: true, classification });
+  } catch (error) {
+    if (error instanceof InquiryLineChatInputError) {
+      return NextResponse.json({ error: "LINEメッセージの関連付け内容が不正です。" }, { status: 400 });
+    }
+    if (error instanceof InquiryLineChatNotFoundError) {
+      return NextResponse.json({ error: "対象のLINEメッセージが見つかりません。" }, { status: 404 });
+    }
+    console.error("Inquiry LINE classification error", error);
+    return NextResponse.json({ error: "LINEメッセージの関連付けを保存できませんでした。" }, { status: 500 });
   }
 }
 
