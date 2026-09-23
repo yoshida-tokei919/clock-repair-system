@@ -1,5 +1,21 @@
 # CURRENT TASK
 
+## Task: LINE Manager sender internal API (local sender not included)
+
+Foundation at `e13b068254e9596be5ee8ef60f20509d8d14ec84` is production complete. This task adds only the authenticated internal API that hands durable outbox work to a future local sender; it does not send a real LINE message, use LINELib, deploy, migrate, change schema/environment/secrets, remove R2/DC, or add reply UI.
+
+Production: pending. The sender internal API is implemented and locally verified in this Task but has not been deployed; only the earlier `e13b068` foundation is production complete.
+
+State machine: `APPROVED` or `PRE_SEND_FAILED` (and expired `CLAIMED`) may be safely claimed as `CLAIMED`; a current claim can become `PRE_SEND_FAILED` or, only through the mandatory fence, `POST_UNCONFIRMED`; only `POST_UNCONFIRMED` can receive a reconciliation lease and then become `CONFIRMED`. `POST_UNCONFIRMED` is never automatically retried or offered by the send claim API. Cancellation is limited to `APPROVED`/`PRE_SEND_FAILED`.
+
+`POST /api/internal/line-manager-sender/claim` and `/reconciliation/claim` are bounded, race-safe scans and return `item: null` when no work is available. Per-item routes acknowledge pre-send failure, fence a post attempt, confirm reconciled evidence, or cancel. They reuse `N8N_INTERNAL_TOKEN` authentication: missing configuration is 503 and invalid authorization is 401. Worker responses are whitelisted and contain only the frozen destination, DB outbox `sendId`, intended text, state/timestamps, and the active lease token.
+
+The confirmation API creates no message itself outside `confirmLineManagerSendOutbox`; only successful confirmation binds the actual Manager `message.id` as `InquiryMessage.externalMessageId` for one OUTBOUND source record. Body/chat/evidence conflicts, stale leases, and reused actual message IDs fail closed with 409.
+
+LINELib facts for the next sender task: `textV2` POST payload uses `{ id: "", type: "textV2", text, sendId }`, and send success returns `{}`. `getChatMessages` returns raw LINE internal JSON. Current code, docs, and tests do not establish that history contains `sendId`, and do not claim live OUTBOUND availability is confirmed. The future sender must fence successfully before its actual POST and make that POST use the DB outbox `sendId` (high-level `send_message`/`sendMessage` generates its own sendId). It must inspect raw OUTBOUND history: if `sendId` appears, require matching frozen `managerChatId`, `sendId`, text, and actual `message.id`; if absent, consider only messages newer than the pre-send watermark with exact chat ID/text/timestamp window/actual ID, failing closed on ambiguity.
+
+Next: implement the local sender, then reply UI and production E2E only with explicit approval. The old DC bridge remains implemented but is not LINE sender architecture; DC removal is not done.
+
 ## 現在Task
 
 Phase 2 / Task 1-3: 完了 / Production rollout 完了

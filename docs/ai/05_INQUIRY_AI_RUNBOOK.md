@@ -1,5 +1,15 @@
 # Inquiry AI Runbook
 
+## LINE Manager sender internal API (no real sending in this task)
+
+- The internal worker uses the existing `N8N_INTERNAL_TOKEN` Bearer authentication. Missing server configuration returns 503; an invalid token returns 401. Never put the token in command arguments, logs, Slack, prompts, or output.
+- `POST /api/internal/line-manager-sender/claim` performs a bounded, race-safe scan and uses the existing guarded safe-claim update for the atomic claim, returning `{ ok: true, item: null }` when none exists. Eligible statuses are `APPROVED`, `PRE_SEND_FAILED`, and expired `CLAIMED`; `POST_UNCONFIRMED` is never a send candidate or automatic retry.
+- A worker with the returned claim token may report `/[id]/pre-send-failed` before any POST, or must succeed at `/[id]/fence` before any future real LINE POST. Stale or wrong tokens return 409.
+- `POST /api/internal/line-manager-sender/reconciliation/claim` works only on `POST_UNCONFIRMED` rows whose reconciliation lease is absent or expired. Confirmation at `/[id]/confirm` requires that active reconciliation token plus nonempty actual message ID/text/frozen bot/chat identifiers and a valid timestamp. Mismatched evidence, stale state, ambiguity, and already-bound incompatible message IDs are 409; malformed input is 400.
+- Confirming creates exactly one OUTBOUND `InquiryMessage`, using the actual Manager message ID as `externalMessageId`; clients must never create `InquiryMessage` directly. Cancellation is limited to pre-send states.
+- A future local sender must pass the outbox DB `sendId` in the raw LINELib textV2 payload (`{ id: "", type: "textV2", text, sendId }`) after a successful fence. LINELib success returns `{}`. Raw `getChatMessages` history is not currently guaranteed to include `sendId`, and live OUTBOUND availability is not confirmed. If raw history has `sendId`, reconcile with frozen chat ID + sendId + text + actual message ID. If it does not, inspect only messages newer than the pre-send watermark using exact chat ID/text/timestamp window/actual ID and fail closed on ambiguity. High-level `send_message`/`sendMessage` generates its own sendId and therefore cannot be used without ensuring the DB sendId reaches the actual POST.
+- This task has no local LINELib sender, no real LINE send, no production E2E/deploy, no reply UI, and no DC/R2 removal. The old DC bridge remains implemented but is not LINE sender architecture. Next is the local sender; reply UI and production E2E require explicit approval.
+
 ## Task 3: Desktop Commander bridge operation
 
 - Katari uses Desktop Commander to run `scripts/inquiry-ai-bridge.ps1`; never put a Bearer token in tool arguments, chat, Slack, or logs.
