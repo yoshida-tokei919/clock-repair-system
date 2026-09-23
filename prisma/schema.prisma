@@ -331,6 +331,7 @@ model InquiryMessageClassification {
 
   message    InquiryMessage                @relation(fields: [inquiryMessageId, inquiryId], references: [id, inquiryId], onDelete: Cascade)
   watchLinks InquiryMessageWatchLink[]
+  repairLinks InquiryMessageRepairLink[]
 
   @@unique([id, inquiryId])
   @@unique([inquiryMessageId, inquiryId])
@@ -348,6 +349,18 @@ model InquiryMessageWatchLink {
 
   @@id([classificationId, inquiryWatchId])
   @@index([inquiryWatchId])
+}
+
+model InquiryMessageRepairLink {
+  classificationId Int
+  repairId         Int
+  createdAt        DateTime @default(now())
+
+  classification InquiryMessageClassification @relation(fields: [classificationId], references: [id], onDelete: Cascade)
+  repair         Repair                       @relation(fields: [repairId], references: [id], onDelete: Restrict)
+
+  @@id([classificationId, repairId])
+  @@index([repairId])
 }
 
 model InquiryFile {
@@ -828,6 +841,7 @@ model Repair {
   partAllocations RepairPartAllocation[]
   publicCases   PublicCase[]
   inquiryWatchPromotion InquiryWatch? @relation("InquiryWatchPromotedRepair")
+  inquiryMessageLinks InquiryMessageRepairLink[]
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])

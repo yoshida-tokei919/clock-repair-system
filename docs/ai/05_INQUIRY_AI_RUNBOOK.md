@@ -1,5 +1,14 @@
 # Inquiry AI Runbook
 
+## Task 3: Inquiry message to Repair associations
+
+- `InquiryMessage` remains the sole LINE source record. `InquiryMessageRepairLink` stores only a derived classification-to-Repair association; it does not copy message body or images.
+- `WATCHES` links only Repairs named by `promotedRepairId` on the classification's linked InquiryWatch rows. `COMMON` links all promoted Repairs in that same Inquiry. `UNASSIGNED` links none. Duplicate Repair IDs collapse to one link.
+- Promotion reconciles all classifications in its Inquiry after promotion markers are saved in the same transaction. Later promotion batches add links, and a fully-promoted retry may repair drift without duplicating links.
+- Manual reclassification reconciles after watch links are replaced in the same transaction. It removes stale Repair links and adds newly eligible ones. The browser sends no Repair ID; Repair IDs are derived server-side from promotion markers.
+- The table is server-internal and has no browser Data API grants. The Task 3 migration explicitly revokes `PUBLIC`, `anon`, and `authenticated` privileges. Task 2 and Task 3 migrations are both production-unapplied.
+- Once an Inquiry is `CLOSED`, a later inbound LINE message may create a different Inquiry. Task 3 carries only pre-intake classifications; Task 4 will consume Repair links in the Repair LINE tab, and Task 6 will classify later messages to existing Repairs.
+
 ## LINE message classification safety
 
 - Message classification is derived metadata stored separately from the immutable `InquiryMessage` source record.

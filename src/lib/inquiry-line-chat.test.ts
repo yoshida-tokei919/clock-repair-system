@@ -235,10 +235,11 @@ test("manual classification verifies message and watch ownership then replaces l
   const calls: any[] = [];
   const now = new Date("2026-09-23T04:00:00Z");
   const tx: any = {
+    $executeRaw: async () => undefined,
     inquiryMessage: {
       findFirst: async (query: any) => {
         calls.push(["message", query]);
-        return { id: 55 };
+        return { id: 55, lineUserId: 5 };
       },
     },
     inquiryWatch: {
@@ -259,6 +260,15 @@ test("manual classification verifies message and watch ownership then replaces l
           confirmedAt: now,
         };
       },
+      findUnique: async () => ({
+        inquiryId: 3,
+        scope: "WATCHES",
+        watchLinks: [
+          { inquiryWatch: { promotedRepairId: 108 } },
+          { inquiryWatch: { promotedRepairId: 107 } },
+        ],
+        repairLinks: [{ repairId: 106 }],
+      }),
     },
     inquiryMessageWatchLink: {
       deleteMany: async (query: any) => {
@@ -269,6 +279,10 @@ test("manual classification verifies message and watch ownership then replaces l
         calls.push(["createMany", query]);
         return { count: 2 };
       },
+    },
+    inquiryMessageRepairLink: {
+      deleteMany: async (query: any) => { calls.push(["repair-delete", query]); },
+      createMany: async (query: any) => { calls.push(["repair-create", query]); },
     },
   };
   const db: any = { $transaction: async (fn: any) => fn(tx) };
@@ -301,6 +315,10 @@ test("manual classification verifies message and watch ownership then replaces l
     { classificationId: 90, inquiryWatchId: 8, inquiryId: 3 },
     { classificationId: 90, inquiryWatchId: 7, inquiryId: 3 },
   ]);
+  assert.deepEqual(calls.slice(5), [
+    ["repair-delete", { where: { classificationId: 90, repairId: { in: [106] } } }],
+    ["repair-create", { data: [{ classificationId: 90, repairId: 108 }, { classificationId: 90, repairId: 107 }] }],
+  ]);
   assert.deepEqual(result, {
     scope: "WATCHES",
     source: "MANUAL",
@@ -314,8 +332,12 @@ test("manual classification verifies message and watch ownership then replaces l
 test("manual classification COMMON clears links without creating watch links", async () => {
   let createManyCalled = false;
   const tx: any = {
-    inquiryMessage: { findFirst: async () => ({ id: 55 }) },
-    inquiryWatch: { findMany: async () => { throw new Error("must not query watches"); } },
+    $executeRaw: async () => undefined,
+    inquiryMessage: { findFirst: async () => ({ id: 55, lineUserId: 5 }) },
+    inquiryWatch: { findMany: async ({ where }: any) => {
+      assert.equal(where.inquiryId, 3);
+      return [{ promotedRepairId: 301 }];
+    } },
     inquiryMessageClassification: {
       upsert: async () => ({
         id: 90,
@@ -325,12 +347,18 @@ test("manual classification COMMON clears links without creating watch links", a
         evidence: null,
         confirmedAt: new Date("2026-09-23T04:00:00Z"),
       }),
+      findUnique: async () => ({ inquiryId: 3, scope: "COMMON", watchLinks: [], repairLinks: [] }),
     },
     inquiryMessageWatchLink: {
       deleteMany: async () => ({ count: 2 }),
       createMany: async () => {
         createManyCalled = true;
         return { count: 0 };
+      },
+    },
+    inquiryMessageRepairLink: {
+      createMany: async ({ data }: any) => {
+        assert.deepEqual(data, [{ classificationId: 90, repairId: 301 }]);
       },
     },
   };
@@ -343,6 +371,34 @@ test("manual classification COMMON clears links without creating watch links", a
   assert.equal(createManyCalled, false);
   assert.equal(result.scope, "COMMON");
   assert.deepEqual(result.watchIds, []);
+});
+
+test("manual UNASSIGNED classification clears stale Repair links in the same transaction", async () => {
+  const calls: string[] = [];
+  const tx: any = {
+    $executeRaw: async () => { calls.push("lock"); },
+    inquiryMessage: { findFirst: async () => ({ id: 55, lineUserId: 5 }) },
+    inquiryMessageClassification: {
+      upsert: async () => ({ id: 90, scope: "UNASSIGNED", source: "MANUAL", confidence: null, evidence: null, confirmedAt: new Date() }),
+      findUnique: async () => ({ inquiryId: 3, scope: "UNASSIGNED", watchLinks: [], repairLinks: [{ repairId: 301 }] }),
+    },
+    inquiryMessageWatchLink: { deleteMany: async () => { calls.push("watch-delete"); } },
+    inquiryMessageRepairLink: {
+      deleteMany: async ({ where }: any) => {
+        assert.deepEqual(where, { classificationId: 90, repairId: { in: [301] } });
+        calls.push("repair-delete");
+      },
+    },
+  };
+  const db: any = { $transaction: async (fn: any) => {
+    calls.push("begin");
+    const result = await fn(tx);
+    calls.push("end");
+    return result;
+  } };
+  const result = await updateInquiryMessageClassification(db, 3, { messageId: 55, scope: "UNASSIGNED", watchIds: [] });
+  assert.equal(result.scope, "UNASSIGNED");
+  assert.deepEqual(calls, ["begin", "lock", "watch-delete", "repair-delete", "end"]);
 });
 
 test("manual classification fails closed for another Inquiry message or watch", async () => {
@@ -362,7 +418,8 @@ test("manual classification fails closed for another Inquiry message or watch", 
 
   const wrongWatchDb: any = {
     $transaction: async (fn: any) => fn({
-      inquiryMessage: { findFirst: async () => ({ id: 55 }) },
+      $executeRaw: async () => undefined,
+      inquiryMessage: { findFirst: async () => ({ id: 55, lineUserId: 5 }) },
       inquiryWatch: { findMany: async () => [{ id: 7 }] },
     }),
   };

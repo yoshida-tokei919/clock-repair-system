@@ -56,6 +56,7 @@ function promotionTx(watches: any[], repairs: any[] = []) {
       findMany: async () => watches,
       update: async () => { writes.push("inquiry-watch-update"); },
     },
+    inquiryMessageClassification: { findMany: async () => [] },
     repair: {
       findMany: async () => repairs,
       create: async () => { writes.push("repair-create"); },
@@ -115,4 +116,50 @@ test("partial promotion markers fail without writes", async () => {
     /incomplete promotion result/,
   );
   assert.deepEqual(writes, []);
+});
+
+test("promotion reconciles links after markers update in the supplied transaction", async () => {
+  const watch = promotionWatch(1, 1, false);
+  const { tx, writes } = promotionTx([watch]);
+  tx.brand = { findUnique: async () => ({ id: 1 }) };
+  tx.watch.create = async () => ({ id: 101 });
+  tx.repair.create = async () => ({ id: 201 });
+  tx.inquiryWatch.update = async ({ data }: any) => {
+    Object.assign(watch, data);
+    writes.push("inquiry-watch-update");
+  };
+  tx.inquiryMessageClassification.findMany = async ({ where }: any) => where.id.gt === 0 ? [{ id: 90 }] : [];
+  tx.inquiryMessageClassification.findUnique = async () => {
+    assert.equal(watch.promotedRepairId, 201);
+    return { inquiryId: 7, scope: "WATCHES", watchLinks: [{ inquiryWatch: { promotedRepairId: watch.promotedRepairId } }], repairLinks: [] };
+  };
+  tx.inquiryMessageRepairLink = {
+    createMany: async ({ data }: any) => {
+      assert.deepEqual(data, [{ classificationId: 90, repairId: 201 }]);
+      writes.push("link-create");
+    },
+  };
+
+  const result = await promoteInquiryWatches(tx, { inquiryId: 7, customerId: 12, watchIds: [1] });
+  assert.equal(result.deduplicated, false);
+  assert.ok(writes.indexOf("link-create") > writes.indexOf("inquiry-watch-update"));
+});
+
+test("fully promoted retry repairs missing links without formal-record writes", async () => {
+  const { tx, writes } = promotionTx([promotionWatch(1, 1, true)], [
+    { id: 201, watchId: 101, customerId: 12, inquiryNumber: "C-001", watch: { customerId: 12 } },
+  ]);
+  tx.inquiryMessageClassification.findMany = async ({ where }: any) => where.id.gt === 0 ? [{ id: 90 }] : [];
+  tx.inquiryMessageClassification.findUnique = async () => ({
+    inquiryId: 7, scope: "WATCHES", watchLinks: [{ inquiryWatch: { promotedRepairId: 201 } }], repairLinks: [],
+  });
+  tx.inquiryMessageRepairLink = {
+    createMany: async ({ data }: any) => {
+      assert.deepEqual(data, [{ classificationId: 90, repairId: 201 }]);
+      writes.push("link-create");
+    },
+  };
+  const result = await promoteInquiryWatches(tx, { inquiryId: 7, customerId: 12, watchIds: [1] });
+  assert.equal(result.deduplicated, true);
+  assert.deepEqual(writes, ["link-create"]);
 });

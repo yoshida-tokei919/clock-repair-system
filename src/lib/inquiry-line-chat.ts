@@ -1,4 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
+import { reconcileInquiryMessageRepairLinks } from "./inquiry-message-repair-links";
+import { lockLineUserInquiryTransaction } from "./inquiry-transaction-lock";
 
 import {
   createApprovedLineManagerSendOutbox,
@@ -251,9 +253,11 @@ export async function updateInquiryMessageClassification(
   return db.$transaction(async (tx: any) => {
     const message = await tx.inquiryMessage.findFirst({
       where: { id: input.messageId, inquiryId },
-      select: { id: true },
+      select: { id: true, lineUserId: true },
     });
     if (!message) throw new InquiryLineChatNotFoundError("Inquiry message not found");
+    // Serialize manual reclassification with promotion for the same LINE user.
+    await lockLineUserInquiryTransaction(tx, message.lineUserId);
 
     if (input.scope === "WATCHES") {
       const watches = await tx.inquiryWatch.findMany({
@@ -297,6 +301,8 @@ export async function updateInquiryMessageClassification(
         })),
       });
     }
+
+    await reconcileInquiryMessageRepairLinks(tx, classification.id);
 
     return {
       scope: classification.scope,

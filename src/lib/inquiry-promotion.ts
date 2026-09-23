@@ -1,4 +1,5 @@
 import type { InquiryWatchField, Prisma } from "@prisma/client";
+import { reconcileInquiryRepairMessageLinks } from "@/lib/inquiry-message-repair-links";
 import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
 
 const MASTER_FIELDS = {
@@ -179,6 +180,7 @@ export async function promoteInquiryWatches(
         inquiryNumber: repair.inquiryNumber,
       };
     });
+    await reconcileInquiryRepairMessageLinks(tx, inquiry.id);
     return {
       customerId: customer.id,
       promotedAt: watches[0].promotedAt!,
@@ -246,5 +248,6 @@ export async function promoteInquiryWatches(
     results.push({ inquiryWatchId: draft.id, watchId: formalWatch.id, repairId: repair.id, inquiryNumber });
   }
   await tx.customer.update({ where: { id: customer.id }, data: { currentSeq: sequence, prefix } });
+  await reconcileInquiryRepairMessageLinks(tx, inquiry.id);
   return { customerId: customer.id, promotedAt, promotions: results, deduplicated: false };
 }
