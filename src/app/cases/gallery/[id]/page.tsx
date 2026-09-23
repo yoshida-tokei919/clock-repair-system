@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ImageOff } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -7,6 +8,9 @@ import {
 } from "@/lib/public-cases";
 
 export const dynamic = "force-dynamic";
+
+const repairCaseLabel = "修理事例";
+const shopName = "ヨシダ時計修理工房";
 
 function text(value?: string | null): string {
   return (value ?? "").trim();
@@ -61,6 +65,55 @@ function getMeta(publicCase: B2CPublicCaseDetail): string {
   ]
     .filter(Boolean)
     .join(" / ");
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string };
+}): Promise<Metadata> {
+  const publicCase = await getB2CPublicCaseDetail(params.id);
+  if (!publicCase) {
+    return {};
+  }
+
+  const brand = getBrandDisplayName(publicCase);
+  const workNames = getWorkNames(publicCase);
+  const primaryWorkName = workNames[0] ?? "";
+  const partNames = getPartNames(publicCase);
+  const identity = Array.from(
+    new Set(
+      [
+        text(publicCase.modelName),
+        text(publicCase.ref) ? `Ref. ${text(publicCase.ref)}` : "",
+        text(publicCase.caliber) ? `Cal. ${text(publicCase.caliber)}` : "",
+      ]
+        .filter(Boolean)
+        .map((value) => text(value)),
+    ),
+  ).join(" / ");
+  const descriptionSubject = [brand, identity].filter(Boolean).join(" ");
+  const descriptionDetails = [primaryWorkName, ...partNames].filter(Boolean);
+  const summary = getSummary(publicCase);
+  const description = summary
+    ? `${descriptionSubject ? `${descriptionSubject}の` : ""}${repairCaseLabel}。${summary}`
+    : descriptionSubject
+      ? descriptionDetails.length
+        ? `${descriptionSubject}の${descriptionDetails.join("、")}に関する${repairCaseLabel}を紹介します。`
+        : `${descriptionSubject}の${repairCaseLabel}を紹介します。`
+      : descriptionDetails.length
+        ? `${descriptionDetails.join("、")}に関する${repairCaseLabel}を紹介します。`
+        : `${repairCaseLabel}を紹介します。`;
+
+  return {
+    title: [brand, identity, primaryWorkName, repairCaseLabel, shopName]
+      .filter(Boolean)
+      .join(" | "),
+    description,
+    alternates: {
+      canonical: `/cases/gallery/${params.id}`,
+    },
+  };
 }
 
 function DetailImage({ publicCase }: { publicCase: B2CPublicCaseDetail }) {
