@@ -79,6 +79,7 @@ model LineUser {
   repairIntakeInvites RepairIntakeInvite[]
   inquiries           Inquiry[]
   inquiryMessages     InquiryMessage[]
+  lineManagerChat     LineManagerChat?
 
   @@index([linkedCustomerId])
   @@index([lastReceivedAt])
@@ -176,6 +177,15 @@ enum InquiryMessageType {
   OTHER
 }
 
+enum LineManagerSendOutboxStatus {
+  APPROVED
+  CLAIMED
+  PRE_SEND_FAILED
+  POST_UNCONFIRMED
+  CONFIRMED
+  CANCELLED
+}
+
 enum InquiryFileStatus {
   PENDING
   STORED
@@ -264,6 +274,7 @@ model Inquiry {
   reviewWatches InquiryWatch[]
   repairIntakeInvites RepairIntakeInvite[]
   slackNotifications SlackNotificationOutbox[]
+  lineManagerSendOutboxes LineManagerSendOutbox[]
 
   @@index([lineUserId, status])
   @@index([lineUserId, lastReceivedAt])
@@ -286,6 +297,8 @@ model InquiryMessage {
   inquiry  Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Restrict)
   lineUser LineUser      @relation(fields: [lineUserId], references: [id], onDelete: Restrict)
   files    InquiryFile[]
+  lineManagerChatEvidence LineManagerChat? @relation("LineManagerChatEvidence")
+  confirmedLineManagerSendOutbox LineManagerSendOutbox? @relation("LineManagerSendOutboxConfirmedInquiryMessage")
 
   @@index([inquiryId, createdAt])
   @@index([lineUserId, createdAt])
@@ -314,6 +327,64 @@ model InquiryFile {
   @@unique([provider, providerFileId])
   @@index([inquiryId, createdAt])
   @@index([uploadStatus])
+}
+
+// A chat destination is only trusted when an immutable inbound message proves it.
+model LineManagerChat {
+  id                       Int      @id @default(autoincrement())
+  lineUserId               Int      @unique
+  managerBotId             String
+  managerChatId            String
+  evidenceInquiryMessageId Int      @unique
+  evidenceManagerMessageId String
+  verifiedAt               DateTime
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  lineUser        LineUser                @relation(fields: [lineUserId], references: [id], onDelete: Restrict)
+  evidenceMessage InquiryMessage          @relation("LineManagerChatEvidence", fields: [evidenceInquiryMessageId], references: [id], onDelete: Restrict)
+  sendOutboxes    LineManagerSendOutbox[]
+
+  @@unique([managerBotId, managerChatId])
+  @@unique([managerBotId, evidenceManagerMessageId])
+}
+
+// Durable send intent. A real LINE message id is recorded only after history reconciliation.
+model LineManagerSendOutbox {
+  id                           Int                         @id @default(autoincrement())
+  inquiryId                    Int
+  lineManagerChatId            Int
+  text                         String
+  idempotencyKey               String                      @unique
+  sendId                       String                      @unique
+  status                       LineManagerSendOutboxStatus @default(APPROVED)
+  approvedAt                   DateTime
+  managerBotIdSnapshot         String
+  managerChatIdSnapshot        String
+  claimToken                   String?
+  claimLeaseExpiresAt          DateTime?
+  claimedAt                    DateTime?
+  sendAttemptCount             Int                         @default(0)
+  lastAttemptAt                DateTime?
+  postAttemptedAt              DateTime?
+  reconciliationToken          String?
+  reconciliationLeaseExpiresAt DateTime?
+  lastHistoryCheckedAt         DateTime?
+  confirmedManagerMessageId    String?                     @unique
+  confirmedInquiryMessageId    Int?                        @unique
+  confirmedAt                  DateTime?
+  lastError                    String?
+  createdAt                    DateTime                    @default(now())
+  updatedAt                    DateTime                    @updatedAt
+
+  inquiry                 Inquiry         @relation(fields: [inquiryId], references: [id], onDelete: Restrict)
+  lineManagerChat         LineManagerChat @relation(fields: [lineManagerChatId], references: [id], onDelete: Restrict)
+  confirmedInquiryMessage InquiryMessage? @relation("LineManagerSendOutboxConfirmedInquiryMessage", fields: [confirmedInquiryMessageId], references: [id], onDelete: Restrict)
+
+  @@index([status, claimLeaseExpiresAt])
+  @@index([status, reconciliationLeaseExpiresAt])
+  @@index([inquiryId])
+  @@index([lineManagerChatId])
 }
 
 model InquiryAiAnalysis {
