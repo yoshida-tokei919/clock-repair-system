@@ -1,10 +1,10 @@
 # CURRENT TASK
 
-## Task: LINE Manager sender internal API (local sender not included)
+## Task: LINE Manager sender internal API and local sender
 
-Foundation at `e13b068254e9596be5ee8ef60f20509d8d14ec84` is production complete. This task adds only the authenticated internal API that hands durable outbox work to a future local sender; it does not send a real LINE message, use LINELib, deploy, migrate, change schema/environment/secrets, remove R2/DC, or add reply UI.
+Foundation at `e13b068254e9596be5ee8ef60f20509d8d14ec84` is production complete. The current local sender work is based on `a8628d0` on `main`; it adds a local, explicit-opt-in LINELib sender worker only. It does not send a real LINE message during development, deploy, migrate, change schema/environment/secrets, remove R2/DC, or add reply UI.
 
-Production: pending. The sender internal API is implemented and locally verified in this Task but has not been deployed; only the earlier `e13b068` foundation is production complete.
+Production: pending. The sender internal API and the current local sender for `a8628d0` have not been deployed or exercised against live LINE; only the earlier `e13b068` foundation is production complete.
 
 State machine: `APPROVED` or `PRE_SEND_FAILED` (and expired `CLAIMED`) may be safely claimed as `CLAIMED`; a current claim can become `PRE_SEND_FAILED` or, only through the mandatory fence, `POST_UNCONFIRMED`; only `POST_UNCONFIRMED` can receive a reconciliation lease and then become `CONFIRMED`. `POST_UNCONFIRMED` is never automatically retried or offered by the send claim API. Cancellation is limited to `APPROVED`/`PRE_SEND_FAILED`.
 
@@ -12,9 +12,9 @@ State machine: `APPROVED` or `PRE_SEND_FAILED` (and expired `CLAIMED`) may be sa
 
 The confirmation API creates no message itself outside `confirmLineManagerSendOutbox`; only successful confirmation binds the actual Manager `message.id` as `InquiryMessage.externalMessageId` for one OUTBOUND source record. Body/chat/evidence conflicts, stale leases, and reused actual message IDs fail closed with 409.
 
-LINELib facts for the next sender task: `textV2` POST payload uses `{ id: "", type: "textV2", text, sendId }`, and send success returns `{}`. `getChatMessages` returns raw LINE internal JSON. Current code, docs, and tests do not establish that history contains `sendId`, and do not claim live OUTBOUND availability is confirmed. The future sender must fence successfully before its actual POST and make that POST use the DB outbox `sendId` (high-level `send_message`/`sendMessage` generates its own sendId). It must inspect raw OUTBOUND history: if `sendId` appears, require matching frozen `managerChatId`, `sendId`, text, and actual `message.id`; if absent, consider only messages newer than the pre-send watermark with exact chat ID/text/timestamp window/actual ID, failing closed on ambiguity.
+lineoa `7.7.18` was found locally and its source verified: `textV2` POST payload uses `{ id: "", type: "textV2", text, sendId }`, low-level `ChatService.send_message(bot_id, chat_id, message, session, xsrf_token)` posts that supplied dict unchanged and returns `{}`, while high-level `send_message`/`sendMessage` generates a new sendId and must not be used. `get_chat_messages` returns raw LINE internal JSON. The orchestration/reconciliation algorithm is implemented and unit-tested with typed/fake `HistoryMessage` data, but the actual lineoa raw-history parser is deliberately disabled: 7.7.18 ships raw JSON without a verified stable message schema/fixture. The local worker finalizes evidence under `%LOCALAPPDATA%\clock-repair-system\line-manager-sender` before the fence, then must durably persist a timezone-aware post-invocation marker after the successful fence and before the one Manager POST. If marker persistence fails, it returns without making a Manager POST, deliberately leaving the row `POST_UNCONFIRMED` for fail-closed handling. Reconciliation requires that marker to be at or after capture and within two minutes of authoritative server `postAttemptedAt`, allowing bounded client/server clock skew while failing closed. Missing, mismatched, distant, or ambiguous evidence/history fails closed.
 
-Next: implement the local sender, then reply UI and production E2E only with explicit approval. The old DC bridge remains implemented but is not LINE sender architecture; DC removal is not done.
+Real sending must not be enabled yet. Next approved step: authenticated history-schema capture/verification (prefer a non-sending history read if feasible), then implement the parser from the observed verified shape, then conduct controlled production E2E only with explicit approval. Reply UI also requires approval. The old DC bridge remains implemented but is not LINE sender architecture; DC removal is not done.
 
 ## 現在Task
 
