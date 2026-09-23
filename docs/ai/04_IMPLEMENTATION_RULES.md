@@ -50,6 +50,18 @@ Task指示で指定されたschema（DB定義）、seed（初期データ）、d
 - commit禁止と指定されたTaskではcommitしない
 - 正本と現行実装にTask対象外の差分を発見した場合、勝手に修正せず報告する
 
+## Supabase Data API / GRANT
+
+2026年10月30日以降、Supabaseでは `public` schema（publicスキーマ）に新規作成したテーブルへData API用の権限が自動付与されない。
+
+- schema / migrationで新規テーブルを作成する場合、Data APIから利用するか必ず確認する
+- Data APIから利用する場合は、同じmigration内で必要な `GRANT`（権限付与）を明示する
+- `anon`（未認証）、`authenticated`（認証済み）、`service_role`（サーバー権限）のどのroleへ何の権限が必要か用途ごとに判断する
+- 全roleへ一律に `select, insert, update, delete` を付与しない
+- サーバー内部専用などData API公開が不要なテーブルには不要なGRANTを付与しない
+- `supabase db reset`、preview branch、新規projectでもmigrationのGRANT不足が影響するため、migration作成時点で確認する
+- schema / migration / RLS / GRANT変更は高リスク変更として扱い、実装担当とレビュー担当を原則分離する
+
 以下は対象Taskでない限り変更しない。
 
 - 帳票
