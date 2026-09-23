@@ -6,7 +6,7 @@ import shutil
 import unittest
 from unittest.mock import patch
 
-from line_manager_sender import HistoryMessage, LINELibAdapter, ReconciliationCandidate, SendCandidate, SendEvidence, process_reconciliation_once, process_send_once, reconcile_history, safe_error, text_v2_payload
+from line_manager_sender import HistoryMessage, LINELibAdapter, ReconciliationCandidate, SendCandidate, SendEvidence, WorkerError, parse_lineoa_history, process_reconciliation_once, process_send_once, reconcile_history, safe_error, text_v2_payload
 
 T0 = datetime(2026, 9, 23, tzinfo=timezone.utc)
 SEND = SendCandidate(1, "approved", "chat_1700000000000_1234567", "bot", "chat", "claim", "CLAIMED")
@@ -26,6 +26,75 @@ class FakeAdapter:
     def post_text_v2(self, bot, chat, payload, *, allow_send):
         self.posts.append((bot,chat,payload)); self.post_error and (_ for _ in ()).throw(self.post_error)
 def msg(message_id, *, text="approved", send_id=None, timestamp=T0, chat="chat"): return HistoryMessage(message_id,chat,text,timestamp,True,send_id)
+
+def history_event(event_type, *, message=None, timestamp=1_790_000_123_456, chat="chat", send_id="MISSING"):
+    event={"type":event_type,"source":{"chatId":chat,"userId":"user"},"timestamp":timestamp}
+    if message is not None: event["message"]=message
+    if send_id != "MISSING": event["sendId"]=send_id
+    return event
+
+class HistoryParserTests(unittest.TestCase):
+    def test_verified_shape_mix_parses_only_text_with_direction_and_utc_timestamp(self):
+        raw={"backward":True,"list":[
+            history_event("chatRead"),
+            history_event("message",message={"id":"inbound","type":"text","text":"inbound text"}),
+            history_event("message",message={"id":"image","type":"image","text":"ignored"}),
+            history_event("messageSent",message={"id":"outbound-send","type":"text","text":"outbound text"},send_id="send-1"),
+            history_event("messageSent",message={"id":"outbound-no-send","type":"text","text":"outbound no send"}),
+        ]}
+        parsed=parse_lineoa_history(raw,"chat")
+        self.assertEqual([(m.id,m.outbound,m.send_id) for m in parsed],[('inbound',False,None),('outbound-send',True,'send-1'),('outbound-no-send',True,None)])
+        self.assertEqual(parsed[0].timestamp,datetime.fromtimestamp(1_790_000_123_456 / 1000,tz=timezone.utc))
+        self.assertEqual(parsed[0].timestamp.tzinfo,timezone.utc)
+
+    def test_text_event_requires_exact_requested_chat_id(self):
+        raw={"list":[history_event("message",message={"id":"inbound","type":"text","text":"text"},chat="other-chat")]}
+        with self.assertRaises(WorkerError): parse_lineoa_history(raw,"chat")
+
+    def test_malformed_root_or_list_fails_closed(self):
+        for raw in (None,[],{}, {"list":{}}, {"list":"not-a-list"}):
+            with self.subTest(raw=raw):
+                with self.assertRaises(WorkerError): parse_lineoa_history(raw,"chat")
+
+    def test_malformed_supported_text_event_fails_closed(self):
+        malformed=[
+            history_event("message",message={"type":"text","text":"text"}),
+            history_event("messageSent",message={"id":"id","type":"text","text":""}),
+            history_event("message",message={"id":"id","type":"text","text":"text"},timestamp=True),
+            history_event("message",message={"id":"id","type":"text","text":"text"},chat=""),
+            history_event("message",message=None),
+        ]
+        for event in malformed:
+            with self.subTest(event=event):
+                with self.assertRaises(WorkerError): parse_lineoa_history({"list":[event]},"chat")
+
+    def test_supported_event_requires_nonempty_string_message_type_but_skips_image(self):
+        for message_type in (None, "", "   ", 1, False):
+            with self.subTest(message_type=message_type):
+                event=history_event("message",message={"id":"id","type":message_type,"text":"text"})
+                with self.assertRaises(WorkerError): parse_lineoa_history({"list":[event]},"chat")
+        image=history_event("messageSent",message={"id":"image","type":"image","text":"ignored"})
+        self.assertEqual(parse_lineoa_history({"list":[image]},"chat"),[])
+
+    def test_send_id_is_optional_but_malformed_value_fails_closed(self):
+        text_message={"id":"id","type":"text","text":"text"}
+        self.assertIsNone(parse_lineoa_history({"list":[history_event("messageSent",message=text_message)]},"chat")[0].send_id)
+        self.assertIsNone(parse_lineoa_history({"list":[history_event("messageSent",message=text_message,send_id=None)]},"chat")[0].send_id)
+        for send_id in ("", "   ", 1, False):
+            with self.subTest(send_id=send_id):
+                with self.assertRaises(WorkerError): parse_lineoa_history({"list":[history_event("messageSent",message=text_message,send_id=send_id)]},"chat")
+
+    def test_adapter_fetches_100_and_parses_returned_raw_history(self):
+        class Service: pass
+        class Client:
+            def __init__(self): self._chat_service,self._session,self._xsrf_token=Service(),object(),"xsrf"; self.calls=[]
+            def get_chat_messages(self,*args,**kwargs):
+                self.calls.append((args,kwargs))
+                return {"list":[history_event("messageSent",message={"id":"actual","type":"text","text":"text"},send_id="send")]}
+        client=Client()
+        parsed=LINELibAdapter(client).get_raw_history("bot","chat")
+        self.assertEqual(client.calls,[(('bot','chat'),{'limit':100})])
+        self.assertEqual(parsed,[HistoryMessage("actual","chat","text",datetime.fromtimestamp(1_790_000_123_456 / 1000,tz=timezone.utc),True,"send")])
 
 class SenderTests(unittest.TestCase):
     def setUp(self):

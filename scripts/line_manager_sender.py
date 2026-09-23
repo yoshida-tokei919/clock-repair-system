@@ -67,6 +67,41 @@ def _now(now: datetime | None) -> datetime:
     if result.tzinfo is None or result.utcoffset() is None: raise WorkerError("Worker clock must be timezone-aware")
     return result.astimezone(timezone.utc)
 
+def parse_lineoa_history(raw: Any, expected_chat_id: str) -> Sequence[HistoryMessage]:
+    """Parse only the authenticated lineoa 7.7.18 history shape verified on 2026-09-23."""
+    _string(expected_chat_id, "expected chatId")
+    if not isinstance(raw, Mapping): raise WorkerError("LINELib history response is not an object")
+    events = raw.get("list")
+    if not isinstance(events, list): raise WorkerError("LINELib history response list is invalid")
+    parsed: list[HistoryMessage] = []
+    for event in events:
+        if not isinstance(event, Mapping):
+            continue
+        event_type = event.get("type")
+        if event_type not in {"message", "messageSent"}:
+            continue
+        message = event.get("message")
+        if not isinstance(message, Mapping): raise WorkerError("LINELib supported history event has invalid message")
+        message_type = _string(message.get("type"), "LINELib supported history event message type")
+        if message_type != "text":
+            continue
+        source = event.get("source")
+        if not isinstance(source, Mapping): raise WorkerError("LINELib text history event has invalid source")
+        chat_id = _string(source.get("chatId"), "history source chatId")
+        if chat_id != expected_chat_id: raise WorkerError("LINELib text history event chatId does not match request")
+        message_id = _string(message.get("id"), "history message id")
+        text = _string(message.get("text"), "history message text")
+        timestamp_ms = event.get("timestamp")
+        if isinstance(timestamp_ms, bool) or not isinstance(timestamp_ms, int): raise WorkerError("Invalid history timestamp")
+        try:
+            timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError) as error:
+            raise WorkerError("Invalid history timestamp") from error
+        send_id = event.get("sendId")
+        if send_id is not None: send_id = _string(send_id, "history sendId")
+        parsed.append(HistoryMessage(message_id, chat_id, text, timestamp, event_type == "messageSent", send_id))
+    return parsed
+
 def text_v2_payload(text: str, send_id: str) -> dict[str, str]:
     if not isinstance(text, str) or not text or not isinstance(send_id, str) or not send_id: raise WorkerError("Outbox text or sendId is missing")
     return {"id": "", "type": "textV2", "text": text, "sendId": send_id}
@@ -146,11 +181,7 @@ class LINELibAdapter:
         except Exception as error: raise WorkerError("Unable to initialize authenticated LINELib client") from error
     def get_raw_history(self, manager_bot_id: str, manager_chat_id: str) -> Sequence[HistoryMessage]:
         raw = self._client.get_chat_messages(manager_bot_id, manager_chat_id, limit=100)
-        if not isinstance(raw, Mapping): raise WorkerError("LINELib history response is not an object")
-        # 7.7.18 provides raw JSON but no shipped history schema/fixture. Parsing
-        # unverified field names would invent reconciliation evidence; empty means
-        # non-confirming until real E2E establishes the raw shape.
-        return []
+        return parse_lineoa_history(raw, manager_chat_id)
     def post_text_v2(self, manager_bot_id: str, manager_chat_id: str, payload: dict[str, str], *, allow_send: bool) -> None:
         if not allow_send: raise WorkerError("Explicit allow_send=True is required")
         result = self._client._chat_service.send_message(manager_bot_id, manager_chat_id, payload, session=self._client._session, xsrf_token=self._client._xsrf_token)
