@@ -412,6 +412,7 @@ model LineManagerChat {
 model LineManagerSendOutbox {
   id                           Int                         @id @default(autoincrement())
   inquiryId                    Int
+  sourceRepairId               Int?
   lineManagerChatId            Int
   text                         String
   idempotencyKey               String                      @unique
@@ -437,12 +438,14 @@ model LineManagerSendOutbox {
   updatedAt                    DateTime                    @updatedAt
 
   inquiry                 Inquiry         @relation(fields: [inquiryId], references: [id], onDelete: Restrict)
+  sourceRepair            Repair?         @relation("LineManagerSendOutboxSourceRepair", fields: [sourceRepairId], references: [id], onDelete: Restrict)
   lineManagerChat         LineManagerChat @relation(fields: [lineManagerChatId], references: [id], onDelete: Restrict)
   confirmedInquiryMessage InquiryMessage? @relation("LineManagerSendOutboxConfirmedInquiryMessage", fields: [confirmedInquiryMessageId], references: [id], onDelete: Restrict)
 
   @@index([status, claimLeaseExpiresAt])
   @@index([status, reconciliationLeaseExpiresAt])
   @@index([inquiryId])
+  @@index([sourceRepairId])
   @@index([lineManagerChatId])
 }
 
@@ -842,6 +845,7 @@ model Repair {
   publicCases   PublicCase[]
   inquiryWatchPromotion InquiryWatch? @relation("InquiryWatchPromotedRepair")
   inquiryMessageLinks InquiryMessageRepairLink[]
+  lineManagerSendOutboxes LineManagerSendOutbox[] @relation("LineManagerSendOutboxSourceRepair")
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])

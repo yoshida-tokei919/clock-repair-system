@@ -52,6 +52,7 @@ import {
 } from "@/lib/repair-work-target-part-filter";
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { toast } from "@/components/ui/use-toast";
+import { RepairLineConversation } from "./RepairLineConversation";
 import {
     photoSharingFallbacks,
     repairPhotoCategories,
@@ -1397,7 +1398,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [editingDateFor, setEditingDateFor] = useState<string | null>(null);
 
     // --- 8. TABS ---
-    const [activeTab, setActiveTab] = useState<'main' | 'photo' | 'document'>('main');
+    const [activeTab, setActiveTab] = useState<'main' | 'photo' | 'document' | 'line'>('main');
 
     // --- 9. PARTS PANEL ---
     const [partsPanelOpen, setPartsPanelOpen] = useState(false);
@@ -2767,6 +2768,7 @@ ${shopName}
                     { id: 'main',     label: 'メイン' },
                     { id: 'photo',    label: '写真' },
                     { id: 'document', label: '書類' },
+                    ...(initialData?.id ? [{ id: 'line', label: 'LINE' } as const] : []),
                 ] as const).map(tab => (
                     <button
                         key={tab.id}
@@ -3688,6 +3690,7 @@ ${shopName}
                 )}
 
                 </fieldset>
+                {activeTab === 'line' && initialData?.id && <RepairLineConversation repairId={Number(initialData.id)} />}
             </div>
 
             {/* --- DIALOGS --- */}

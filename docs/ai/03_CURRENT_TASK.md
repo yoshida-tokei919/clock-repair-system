@@ -1,6 +1,16 @@
 # CURRENT TASK
 
-## Task 3: Carry Inquiry LINE classifications through Repair promotion
+## Task 4: Repair LINE conversation tab
+
+Task 4 adds a LINE tab to saved Repair details. It reads the one originating Inquiry through `Repair.inquiryWatchPromotion`, shows Repair-linked messages (including COMMON) by default, can show the entire source Inquiry, and queues customer text replies through the existing LINE Manager outbox. A Repair without a promotion marker has no inferred LINE history. `InquiryMessage` and images remain the source records; `LineManagerSendOutbox.sourceRepairId` carries explicit reply context until Manager history confirmation creates and links the OUTBOUND message.
+
+Local main starts at `b4de2cb` (ahead 4 of `origin/main` `cb6165f`). Task 2, Task 3, and Task 4 migrations remain production-unapplied. Independent review is complete: the initial P2 finding (unbounded Repair pending-outbox history) was fixed with a 20-row bound and re-review found no actionable regressions. Implementation remains uncommitted; local manual screen verification is complete and Production is pending. Do not push, deploy, apply migrations, or send LINE during this implementation.
+
+Task 6 will handle later unrelated Inquiry routing and post-intake automatic classification.
+
+Production: pending
+
+## Previous Task 3: Carry Inquiry LINE classifications through Repair promotion
 
 Task 3 adds persistent derived `InquiryMessageRepairLink` associations for pre-intake classifications. The original `InquiryMessage` and its body/images remain the one LINE conversation source. Independent read-only review is complete with no remaining schema/migration blocker. Manual screen verification and Production remain pending.
 
@@ -32,8 +42,8 @@ Production/main remains `cb6165f`; local main began this Task at `fffc49e` (ahea
 
 1. Inquiry LINE history + text reply UI + `APPROVED` outbox creation — local commit `6ef12a1`, Production pending.
 2. Message ↔ `InquiryWatch` classification foundation and manual confirmation — local commit `abfece4`, Production pending.
-3. **Current Task**: carry classifications through `InquiryWatch` → `Repair` promotion without copying LINE source history.
-4. Add a LINE tab to Repair pages, showing Repair-related + common messages and allowing replies through the same conversation.
+3. Carry classifications through `InquiryWatch` → `Repair` promotion without copying LINE source history — local commit `b4de2cb`, Production pending.
+4. **Current Task**: add a LINE tab to Repair pages, showing Repair-related + common messages and allowing replies through the same conversation.
 5. Add Repair-specific current summary, current customer requirements, and important change history.
 6. Add ongoing AI classification and summary updates for new LINE messages after intake; AI must not overwrite manual classifications.
 

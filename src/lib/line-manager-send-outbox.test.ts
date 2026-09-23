@@ -128,3 +128,56 @@ test("confirmation fails closed for text mismatch or an actual message id alread
   await assert.rejects(confirmLineManagerSendOutbox(db, { id: 1, reconciliationToken: "token", actualMessageId: "actual", text: "different", timestamp: new Date(), managerBotId: "bot", managerChatId: "chat" }));
   await assert.rejects(confirmLineManagerSendOutbox(db, { id: 1, reconciliationToken: "token", actualMessageId: "actual", text: "approved", timestamp: new Date(), managerBotId: "bot", managerChatId: "chat" }));
 });
+
+test("source Repair must belong to the same Inquiry and is part of outbox idempotency", async () => {
+  const promotion = { inquiryId: 10, promotedRepairId: 3 };
+  let saved: any;
+  const db: any = {
+    inquiry: { findUnique: async () => ({ id: 10, lineUserId: 7 }) },
+    lineManagerChat: { findUnique: async () => ({ id: 2, lineUserId: 7, managerBotId: "bot", managerChatId: "chat" }) },
+    repair: { findUnique: async () => ({ id: 3, inquiryWatchPromotion: promotion }) },
+    lineManagerSendOutbox: { upsert: async (args: any) => saved ?? (saved = args.create) },
+  };
+  const input = { inquiryId: 10, lineManagerChatId: 2, sourceRepairId: 3, text: "hello", idempotencyKey: "repair-key" };
+  assert.equal((await createApprovedLineManagerSendOutbox(db, input)).sourceRepairId, 3);
+  await assert.rejects(createApprovedLineManagerSendOutbox(db, { ...input, sourceRepairId: undefined }));
+  promotion.inquiryId = 99;
+  await assert.rejects(createApprovedLineManagerSendOutbox(db, input));
+  promotion.inquiryId = 10; promotion.promotedRepairId = 4;
+  await assert.rejects(createApprovedLineManagerSendOutbox(db, input));
+});
+
+test("Repair confirmation classifies with MANUAL WATCHES and preserves human MANUAL priority", async () => {
+  for (const initialSource of [null, "AI", "MANUAL"] as const) {
+    const timestamp = new Date("2026-09-24T01:02:03Z");
+    let status = "POST_UNCONFIRMED";
+    let classification: any = initialSource ? { id: 50, source: initialSource, scope: initialSource === "MANUAL" ? "COMMON" : "UNASSIGNED" } : null;
+    let createdMessage: any = null;
+    let watchCreates = 0, watchDeletes = 0, repairCreates = 0, locks = 0;
+    const outbox = { id: 1, status, sourceRepairId: 3, reconciliationToken: "token", text: "reply", inquiryId: 10, managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat", inquiry: { lineUserId: 7 }, lineManagerChat: { lineUserId: 7, managerBotId: "bot", managerChatId: "chat" } };
+    const tx: any = {
+      $executeRaw: async () => { locks++; },
+      repair: { findUnique: async () => ({ inquiryWatchPromotion: { id: 5, inquiryId: 10, promotedRepairId: 3 } }) },
+      inquiryMessage: { findUnique: async () => null, create: async (args: any) => (createdMessage = { id: 99, ...args.data }) },
+      inquiryMessageClassification: {
+        findUnique: async (args: any) => args.where.inquiryMessageId ? classification : { inquiryId: 10, scope: classification.scope, watchLinks: classification.scope === "WATCHES" ? [{ inquiryWatch: { promotedRepairId: 3 } }] : [], repairLinks: [] },
+        upsert: async (args: any) => { classification = { id: 50, ...args.create }; return { id: 50 }; },
+      },
+      inquiryMessageWatchLink: { deleteMany: async () => { watchDeletes++; }, create: async (args: any) => { watchCreates++; assert.equal(args.data.inquiryWatchId, 5); } },
+      inquiryMessageRepairLink: { deleteMany: async () => ({ count: 0 }), createMany: async (args: any) => { repairCreates++; assert.equal(args.data[0].repairId, 3); } },
+      inquiryWatch: { findMany: async () => [{ promotedRepairId: 3 }] },
+      lineManagerSendOutbox: { findUnique: async () => status === "CONFIRMED" ? { ...outbox, status, confirmedManagerMessageId: "actual", confirmedInquiryMessageId: 99, confirmedInquiryMessage: createdMessage } : outbox, updateMany: async () => { status = "CONFIRMED"; return { count: 1 }; } },
+    };
+    const db: any = { $transaction: async (fn: any) => fn(tx) };
+    const input = { id: 1, reconciliationToken: "token", actualMessageId: "actual", text: "reply", timestamp, managerBotId: "bot", managerChatId: "chat" };
+    await confirmLineManagerSendOutbox(db, input);
+    assert.equal(locks, 1);
+    assert.equal(repairCreates, 1);
+    assert.equal(classification.scope, initialSource === "MANUAL" ? "COMMON" : "WATCHES");
+    assert.equal(classification.source, "MANUAL");
+    assert.equal(watchCreates, initialSource === "MANUAL" ? 0 : 1);
+    assert.equal(watchDeletes, initialSource === "MANUAL" ? 0 : 1);
+    await confirmLineManagerSendOutbox(db, input);
+    assert.equal(watchCreates, initialSource === "MANUAL" ? 0 : 1);
+  }
+});

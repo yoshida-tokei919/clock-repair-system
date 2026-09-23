@@ -1,5 +1,14 @@
 # Inquiry AI Runbook
 
+## Task 4: Repair LINE tab and explicit reply context
+
+- A saved Repair's LINE tab uses only `Repair.inquiryWatchPromotion -> InquiryWatch -> Inquiry` as its origin. Legacy/manual Repairs without that promotion fail closed; customer identifiers never select a conversation.
+- `InquiryMessage` and stored `InquiryFile` remain the sole source records. The Repair tab reads at most 200 recent messages from the originating Inquiry. Its default filter uses persisted `InquiryMessageRepairLink` only, so COMMON appears when Task 3 reconciliation has linked it; full view still stays within that Inquiry.
+- A Repair reply creates an APPROVED outbox with immutable `sourceRepairId`. It does not send LINE or create an OUTBOUND source message. Pending Repair replies display as related immediately. Manager history confirmation revalidates the source promotion and, in the same transaction under the LineUser advisory lock, associates the confirmed source message through MANUAL WATCHES classification and derived Repair links. Existing MANUAL classification retains priority; ordinary Inquiry replies remain unchanged.
+- The Repair tab may correct classification through the authenticated Inquiry LINE PATCH, using InquiryWatch IDs only. It never sends Repair IDs from the browser for classification.
+- Task 2, Task 3, and Task 4 migrations remain production-unapplied. Task 4 only alters the existing server-internal outbox table, so it adds no Data API grant.
+- Later unrelated Inquiry routing and post-intake automatic classification belong to Task 6.
+
 ## Task 3: Inquiry message to Repair associations
 
 - `InquiryMessage` remains the sole LINE source record. `InquiryMessageRepairLink` stores only a derived classification-to-Repair association; it does not copy message body or images.
