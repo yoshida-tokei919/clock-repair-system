@@ -1,18 +1,38 @@
 # CURRENT TASK
 
-## Task: automatic verified LINE Manager chat mapping foundation
+## Task: Inquiry LINE conversation UI + APPROVED outbox creation
 
-This Task adds only a small authenticated internal mapping API and a local, read-only mapping worker. It performs no LINE send, reply UI, outbox-creation API/UI, schema or migration work, production write, deploy, push, environment change, or secret change; authenticated read-only LINE Manager `get_chats` shape verification was performed during investigation.
+This Task adds the first app-facing LINE conversation slice for Inquiry review. The Inquiry review screen reads the current Inquiry's saved LINE history, displays inbound images through an authenticated redirect route, and creates only an `APPROVED` `LineManagerSendOutbox` when the technician submits a text reply.
 
-Production: pending. The sender internal API, local sender, history parser, and auth storage were deployed in sender release `136be15` (`production-line-manager-sender-20260923`). Production later advanced to `dee7a6f` only through SEO commits, with no sender-file changes.
+Production: pending. The verified LINE Manager mapping foundation was deployed successfully at `7c8be6b` (`production-line-manager-mapping-20260923`). Production/main later advanced to `cb6165f` through Web/SEO work only; this Task is based on that clean `cb6165f` main and must preserve those Web/SEO changes.
 
-Controlled production sender E2E succeeded safely: one real test message had `sendAttemptCount=1`, became `CONFIRMED`, created exactly one matching OUTBOUND `InquiryMessage`, and produced one Manager `messageSent` event carrying its `sendId`. No identifiers or message body are recorded here.
+### Safety boundary
 
-Mapping identity is exact immutable message-id evidence only: an INBOUND `InquiryMessage.externalMessageId` must exactly equal the Manager chat history `message.id`. Webhook LINE user IDs and Manager chat IDs are distinct identifiers; display names, profiles, customer names, bodies, images, and all inferred identity are prohibited. The mapping API lists at most 20 unmapped LINE users with at most five safe inbound evidence records each, and verification reuses `createVerifiedLineManagerChat` to validate and upsert the exact evidence without overwriting a conflicting mapping.
+- No schema, migration, environment, auth-setting, or secret change.
+- No direct LINE/lineoa POST from Next.js.
+- The reply API never creates an OUTBOUND `InquiryMessage`; that source record is created only after existing Manager history reconciliation confirms the real LINE message.
+- `APPROVED`, `CLAIMED`, `PRE_SEND_FAILED`, and `POST_UNCONFIRMED` are pending/in-flight states and must not be presented as sent.
+- Outbound in this Task is text only. Image sending is out of scope.
+- No Repair LINE tab, message-to-watch/Repair classification, or AI conversation summary update in this Task.
+- Raw LINE Manager bot/chat IDs, send IDs, external LINE message IDs, R2 object keys, lease tokens, and signed R2 URLs are not exposed to the browser payload.
 
-The local worker is dry-run by default and uses only `LINELib.get_chats(bot_id, 25)` and `LINELib.get_chat_messages(bot_id, chat_id, limit=100)`. It reads fixed auth storage at `%LOCALAPPDATA%\clock-repair-system\linelib-poc\lineoa-storage.json`, accepts only the production origin or explicit localhost test origin, and never logs tokens, identifiers, contents, profiles, or cookies. `--apply` can verify at most one already-proven mapping per invocation; it never sends LINE content.
+### Agreed LINE conversation architecture
 
-Next after this Task, not automatically approved: reply UI plus APPROVED outbox creation using verified mappings. DC removal and broader architecture remain outside scope.
+- One real LINE conversation belongs to the `LineUser`/customer. Do not split the actual LINE chat per Repair.
+- Inquiry and future Repair screens are views over the same source conversation rather than copied chat histories.
+- Future message association is many-to-many so one message may relate to one watch, multiple watches/Repairs, all watches (`COMMON`), or remain unresolved (`UNASSIGNED`).
+- Human-confirmed association overrides later AI classification.
+- Original `InquiryMessage`/LINE content remains the source of truth. AI classification and summaries are derived assistance only.
+- Internal notes and customer LINE replies stay separate in UI and storage.
+
+### Planned next LINE conversation Tasks
+
+1. **Current Task**: Inquiry LINE history + text reply UI + `APPROVED` outbox creation.
+2. Message ↔ `InquiryWatch` relation and watch classification, including `COMMON` / `UNASSIGNED`.
+3. Carry watch/message associations through `InquiryWatch` → `Repair` promotion without copying the LINE source history.
+4. Add a LINE tab to Repair pages, showing the Repair-related messages plus common messages and allowing replies through the same conversation.
+5. Add Repair-specific current summary, current customer requirements, and important change history.
+6. Continue watch/Repair classification and summary updates for new LINE messages after intake.
 
 ## 現在Task
 

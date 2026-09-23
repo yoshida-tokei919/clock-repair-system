@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Clipboard, Link as LinkIcon, Plus, Save } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, ChevronUp, Clipboard, Link as LinkIcon, Plus, RefreshCw, Save, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   INQUIRY_WATCH_FIELDS,
@@ -77,6 +78,49 @@ type ReviewPayload = {
   };
 };
 
+type LineFile = {
+  id: number;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  uploadStatus: "PENDING" | "STORED" | "FAILED";
+};
+
+type LineMessage = {
+  id: number;
+  direction: "INBOUND" | "OUTBOUND";
+  messageType: "TEXT" | "IMAGE" | "FILE" | "OTHER";
+  body: string | null;
+  receivedAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  status: string;
+  files: LineFile[];
+};
+
+type LineOutboxStatus = "APPROVED" | "CLAIMED" | "PRE_SEND_FAILED" | "POST_UNCONFIRMED";
+
+type LinePendingOutbox = {
+  id: number;
+  text: string;
+  status: LineOutboxStatus;
+  approvedAt: string;
+  createdAt: string;
+};
+
+type LinePayload = {
+  inquiryId: number;
+  sendAvailable: boolean;
+  mappingVerifiedAt: string | null;
+  messages: LineMessage[];
+  pendingOutboxes: LinePendingOutbox[];
+  hasEarlierMessages: boolean;
+};
+
+type LineTimelineItem =
+  | { kind: "message"; id: number; at: string; message: LineMessage }
+  | { kind: "outbox"; id: number; at: string; outbox: LinePendingOutbox };
+
 type PromotionCustomer = {
   id: number;
   name: string;
@@ -124,6 +168,27 @@ const SOURCE_LABELS = {
   TECHNICIAN_CONFIRMED: "技術者確認",
 } as const;
 
+const LINE_OUTBOX_STATUS_LABELS: Record<LineOutboxStatus, string> = {
+  APPROVED: "送信待ち",
+  CLAIMED: "送信処理中",
+  PRE_SEND_FAILED: "送信前エラー",
+  POST_UNCONFIRMED: "送信確認中",
+};
+
+function lineMessageTime(message: LineMessage) {
+  return message.receivedAt ?? message.sentAt ?? message.createdAt;
+}
+
+function formatLineTime(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+
 function masterLabel(item: { name: string; nameJp?: string | null; nameEn?: string | null }) {
   return item.nameJp || item.nameEn || item.name;
 }
@@ -169,6 +234,12 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [intakeInvite, setIntakeInvite] = useState<{ token: string; expiresAt: string } | null>(null);
   const [intakeDialogOpen, setIntakeDialogOpen] = useState(false);
+  const [linePayload, setLinePayload] = useState<LinePayload | null>(null);
+  const [lineLoading, setLineLoading] = useState(true);
+  const [lineError, setLineError] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const replyIntentRef = useRef<{ text: string; idempotencyKey: string } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -188,6 +259,60 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
   }
 
   useEffect(() => { void load(); }, [inquiryId]);
+
+  async function loadLine() {
+    setLineLoading(true);
+    setLineError(null);
+    try {
+      const response = await fetch(`/api/inquiries/${inquiryId}/line`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "LINE履歴を読み込めませんでした。");
+      setLinePayload(data);
+    } catch (loadError) {
+      setLineError(loadError instanceof Error ? loadError.message : "LINE履歴を読み込めませんでした。");
+    } finally {
+      setLineLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadLine(); }, [inquiryId]);
+
+  const updateReplyText = (value: string) => {
+    setReplyText(value);
+    if (replyIntentRef.current && replyIntentRef.current.text !== value) {
+      replyIntentRef.current = null;
+    }
+  };
+
+  async function queueLineReply() {
+    if (!linePayload?.sendAvailable || replySubmitting || !replyText.trim() || replyText.length > 5000) return;
+
+    let intent = replyIntentRef.current;
+    if (!intent || intent.text !== replyText) {
+      intent = { text: replyText, idempotencyKey: crypto.randomUUID() };
+      replyIntentRef.current = intent;
+    }
+
+    setReplySubmitting(true);
+    setLineError(null);
+    try {
+      const response = await fetch(`/api/inquiries/${inquiryId}/line`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(intent),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "LINE送信待ちを作成できませんでした。");
+      setReplyText("");
+      replyIntentRef.current = null;
+      setNotice("LINE送信待ちに追加しました。");
+      await loadLine();
+    } catch (sendError) {
+      setLineError(sendError instanceof Error ? sendError.message : "LINE送信待ちを作成できませんでした。");
+    } finally {
+      setReplySubmitting(false);
+    }
+  }
 
   async function loadPromotionCustomers(query = "") {
     const response = await fetch(`/api/inquiries/${inquiryId}/promotion/customers${query ? `?q=${encodeURIComponent(query)}` : ""}`, { cache: "no-store" });
@@ -388,6 +513,30 @@ ${intakeUrl}` : "";
     status: drafts[watch.id] ? statusFor(watch, drafts[watch.id]) : null,
   })), [drafts, watches]);
 
+  const lineTimeline = useMemo<LineTimelineItem[]>(() => {
+    if (!linePayload) return [];
+    const items: LineTimelineItem[] = [
+      ...linePayload.messages.map((message) => ({
+        kind: "message" as const,
+        id: message.id,
+        at: lineMessageTime(message),
+        message,
+      })),
+      ...linePayload.pendingOutboxes.map((outbox) => ({
+        kind: "outbox" as const,
+        id: outbox.id,
+        at: outbox.approvedAt,
+        outbox,
+      })),
+    ];
+    return items.sort((left, right) => {
+      const timeDifference = new Date(left.at).getTime() - new Date(right.at).getTime();
+      if (timeDifference) return timeDifference;
+      if (left.kind === right.kind) return left.id - right.id;
+      return left.kind === "message" ? -1 : 1;
+    });
+  }, [linePayload]);
+
   if (loading) return <div className="p-6 text-sm text-zinc-500">Inquiry確認情報を読み込んでいます…</div>;
   if (error && !payload) return <div className="p-6 text-sm text-red-700">{error}</div>;
   if (!payload || !options) return null;
@@ -403,6 +552,65 @@ ${intakeUrl}` : "";
 
       {error && <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {notice && <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
+
+      <Card>
+        <CardHeader className="gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-lg">LINEやり取り</CardTitle>
+            <p className="mt-1 text-sm text-zinc-600">このInquiryに保存されたLINE履歴です。送信待ちは実際の送信確認前です。</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => void loadLine()} disabled={lineLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${lineLoading ? "animate-spin" : ""}`} />
+            更新
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {lineError && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{lineError}</div>}
+          {linePayload?.hasEarlierMessages && <p className="text-xs text-zinc-500">直近200件を表示しています。</p>}
+          <div className="max-h-[30rem] space-y-3 overflow-y-auto rounded-md border border-zinc-200 bg-zinc-50 p-3">
+            {lineLoading && !linePayload ? (
+              <p className="py-6 text-center text-sm text-zinc-500">LINE履歴を読み込んでいます…</p>
+            ) : lineTimeline.length === 0 ? (
+              <p className="py-6 text-center text-sm text-zinc-500">LINE履歴はまだありません。</p>
+            ) : (
+              lineTimeline.map((item) => <LineTimelineEntry key={`${item.kind}-${item.id}`} inquiryId={inquiryId} item={item} />)
+            )}
+          </div>
+
+          {linePayload && !linePayload.sendAvailable && (
+            <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              LINE送信先の確認がまだ完了していません。受信履歴の照合後に返信できます。
+            </div>
+          )}
+
+          <div className="space-y-2 border-t pt-4">
+            <Label htmlFor="inquiry-line-reply">お客様へのLINE返信</Label>
+            <Textarea
+              id="inquiry-line-reply"
+              value={replyText}
+              onChange={(event) => updateReplyText(event.target.value)}
+              placeholder="お客様へ送る内容を入力"
+              disabled={!linePayload?.sendAvailable || replySubmitting}
+              maxLength={5000}
+              className="min-h-28"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-amber-700">ここに入力した内容はお客様へのLINE送信用です。内部メモではありません。</p>
+              <span className={`text-xs ${replyText.length > 5000 ? "text-red-600" : "text-zinc-500"}`}>{replyText.length} / 5000</span>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={() => void queueLineReply()}
+                disabled={!linePayload?.sendAvailable || replySubmitting || !replyText.trim() || replyText.length > 5000}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                {replySubmitting ? "追加中…" : "LINE送信待ちに追加"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card><CardHeader><CardTitle className="text-lg">B2C 受付判断</CardTitle><p className="text-sm text-zinc-600">受付希望のみを固定したリンクでお客様へ案内します。</p></CardHeader><CardContent className="space-y-3"><div className="flex flex-wrap gap-2 text-sm"><Badge>保留 {watches.filter((watch) => watch.decision === "PENDING").length}</Badge><Badge>受付希望 {watches.filter((watch) => watch.decision === "REQUESTED").length}</Badge><Badge variant="secondary">お断り {watches.filter((watch) => watch.decision === "DECLINED").length}</Badge></div>{watches.filter((watch) => !watch.promotedAt).map((watch) => <div key={watch.id} className={`flex flex-wrap items-center justify-between gap-2 rounded border p-3 ${watch.decision === "DECLINED" ? "bg-zinc-50" : ""}`}><span>時計 {watch.position} {watch.label || ""} — {watch.decision}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => void setDecision(watch, "PENDING")}>保留に戻す</Button><Button size="sm" variant="outline" onClick={() => void setDecision(watch, "DECLINED")}>お断り</Button><Button size="sm" onClick={() => void setDecision(watch, "REQUESTED")}>受付希望</Button></div></div>)}{watches.filter((watch) => watch.promotedAt).map((watch) => <p key={watch.id} className="text-sm text-zinc-500">時計 {watch.position}: 昇格済み {watch.promotedRepairId ? `Repair #${watch.promotedRepairId}` : ""}</p>)}<Button disabled={!intakeInvite && !watches.some((watch) => watch.decision === "REQUESTED" && !watch.promotedAt)} onClick={() => void issueInquiryIntakeInvite()}>{intakeInvite ? <><LinkIcon className="mr-2 h-4 w-4" />{`\u53d7\u4ed8\u30ea\u30f3\u30af\u3092\u78ba\u8a8d`}</> : `\u304a\u5ba2\u69d8\u7528\u53d7\u4ed8\u30ea\u30f3\u30af\u3092\u767a\u884c`}</Button></CardContent></Card>
 
@@ -538,6 +746,62 @@ ${intakeUrl}` : "";
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+
+function LineTimelineEntry({ inquiryId, item }: { inquiryId: number; item: LineTimelineItem }) {
+  if (item.kind === "outbox") {
+    const isError = item.outbox.status === "PRE_SEND_FAILED";
+    return (
+      <div className="flex justify-end">
+        <div className={`max-w-[85%] rounded-lg border px-3 py-2 text-sm shadow-sm ${isError ? "border-red-200 bg-red-50" : "border-blue-200 bg-blue-50"}`}>
+          <p className="whitespace-pre-wrap break-words text-zinc-900">{item.outbox.text}</p>
+          <div className="mt-1 flex items-center justify-end gap-2 text-[11px] text-zinc-500">
+            <span>{LINE_OUTBOX_STATUS_LABELS[item.outbox.status]}</span>
+            <span>{formatLineTime(item.outbox.approvedAt)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const message = item.message;
+  const outbound = message.direction === "OUTBOUND";
+  const storedImages = message.messageType === "IMAGE"
+    ? message.files.filter((file) => file.uploadStatus === "STORED")
+    : [];
+
+  return (
+    <div className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
+      <div className={`max-w-[85%] rounded-lg border px-3 py-2 text-sm shadow-sm ${outbound ? "border-emerald-200 bg-emerald-50" : "border-zinc-200 bg-white"}`}>
+        {message.body && <p className="whitespace-pre-wrap break-words text-zinc-900">{message.body}</p>}
+        {message.messageType === "IMAGE" && storedImages.length > 0 && (
+          <div className={`space-y-2 ${message.body ? "mt-2" : ""}`}>
+            {storedImages.map((file) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={file.id}
+                src={`/api/inquiries/${inquiryId}/line/files/${file.id}`}
+                alt="LINE受信画像"
+                className="max-h-80 max-w-full rounded border border-zinc-200 object-contain"
+                loading="lazy"
+              />
+            ))}
+          </div>
+        )}
+        {message.messageType === "IMAGE" && storedImages.length === 0 && (
+          <p className="text-zinc-500">画像を表示できません（保存確認中または保存失敗）。</p>
+        )}
+        {message.messageType === "FILE" && <p className="text-zinc-500">ファイルメッセージ</p>}
+        {message.messageType === "OTHER" && <p className="text-zinc-500">その他のLINEメッセージ</p>}
+        {!message.body && message.messageType === "TEXT" && <p className="text-zinc-500">本文なし</p>}
+        <div className={`mt-1 flex items-center gap-2 text-[11px] text-zinc-500 ${outbound ? "justify-end" : "justify-start"}`}>
+          <span>{outbound ? "送信済み" : "受信"}</span>
+          <span>{formatLineTime(lineMessageTime(message))}</span>
+        </div>
+      </div>
     </div>
   );
 }
