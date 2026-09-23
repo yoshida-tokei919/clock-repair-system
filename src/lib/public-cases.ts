@@ -158,9 +158,26 @@ function withPublicCaseGalleryFilters(
   return withPublicCaseSearch(withPublicCaseBrand(where, brand), query);
 }
 
-function containsCopyKeyword(
-  publicCase: B2CPublicCaseForGallery | B2CPublicCaseDetail,
-): boolean {
+type PublicCaseCopyKeywordCandidate = {
+  brandName: string | null;
+  brandNameKana: string | null;
+  brandDisplayName: string | null;
+  modelName: string | null;
+  ref: string | null;
+  caliber: string | null;
+  searchText: string | null;
+  workItems: Array<{
+    b2cDisplayName: string | null;
+    b2bDisplayName: string | null;
+    normalizedWorkName: string | null;
+  }>;
+  partItems?: Array<{
+    displayName: string | null;
+    normalizedSourceText: string | null;
+  }>;
+};
+
+function containsCopyKeyword(publicCase: PublicCaseCopyKeywordCandidate): boolean {
   const values = [
     publicCase.brandName,
     publicCase.brandNameKana,
@@ -174,12 +191,10 @@ function containsCopyKeyword(
       workItem.b2bDisplayName,
       workItem.normalizedWorkName,
     ]),
-    ...("partItems" in publicCase
-      ? publicCase.partItems.flatMap((partItem) => [
+    ...(publicCase.partItems?.flatMap((partItem) => [
           partItem.displayName,
           partItem.normalizedSourceText,
-        ])
-      : []),
+        ]) ?? []),
   ];
 
   return values.some((value) => String(value ?? "").includes(copyKeyword));
@@ -455,4 +470,45 @@ export async function getB2CPublicCaseDetail(id: string) {
     sourceType: "FMP",
     showPriceB2c: false,
   });
+}
+
+export async function getB2CPublicCaseSitemapEntries(): Promise<
+  Array<{ id: number; updatedAt: Date }>
+> {
+  const publicCases = await prisma.publicCase.findMany({
+    where: {
+      b2cPublishStatus: "PUBLISHED",
+      reviewStatus: "APPROVED",
+      showPriceB2c: false,
+    },
+    select: {
+      id: true,
+      updatedAt: true,
+      brandName: true,
+      brandNameKana: true,
+      brandDisplayName: true,
+      modelName: true,
+      ref: true,
+      caliber: true,
+      searchText: true,
+      workItems: {
+        select: {
+          b2cDisplayName: true,
+          b2bDisplayName: true,
+          normalizedWorkName: true,
+        },
+      },
+      partItems: {
+        select: {
+          displayName: true,
+          normalizedSourceText: true,
+        },
+      },
+    },
+    orderBy: { id: "asc" },
+  });
+
+  return publicCases
+    .filter((publicCase) => !containsCopyKeyword(publicCase))
+    .map(({ id, updatedAt }) => ({ id, updatedAt }));
 }

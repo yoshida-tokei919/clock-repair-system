@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import {
     getLatestB2CPublicCasesForHome,
     type B2CPublicCaseForGallery,
@@ -6,6 +7,12 @@ import {
 /* eslint-disable @next/next/no-img-element */
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+    alternates: {
+        canonical: "/",
+    },
+};
 
 // --- 1. CSS (Original) ---
 const GLOBAL_CSS = `
