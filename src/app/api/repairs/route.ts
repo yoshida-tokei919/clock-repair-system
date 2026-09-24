@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { findOrCreateBrand, findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+import { mergeWatchRefs } from "@/lib/parts-master-compatibility";
+import { getRepairPartType, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
 import {
@@ -415,24 +417,39 @@ export async function POST(req: Request) {
             // 6. Create Estimate (if items exist)
             let estimateItems = body.estimate?.items || [];
             if (estimateItems.length > 0) {
+                const caseRefName = watch?.caseReferenceId
+                    ? (await tx.watchReference.findUnique({ where: { id: watch.caseReferenceId }, select: { name: true } }))?.name
+                    : null;
+                const currentWatchRefs = mergeWatchRefs(refNameInput, caseRefName);
                 estimateItems = await Promise.all(estimateItems.map(async (item: any) => {
                     if (item.type !== 'part') return item;
-                    const isInteriorPart = item.partType === 'interior'
-                        || item.category === 'internal'
-                        || item.category === 'part_internal';
+                    const isInteriorPart = getRepairPartType(item) === "interior";
 
                     if (item.partsMasterId) {
                         const existingMaster = await tx.partsMaster.findUnique({ where: { id: Number(item.partsMasterId) } });
-                        if (!existingMaster) return item;
+                        if (!existingMaster) throw new RepairPartValidationError("指定された部品が見つかりません。");
+                        const validatedName = await validateRepairPartItem(tx, item.standardPartNameId, existingMaster, {
+                            partType: isInteriorPart ? "interior" : "exterior",
+                            brandId: brand.id,
+                            modelId,
+                            currentRefs: currentWatchRefs,
+                            allowLegacyResave: false,
+                            movementMakerId,
+                            movementCaliberId,
+                            baseMovementMakerId,
+                            baseMovementCaliberId,
+                        });
 
                         const syncedPart = await createOrUpdatePartsMaster({
                             id: existingMaster.id,
+                            repairLinkedMaster: true,
                             partType: item.partType ?? existingMaster.partType,
                             category: item.category ?? existingMaster.category,
                             subcategory: existingMaster.subcategory,
+                            standardPartNameId: validatedName.id,
                             brandId: existingMaster.brandId,
                             modelId: existingMaster.modelId,
-                            watchRefs: existingMaster.watchRefs,
+                            watchRefs: isInteriorPart ? existingMaster.watchRefs : mergeWatchRefs(existingMaster.watchRefs, currentWatchRefs),
                             caliberId: existingMaster.caliberId,
                             baseCaliberId: existingMaster.baseCaliberId,
                             movementMakerId: existingMaster.movementMakerId,
@@ -463,16 +480,28 @@ export async function POST(req: Request) {
                         return { ...item, partsMasterId: syncedPart.id };
                     }
 
+                    const validatedName = await validateRepairPartItem(tx, item.standardPartNameId, null, {
+                        partType: isInteriorPart ? "interior" : "exterior",
+                        brandId: brand.id,
+                        modelId,
+                        currentRefs: currentWatchRefs,
+                        movementMakerId,
+                        movementCaliberId,
+                        baseMovementMakerId,
+                        baseMovementCaliberId,
+                    });
                     const syncedPart = await createOrUpdatePartsMaster({
                         partType: item.partType,
                         category: item.category,
+                        standardPartNameId: validatedName.id,
+                        standardNameCandidates: [validatedName.nameJa, validatedName.displayJa],
                         brandId: brand.id,
                         modelId,
                         caliberId: isInteriorPart ? movementCaliberId : caliberId,
                         baseCaliberId: baseMovementCaliberId,
                         movementMakerId,
                         baseMakerId: baseMovementMakerId,
-                        watchRefs: refNameInput || null,
+                        watchRefs: isInteriorPart ? refNameInput || null : currentWatchRefs,
                         nameJp: item.name,
                         nameEn: item.name,
                         partRefs: item.partRef,
@@ -483,7 +512,7 @@ export async function POST(req: Request) {
                         latestCostYen: item.cost,
                         retailPrice: item.price,
                         stockQuantity: item.stockQuantity ?? 0,
-                    }, tx as any);
+                    }, tx as any, { strictRepairIdentity: true });
 
                     return { ...item, partsMasterId: syncedPart.id };
                 }));
@@ -552,6 +581,9 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ success: true, repair: result.repair, stockWarnings: result.stockWarnings });
     } catch (error: any) {
+        if (error instanceof RepairPartValidationError) {
+            return NextResponse.json({ error: error.message }, { status: error.status });
+        }
         console.error("Transaction Error:", error);
         // Write error to file for debugging
         const fs = require('fs');

@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { getShippingFeeByAddress } from "@/lib/shipping";
 import { matchesBrandSearch } from "@/lib/master-normalize";
+import { matchesExteriorPartCandidate, matchesInternalPartCandidate, mergeWatchRefs } from "@/lib/parts-master-compatibility";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -88,6 +89,8 @@ type RepairWorkSelectOption = {
 type WorkTargetPartOption = {
     id: string;
     name: string;
+    nameJa?: string | null;
+    displayJa?: string | null;
     key?: string | null;
     partType?: string | null;
     categoryKey?: string | null;
@@ -632,6 +635,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [brand, setBrand] = useState(initialData?.watch?.brand?.name || "");
     const [model, setModel] = useState(initialData?.watch?.model?.name || "");
     const [refName, setRefName] = useState(initialData?.watch?.reference?.name || "");
+    const caseRefName = initialData?.watch?.caseReference?.name || "";
     const [caliber, setCaliber] = useState(initialData?.watch?.caliber?.name || "");
     const [movementMaker, setMovementMaker] = useState(initialData?.movementMaker?.name || "");
     const [movementCaliber, setMovementCaliber] = useState(initialData?.movementCaliber?.name || "");
@@ -648,6 +652,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // Unified list with 'category' flag
     interface LineItem {
         id: string;
+        repairLineItemId?: number | null;
         category: AddItemCategory | 'external' | 'part_internal' | 'part_generic';
         partType?: string;
         name: string;
@@ -665,6 +670,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         supplierName?: string;
         status?: 'pending' | 'ordered' | 'arrived';
         partsMasterId?: number | null;
+        standardPartNameId?: string | null;
         repairWorkCategoryId?: number | null;
         repairWorkActionId?: number | null;
         targetPartNameId?: string | null;
@@ -700,6 +706,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 }
                 : createEstimateItemFromPart(i.partsMaster ?? {}, {
                     id: String(i.id),
+                    repairLineItemId: i.repairLineItemId ?? null,
                     category: i.sourceAreaSnapshot === 'internal' ? 'part_internal' : 'part_external',
                     sourceAreaSnapshot: i.sourceAreaSnapshot ?? null,
                     b2cDisplayNameSnapshot: i.b2cDisplayNameSnapshot ?? null,
@@ -709,6 +716,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     quantity: i.quantity || 1,
                     spec: i.notes,
                     partsMasterId: i.partsMasterId ?? null,
+                    standardPartNameId: i.partsMaster?.standardPartNameId ?? null,
                     repairWorkCategoryId: null,
                     repairWorkActionId: null,
                     targetPartNameId: null,
@@ -771,6 +779,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [selectedPartInputType, setSelectedPartInputType] = useState<PartInputType>("part_external");
     const [selectedPartCategoryKey, setSelectedPartCategoryKey] = useState("");
     const [selectedPartNameKey, setSelectedPartNameKey] = useState("");
+    const [partSelectionError, setPartSelectionError] = useState("");
 
     const isAddingPartItem = addItemCategory.includes("part");
     const isAddingExternalLaborItem = addItemCategory === "external_labor";
@@ -805,6 +814,15 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const selectedPartNameOption = useMemo(
         () => selectedPartNameKey ? getPartNameOptionByKey(selectedPartNameKey) : undefined,
         [selectedPartNameKey]
+    );
+    const selectedPartNameMaster = useMemo(() =>
+        workTargetPartOptions.find((option) =>
+            option.key === selectedPartNameKey && option.categoryKey === selectedPartCategoryKey
+            && (selectedPartInputType === "part_internal"
+                ? ["part_internal", "internal", "interior"].includes(option.partType ?? "")
+                : ["part_external", "external", "exterior"].includes(option.partType ?? ""))
+        ),
+        [workTargetPartOptions, selectedPartNameKey, selectedPartCategoryKey, selectedPartInputType]
     );
     const selectedRepairWorkCategoryKey = useMemo(() => {
         if (!newWorkCategoryId) return null;
@@ -886,6 +904,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, [filteredWorkTargetPartOptions]);
 
     const handlePartInputTypeChange = useCallback((nextType: PartInputType) => {
+        setPartSelectionError("");
         setSelectedPartInputType(nextType);
         setSelectedPartCategoryKey("");
         setSelectedPartNameKey("");
@@ -894,6 +913,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, []);
 
     const handlePartCategoryChange = useCallback((nextCategoryKey: string) => {
+        setPartSelectionError("");
         setSelectedPartCategoryKey(nextCategoryKey);
         setSelectedPartNameKey("");
         setNewItemName("");
@@ -901,6 +921,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, []);
 
     const handlePartNameChange = useCallback((nextPartNameKey: string) => {
+        setPartSelectionError("");
         setSelectedPartNameKey(nextPartNameKey);
         const selected = getPartNameOptionByKey(nextPartNameKey);
         if (selected) {
@@ -944,6 +965,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             category: resolvedCategory,
             partType: resolvedPartType,
             partsMasterId: part.partsMasterId ?? part.partId ?? part.id ?? base.partsMasterId ?? null,
+            standardPartNameId: part.standardPartNameId ?? base.standardPartNameId ?? null,
         }) as LineItem
     }, [buildSelectedPartName]);
 
@@ -1403,6 +1425,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // --- 9. PARTS PANEL ---
     const [partsPanelOpen, setPartsPanelOpen] = useState(false);
     const [partsPanelRowIdx, setPartsPanelRowIdx] = useState<number | null>(null);
+    const [partsPanelError, setPartsPanelError] = useState("");
     const [partsSearchQuery, setPartsSearchQuery] = useState('');
     const activePartsPanelLineItem = partsPanelRowIdx !== null ? lineItems[partsPanelRowIdx] : undefined;
 
@@ -1425,8 +1448,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         ? `line:${partsPanelRowIdx}:${activePartsPanelLineItem?.id ?? ""}:${activePartsPanelLineItem?.partsMasterId ?? ""}`
         : `new:${selectedPartInputType}:${selectedPartNameKey}`;
     const partsPanelStandardPartNameId = partsPanelRowIdx !== null
-        ? activePartsPanelLineItem?.targetPartNameId ?? null
-        : null;
+        ? activePartsPanelLineItem?.standardPartNameId ?? null
+        : selectedPartNameMaster?.id ?? null;
     const partsPanelStandardPartNameKey = partsPanelRowIdx !== null
         ? null
         : selectedPartNameOption?.key ?? null;
@@ -1627,6 +1650,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const handleOpenPartsPanelFromSearch = useCallback(() => {
         if (partSearchRowIdx === null) return;
         setPartsPanelRowIdx(partSearchRowIdx);
+        setPartsPanelError("");
         setPartsSearchQuery("");
         setPartsPanelOpen(true);
         setPartSearchDialogOpen(false);
@@ -1853,6 +1877,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             });
         } else {
             setRawPricingRuleCandidates([]);
+            if (!selectedPartNameMaster?.id) {
+                setWorkOpts([]);
+                return;
+            }
             // Fetch parts master data
                 getPartsMatched(
                     b.id,
@@ -1863,7 +1891,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     masterCalOpts.find(o => o.value === movementCaliber || o.label === movementCaliber)?.id,
                     movementMakerOpts.find(o => o.value === baseMovementMaker || o.label === baseMovementMaker)?.id,
                     masterCalOpts.find(o => o.value === baseMovementCaliber || o.label === baseMovementCaliber)?.id,
-                    newItemName
+                    newItemName,
+                    selectedPartNameMaster.id,
+                    selectedPartNameMaster.nameJa ?? selectedPartNameMaster.name,
+                    selectedPartNameMaster.displayJa,
+                    refName,
+                    caseRefName
                 ).then(parts => {
                     if (cancelled) return;
                     setWorkOpts(parts.map(p => ({
@@ -1883,6 +1916,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         stockQuantity: p.stockQuantity ?? 0,
                         supplierName: (p as any).supplier?.name || undefined,
                         partType: p.partType || undefined,
+                        brandId: p.brandId,
+                        modelId: p.modelId,
+                        watchRefs: p.watchRefs,
+                        nameJp: p.nameJp,
+                        standardPartNameId: p.standardPartNameId ?? null,
                         inlineTag: p.grade || undefined,
                         meta: [
                             `ID: ${p.id}`,
@@ -1898,7 +1936,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         return () => {
             cancelled = true;
         };
-    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, movementMakerOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, isAddingLaborItem, newItemName, newWorkCategoryId, newTargetPartNameId, newWorkActionId, newWorkDetailLabel, newWorkCategorySnapshot, newTargetPartNameSnapshot, newWorkActionSnapshot, customerTypeSelection, getOptionIdByValue, cleanOptionalText]);
+    }, [brand, model, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, brandOpts, movementMakerOpts, modelOpts, calOpts, masterCalOpts, addItemCategory, isAddingLaborItem, newItemName, newWorkCategoryId, newTargetPartNameId, newWorkActionId, newWorkDetailLabel, newWorkCategorySnapshot, newTargetPartNameSnapshot, newWorkActionSnapshot, customerTypeSelection, getOptionIdByValue, cleanOptionalText, selectedPartNameMaster, selectedPartNameOption, refName, caseRefName]);
 
     useEffect(() => {
         if (!isAddingLaborItem) return;
@@ -2044,6 +2082,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         cousinsNumber: i.cousinsNumber ?? null,
                         stockQuantity: i.stockQuantity ?? null,
                         partsMasterId: i.partsMasterId ?? null,
+                        repairLineItemId: i.category.includes('part') ? i.repairLineItemId ?? null : null,
+                        standardPartNameId: i.category.includes('part') ? i.standardPartNameId ?? null : null,
                         quantity: i.quantity ?? 1,
                         repairWorkCategoryId: i.category.includes('part') ? null : i.repairWorkCategoryId ?? null,
                         repairWorkActionId: i.category.includes('part') ? null : i.repairWorkActionId ?? null,
@@ -2950,7 +2990,11 @@ ${shopName}
                                         <AdvancedCombobox value={model} onChange={setModel} options={modelOpts} placeholder="モデル名..." />
                                     </FormRow>
                                     <FormRow label="Ref">
-                                        <AdvancedCombobox value={refName} onChange={setRefName} options={refOpts} placeholder="Ref.No..." />
+                                        <AdvancedCombobox value={refName} onChange={(value) => {
+                                            setRefName(value);
+                                            setSelectedWorkOption(null);
+                                            setWorkOpts([]);
+                                        }} options={refOpts} placeholder="Ref.No..." />
                                     </FormRow>
                                     <div className="grid gap-2 rounded-md border border-zinc-200 bg-zinc-50/70 p-2 md:grid-cols-2">
                                         <div className="space-y-2">
@@ -3303,6 +3347,9 @@ ${shopName}
                                             </select>
                                         </div>
                                     )}
+                                    {isAddingPartItem && partSelectionError && (
+                                        <p className="mb-2 text-xs text-red-600" role="alert">{partSelectionError}</p>
+                                    )}
                                     {isAddingLaborItem && (
                                         <div className="mb-2 rounded border border-dashed border-zinc-200 bg-white">
                                             <button
@@ -3393,6 +3440,10 @@ ${shopName}
                                         </div>
                                         <Input className="h-9 text-sm w-14 text-center font-mono" placeholder="1" value={newItemQty} onChange={e => setNewItemQty(e.target.value)} type="number" min={1} />
                                         <Button size="sm" className="h-9 w-10 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
+                                            if (isAddingPartItem && (!selectedPartCategoryKey || !selectedPartNameKey || !selectedPartNameMaster?.id)) {
+                                                setPartSelectionError("部品カテゴリと標準部品名を選択してください。");
+                                                return;
+                                            }
                                             const structuredWorkName = isAddingLaborItem
                                                 ? [
                                                     cleanOptionalText(newTargetPartNameSnapshot) ?? cleanOptionalText(newWorkCategorySnapshot),
@@ -3408,12 +3459,24 @@ ${shopName}
                                             const match = addItemCategory === 'part_external'
                                                 ? (selectedWorkOption ?? fallbackMatch)
                                                 : undefined;
+                                            if (match && selectedPartInputType === "part_external" && !matchesExteriorPartCandidate(match, {
+                                                brandId: selectedBrandId,
+                                                modelId: selectedModelId,
+                                                currentRefs: mergeWatchRefs(refName, caseRefName),
+                                                standardPartNameId: selectedPartNameMaster?.id,
+                                                standardPartName: selectedPartNameMaster?.nameJa ?? selectedPartNameMaster?.name,
+                                                standardDisplayName: selectedPartNameMaster?.displayJa,
+                                            })) {
+                                                setPartSelectionError("現在のRef・標準部品名に合う部品を選び直してください。");
+                                                return;
+                                            }
                                             const baseItem: LineItem = {
                                                 id: `auto-${Date.now()}`,
                                                 category: addItemCategory,
                                                 ...(isAddingPartItem ? {
                                                     partType: toLineItemPartType(selectedPartInputType),
                                                     partNameEn: selectedPartNameOption?.displayEn ?? selectedPartNameOption?.nameEn,
+                                                    standardPartNameId: selectedPartNameMaster?.id ?? null,
                                                 } : {}),
                                                 name: resolvedItemName,
                                                 cost: parseInt(newItemCost) || undefined,
@@ -3491,6 +3554,8 @@ ${shopName}
                                     </div>
                                 )}
                                 {partsPanelOpen && (
+                                    <div>
+                                    {partsPanelError && <p className="px-3 py-2 text-xs text-red-600" role="alert">{partsPanelError}</p>}
                                     <PartsSearchPanel
                                         mode="panel"
                                         initialKeyword={partsPanelInitialKeyword}
@@ -3518,11 +3583,62 @@ ${shopName}
                                         baseMovementMaker={baseMovementMaker}
                                         baseMovementCaliberId={baseMovementCaliberId}
                                         baseMovementCaliber={baseMovementCaliber}
-                                        onSelect={isReadOnly ? undefined : (part) => {
+                                        onSelect={isReadOnly ? undefined : async (part) => {
                                             if (partsPanelRowIdx === null) return;
+                                            setPartsPanelError("");
+                                            const line = lineItems[partsPanelRowIdx];
+                                            const selectedId = line?.standardPartNameId || part.selectedStandardPartNameId;
+                                            const selectedName = workTargetPartOptions.find((option) => option.id === selectedId);
+                                            if (!line || !selectedName) {
+                                                setPartsPanelError("標準部品名を選択してください。");
+                                                return;
+                                            }
+                                            let resolvedPart: any;
+                                            try {
+                                                const response = await fetch(`/api/parts/${part.partsMasterId ?? part.id}`);
+                                                if (!response.ok) throw new Error("部品情報を取得できませんでした。");
+                                                resolvedPart = await response.json();
+                                            } catch {
+                                                setPartsPanelError("部品情報を取得できませんでした。");
+                                                return;
+                                            }
+                                            const isExterior = derivePartsSearchPartTypeFromLineItem(line) === "exterior";
+                                            const allowedNameTypes = isExterior
+                                                ? ["part_external", "external", "exterior"]
+                                                : ["part_internal", "internal", "interior"];
+                                            if (!allowedNameTypes.includes(selectedName.partType ?? "")) {
+                                                setPartsPanelError("明細区分に合う標準部品名を選択してください。");
+                                                return;
+                                            }
+                                            if (isExterior && !matchesExteriorPartCandidate(resolvedPart, {
+                                                brandId: selectedBrandId,
+                                                modelId: selectedModelId,
+                                                currentRefs: mergeWatchRefs(refName, caseRefName),
+                                                standardPartNameId: selectedId,
+                                                standardPartName: selectedName.nameJa ?? selectedName.name,
+                                                standardDisplayName: selectedName.displayJa,
+                                            })) {
+                                                setPartsPanelError("現在のブランド・Ref・標準部品名に適合しない部品です。");
+                                                return;
+                                            }
+                                            if (!isExterior && !matchesInternalPartCandidate(resolvedPart, {
+                                                movementMakerId,
+                                                movementCaliberId,
+                                                baseMovementMakerId,
+                                                baseMovementCaliberId,
+                                                standardPartNameId: selectedId,
+                                                standardPartName: selectedName.nameJa ?? selectedName.name,
+                                                standardDisplayName: selectedName.displayJa,
+                                            })) {
+                                                setPartsPanelError("現在のムーブメントメーカー・Cal・標準部品名に適合しない部品です。");
+                                                return;
+                                            }
                                             const nextItems = lineItems.map((li, i) =>
                                                 i === partsPanelRowIdx
-                                                    ? finalizePartLineItem(buildPartLineItem(li, part), true)
+                                                    ? finalizePartLineItem(buildPartLineItem(li, {
+                                                        ...resolvedPart,
+                                                        standardPartNameId: resolvedPart.standardPartNameId ?? selectedId,
+                                                    }), true)
                                                     : li
                                             );
                                             setLineItems(nextItems);
@@ -3541,6 +3657,7 @@ ${shopName}
                                             setPartsPanelRowIdx(null);
                                         }}
                                     />
+                                    </div>
                                 )}
                             </div>
                         </div>

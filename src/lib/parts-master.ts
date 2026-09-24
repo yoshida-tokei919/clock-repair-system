@@ -6,6 +6,8 @@ import {
     normalizeCaliberName,
     normalizeMasterName,
 } from "@/lib/master-normalize";
+import { hasCompleteInternalPartContext, hasPartRefOverlap, matchesInternalPartCandidate, matchesStandardPartNameIdentity, mergeWatchRefs, preserveStandardPartNameId, splitWatchRefs, watchRefsAllowIdentity } from "@/lib/parts-master-compatibility";
+import { RepairPartValidationError } from "@/lib/repair-part-validation";
 
 type DbLike = PrismaClient | Prisma.TransactionClient;
 
@@ -32,6 +34,8 @@ export type PartsMasterInput = ResolveMasterRefsInput & {
     category?: string | null;
     subcategory?: string | null;
     standardPartNameId?: string | null;
+    standardNameCandidates?: Array<string | null>;
+    repairLinkedMaster?: boolean;
     gradeId?: string | null;
     watchRefs?: string | null;
     name?: string | null;
@@ -260,14 +264,29 @@ function gradeMatches(
     return !dataGradeId && !candidateGradeId;
 }
 
-async function findExistingPartsMaster(db: DbLike, data: ReturnType<typeof buildNormalizedPartsMasterData>, currentId?: number | null) {
+async function findExistingPartsMaster(db: DbLike, data: ReturnType<typeof buildNormalizedPartsMasterData>, currentId?: number | null, standardNameCandidates?: Array<string | null>, strictRepairIdentity = false) {
     const baseWhere: any = isInteriorPart(data.partType)
         ? { OR: [{ partType: "interior" }, { category: "internal" }] }
         : { OR: [{ partType: "exterior" }, { category: "external" }] };
-    if (isInteriorPart(data.partType) && data.caliberId !== null) {
+    const internalContext = {
+        movementMakerId: data.movementMakerId,
+        movementCaliberId: data.caliberId,
+        baseMovementMakerId: data.baseMakerId,
+        baseMovementCaliberId: data.baseCaliberId,
+    };
+    // Repair entry requires a verified pair; standalone Parts workflows retain
+    // their existing nullable Cal/maker candidate matching.
+    if (strictRepairIdentity && isInteriorPart(data.partType) && !hasCompleteInternalPartContext(internalContext)) return null;
+    if (strictRepairIdentity && isInteriorPart(data.partType)) {
+        baseWhere.AND = [{ OR: [
+            ...(data.movementMakerId && data.caliberId
+                ? [{ movementMakerId: data.movementMakerId, caliberId: data.caliberId }] : []),
+            ...(data.baseMakerId && data.baseCaliberId
+                ? [{ baseMakerId: data.baseMakerId, baseCaliberId: data.baseCaliberId }] : []),
+        ] }];
+    } else if (isInteriorPart(data.partType) && data.caliberId !== null) {
         baseWhere.caliberId = data.caliberId;
     }
-
     const candidates = await db.partsMaster.findMany({
         where: baseWhere,
         select: {
@@ -278,10 +297,14 @@ async function findExistingPartsMaster(db: DbLike, data: ReturnType<typeof build
             watchRefs: true,
             caliberId: true,
             movementMakerId: true,
+            baseCaliberId: true,
+            baseMakerId: true,
+            category: true,
             gradeId: true,
             grade: true,
             nameJp: true,
             partRefs: true,
+            standardPartNameId: true,
         },
     });
 
@@ -291,8 +314,13 @@ async function findExistingPartsMaster(db: DbLike, data: ReturnType<typeof build
 
     if (isInteriorPart(data.partType)) {
         return others.find((candidate) => {
-            if (data.caliberId !== null && candidate.caliberId !== data.caliberId) return false;
-            if (data.movementMakerId !== null && candidate.movementMakerId !== data.movementMakerId) return false;
+            if (!matchesStandardPartNameIdentity(candidate, data, standardNameCandidates)) return false;
+            if (strictRepairIdentity) {
+                if (!matchesInternalPartCandidate(candidate, internalContext)) return false;
+            } else {
+                if (data.caliberId !== null && candidate.caliberId !== data.caliberId) return false;
+                if (data.movementMakerId !== null && candidate.movementMakerId !== data.movementMakerId) return false;
+            }
             if (!gradeMatches(data, candidate)) return false;
             if (inputPartRefs.length > 0) {
                 return hasTokenOverlap(inputPartRefs, splitMultiValue(candidate.partRefs), normalizeRefToken);
@@ -302,16 +330,26 @@ async function findExistingPartsMaster(db: DbLike, data: ReturnType<typeof build
     }
 
     return others.find((candidate) => {
+        if (!matchesStandardPartNameIdentity(candidate, data, standardNameCandidates)) return false;
         if (data.brandId !== null && candidate.brandId !== data.brandId) return false;
         if (!gradeMatches(data, candidate)) return false;
-        if (inputPartRefs.length > 0) {
-            return hasTokenOverlap(inputPartRefs, splitMultiValue(candidate.partRefs), normalizeRefToken);
+        if (!watchRefsAllowIdentity(data.watchRefs, candidate.watchRefs)) return false;
+        const incomingHasWatchRef = splitWatchRefs(data.watchRefs).length > 0;
+        const candidateHasWatchRef = splitWatchRefs(candidate.watchRefs).length > 0;
+        if (incomingHasWatchRef && !candidateHasWatchRef) {
+            if (data.modelId === null || candidate.modelId === null || data.modelId !== candidate.modelId) return false;
+            return hasPartRefOverlap(data.partRefs, candidate.partRefs);
+        }
+        if (!incomingHasWatchRef && data.modelId !== null && candidate.modelId !== null
+            && data.modelId !== candidate.modelId) return false;
+        if (inputPartRefs.length > 0 || splitWatchRefs(candidate.partRefs).length > 0) {
+            return hasPartRefOverlap(data.partRefs, candidate.partRefs);
         }
         return normalizeTextToken(candidate.nameJp) === inputName;
     }) ?? null;
 }
 
-export async function createOrUpdatePartsMaster(input: PartsMasterInput, db: DbLike = prisma) {
+export async function createOrUpdatePartsMaster(input: PartsMasterInput, db: DbLike = prisma, options: { strictRepairIdentity?: boolean } = {}) {
     const currentId = parseNullableInt(input.id);
     const refs = await resolveMasterRefs(input, db);
     const data = buildNormalizedPartsMasterData(input, refs);
@@ -320,16 +358,33 @@ export async function createOrUpdatePartsMaster(input: PartsMasterInput, db: DbL
         throw new Error("nameJp is required");
     }
 
-    const existing = await findExistingPartsMaster(db, data, currentId);
+    const existing = await findExistingPartsMaster(db, data, currentId, input.standardNameCandidates, options.strictRepairIdentity);
 
     if (existing && !currentId) {
         return await db.partsMaster.update({
             where: { id: existing.id },
-            data,
+            data: {
+                ...data,
+                standardPartNameId: preserveStandardPartNameId(existing.standardPartNameId, data.standardPartNameId),
+                watchRefs: mergeWatchRefs(existing.watchRefs, data.watchRefs),
+            },
         });
     }
 
     if (currentId) {
+        if (input.repairLinkedMaster) {
+            const current = await db.partsMaster.findUnique({
+                where: { id: currentId },
+                select: { standardPartNameId: true, watchRefs: true },
+            });
+            if (!current) throw new RepairPartValidationError("指定された部品が見つかりません。");
+            if (current.standardPartNameId && data.standardPartNameId
+                && current.standardPartNameId !== data.standardPartNameId) {
+                throw new RepairPartValidationError("既存部品の標準部品名と一致しません。");
+            }
+            data.standardPartNameId = preserveStandardPartNameId(current.standardPartNameId, data.standardPartNameId);
+            data.watchRefs = mergeWatchRefs(current.watchRefs, data.watchRefs);
+        }
         return await db.partsMaster.update({
             where: { id: currentId },
             data,

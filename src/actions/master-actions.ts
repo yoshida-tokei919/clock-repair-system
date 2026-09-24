@@ -4,6 +4,7 @@ import { RepairWorkType, type PricingRule } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { findOrCreateBrand, findOrCreateCaliber, findOrCreateModel, findOrCreateWatchReference } from "@/lib/master-normalize";
+import { matchesExteriorPartCandidate, matchesStandardPartName, mergeWatchRefs, splitWatchRefs } from "@/lib/parts-master-compatibility";
 import {
     getExternalPricingRules as getExternalPricingRulesFromDb,
     type ExternalPricingRuleCustomerType,
@@ -180,6 +181,8 @@ export async function getInternalPartNameMasters(includeExternal = false) {
     return partNames.map((partName) => ({
         id: partName.id,
         name: partName.displayJa || partName.nameJa,
+        nameJa: partName.nameJa,
+        displayJa: partName.displayJa,
         key: partName.key,
         partType: partName.partType || partName.category?.partType || null,
         categoryKey: partName.category?.key ?? null,
@@ -460,13 +463,20 @@ export async function getPartsMatched(
     movementCaliberId?: number,
     baseMovementMakerId?: number,
     baseMovementCaliberId?: number,
-    searchTerm?: string
+    searchTerm?: string,
+    standardPartNameId?: string | null,
+    standardPartName?: string | null,
+    standardDisplayName?: string | null,
+    currentProductRef?: string | null,
+    currentCaseRef?: string | null
 ) {
     try {
         const isInteriorWhere = { OR: [{ partType: 'interior' }, { category: 'internal' }] };
         const isExteriorWhere = { NOT: isInteriorWhere };
 
         const whereClauses: any[] = [];
+        const currentRefs = mergeWatchRefs(currentProductRef, currentCaseRef);
+        const hasCurrentRefs = splitWatchRefs(currentRefs).length > 0;
 
         const watchBrand = brandId
             ? await prisma.brand.findUnique({ where: { id: brandId }, select: { brandKind: true } })
@@ -477,7 +487,7 @@ export async function getPartsMatched(
                 brandId,
                 ...isExteriorWhere,
             };
-            if (modelId) exteriorClause.OR = [{ modelId }, { modelId: null }];
+            if (!hasCurrentRefs && modelId) exteriorClause.OR = [{ modelId }, { modelId: null }];
             if (category) exteriorClause.category = category;
             whereClauses.push(exteriorClause);
         }
@@ -532,10 +542,18 @@ export async function getPartsMatched(
                     && part.baseMakerId === baseMovementMakerId
                     && part.baseCaliberId === baseMovementCaliberId
                 );
-                return movementMatched || baseMovementMatched;
+                return (movementMatched || baseMovementMatched)
+                    && matchesStandardPartName(part, standardPartNameId, standardPartName, standardDisplayName);
             }
 
-            return Boolean(brandId && part.brandId === brandId);
+            return matchesExteriorPartCandidate(part, {
+                brandId,
+                modelId,
+                currentRefs,
+                standardPartNameId,
+                standardPartName,
+                standardDisplayName,
+            });
         });
 
         const normalizedSearchTerm = searchTerm?.trim().toLowerCase() || "";

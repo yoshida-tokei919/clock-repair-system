@@ -21,7 +21,8 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                     brand: true,
                     model: true,
                     caliber: true,
-                    reference: true
+                    reference: true,
+                    caseReference: true
                 }
             },
             estimate: {
@@ -32,6 +33,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                             partsMaster: {
                                 select: {
                                     partType: true,
+                                    standardPartNameId: true,
                                     grade: true,
                                     notes1: true,
                                     notes2: true,
@@ -49,7 +51,9 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
             repairLineItems: {
                 orderBy: { id: "asc" },
                 select: {
+                    id: true,
                     lineType: true,
+                    partsMasterId: true,
                     repairWorkCategoryId: true,
                     repairWorkCategory: { select: { repairType: true } },
                     repairWorkActionId: true,
@@ -111,14 +115,19 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
 
     // JSON.parse(JSON.stringify(...)) で Date オブジェクトを文字列化してクライアントへ渡す
     const laborRepairLineItems = repair.repairLineItems.filter((item) => item.lineType === "LABOR");
+    const partRepairLineItems = repair.repairLineItems.filter((item) => item.lineType === "PART");
     let laborLineIndex = 0;
+    let partLineIndex = 0;
     const estimateItemsWithStructuredFields = repair.estimate?.items.map((item) => {
+        const partRepairLineItem = item.type === "part" ? partRepairLineItems[partLineIndex++] : null;
         const repairLineItem = item.type === "labor"
             ? laborRepairLineItems[laborLineIndex++]
             : null;
         if (!repairLineItem) {
             return {
                 ...item,
+                repairLineItemId: partRepairLineItem?.partsMasterId === item.partsMasterId
+                    ? partRepairLineItem.id : null,
                 repairWorkCategoryId: null,
                 repairWorkActionId: null,
                 targetPartNameId: null,

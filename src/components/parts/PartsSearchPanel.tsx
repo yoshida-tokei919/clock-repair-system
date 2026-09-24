@@ -59,6 +59,7 @@ type SupplierOption = {
 
 type PartSelection = {
   id: number
+  selectedStandardPartNameId?: string | null
   partsMasterId?: number
   partType?: string
   name: string
@@ -257,6 +258,7 @@ export default function PartsSearchPanel({
     if (onSelect) {
       onSelect({
         id: part.id,
+        selectedStandardPartNameId: selectedStandardPartNameId || initialStandardPartName?.id || initialStandardPartNameId || null,
         partsMasterId: part.id,
         partType: part.partType ?? undefined,
         name: part.nameJp,
@@ -494,7 +496,10 @@ export default function PartsSearchPanel({
         grade={selectedGrade?.nameJa || initialGrade}
         partsMasterId={initialPartsMasterId}
         disabled={loading}
-        onResolvePart={onSelect}
+        onResolvePart={part => onSelect?.({
+          ...part,
+          selectedStandardPartNameId: selectedStandardPartNameId || initialStandardPartName?.id || initialStandardPartNameId || null,
+        })}
       />
     </div>
   )

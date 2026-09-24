@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { findOrCreateBrand, findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+import { mergeWatchRefs, resolvePatchProductRef } from "@/lib/parts-master-compatibility";
+import { getRepairPartType, isExistingRepairPartLink, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
 import {
@@ -42,17 +44,24 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         const result = await prisma.$transaction(async (tx) => {
             const repairRecord = await tx.repair.findUnique({
                 where: { id },
-                include: { watch: { include: { brand: true, model: true, caliber: true, reference: true } } }
+                include: { watch: { include: { brand: true, model: true, caliber: true, reference: true, caseReference: true } } }
             });
 
             if (!repairRecord) {
                 throw new Error("修琁E��録が見つかりません");
             }
 
+            // Capture this Repair's persisted PART links before the replacement deletes them.
+            const persistedPartLinks = new Map((await tx.repairLineItem.findMany({
+                where: { repairId: id, lineType: "PART" },
+                select: { id: true, partsMasterId: true },
+            })).map((line) => [line.id, line.partsMasterId]));
+
             let brandId = repairRecord.watch.brandId;
             let modelId = repairRecord.watch.modelId;
             let caliberId = repairRecord.watch.caliberId;
             let referenceId = repairRecord.watch.referenceId;
+            const productRef = resolvePatchProductRef(body.watch, repairRecord.watch.reference?.name);
             let movementMakerId = repairRecord.movementMakerId;
             let movementCaliberId = repairRecord.movementCaliberId;
             let baseMovementMakerId = repairRecord.baseMovementMakerId;
@@ -126,9 +135,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     : null;
 
                 // Reference Handling
-                if (body.watch.ref && modelId) {
+                if (productRef.supplied && !productRef.name) {
+                    referenceId = null;
+                } else if (productRef.supplied && productRef.name && modelId) {
                     const wr = await tx.watchReference.findFirst({
-                        where: { modelId: modelId, name: body.watch.ref }
+                        where: { modelId: modelId, name: productRef.name }
                     });
                     if (wr) {
                         referenceId = wr.id;
@@ -136,7 +147,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                         const newWr = await tx.watchReference.create({
                             data: {
                                 modelId: modelId,
-                                name: body.watch.ref,
+                                name: productRef.name,
                                 caliberId: caliberId
                             }
                         });
@@ -298,24 +309,42 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                     await tx.estimateItem.deleteMany({ where: { estimateId: estimate.id } });
 
                     if (body.estimate.items.length > 0) {
+                        const currentWatchRefs = mergeWatchRefs(
+                            productRef.name,
+                            repairRecord.watch.caseReference?.name
+                        );
                         const syncedEstimateItems = await Promise.all(body.estimate.items.map(async (item: any) => {
                             if (item.type !== 'part') return item;
-                            const isInteriorPart = item.partType === 'interior'
-                                || item.category === 'internal'
-                                || item.category === 'part_internal';
+                            const isInteriorPart = getRepairPartType(item) === "interior";
 
                             if (item.partsMasterId) {
                                 const existingMaster = await tx.partsMaster.findUnique({ where: { id: Number(item.partsMasterId) } });
-                                if (!existingMaster) return item;
+                                if (!existingMaster) throw new RepairPartValidationError("指定された部品が見つかりません。");
+                                const allowLegacyResave = isExistingRepairPartLink(
+                                    item.repairLineItemId, item.partsMasterId, persistedPartLinks
+                                );
+                                const validatedName = await validateRepairPartItem(tx, item.standardPartNameId, existingMaster, {
+                                    partType: isInteriorPart ? "interior" : "exterior",
+                                    brandId,
+                                    modelId,
+                                    currentRefs: currentWatchRefs,
+                                    allowLegacyResave,
+                                    movementMakerId,
+                                    movementCaliberId,
+                                    baseMovementMakerId,
+                                    baseMovementCaliberId,
+                                });
 
                                 const syncedPart = await createOrUpdatePartsMaster({
                                     id: existingMaster.id,
+                                    repairLinkedMaster: true,
                                     partType: item.partType ?? existingMaster.partType,
                                     category: item.category ?? existingMaster.category,
                                     subcategory: existingMaster.subcategory,
+                                    standardPartNameId: validatedName.id,
                                     brandId: existingMaster.brandId,
                                     modelId: existingMaster.modelId,
-                                    watchRefs: existingMaster.watchRefs,
+                                    watchRefs: isInteriorPart ? existingMaster.watchRefs : mergeWatchRefs(existingMaster.watchRefs, currentWatchRefs),
                                     caliberId: existingMaster.caliberId,
                                     baseCaliberId: existingMaster.baseCaliberId,
                                     movementMakerId: existingMaster.movementMakerId,
@@ -346,16 +375,30 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                                 return { ...item, partsMasterId: syncedPart.id };
                             }
 
+                            const validatedName = await validateRepairPartItem(tx, item.standardPartNameId, null, {
+                                partType: isInteriorPart ? "interior" : "exterior",
+                                brandId,
+                                modelId,
+                                currentRefs: currentWatchRefs,
+                                movementMakerId,
+                                movementCaliberId,
+                                baseMovementMakerId,
+                                baseMovementCaliberId,
+                            });
                             const syncedPart = await createOrUpdatePartsMaster({
                                 partType: item.partType,
                                 category: item.category,
+                                standardPartNameId: validatedName.id,
+                                standardNameCandidates: [validatedName.nameJa, validatedName.displayJa],
                                 brandId,
                                 modelId,
                                 caliberId: isInteriorPart ? movementCaliberId : caliberId,
                                 baseCaliberId: baseMovementCaliberId,
                                 movementMakerId,
                                 baseMakerId: baseMovementMakerId,
-                                watchRefs: body.watch?.ref || repairRecord.watch.reference?.name || null,
+                                watchRefs: isInteriorPart
+                                    ? productRef.name
+                                    : currentWatchRefs,
                                 nameJp: item.name,
                                 nameEn: item.name,
                                 partRefs: item.partRef,
@@ -366,7 +409,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                                 latestCostYen: item.cost,
                                 retailPrice: item.price,
                                 stockQuantity: item.stockQuantity ?? 0,
-                            }, tx as any);
+                            }, tx as any, { strictRepairIdentity: true });
 
                             return { ...item, partsMasterId: syncedPart.id };
                         }));
@@ -452,6 +495,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
         return NextResponse.json({ success: true, repair: result });
     } catch (error: any) {
+        if (error instanceof RepairPartValidationError) {
+            return NextResponse.json({ error: error.message }, { status: error.status });
+        }
         console.error("Update Error:", error);
         return NextResponse.json(
             { error: error.message || "予期せぬエラーが発生しました" },
