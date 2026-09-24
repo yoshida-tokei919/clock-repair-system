@@ -1,9 +1,11 @@
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { CANONICAL_BRANDS, canonicalBrandUpdateData } from "../src/lib/canonical-brands";
 import { normalizeBrandName } from "../src/lib/master-normalize";
 
-const prisma = new PrismaClient();
 const apply = process.argv.includes("--apply");
+const PRODUCTION_CONFIRMATION = "TASK175_CANONICAL_BRAND_IMPORT";
+const PRODUCTION_CONFIRMATION_ENV = "PRODUCTION_CANONICAL_BRAND_IMPORT_CONFIRM";
+let prisma: PrismaClient | undefined;
 
 type CanonicalBrand = typeof CANONICAL_BRANDS[number];
 type ExistingBrand = {
@@ -60,7 +62,28 @@ function changedBrandData(existing: ExistingBrand, canonical: CanonicalBrand) {
     return data;
 }
 
+function validateApplySafety() {
+    if (!apply) return;
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) throw new Error("DATABASE_URL is required for --apply.");
+    let url: URL;
+    try {
+        url = new URL(databaseUrl);
+    } catch {
+        throw new Error("Invalid DATABASE_URL for --apply.");
+    }
+    if (!["postgresql:", "postgres:"].includes(url.protocol) || !url.hostname) throw new Error("Invalid DATABASE_URL for --apply.");
+    if (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) return;
+    const confirmations = process.argv.slice(2).filter((arg) => arg.startsWith("--production-confirm="));
+    if (confirmations.length !== 1 || confirmations[0] !== `--production-confirm=${PRODUCTION_CONFIRMATION}` || process.env[PRODUCTION_CONFIRMATION_ENV] !== PRODUCTION_CONFIRMATION) {
+        throw new Error(`Non-local --apply requires --production-confirm=${PRODUCTION_CONFIRMATION} and matching ${PRODUCTION_CONFIRMATION_ENV}.`);
+    }
+}
+
 async function main() {
+    const { PrismaClient } = await import("@prisma/client");
+    validateApplySafety();
+    prisma = new PrismaClient();
     validateCanonicalAliases();
     const [existingBrands, existingAliases] = await Promise.all([
         prisma.brand.findMany({
@@ -147,4 +170,4 @@ async function main() {
 
 main()
     .catch((error) => { console.error(error); process.exitCode = 1; })
-    .finally(async () => { await prisma.$disconnect(); });
+    .finally(async () => { await prisma?.$disconnect(); });
