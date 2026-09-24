@@ -1,20 +1,36 @@
 # CURRENT TASK
 
+## Production rollout record — 2026-09-24
+
+- Production commit: `38d38c09109a880767ba4e4c6802e890cfdee7bf` (`feat: add Repair LINE conversation tab`)
+- Deploy source: GitHub `main` → Railway automatic deployment
+- Railway deployment: `9869644f-e192-4f62-a244-ddd9b707b25e` / `SUCCESS` / instance `RUNNING`
+- Production backup: `C:\Users\yoshi\clock-repair-backups\production-20260923T233823Z`
+- Prisma production status: 27 migrations applied / unfinished 0
+- Applied in this rollout: `20260923_add_inquiry_message_classification`, `20260924_add_inquiry_message_repair_links`, `20260924_add_line_manager_outbox_source_repair`
+- Non-sending production smoke: `/` = 200, `/login` = 200, unauthenticated `/api/repairs/1/line` = 401
+- Real LINE send was not performed during rollout smoke.
+- Production manual screen verification for Inquiry LINE / Repair LINE is still pending with Yoshida.
+- Production tag is intentionally pending until manual screen verification is complete.
+- `stash@{0}: accidental-copilot-task3-20260924` remains untouched.
+
+Production: deployed; manual screen verification and production tag pending
+
 ## Task 4: Repair LINE conversation tab
 
 Task 4 adds a LINE tab to saved Repair details. It reads the one originating Inquiry through `Repair.inquiryWatchPromotion`, shows Repair-linked messages (including COMMON) by default, can show the entire source Inquiry, and queues customer text replies through the existing LINE Manager outbox. A Repair without a promotion marker has no inferred LINE history. `InquiryMessage` and images remain the source records; `LineManagerSendOutbox.sourceRepairId` carries explicit reply context until Manager history confirmation creates and links the OUTBOUND message.
 
-Local main starts at `b4de2cb` (ahead 4 of `origin/main` `cb6165f`). Task 2, Task 3, and Task 4 migrations remain production-unapplied. Independent review is complete: the initial P2 finding (unbounded Repair pending-outbox history) was fixed with a 20-row bound and re-review found no actionable regressions. Implementation remains uncommitted; local manual screen verification is complete and Production is pending. Do not push, deploy, apply migrations, or send LINE during this implementation.
+Implementation and independent review are complete: the initial P2 finding (unbounded Repair pending-outbox history) was fixed with a 20-row bound and re-review found no actionable regressions. Local manual screen verification was completed before rollout. Task 2, Task 3, and Task 4 migrations were applied to production on 2026-09-24, and commit `38d38c0` was deployed successfully through GitHub `main` → Railway. Production manual screen verification and the production tag remain pending.
 
 Task 6 will handle later unrelated Inquiry routing and post-intake automatic classification.
 
-Production: pending
+Production: deployed; manual screen verification and tag pending
 
 ## Previous Task 3: Carry Inquiry LINE classifications through Repair promotion
 
-Task 3 adds persistent derived `InquiryMessageRepairLink` associations for pre-intake classifications. The original `InquiryMessage` and its body/images remain the one LINE conversation source. Independent read-only review is complete with no remaining schema/migration blocker. Manual screen verification and Production remain pending.
+Task 3 adds persistent derived `InquiryMessageRepairLink` associations for pre-intake classifications. The original `InquiryMessage` and its body/images remain the one LINE conversation source. Independent read-only review completed with no remaining schema/migration blocker. This section preserves the Task 3 design history; production rollout was completed on 2026-09-24.
 
-Production/main remains `cb6165f`; local main began this Task at `fffc49e` (ahead 3). Task 2 migration `20260923_add_inquiry_message_classification` and Task 3 migration `20260924_add_inquiry_message_repair_links` are both production-unapplied. Local Task 3 commit is allowed after review; do not push, deploy, or apply migrations without the user's explicit approval.
+Production/main is now `38d38c0`. Task 2 migration `20260923_add_inquiry_message_classification` and Task 3 migration `20260924_add_inquiry_message_repair_links` were applied to production on 2026-09-24 together with the Task 4 migration. The earlier pre-deploy restriction is no longer active for these already-applied changes.
 
 ### Scope
 
@@ -28,7 +44,7 @@ Production/main remains `cb6165f`; local main began this Task at `fffc49e` (ahea
 
 - New migration only: `20260924_add_inquiry_message_repair_links`; the committed Task 2 migration is unchanged.
 - The new table is server-internal. No browser Data API GRANT is added; `PUBLIC`, `anon`, and `authenticated` table privileges are explicitly revoked.
-- Both Task 2 and Task 3 migrations are production-unapplied. Independent Task 3 schema/migration review is complete; no blocker remains before a separately approved production migration/deploy.
+- Task 2 and Task 3 migrations were applied to production on 2026-09-24 after independent schema/migration review and a production backup.
 
 ### Invariants
 
@@ -40,10 +56,10 @@ Production/main remains `cb6165f`; local main began this Task at `fffc49e` (ahea
 
 ### Planned next LINE conversation Tasks
 
-1. Inquiry LINE history + text reply UI + `APPROVED` outbox creation — local commit `6ef12a1`, Production pending.
-2. Message ↔ `InquiryWatch` classification foundation and manual confirmation — local commit `abfece4`, Production pending.
-3. Carry classifications through `InquiryWatch` → `Repair` promotion without copying LINE source history — local commit `b4de2cb`, Production pending.
-4. **Current Task**: add a LINE tab to Repair pages, showing Repair-related + common messages and allowing replies through the same conversation.
+1. Inquiry LINE history + text reply UI + `APPROVED` outbox creation — commit `6ef12a1`, production deployed 2026-09-24.
+2. Message ↔ `InquiryWatch` classification foundation and manual confirmation — commit `abfece4`, production deployed 2026-09-24.
+3. Carry classifications through `InquiryWatch` → `Repair` promotion without copying LINE source history — commit `b4de2cb`, production deployed 2026-09-24.
+4. Repair LINE tab, Repair-related/common history, and replies through the same conversation — commit `38d38c0`, production deployed; authenticated production screen verification and tag pending.
 5. Add Repair-specific current summary, current customer requirements, and important change history.
 6. Add ongoing AI classification and summary updates for new LINE messages after intake; AI must not overwrite manual classifications.
 
