@@ -4,6 +4,7 @@ Before investigating or modifying this repository, read:
 
 1. `docs/ai/04_IMPLEMENTATION_RULES.md`
 2. `docs/ai/03_CURRENT_TASK.md`
+3. `docs/ai/02_PRODUCT_ROADMAP.md`
 
 When handling LINE inquiries, Slack inquiry notifications, or AI intake processing, also read `docs/ai/05_INQUIRY_AI_RUNBOOK.md` after the documents above.
 
@@ -12,10 +13,11 @@ Do not modify files or behavior outside the current Task unless the user explici
 
 ## 動作確認の役割分担
 
-- ユーザーから明示指示がある場合を除き、Codex/AIはPlaywrightやブラウザ自動操作による実画面確認を行わない。
-- Codex/AIは、Taskに応じてTypeScript型チェック、lint、Node test、`git diff --check` などの静的・自動確認を担当する。
-- 実画面・ブラウザ・スマホの確認はユーザーが手動で行う。Codex/AIは確認手順と期待結果を日本語で提示する。
-- 実画面確認をしていない場合は「確認済み」と報告しない。
+- ユーザーの手動実画面確認は原則としてTask完了条件にしない。
+- Codex/AIは、Taskに応じてTypeScript型チェック、lint、Node test、`git diff --check`、必要ならPlaywright等のブラウザ自動確認を担当する。
+- UI変更では、可能な範囲でCodex/AI側の自動確認を優先し、ユーザーへ毎回の画面チェックを要求しない。
+- プリンタ、スマホ実機、外部サービス本人操作、実顧客送信などAIだけで安全に確認できない項目、またはユーザーが明示的に希望した場合のみ手動確認を依頼する。
+- 自動確認できなかった項目は「未確認」と明示し、確認したと偽らない。
 - Node testが `spawn EPERM` などの実行環境エラーで起動できない場合は、assertion failureと区別して報告し、同じ回避再実行を繰り返さない。
 
 For repair work masters, parts masters, PricingRule, or INTERNAL/EXTERNAL classification:
