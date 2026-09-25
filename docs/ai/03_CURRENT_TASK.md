@@ -1,6 +1,6 @@
 # CURRENT TASK
 
-## 現在のcheckpoint — 2026-09-25
+## 現在のcheckpoint — 2026-09-26
 
 このファイルは、現在の実装Taskとproductionの現在地だけを管理する。
 過去Taskの詳細は `docs/ai-tasks/` と各runbookを参照し、ここへ長い履歴を残さない。
@@ -47,6 +47,19 @@ Production: Task184 complete
 
 ## 直近完了Task
 
+### Task187: Task185/186 実装前調査
+
+- docs-only / investigation-only
+- 詳細: `docs/ai-tasks/187-work-time-scheduler-preimplementation-investigation.md`
+- 現行 `scheduledDate（予定日）` だけでは複数日分割を表現できないため、予定明細モデルが必要
+- WorkTimeSession（作業時間セッション）は開始/終了区間の履歴を持つ新規モデルが適切
+- RepairLineItem（修理明細）はreplaceでID再採番されるため、実績履歴をRepairLineItem.idへ強く依存させない
+- 部品待ちstatusはOrderRequest / RepairPartAllocationと連動するため、作業中断状態はRepair.statusと分離する方向
+- 新規テーブルは原則server-only / Data API非公開 / GRANT不要の方向
+- 実装Task案はTask188〜195へ分割。ユーザー承認なしに開始しない
+- schema / migration / API / UI / DB変更なし
+- Production: pending（docs-onlyのためdeploy対象外）
+
 ### Task184: シンプル自動スケジューラー MVP
 
 - commit: `1b66b0bef90aceb4e8935246797acf094145ecf7`
@@ -63,11 +76,10 @@ Production: Task184 complete
 
 ## 次に行うこと
 
-- Task185 docs-onlyで、`estimatedWorkMinutes（推定作業時間）` を標準時間・実作業時間実績から自動算出する設計を `docs/ai-tasks/185-work-time-estimation-design.md` に記録済み。
-- Task186 docs-onlyで、納期逆算・仕入先リードタイム・見積り/受付/問い合わせ等の業務時間・共通タイマー・複数日分割・作業中断/部品待ち・実効作業容量を `docs/ai-tasks/186-scheduler-deadline-capacity-timer-design.md` に記録済み。
-- **実装Taskはまだ開始しない。** 作業時間マスタ / 実績履歴 / BrandMasterの外装リスク係数 / Repair「作業時間」タブ / WorkTimeSession / 分割配置 / 中断フローは、次の実装前調査で既存schema・マスタ・status・OrderRequestとの接続を確認してからTask分割する。
-- Task185設計では、同一条件の実作業時間を一義情報とし、複数実績は中央値を基本採用する。実績がなければ標準時間へfallbackする。
-- 既存Task184の自動スケジューラーは引き続き実運用可能。作業時間自動算出が未実装の間は既存`estimatedWorkMinutes`を使用する。
-- 発注リードタイム連携・priorityScore正式設計・作業時間自動算出はいずれも後続Taskとして扱い、差分を混ぜない。
+- Task185 / 186の実装前調査はTask187で完了。
+- 実装候補はTask188〜195へ分割済み。最初の候補は Task188「WorkTimeSession基盤」。
+- Task188は新規テーブルを伴う高リスク変更のため、実装担当と独立レビュー担当を分離する。
+- production migration / deploy / pushはユーザーの明示承認なしに実行しない。
+- 既存Task184の自動スケジューラーは引き続き実運用可能。後続Task実装までは既存`estimatedWorkMinutes` / `scheduledDate`を使用する。
 - マスタデータ投入・復旧は別Taskとして並行可。Schedule差分と混ぜない。
-- ユーザー承認なしに次の実装Taskを開始しない。
+- **ユーザー承認なしにTask188を開始しない。**
