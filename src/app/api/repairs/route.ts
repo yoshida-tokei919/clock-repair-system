@@ -1,7 +1,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
+import { addConfirmedRepairStatusLog, canAllocateRepairParts, reconcileRepairPartAllocations, syncExistingPendingRepairOrders } from "@/lib/repair-part-allocation";
 import { findOrCreateBrand, findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
 import { mergeWatchRefs } from "@/lib/parts-master-compatibility";
@@ -560,6 +560,18 @@ export async function POST(req: Request) {
                     throw error;
                 }
 
+            }
+
+            if (!canAllocateRepairParts({
+                status: dbStatus,
+                approvalStatus: repair.approvalStatus,
+                customerType: customer.type,
+            })) {
+                const requestedPartIds = Array.isArray(body.explicitOrderPartsMasterIds)
+                    ? body.explicitOrderPartsMasterIds.filter((id: unknown): id is number =>
+                        typeof id === "number" && Number.isInteger(id) && id > 0)
+                    : [];
+                await syncExistingPendingRepairOrders(tx, repair.id, requestedPartIds);
             }
 
             // 7. 蝨ｨ蠎ｫ繝√ぉ繝・・ｽ・ｽ・ｽE・ｽEartsMasterId 縺後≠繧矩Κ蜩・ｿｽE縺ｿ・ｽE・ｽE

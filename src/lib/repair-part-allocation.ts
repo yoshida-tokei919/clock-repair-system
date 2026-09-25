@@ -120,6 +120,142 @@ export function getRepairPartAllocationPlan({
     };
 }
 
+/** A pending order is a shortage target, never an increment on every save. */
+export function getPendingOrderTarget({
+    requiredQuantity,
+    allocatedQuantity,
+    availableStock,
+    incomingQuantity,
+}: {
+    requiredQuantity: number;
+    allocatedQuantity: number;
+    availableStock: number;
+    incomingQuantity: number;
+}): number {
+    return Math.max(0, requiredQuantity - allocatedQuantity - availableStock - incomingQuantity);
+}
+
+/** A retry cannot replace a pending quantity already synchronized by Repair save. */
+export function getPreapprovalPendingOrderTarget({
+    pendingQuantity,
+    totalRequiredQuantity,
+    availableStock,
+    orderedQuantity,
+}: {
+    pendingQuantity?: number;
+    totalRequiredQuantity: number;
+    availableStock: number;
+    orderedQuantity: number;
+}): number {
+    return pendingQuantity ?? getPendingOrderTarget({
+        requiredQuantity: totalRequiredQuantity,
+        allocatedQuantity: 0,
+        availableStock,
+        incomingQuantity: orderedQuantity,
+    });
+}
+
+/** Before allocation is allowed, synchronize only orders that were explicitly requested. */
+export async function syncExistingPendingRepairOrders(
+    tx: Prisma.TransactionClient,
+    repairId: number,
+    explicitlyRequestedPartIds: readonly number[] = [],
+) {
+    const pendingOrders = await tx.orderRequest.findMany({
+        where: { repairId, status: "pending" },
+        select: { id: true, partsMasterId: true },
+    });
+    if (pendingOrders.length === 0 && explicitlyRequestedPartIds.length === 0) return;
+
+    const [estimateItems, activeOrders, allocations] = await Promise.all([
+        tx.estimateItem.findMany({
+            where: { estimate: { repairId }, type: "part", partsMasterId: { not: null } },
+            select: { partsMasterId: true, quantity: true },
+        }),
+        tx.orderRequest.findMany({
+            where: { repairId, status: "ordered" },
+            select: { partsMasterId: true, quantity: true, status: true },
+        }),
+        tx.repairPartAllocation.findMany({
+            where: { repairId },
+            select: { partsMasterId: true, quantity: true, state: true },
+        }),
+    ]);
+
+    const seenParts = new Set<number>();
+    for (const pending of pendingOrders) {
+        if (!pending.partsMasterId) continue;
+        if (seenParts.has(pending.partsMasterId)) {
+            await tx.orderRequest.update({ where: { id: pending.id }, data: { status: "cancelled" } });
+            continue;
+        }
+        seenParts.add(pending.partsMasterId);
+        const requiredQuantity = estimateItems
+            .filter(item => item.partsMasterId === pending.partsMasterId)
+            .reduce((total, item) => total + Math.max(0, item.quantity ?? 1), 0);
+        const orderedQuantity = activeOrders
+            .filter(order => order.partsMasterId === pending.partsMasterId && order.status === "ordered")
+            .reduce((total, order) => total + Math.max(0, order.quantity), 0);
+        const allocatedQuantity = allocations
+            .filter(row => row.partsMasterId === pending.partsMasterId && (row.state === "RESERVED" || row.state === "CONSUMED"))
+            .reduce((total, row) => total + row.quantity, 0);
+        const master = await tx.partsMaster.findUnique({
+            where: { id: pending.partsMasterId },
+            select: { stockQuantity: true },
+        });
+        const target = getPendingOrderTarget({
+            requiredQuantity,
+            allocatedQuantity,
+            // Received units are already reflected in available physical stock.
+            availableStock: master?.stockQuantity ?? 0,
+            incomingQuantity: orderedQuantity,
+        });
+        await tx.orderRequest.update({
+            where: { id: pending.id },
+            data: target > 0 ? { quantity: target } : { status: "cancelled" },
+        });
+    }
+
+    // A new repair only creates requests the user explicitly selected and
+    // that survived validation as persisted PART estimate items.
+    for (const partsMasterId of Array.from(new Set(explicitlyRequestedPartIds))) {
+        if (seenParts.has(partsMasterId) || !estimateItems.some(item => item.partsMasterId === partsMasterId)) continue;
+        const requiredQuantity = estimateItems
+            .filter(item => item.partsMasterId === partsMasterId)
+            .reduce((total, item) => total + Math.max(0, item.quantity ?? 1), 0);
+        const orderedQuantity = activeOrders
+            .filter(order => order.partsMasterId === partsMasterId && order.status === "ordered")
+            .reduce((total, order) => total + Math.max(0, order.quantity), 0);
+        const allocatedQuantity = allocations
+            .filter(row => row.partsMasterId === partsMasterId && (row.state === "RESERVED" || row.state === "CONSUMED"))
+            .reduce((total, row) => total + row.quantity, 0);
+        const master = await tx.partsMaster.findUnique({ where: { id: partsMasterId } });
+        if (!master) throw new Error("partsMaster not found");
+        const target = getPendingOrderTarget({
+            requiredQuantity,
+            allocatedQuantity,
+            availableStock: master.stockQuantity,
+            incomingQuantity: orderedQuantity,
+        });
+        if (target === 0) continue;
+        await tx.orderRequest.create({
+            data: {
+                repairId,
+                partsMasterId,
+                quantity: target,
+                partNameJp: master.nameJp,
+                partNameEn: master.nameEn,
+                partRefs: master.partRefs,
+                cousinsNumber: master.cousinsNumber,
+                supplierId: master.supplierId,
+                searchWordJp: master.nameJp,
+                searchWordEn: master.nameEn,
+                status: "pending",
+            },
+        });
+    }
+}
+
 type ReconcileOptions = {
     /** Requested UI status. It is normalized against the actual allocation/order state. */
     requestedStatus?: string | null;
@@ -217,6 +353,7 @@ export async function reconcileRepairPartAllocations(
         customerType: repair.customer.type,
         allowAdvanceFromApproval: options.allowAdvanceFromApproval,
     })) {
+        await syncExistingPendingRepairOrders(tx, repairId);
         const activeOrders = await tx.orderRequest.findMany({
             where: { repairId, status: { in: [...ACTIVE_ORDER_STATUSES] } },
             select: { status: true },
@@ -337,7 +474,7 @@ export async function reconcileRepairPartAllocations(
             : 0;
         const partOrders = orders.filter(order => order.partsMasterId === partsMasterId);
         const incomingQuantity = partOrders
-            .filter(order => order.status === "ordered" || order.status === "received")
+            .filter(order => order.status === "ordered")
             .reduce((total, order) => total + Math.max(0, order.quantity), 0);
         const pending = partOrders.find(order => order.status === "pending");
         const pendingTarget = Math.max(0, requiredQuantity - allocatedQuantity - incomingQuantity);

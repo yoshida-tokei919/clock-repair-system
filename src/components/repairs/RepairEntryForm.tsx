@@ -815,6 +815,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         () => selectedPartNameKey ? getPartNameOptionByKey(selectedPartNameKey) : undefined,
         [selectedPartNameKey]
     );
+    const explicitlyRequestedOrderPartIdsRef = useRef(new Set<number>());
     const selectedPartNameMaster = useMemo(() =>
         workTargetPartOptions.find((option) =>
             option.key === selectedPartNameKey && option.categoryKey === selectedPartCategoryKey
@@ -973,11 +974,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         if (quantity <= 0) return false;
         let changed = false;
         setOrderList(prev => {
-            const existing = prev.find(order => order.partId === partId && ['pending', 'ordered'].includes(order.status));
+            const existing = prev.find(order => order.partId === partId && order.status === 'pending');
             if (existing) {
                 changed = true;
                 return prev.map(order =>
-                    order === existing ? { ...order, quantity: (order.quantity || 1) + quantity } : order
+                    order === existing ? { ...order, quantity } : order
                 );
             }
             changed = true;
@@ -1007,18 +1008,18 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         ), 0);
     }, [lineItems]);
 
-    const getMissingOrderQuantityForPart = useCallback((partId?: number | null, items: LineItem[] = lineItems, stockQuantity?: number) => {
+    const getPendingOrderTargetForPart = useCallback((partId?: number | null, items: LineItem[] = lineItems, stockQuantity?: number) => {
         if (!partId) return 0;
         const totalRequired = getTotalRequiredQuantityForPart(partId, items);
         const fallbackStock = items.find(item => item.partsMasterId === partId)?.stockQuantity ?? 0;
         const stock = Math.max(0, stockQuantity ?? fallbackStock ?? 0);
-        const shortage = Math.max(0, totalRequired - stock);
-        const covered = (() => {
-            const quantities = getOrderQuantitiesForPart(partId);
-            return quantities.pending + quantities.ordered;
-        })();
-        return Math.max(0, shortage - covered);
+        return Math.max(0, totalRequired - stock - getOrderQuantitiesForPart(partId).ordered);
     }, [getOrderQuantitiesForPart, getTotalRequiredQuantityForPart, lineItems]);
+
+    const getMissingOrderQuantityForPart = useCallback((partId?: number | null, items: LineItem[] = lineItems, stockQuantity?: number) => {
+        if (!partId) return 0;
+        return Math.max(0, getPendingOrderTargetForPart(partId, items, stockQuantity) - getOrderQuantitiesForPart(partId).pending);
+    }, [getOrderQuantitiesForPart, getPendingOrderTargetForPart, lineItems]);
 
     const getStatusLabelForLineItem = useCallback((item: LineItem, idx: number) => {
         if (!item.category.includes('part') || !item.partsMasterId) return null;
@@ -1120,12 +1121,13 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         };
     }, [fetchRepairOrders, initialData?.id]);
 
-    const ensureOrderRequest = useCallback(async (item: LineItem, showToast = false) => {
+    const ensureOrderRequest = useCallback(async (item: LineItem, showToast = false, repairId = initialData?.id, items = lineItems) => {
         if (!item.partsMasterId) return false;
         const quantity = Number(item.quantity) || 1;
         if (quantity <= 0) return false;
 
-        if (!initialData?.id) {
+        if (!repairId) {
+            explicitlyRequestedOrderPartIdsRef.current.add(item.partsMasterId);
             const added = queuePartForOrderList(item.partsMasterId, quantity);
             if (added && showToast) {
                 toast({
@@ -1136,32 +1138,45 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             return added;
         }
 
-        const res = await fetch('/api/orders', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                repairId: initialData.id,
-                partsMasterId: item.partsMasterId,
-                quantity,
-            })
-        });
-
-        if (!res.ok) {
-            throw new Error('failed to create order request');
-        }
-
-        const json = await res.json();
-        if (json.order) {
-            upsertOrderListEntry(json.order);
-        }
-        if (json.created && showToast) {
-            toast({
-                title: "発注リストに追加しました",
-                description: item.supplierName ? `仕入先: ${item.supplierName}` : undefined,
+        try {
+            const res = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    repairId,
+                    partsMasterId: item.partsMasterId,
+                    quantity,
+                    totalRequiredQuantity: getTotalRequiredQuantityForPart(item.partsMasterId, items),
+                })
             });
+
+            if (!res.ok) {
+                const error = await res.json().catch(() => null);
+                throw new Error(typeof error?.error === 'string' && /[\u3040-\u30ff\u3400-\u9fff]/.test(error.error)
+                    ? error.error : '発注リストに追加できませんでした。');
+            }
+
+            const json = await res.json();
+            if (json.order) {
+                upsertOrderListEntry(json.order);
+            }
+            if (json.created && showToast) {
+                toast({
+                    title: "発注リストに追加しました",
+                    description: item.supplierName ? `仕入先: ${item.supplierName}` : undefined,
+                });
+            }
+            return Boolean(json.created || json.updated);
+        } catch (error) {
+            toast({
+                title: "発注リストに追加できませんでした",
+                description: error instanceof Error && /[\u3040-\u30ff\u3400-\u9fff]/.test(error.message)
+                    ? error.message : "通信エラーが発生しました。",
+                variant: "destructive",
+            });
+            return false;
         }
-        return Boolean(json.created || json.updated);
-    }, [initialData?.id, orderList, queuePartForOrderList, upsertOrderListEntry]);
+    }, [getTotalRequiredQuantityForPart, initialData?.id, lineItems, queuePartForOrderList, toast, upsertOrderListEntry]);
 
     const finalizePartLineItem = useCallback((item: LineItem, showToast = false) => {
         if (!item.category.includes('part') || !item.partsMasterId) return item;
@@ -1187,8 +1202,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         setLineItems(prev => prev.map((li, i) =>
             i === idx ? { ...li, status: 'pending' as const } : li
         ));
-        void ensureOrderRequest({ ...item, quantity: missingQty, status: 'pending' as const }, true);
-    }, [lineItems, ensureOrderRequest, getMissingOrderQuantityForPart]);
+        void ensureOrderRequest({ ...item, quantity: getPendingOrderTargetForPart(partId), status: 'pending' as const }, true);
+    }, [lineItems, ensureOrderRequest, getMissingOrderQuantityForPart, getPendingOrderTargetForPart]);
 
     useEffect(() => {
         if (initialData?.id) return;
@@ -1201,7 +1216,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             )
             .map(item => ({
                 partId: item.partsMasterId as number,
-                quantity: getMissingOrderQuantityForPart(item.partsMasterId),
+                quantity: getPendingOrderTargetForPart(item.partsMasterId),
             }))
             .filter(item => item.quantity > 0);
 
@@ -1221,7 +1236,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             }
             return next;
         });
-    }, [getMissingOrderQuantityForPart, initialData?.id, lineItems]);
+    }, [getMissingOrderQuantityForPart, getPendingOrderTargetForPart, initialData?.id, lineItems]);
 
     const [diagnosis, setDiagnosis] = useState(initialData?.workSummary || ""); // Diagnosis/Request details
     const [internalNotes, setInternalNotes] = useState(initialData?.internalNotes || "");
@@ -2098,6 +2113,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 },
                 status: nextStatus,
                 statusLog: nextStatusLog,
+                explicitOrderPartsMasterIds: mode === 'create'
+                    ? Array.from(explicitlyRequestedOrderPartIdsRef.current)
+                    : undefined,
                 photoPostingOptOut,
                 photos
             };
@@ -3501,7 +3519,7 @@ ${shopName}
                                             if (match && nextItem.category.includes('part') && nextItem.partsMasterId) {
                                                 const missingQty = getMissingOrderQuantityForPart(nextItem.partsMasterId, nextItems, nextItem.stockQuantity);
                                                 if (missingQty > 0) {
-                                                    void ensureOrderRequest({ ...nextItem, quantity: missingQty }, true);
+                                                    void ensureOrderRequest({ ...nextItem, quantity: getPendingOrderTargetForPart(nextItem.partsMasterId, nextItems, nextItem.stockQuantity) }, true, undefined, nextItems);
                                                 }
                                             }
                                             setNewItemName("");
@@ -3648,9 +3666,9 @@ ${shopName}
                                                 if (missingQty > 0) {
                                                     void ensureOrderRequest({
                                                         ...nextItem,
-                                                        quantity: missingQty,
+                                                        quantity: getPendingOrderTargetForPart(nextItem.partsMasterId, nextItems, nextItem.stockQuantity),
                                                         status: 'pending',
-                                                    }, true);
+                                                    }, true, undefined, nextItems);
                                                 }
                                             }
                                             setPartsPanelOpen(false);
