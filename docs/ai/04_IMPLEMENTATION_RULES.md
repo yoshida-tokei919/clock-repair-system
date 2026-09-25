@@ -223,6 +223,16 @@ number（数値）へ変換しない。
 - 引き継ぎ後のAIは docs/ai/02_PRODUCT_ROADMAP.md を読み、現在TaskがMVPロードマップのどこに位置するか確認する。
 - 引き継ぎ文は会話全文の再掲ではなく、次のAIが安全に再開できる必要十分な情報へ圧縮する。
 
+## ツール選択とDesktop Commander節約
+
+- 同じ作業を専用プラグイン / connectorで安全に実行できる場合は、Desktop Commanderより専用プラグインを優先する。
+- Notionの検索・読取・作成・更新はNotionプラグインを優先する。
+- GitHub上のremote repository確認、Issue、PR、remote側ファイル操作はGitHubプラグインを優先する。
+- Supabase、Gmail、Slack等も、対応する専用プラグインが利用可能ならそちらを優先する。
+- Desktop Commanderは、ローカルworking tree、未commit / 未push差分、ローカルGit操作、Windowsアプリ操作、ローカルファイル、CLI実行など、ローカルPCへの直接アクセスが必要な場合に限定して使う。
+- remote側のGitHub状態とローカルworking treeが異なる可能性がある場合、ローカル状態の確認をGitHubプラグインで代用しない。
+- 複数手段がある場合は、正確性と安全性を損なわない範囲でDesktop Commanderの呼び出し回数を最小化する。
+
 ## AI実装担当の分業ルール
 
 ### 基本方針
