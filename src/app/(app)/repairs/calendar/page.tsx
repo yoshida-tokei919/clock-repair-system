@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AutoScheduleReview } from "@/components/repairs/AutoScheduleReview";
 
 type CalendarException = { date: string; availableMinutes: number; note: string | null };
 type CalendarResponse = { month: string; defaultAvailableMinutes: number; exceptions: CalendarException[] };
@@ -184,6 +185,7 @@ export default function WorkCalendarPage() {
           </div>
         </section>
       )}
+      <AutoScheduleReview />
     </div>
   );
 }
