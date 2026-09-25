@@ -7,158 +7,128 @@
 
 ## Production
 
-- Production application commit: `76b90a3f6a75d41d4e37143d185e8904a31355b8`
-- Commit subject: `feat: add schedule MVP foundation`
+- Production application commit: `d0f7f66ab11da7d2e4edb7d1db72deca854e866b`
+- Commit subject: `feat: add WorkCalendar MVP`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `ed85d5e8-a86d-456b-8681-08e7784aba3d`
+- Railway deployment: `7557aac8-c75f-4104-8bbe-294b963a4a53`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task182-20260925`
+- Production tag: `production-task183-20260925`
 - Region: `sin`
-- Supabase production migration: `20260925033435 add_repair_schedule_locked`
+- Supabase production migration: `20260925072252 add_work_calendar`
 - Production backup:
-  - `C:\Users\yoshi\clock-repair-backups\task182-20260925T033100Z`
+  - `C:\Users\yoshi\clock-repair-backups\task183-20260925T072110Z`
   - `roles.sql`
   - `schema.sql`
   - `data.sql`
   - `manifest.txt`（SHA256記録）
+
+Production: Task183 complete
+
+## Task183 production確認
+
+- `WorkCalendar` table作成済み
+- RLS: enabled
+- `availableMinutes`: DB CHECK 0〜1440分
+- Data API:
+  - `anon`: table privilegeなし
+  - `authenticated`: table privilegeなし
+  - `service_role`: table privilegeなし
+- 反映直後の例外row: 0件
+- Railway production build:
+  - Prisma Client generate: PASS
+  - Next.js compile: PASS
+  - lint/type check工程: PASS
+  - static page generation: 60 / 60
+- Railway runtime:
+  - `next start` 正常起動
+  - `Ready in 511ms`
 - Non-destructive smoke:
   - `/` = 200
   - `/login` = 200
-  - `/orders` = 200
-  - unauthenticated `PATCH /api/repairs/1/schedule` = 401
-- Railway runtime log: startup errorなし
-- Supabase Security Advisor:
-  - Task182由来の新規警告なし
-  - 既存functionの mutable search_path WARN 2件はTask外
+  - unauthenticated `/repairs/calendar` = 307 → NextAuth
+  - unauthenticated `GET /api/work-calendar?month=2026-09` = 401
 
-Production: Task182 complete
+## Security Advisor
+
+- `WorkCalendar`: `rls_enabled_no_policy` INFO 1件
+  - server-only tableとしてData API roleへの権限を明示REVOKEしているため意図した状態
+  - policy / Data API GRANTは不要
+- 既存 `function_search_path_mutable` WARN 2件はTask外
+  - `set_invoice_gross_total_on_insert`
+  - `preventInquiryMessageClassificationManualOverwrite`
+- Railway buildで出る既存npm audit / Next.js security warningはTask183外。別Taskで扱う
 
 ## 直近完了Task
 
-### Task182: Schedule MVP Step 1 基盤
+### Task183: WorkCalendar MVP
 
-- commit: `76b90a3f6a75d41d4e37143d185e8904a31355b8`
-- Repairの既存項目を再利用:
-  - `priorityScore`（優先度スコア）
-  - `scheduledDate`（作業予定日）
-  - `estimatedWorkMinutes`（想定作業時間）
-  - `deliveryDateExpected`（納品予定日）
-  - `deliveryDateActual`（実納品日）
-- 新規追加:
-  - `scheduleLocked Boolean @default(false)`（自動再配置ロック）
-- Repair詳細に独立した作業スケジュールパネルを追加
-- 専用API `PATCH /api/repairs/[id]/schedule` を追加
-- `priorityScore` はStep 1ではread-only
-- `src/lib/scheduling.ts` の旧仮ロジックは変更・有効化していない
-- WorkCalendar / 自動スケジューラー / Shipment / 発注リードタイム等はTask外
-- 詳細: `docs/ai-tasks/182-schedule-mvp-foundation.md`
+- commit: `d0f7f66ab11da7d2e4edb7d1db72deca854e866b`
+- 詳細: `docs/ai-tasks/183-work-calendar-mvp.md`
+- 標準作業可能時間: 480分（8時間）/日
+- 通常日はDB rowを持たず既定480分
+- 例外のみ `WorkCalendar` に保存
+- 休み0h / 半日4h / 通常8h / 任意時間 / メモ
+- `/repairs/calendar` で月単位の例外入力
+- 専用API `GET /api/work-calendar` / `PUT /api/work-calendar`
+- 自動スケジューラー本体はTask外
 
-Task182 local確認:
-- schedule入力test: 2 / 2 PASS
-- `npx prisma validate`: PASS
-- `npx tsc --noEmit --incremental false`: PASS
-- `git diff --check`: PASS
-- Railway production build内 `prisma generate`: PASS
-- Railway production Next.js build: PASS
+## Schedule MVPの現在地
 
-## 現在Task
+1. Step 1: Schedule MVP基盤 — **Task182 production完了**
+2. Step 2: WorkCalendar MVP — **Task183 production完了**
+3. Step 3: シンプル自動スケジューラー — **次Task候補**
+4. Step 1〜3完了時点でスケジュール込み実運用開始
 
-次の実装Taskは、`docs/ai/02_PRODUCT_ROADMAP.md` の
-**MVP Step 2: WorkCalendar MVP**。
+## 次の実装Task候補
 
-Task番号は **Task183** とする。
+Task番号は **Task184** とする。
 
-## Task183: WorkCalendar MVP
+### Task184: シンプル自動スケジューラー MVP
 
-### 目的
+目的:
+- Repairを日単位の作業予定へ自動配置する最小スケジューラーを作る
+- WorkCalendarの日別作業可能時間を利用する
+- 人間が最終判断できる設計を維持する
 
-Schedule MVP Step 3のシンプル自動スケジューラーが、
-「その日に何分作業できるか」を参照できる最小カレンダー基盤を作る。
+実装開始前に必ず調査:
+1. `src/lib/scheduling.ts` の旧仮ロジック
+2. 現行の作業可能状態・停止理由に使える既存データ
+3. `priorityScore` の現行用途と値
+4. `deliveryDateExpected` / `estimatedWorkMinutes` / `scheduleLocked`
+5. WorkCalendarの取得方法と日別空き時間計算
 
-最優先目標:
-- できるだけ早くスケジュール管理込みで実運用開始する
-- 複雑な勤務管理・予約管理へ広げない
-- 通常日の既定値を8時間/日として、例外だけ入力する運用を優先する
+Task184で勝手に確定しないもの:
+- priorityScore計算式
+- 作業可能条件
+- 停止理由
+- 部品待ち判定
+- B2B/B2C優先条件
 
-### MVP要件
+既存schema・実装・正本文書から安全に決められない業務ルールは、実装前に調査結果として明示する。
 
-ロードマップのStep 2を基準に以下を最低限サポートする。
-
-- 標準作業可能時間: 8時間/日
-- 通常日は既定値を利用
-- 休み: 0h
-- 半日: 4h
-- 通常: 8h
-- 任意時間
-- メモ
-- 月初に休み・半日・私用等の例外だけ登録できる
-- Step 3から日別作業可能時間を安全に取得できる
-
-### 実装前に調査するもの
-
-1. 現行Prisma schema
-2. 既存calendar / schedule / settings関連model・API・UI
-3. 日付のtimezone運用
-4. 管理画面のnavigation / page構成
-5. server-side認証・API流儀
-6. WorkCalendarを新規tableにする場合のRLS / Data API / GRANT要否
-
-### Task境界
-
-Task183ではWorkCalendar基盤と手動例外入力までに限定する。
-
-対象外:
-- 自動スケジューラー本体
-- priorityScore計算ロジック
-- Repairの自動配置
-- ドラッグ配置
-- 分刻みガント
-- 作業実績計測
+Task184対象外:
+- 発注リードタイム連携
 - Shipment
-- 発注リードタイム
+- ゆうプリR
 - LINE
 - 帳票 / PDF / 共有ページ
 - マスタデータ投入・復旧
-
-schema / migration / RLS / GRANT変更が必要な場合は高リスク変更として扱い、
-Codex実装後にカタリが独立レビューする。
-production migration / deployはユーザーの明示承認なしに実行しない。
-
-## Schedule MVPの順序
-
-1. Step 1: Schedule MVP基盤 — **Task182 production完了**
-2. Step 2: WorkCalendar MVP — **Task183 現在Task**
-3. Step 3: シンプル自動スケジューラー
-4. Step 1〜3完了時点でスケジュール込み実運用開始
+- 分刻みガント
+- ドラッグ配置
+- AI最適化
+- npm audit / Next.js依存更新
 
 ## 並行作業・Task境界
 
 - マスタデータ投入・復旧は別Taskとして並行してよい
 - Schedule MVPとマスタ投入の差分・commitを混ぜない
-- Brand / BrandAlias production importは完了済み
-- foundation master 6種のproduction importは完了済み
-- Task180 / Task181 / Task182はproduction反映済み
-- 新しいschema / migration / RLS / GRANT変更は高リスク変更として独立レビューする
-
-## 保留中
-
-- Task172: Stripe production化
-- LINE conversation後続Task（Repair summary / ongoing AI classification等）
-- Shipment / ゆうプリR / LINE発送連携はSchedule MVP運用開始後のロードマップ順で進める
-- QR / 事例公開等は当面Schedule MVPより後順位
-- Railway buildで検出された既存依存関係のnpm audit / Next.js security warningは別Taskで扱う
+- schema / migration / RLS / GRANT変更は高リスク変更として独立レビューする
+- 一つのTask終了後、ユーザー承認なしに次Taskを実装開始しない
 
 ## 次に行うこと
 
-1. Task183開始時の `git status` を確認
-2. WorkCalendar関連の既存schema / UI / API / timezone運用を調査
-3. 最小schemaとTask境界を確定
-4. Codex枠が利用可能ならCodexを実装担当にする
-5. カタリが差分・migration・RLS / GRANTを独立レビュー
-6. local自動確認
-7. Task183を1 commitにする
-8. production migration / deploy前にユーザー承認ポイントで停止
+1. このproduction記録docsをdocs-only commitにする
+2. docs-only commit単独では不要なRailway redeployを避けるためpushしない
+3. ユーザー承認後、Task184の調査から開始する
 
-このdocs-maintenance自体はアプリ挙動・schema・production DBを変更しない。
-
-Docs-maintenance Production: pending（docs-only。production applicationは引き続き `76b90a3`）。
+Docs-maintenance Production: pending（docs-only。production applicationは `d0f7f66`）。

@@ -9,7 +9,8 @@ Schedule MVP Step 2。日別の作業可能時間をStep 3から参照できる�
 - `WorkCalendar` は `workDate DATE` を主キーに、`availableMinutes`、nullable `note`、作成・更新日時を保持する。例外だけ保存し、日付の重複やsequenceはない。
 - migrationは `public."WorkCalendar"` を作成し、`availableMinutes` に0〜1440のCHECK制約を設ける。
 - この表はPrisma direct DB connectionからだけ使用するserver-only表。Data APIからのアクセスは不要なので、同じmigration内でRLSを有効化し、`anon`、`authenticated`、`service_role` から全table権限をREVOKEする。policyやGRANTは作らない。
-- migrationはlocal・productionとも未適用。schema / migration / RLS / REVOKEはカタリ独立レビュー済み。production反映は未承認・未実施。
+- schema / migration / RLS / REVOKEはカタリ独立レビュー済み。production migration `20260925072252 add_work_calendar` を適用済み。
+- production確認でRLS有効、0〜1440分CHECK制約あり、`anon` / `authenticated` / `service_role` のtable privilegeなしを再確認した。
 
 ## API・日付処理
 
@@ -30,11 +31,20 @@ Schedule MVP Step 2。日別の作業可能時間をStep 3から参照できる�
 - `npx tsc --noEmit --incremental false`: PASS。
 - `git diff --check`: PASS。
 - カタリ独立レビュー: schema / migration / RLS / REVOKE / API副作用 / Task境界を確認し、機能上の指摘なし。
-- `npx prisma generate`: 既存Windows DLL `query_engine-windows.dll.node` のunlinkで `EPERM` となり停止。型生成用の `npx prisma generate --no-engine` はPASS。通常エンジンを含む生成は未確認。
-- `npx next build`: build worker起動時に環境の `spawn EPERM` で停止。コンパイル結果は未確認。
-- `npm run lint`: ESLint未設定の対話式設定画面が開いたためlintは未実施。
-- UIブラウザ自動確認: 未確認。local DBには新migrationを適用しておらず、認証後の画面とAPIを安全に起動できない。
+- local `npx prisma generate`: 既存Windows DLL `query_engine-windows.dll.node` のunlinkで `EPERM`。Railway production buildではPrisma Client生成PASS。
+- local `npx next build`: build worker起動時に環境の `spawn EPERM`。Railway production buildではNext.js compile / type check / page generationまでPASS。
+- `npm run lint`: local ESLint未設定の対話式設定画面が開いたため単独lintは未実施。Railway build内のlint/type check工程は通過。
+- production non-destructive smoke: `/`=200、`/login`=200、未認証 `/repairs/calendar`=307（NextAuth redirect）、未認証 `GET /api/work-calendar?month=2026-09`=401。
+- Railway runtime: `next start` → `Ready in 511ms`。起動失敗なし。
 
 ## Production
 
-Production: pending。現在のproduction application commitは `76b90a3f6a75d41d4e37143d185e8904a31355b8`、tagは `production-task182-20260925`。Task183のcommit、push、production migration、deployは未実施。既存のdocs-only commit `f40f1d4` は変更していない。
+Production: complete。
+
+- application commit: `d0f7f66ab11da7d2e4edb7d1db72deca854e866b`
+- Railway deployment: `7557aac8-c75f-4104-8bbe-294b963a4a53` / `SUCCESS` / region `sin`
+- production tag: `production-task183-20260925`
+- Supabase migration: `20260925072252 add_work_calendar`
+- backup: `C:\\Users\\yoshi\\clock-repair-backups\\task183-20260925T072110Z`（`roles.sql` / `schema.sql` / `data.sql` / SHA256付き `manifest.txt`）
+- Security Advisor: `WorkCalendar` の `rls_enabled_no_policy` INFO 1件は、Data API roleへの権限を明示REVOKEしたserver-only設計のため意図どおり。既存 `function_search_path_mutable` WARN 2件はTask外。
+- production `WorkCalendar` exception rowは反映直後0件。
