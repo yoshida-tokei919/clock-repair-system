@@ -203,9 +203,11 @@
 8. 作業時間情報の設計
 9. 自動スケジュール案作成
 
-### 作業時間推定の詳細設計
+### 作業時間・スケジューラ精度向上の詳細設計
 
-`estimatedWorkMinutes（推定作業時間）` の標準時間・実作業時間実績・複合作業補正・外装ブランドリスク係数・案件実績学習の詳細は `docs/ai-tasks/185-work-time-estimation-design.md` を参照する。
+`estimatedWorkMinutes（推定作業時間）` の標準時間・実作業時間実績・複合作業補正・外装ブランドリスク係数・案件実績学習は `docs/ai-tasks/185-work-time-estimation-design.md` を参照する。
+
+納期逆算、仕入先リードタイム、見積り/受付/問い合わせ等の業務時間、共通業務タイマー、複数日分割、作業中断/部品待ち、実効作業容量は `docs/ai-tasks/186-scheduler-deadline-capacity-timer-design.md` を参照する。
 
 ### 完了条件
 

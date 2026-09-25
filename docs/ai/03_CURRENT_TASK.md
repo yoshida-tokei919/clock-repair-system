@@ -64,7 +64,8 @@ Production: Task184 complete
 ## 次に行うこと
 
 - Task185 docs-onlyで、`estimatedWorkMinutes（推定作業時間）` を標準時間・実作業時間実績から自動算出する設計を `docs/ai-tasks/185-work-time-estimation-design.md` に記録済み。
-- **実装Taskはまだ開始しない。** 作業時間マスタ / 実績履歴 / BrandMasterの外装リスク係数 / Repair「作業時間」タブは、次の実装前調査で既存schema・マスタとの接続を確認してからTask分割する。
+- Task186 docs-onlyで、納期逆算・仕入先リードタイム・見積り/受付/問い合わせ等の業務時間・共通タイマー・複数日分割・作業中断/部品待ち・実効作業容量を `docs/ai-tasks/186-scheduler-deadline-capacity-timer-design.md` に記録済み。
+- **実装Taskはまだ開始しない。** 作業時間マスタ / 実績履歴 / BrandMasterの外装リスク係数 / Repair「作業時間」タブ / WorkTimeSession / 分割配置 / 中断フローは、次の実装前調査で既存schema・マスタ・status・OrderRequestとの接続を確認してからTask分割する。
 - Task185設計では、同一条件の実作業時間を一義情報とし、複数実績は中央値を基本採用する。実績がなければ標準時間へfallbackする。
 - 既存Task184の自動スケジューラーは引き続き実運用可能。作業時間自動算出が未実装の間は既存`estimatedWorkMinutes`を使用する。
 - 発注リードタイム連携・priorityScore正式設計・作業時間自動算出はいずれも後続Taskとして扱い、差分を混ぜない。
