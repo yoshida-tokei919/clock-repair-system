@@ -810,6 +810,7 @@ model Repair {
   priorityScore        Int       @default(0)
   scheduledDate        DateTime?
   estimatedWorkMinutes Int       @default(0)
+  scheduleLocked       Boolean   @default(false)
   
   workSummary          String?
   internalNotes        String?

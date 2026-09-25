@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { RepairEntryForm } from "@/components/repairs/RepairEntryForm";
+import { RepairSchedulePanel } from "@/components/repairs/RepairSchedulePanel";
 
 export const dynamic = "force-dynamic";
 
@@ -176,6 +177,14 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
 
     return (
         <div className="bg-zinc-100 min-h-screen">
+            <RepairSchedulePanel
+                repairId={repair.id}
+                scheduledDate={repair.scheduledDate?.toISOString() ?? null}
+                estimatedWorkMinutes={repair.estimatedWorkMinutes}
+                deliveryDateExpected={repair.deliveryDateExpected?.toISOString() ?? null}
+                scheduleLocked={repair.scheduleLocked}
+                priorityScore={repair.priorityScore}
+            />
             <RepairEntryForm mode="view" initialData={initialData} />
         </div>
     );
