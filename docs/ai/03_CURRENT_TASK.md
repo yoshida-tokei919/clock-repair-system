@@ -56,7 +56,7 @@ Production: Task184 complete
 - RepairLineItem（修理明細）はreplaceでID再採番されるため、実績履歴をRepairLineItem.idへ強く依存させない
 - 部品待ちstatusはOrderRequest / RepairPartAllocationと連動するため、作業中断状態はRepair.statusと分離する方向
 - 新規テーブルは原則server-only / Data API非公開 / GRANT不要の方向
-- 実装Task案はTask188〜195へ分割。ユーザー承認なしに開始しない
+- 実装Task案はTask188〜195へ分割。Task187後の設計追補でスケジューラ専用設定レイヤーを追加したため、Task188/189は基本方針維持、Task190以降は設定モデルを前提にTask境界・schemaを再確認する。ユーザー承認なしに開始しない
 - schema / migration / API / UI / DB変更なし
 - Production: pending（docs-onlyのためdeploy対象外）
 

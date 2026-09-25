@@ -74,7 +74,7 @@ RepairLineItem（修理明細）にはカテゴリ、処置、対象部品名、
 WorkTimeSession（作業時間セッション）や実績履歴を RepairLineItem.id へ強く依存させない。
 計測開始時点の作業条件をsnapshotとして保持する設計が安全。
 
-既存 `Caliber.standardWorkMinutes` はTask185の新標準時間マスタへ無理に統合せず、既存互換値として扱う。
+既存 `Caliber.standardWorkMinutes（Cal別標準作業時間）` は一般条件の標準時間マスタそのものにはしない。ただし、Cal別実績がない間は一般条件から算出した初期値、実績蓄積後は件数閾値・集計方法に従う現在採用値を保持する用途として再利用できる可能性があるため、Task190の物理設計で再検討する。
 
 ## OrderRequest / Supplier / 中断
 
@@ -150,3 +150,37 @@ WorkTimeSession、作業計画、分割予定、標準時間マスタも原則se
 
 Production: pending。investigation-only / docs-onlyのためapplication deploy対象外。
 コード・schema・migration・DB・production変更なし。
+
+
+## 2026-09-26 設計追補: スケジューラ設定レイヤー
+
+Task185 / 186の算出条件は、実情に合わせて継続調整できる専用設定画面を持つ方向へ更新された。
+
+設定対象には以下を含む。
+- 実績採用の件数閾値
+- 平均 / 中央値 / P80等の集計方法
+- 直近3ヶ月 / 6ヶ月等の集計期間
+- 時計機能別・作業別の標準作業時間
+- 納期・ランニングテスト・再調整・発送バッファ
+- 問い合わせ等の予約容量
+- Supplier（仕入先）リードタイム採用条件
+- 取引先優先度
+- 分割配置・中断・再計算ルール
+- 現在の算出条件表示
+- 将来の設定変更前preview
+
+修理時間の初期ルールは、実績0件=一般標準、1〜9件=中央値、10件以上=平均値。見積りは100件未満20分、十分な件数蓄積後に直近3〜6ヶ月平均を採用する。
+
+### 実装Task分割への影響
+
+Task188 WorkTimeSession基盤 / Task189 共通タイマーUIは設定レイヤーへの依存が比較的小さいため、基本方針は維持可能。
+
+一方、Task190以降はハードコードを避けるため再設計が必要。
+特に以下を実装前に決める。
+- SchedulerSetting（仮称）の単一設定モデルで持つ値
+- 作業時間・工程・Supplier等、条件行が複数必要な設定を個別マスタへ分ける範囲
+- 既存 WorkCalendar / Caliber.standardWorkMinutes / Supplier 等の既存列と新設定の正本関係
+- 設定履歴 / updatedAt / 算出根拠のsnapshot要否
+- 設定変更時に既存予定を即再配置せず、preview → apply とする境界
+
+したがって、Task190「作業時間標準・実績学習」、Task191「発注リードタイム・中断」、Task192「納期逆算・実効容量」、Task193「Scheduler v2」は、この設定レイヤーを前提にTask境界とschemaを再確認してから実装する。

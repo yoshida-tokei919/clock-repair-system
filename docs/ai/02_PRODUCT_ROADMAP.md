@@ -207,7 +207,7 @@
 
 `estimatedWorkMinutes（推定作業時間）` の標準時間・実作業時間実績・複合作業補正・外装ブランドリスク係数・案件実績学習は `docs/ai-tasks/185-work-time-estimation-design.md` を参照する。
 
-納期逆算、仕入先リードタイム、見積り/受付/問い合わせ等の業務時間、共通業務タイマー、複数日分割、作業中断/部品待ち、実効作業容量は `docs/ai-tasks/186-scheduler-deadline-capacity-timer-design.md` を参照する。
+納期逆算、仕入先リードタイム、見積り/受付/問い合わせ等の業務時間、共通業務タイマー、複数日分割、作業中断/部品待ち、実効作業容量、および件数閾値・集計期間・標準時間・工程日数等を調整するスケジューラ専用設定画面は `docs/ai-tasks/186-scheduler-deadline-capacity-timer-design.md` を参照する。主要算出条件はコードへ固定せず、現在採用条件と根拠を確認できる設計を優先する。
 
 ### 完了条件
 
