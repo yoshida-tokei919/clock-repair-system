@@ -4,7 +4,7 @@
 
 - WorkTimeSession の schema、migration、server API、入力検証、snapshot、状態遷移テストをローカル実装。
 - UI、集計・推定、SchedulerSetting、作業標準、スケジューラ v2、Task189 以降は対象外。
-- Production: pending。production migration / DB 操作 / deploy / push は未実施。
+- Production: complete。application commit `d69e2fcdfc60e852cc09594311ba31a788cee8d2`、Supabase migration `20260926203459 add_work_time_session`、Railway deployment `0bcf36a8-d0a2-44fd-a9c0-33c7ee520bef`、production tag `production-task188-20260927`。
 
 ## データと安全性
 
@@ -36,4 +36,9 @@
 - `git diff --check`: PASS。
 - カタリ独立レビュー: PASS。初回指摘の `startedAt` 単独index不足と過剰な PUBLIC / enum REVOKE はCodexが修正し、再レビュー済み。
 - カタリ独立再実行: Prisma validate PASS、関連テスト 12 / 12 PASS、TypeScript PASS、`npx next build` PASS（exit 0）。build中の既存 `/api/repairs/recent` Dynamic server usageログはTask188対象外。
-- production migration / DB 照合は未実施。
+- production backup: `C:\\Users\\yoshi\\clock-repair-backups\\task188-20260926T202752Z`（`roles.sql` / `schema.sql` / `data.sql` / SHA256付き `manifest.txt`）。
+- production migration `20260926203459 add_work_time_session` を適用。`WorkTimeSession` は初期0件、RLS有効、policy 0件、anon / authenticated / service_role のtable privilege 0件、sequence usage privilege 0件を確認。
+- production indexは `startedAt` 単独、activityType / Repair / Inquiry / OrderRequest + startedAt、およびactive全体1件のpartial unique indexを確認。3本のFKと2本のCHECK制約も確認。
+- Railway production build/deploy: `SUCCESS`。`next start` → `Ready in 411ms`。
+- production smoke: `/`=200、`/login`=200、未認証 `GET /api/work-time-sessions/active`=401、既存 `GET /api/work-calendar?month=2026-09`=401。
+- Security Advisorの `WorkCalendar` / `WorkTimeSession` `rls_enabled_no_policy` INFO はData API権限なしのserver-only設計として意図どおり。既存 `function_search_path_mutable` WARN 2件はTask188対象外。

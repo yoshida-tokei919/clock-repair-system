@@ -7,36 +7,34 @@
 
 ## Production
 
-- Production application commit: `1b66b0bef90aceb4e8935246797acf094145ecf7`
-- Commit subject: `feat: add simple auto scheduler MVP`
+- Production application commit: `d69e2fcdfc60e852cc09594311ba31a788cee8d2`
+- Commit subject: `feat: add work time session foundation`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `0c4bcef6-f4c0-44c9-8826-ba4060bac15e`
+- Railway deployment: `0bcf36a8-d0a2-44fd-a9c0-33c7ee520bef`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task184-20260925`
+- Production tag: `production-task188-20260927`
 - Region: `sin`
-- Task184 schema / migration: なし
-- Production DBの直近migrationは Task183 の `20260925072252 add_work_calendar`
-- Production backup: Task184はmigrationなしのため不要
+- Supabase migration: `20260926203459 add_work_time_session`
+- Production backup: `C:\\Users\\yoshi\\clock-repair-backups\\task188-20260926T202752Z`
 
-Production: Task184 complete
+Production: Task188 complete
 
-## Task184 production確認
+## Task188 production確認
 
-- Railway source commit: `1b66b0bef90aceb4e8935246797acf094145ecf7`
+- Railway source commit: `d69e2fcdfc60e852cc09594311ba31a788cee8d2`
 - Railway runtime:
   - `next start` 正常起動
-  - `Ready in 342ms`
+  - `Ready in 411ms`
 - Non-destructive smoke:
   - `/` = 200
   - `/login` = 200
-  - unauthenticated `/repairs/calendar` = 307 → NextAuth
+  - unauthenticated `GET /api/work-time-sessions/active` = 401
   - unauthenticated `GET /api/work-calendar?month=2026-09` = 401
-  - unauthenticated `GET /api/repairs/auto-schedule` = 401
-- schema / migration / RLS / GRANT変更なし
-- local related tests: 15 / 15 PASS
-- TypeScript: PASS
-- `git diff --check`: PASS
-- ローカルbuildは環境起因 `spawn EPERM` だったが、Railway production build/deployはSUCCESS
+- `WorkTimeSession`: 初期0件、RLS有効、policy 0件、Data API 3 roleのtable / sequence privilege 0件
+- `startedAt` 単独index、各FK + startedAt index、single-active partial unique index、FK 3本、CHECK 2本をproductionで確認
+- local related tests: 12 / 12 PASS
+- Prisma validate / TypeScript / local Next build / `git diff --check`: PASS
+- Railway production build/deploy: SUCCESS
 
 ## Schedule MVPの現在地
 
@@ -46,6 +44,17 @@ Production: Task184 complete
 4. **Step 1〜3完了。スケジュール込み実運用開始ポイントへ到達**
 
 ## 直近完了Task
+
+### Task188: WorkTimeSession基盤
+
+- commit: `d69e2fcdfc60e852cc09594311ba31a788cee8d2`
+- 詳細: `docs/ai-tasks/188-work-time-session-foundation.md`
+- WorkTimeSession schema / migration / server API / snapshot / 状態遷移を実装
+- 同時active sessionはDB partial unique indexで全体1件を保証
+- RepairLineItem.idへ強く依存せず、開始時条件をsnapshot保存
+- server-only / Data API非公開としてRLS有効、anon / authenticated / service_role権限なし
+- production backup / migration / deploy / smoke / production tagまで完了
+- Production: complete
 
 ### Task187: Task185/186 実装前調査
 
@@ -76,9 +85,8 @@ Production: Task184 complete
 
 ## 次に行うこと
 
-- Task188「WorkTimeSession基盤」はローカル実装・検証済み。詳細は `docs/ai-tasks/188-work-time-session-foundation.md`。
-- Task188の新規テーブル / migration / RLS / GRANT は高リスク変更。カタリ独立レビュー済み（startedAt単独index追加、過剰なPUBLIC/enum REVOKE削除を指摘し、Codex修正後の再レビューPASS）。production 適用は未実施。
-- Production: pending。push / production migration / deploy は未実施。
+- Task188「WorkTimeSession基盤」はproduction完了。詳細は `docs/ai-tasks/188-work-time-session-foundation.md`。
+- 次候補はTask189「共通業務タイマーUI」。Repair / Inquiry / OrderRequest / 共通業務をTask188のタイマー基盤へ接続する。
+- Task189はユーザー承認なしに開始しない。
 - 既存Task184の自動スケジューラーは引き続き実運用可能。後続Task実装までは既存`estimatedWorkMinutes` / `scheduledDate`を使用する。
 - マスタデータ投入・復旧は別Taskとして並行可。Schedule差分と混ぜない。
-- Task189以降はユーザー承認なしに開始しない。
