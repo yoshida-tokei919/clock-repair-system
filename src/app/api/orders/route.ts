@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     include: {
       partsMaster: { select: { nameJp: true, nameEn: true, partRefs: true, cousinsNumber: true } },
       supplier: { select: { name: true } },
-      repair: { select: { inquiryNumber: true, customer: { select: { name: true } } } },
+      repair: { select: { id: true, inquiryNumber: true, customer: { select: { name: true } } } },
     },
     orderBy: { createdAt: "asc" },
   });

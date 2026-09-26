@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { RepairEntryForm } from "@/components/repairs/RepairEntryForm";
 import { RepairSchedulePanel } from "@/components/repairs/RepairSchedulePanel";
+import { RepairWorkTimerPanel } from "@/components/repairs/RepairWorkTimerPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,8 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 select: {
                     id: true,
                     lineType: true,
+                    itemNameSnapshot: true,
+                    estimateDisplayNameSnapshot: true,
                     partsMasterId: true,
                     repairWorkCategoryId: true,
                     repairWorkCategory: { select: { repairType: true } },
@@ -185,6 +188,11 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 scheduleLocked={repair.scheduleLocked}
                 priorityScore={repair.priorityScore}
             />
+            <RepairWorkTimerPanel repairId={repair.id} laborLines={laborRepairLineItems.map(item => ({
+                id: item.id,
+                itemNameSnapshot: item.itemNameSnapshot,
+                estimateDisplayNameSnapshot: item.estimateDisplayNameSnapshot,
+            }))} />
             <RepairEntryForm mode="view" initialData={initialData} />
         </div>
     );

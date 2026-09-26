@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { WorkTimerStartButton } from "@/components/work-time/WorkTimerStartButton";
 import {
   INQUIRY_WATCH_FIELDS,
   type InquiryWatchConfirmationStatus,
@@ -568,6 +569,12 @@ ${intakeUrl}` : "";
         <p className="mt-2 text-sm text-zinc-600">ここで保存するのは確認用のInquiryWatchです。Watch・Repair・masterは作成しません。</p>
         {payload.inquiry.conversationSummary && <p className="mt-3 rounded bg-white/70 p-3 text-sm text-zinc-700">{payload.inquiry.conversationSummary}</p>}
       </header>
+
+      <div>
+        <WorkTimerStartButton input={{ activityType: "INQUIRY", inquiryId, label: `Inquiry #${inquiryId}` }}>
+          問い合わせ対応開始
+        </WorkTimerStartButton>
+      </div>
 
       {error && <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {notice && <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}

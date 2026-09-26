@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useAutoRefreshOnReturn } from '@/hooks/use-auto-refresh-on-return'
+import { WorkTimerStartButton } from '@/components/work-time/WorkTimerStartButton'
 
 type OrderRequest = {
   id: number
@@ -15,7 +16,7 @@ type OrderRequest = {
   orderedAt: string | null
   receivedAt: string | null
   supplier: { name: string } | null
-  repair: { inquiryNumber: string; customer: { name: string } } | null
+  repair: { id: number; inquiryNumber: string; customer: { name: string } } | null
   partsMaster: {
     nameJp: string
     nameEn: string | null
@@ -145,6 +146,9 @@ export default function OrdersPage() {
 
                 {/* 右：ボタン */}
                 <div className="flex flex-col gap-2 items-end">
+                  <WorkTimerStartButton input={{ activityType: 'PARTS_ORDER', orderRequestId: order.id, ...(order.repair ? { repairId: order.repair.id } : {}), label: order.partNameJp.slice(0, 200) }}>
+                    発注作業開始
+                  </WorkTimerStartButton>
                   {/* ステータス更新ボタン */}
                   {order.status === 'pending' && (
                     <button
