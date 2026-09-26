@@ -1,6 +1,6 @@
 # CURRENT TASK
 
-## 現在のcheckpoint — 2026-09-26
+## 現在のcheckpoint — 2026-09-27
 
 このファイルは、現在の実装Taskとproductionの現在地だけを管理する。
 過去Taskの詳細は `docs/ai-tasks/` と各runbookを参照し、ここへ長い履歴を残さない。
@@ -76,10 +76,9 @@ Production: Task184 complete
 
 ## 次に行うこと
 
-- Task185 / 186の実装前調査はTask187で完了。
-- 実装候補はTask188〜195へ分割済み。最初の候補は Task188「WorkTimeSession基盤」。
-- Task188は新規テーブルを伴う高リスク変更のため、実装担当と独立レビュー担当を分離する。
-- production migration / deploy / pushはユーザーの明示承認なしに実行しない。
+- Task188「WorkTimeSession基盤」はローカル実装・検証済み。詳細は `docs/ai-tasks/188-work-time-session-foundation.md`。
+- Task188の新規テーブル / migration / RLS / GRANT は高リスク変更。カタリ独立レビュー済み（startedAt単独index追加、過剰なPUBLIC/enum REVOKE削除を指摘し、Codex修正後の再レビューPASS）。production 適用は未実施。
+- Production: pending。push / production migration / deploy は未実施。
 - 既存Task184の自動スケジューラーは引き続き実運用可能。後続Task実装までは既存`estimatedWorkMinutes` / `scheduledDate`を使用する。
 - マスタデータ投入・復旧は別Taskとして並行可。Schedule差分と混ぜない。
-- **ユーザー承認なしにTask188を開始しない。**
+- Task189以降はユーザー承認なしに開始しない。

@@ -286,6 +286,7 @@ model Inquiry {
   repairIntakeInvites RepairIntakeInvite[]
   slackNotifications SlackNotificationOutbox[]
   lineManagerSendOutboxes LineManagerSendOutbox[]
+  workTimeSessions WorkTimeSession[]
 
   @@index([lineUserId, status])
   @@index([lineUserId, lastReceivedAt])
@@ -847,6 +848,7 @@ model Repair {
   inquiryWatchPromotion InquiryWatch? @relation("InquiryWatchPromotedRepair")
   inquiryMessageLinks InquiryMessageRepairLink[]
   lineManagerSendOutboxes LineManagerSendOutbox[] @relation("LineManagerSendOutboxSourceRepair")
+  workTimeSessions WorkTimeSession[]
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
@@ -1627,6 +1629,7 @@ model OrderRequest {
   // 関連カルテ
   repairId      Int?
   repair        Repair?  @relation(fields: [repairId], references: [id])
+  workTimeSessions WorkTimeSession[]
 
   // メモ・日時
   notes         String?
@@ -1634,6 +1637,49 @@ model OrderRequest {
   receivedAt    DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+enum WorkTimeActivityType {
+  REPAIR
+  ESTIMATE
+  INTAKE
+  INQUIRY
+  CUSTOMER_CONTACT
+  PARTS_ORDER
+  SHIPPING
+  ADMIN
+  OTHER
+}
+
+model WorkTimeSession {
+  id                   Int                  @id @default(autoincrement())
+  activityType         WorkTimeActivityType
+  repairId             Int?
+  inquiryId            Int?
+  orderRequestId       Int?
+  workLabelSnapshot    String?
+  contextSchemaVersion Int                  @default(1)
+  contextSnapshot      Json?
+  startedAt            DateTime
+  endedAt              DateTime?
+  originalStartedAt    DateTime?
+  originalEndedAt      DateTime?
+  adjustedAt           DateTime?
+  adjustmentReason     String?
+  invalidatedAt        DateTime?
+  invalidationReason   String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  repair       Repair?       @relation(fields: [repairId], references: [id], onDelete: SetNull)
+  inquiry      Inquiry?      @relation(fields: [inquiryId], references: [id], onDelete: SetNull)
+  orderRequest OrderRequest? @relation(fields: [orderRequestId], references: [id], onDelete: SetNull)
+
+  @@index([startedAt])
+  @@index([activityType, startedAt])
+  @@index([repairId, startedAt])
+  @@index([inquiryId, startedAt])
+  @@index([orderRequestId, startedAt])
 }
 
 enum PublicCaseSourceType {
