@@ -118,7 +118,11 @@ export default function SchedulerSettingsEditor() {
           <label className="text-sm"><span className="mb-1 block font-medium">少数実績の集計方法</span><AggregationSelect value={setting.repairEarlyAggregationMethod} onChange={v => patchSetting({ repairEarlyAggregationMethod: v })} /></label>
           <label className="text-sm"><span className="mb-1 block font-medium">十分な実績の集計方法</span><AggregationSelect value={setting.defaultAggregationMethod} onChange={v => patchSetting({ defaultAggregationMethod: v })} /></label>
           <label className="text-sm"><span className="mb-1 block font-medium">外れ値処理</span><select className={inputClass} value={setting.repairOutlierMethod} onChange={e => patchSetting({ repairOutlierMethod: e.target.value as "NONE" | "IQR" })}><option value="NONE">なし（全サンプル）</option><option value="IQR">IQR（四分位範囲から外れる値を除外）</option></select></label>
+          <NumberField label="ランニングテスト（暦日、空欄は未設定）" value={setting.runningTestDays} nullable onChange={v => patchSetting({ runningTestDays: v })} />
+          <NumberField label="再調整余裕（暦日、空欄は未設定）" value={setting.reworkBufferDays} nullable onChange={v => patchSetting({ reworkBufferDays: v })} />
+          <NumberField label="発送余裕（暦日、空欄は未設定）" value={setting.shippingBufferDays} nullable onChange={v => patchSetting({ shippingBufferDays: v })} />
         </div>
+        <p className="text-xs text-zinc-600">工程日数の空欄は未設定、0は明示的な0日です。これらの値は後続の納期preview用で、現行の自動スケジュールには反映されません。</p>
         <p className="text-xs text-zinc-600">集計期間は直近何ヶ月の実績を見るかを指定します。外れ値処理IQRは極端な計測値の影響を抑えます。標準1日作業時間と予定確認時間は現行WorkCalendar容量には接続されていません。</p>
         <button className={buttonClass} disabled={busy} onClick={() => run(() => api("/api/settings/scheduler", "PUT", {
           standardDailyMinutes: setting.standardDailyMinutes, dailyScheduleReviewMinutes: setting.dailyScheduleReviewMinutes,
@@ -126,6 +130,8 @@ export default function SchedulerSettingsEditor() {
           repairFullSampleThreshold: setting.repairFullSampleThreshold, repairEarlyAggregationMethod: setting.repairEarlyAggregationMethod,
           defaultAggregationMethod: setting.defaultAggregationMethod, repairLookbackMonths: setting.repairLookbackMonths,
           repairOutlierMethod: setting.repairOutlierMethod,
+          runningTestDays: setting.runningTestDays, reworkBufferDays: setting.reworkBufferDays,
+          shippingBufferDays: setting.shippingBufferDays,
         }), "共通設定を保存しました。")}>共通設定を保存</button>
       </section>
 

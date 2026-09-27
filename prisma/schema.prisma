@@ -1736,6 +1736,9 @@ model SchedulerSetting {
   defaultAggregationMethod     SchedulerAggregationMethod @default(MEAN)
   repairLookbackMonths         Int                        @default(6)
   repairOutlierMethod          SchedulerOutlierMethod     @default(NONE)
+  runningTestDays              Int?
+  reworkBufferDays             Int?
+  shippingBufferDays           Int?
   createdAt                    DateTime                   @default(now())
   updatedAt                    DateTime                   @updatedAt
 }

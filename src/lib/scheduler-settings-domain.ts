@@ -35,12 +35,14 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]) {
 export type SchedulerInput = Pick<SchedulerSetting,
   "standardDailyMinutes" | "dailyScheduleReviewMinutes" | "repairLearningMode" |
   "repairLearningMinimumSamples" | "repairFullSampleThreshold" | "repairEarlyAggregationMethod" |
-  "defaultAggregationMethod" | "repairLookbackMonths" | "repairOutlierMethod">;
+  "defaultAggregationMethod" | "repairLookbackMonths" | "repairOutlierMethod" |
+  "runningTestDays" | "reworkBufferDays" | "shippingBufferDays">;
 export function parseSchedulerInput(value: unknown): SchedulerInput {
   const v = object(value);
   exactKeys(v, ["standardDailyMinutes", "dailyScheduleReviewMinutes", "repairLearningMode",
     "repairLearningMinimumSamples", "repairFullSampleThreshold", "repairEarlyAggregationMethod",
-    "defaultAggregationMethod", "repairLookbackMonths", "repairOutlierMethod"]);
+    "defaultAggregationMethod", "repairLookbackMonths", "repairOutlierMethod",
+    "runningTestDays", "reworkBufferDays", "shippingBufferDays"]);
   const standardDailyMinutes = integer(v.standardDailyMinutes, "標準1日作業時間", 1, 1440);
   const dailyScheduleReviewMinutes = integer(v.dailyScheduleReviewMinutes, "予定確認時間", 0, standardDailyMinutes);
   const repairLearningMinimumSamples = integer(v.repairLearningMinimumSamples, "修理の最低サンプル数", 1);
@@ -51,6 +53,9 @@ export function parseSchedulerInput(value: unknown): SchedulerInput {
     defaultAggregationMethod: choice(v.defaultAggregationMethod, "十分な実績の集計", ["MEAN", "MEDIAN", "P80"]),
     repairLookbackMonths: integer(v.repairLookbackMonths, "修理の集計期間", 1, 120),
     repairOutlierMethod: choice(v.repairOutlierMethod, "外れ値処理", ["NONE", "IQR"]),
+    runningTestDays: nullableInteger(v.runningTestDays, "ランニングテスト日数", 0),
+    reworkBufferDays: nullableInteger(v.reworkBufferDays, "再調整余裕日数", 0),
+    shippingBufferDays: nullableInteger(v.shippingBufferDays, "発送余裕日数", 0),
   };
 }
 

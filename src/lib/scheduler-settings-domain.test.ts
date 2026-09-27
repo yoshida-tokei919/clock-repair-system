@@ -21,8 +21,24 @@ test("nullable activity fields stay null and unsupported AUTO is rejected", () =
 test("singleton settings enforce bounds and sample ordering", () => {
   const input = { standardDailyMinutes: 480, dailyScheduleReviewMinutes: 30, repairLearningMode: "AUTO",
     repairLearningMinimumSamples: 3, repairFullSampleThreshold: 10, repairEarlyAggregationMethod: "MEDIAN",
-    defaultAggregationMethod: "MEAN", repairLookbackMonths: 6, repairOutlierMethod: "IQR" };
+    defaultAggregationMethod: "MEAN", repairLookbackMonths: 6, repairOutlierMethod: "IQR",
+    runningTestDays: null, reworkBufferDays: 0, shippingBufferDays: 5 };
   assert.equal(parseSchedulerInput(input).repairOutlierMethod, "IQR");
+  assert.equal(parseSchedulerInput(input).runningTestDays, null);
+  assert.equal(parseSchedulerInput(input).reworkBufferDays, 0);
+  assert.equal(parseSchedulerInput(input).shippingBufferDays, 5);
+  for (const key of ["runningTestDays", "reworkBufferDays", "shippingBufferDays"] as const) {
+    for (const value of [null, 0, 3])
+      assert.equal(parseSchedulerInput({ ...input, [key]: value })[key], value);
+    assert.throws(() => parseSchedulerInput({ ...input, [key]: -1 }), /整数/);
+    assert.throws(() => parseSchedulerInput({ ...input, [key]: 1.5 }), /整数/);
+    assert.throws(() => parseSchedulerInput({ ...input, [key]: "0" }), /整数/);
+  }
+  assert.throws(() => parseSchedulerInput({ ...input, unknownKey: 1 }), /入力項目/);
+  assert.throws(() => parseSchedulerInput({ ...input, runningTestDays: undefined }), /整数/);
+  const missingBuffer: Record<string, unknown> = { ...input };
+  delete missingBuffer.shippingBufferDays;
+  assert.throws(() => parseSchedulerInput(missingBuffer), /入力項目/);
   assert.throws(() => parseSchedulerInput({ ...input, repairFullSampleThreshold: 2 }));
   assert.throws(() => parseSchedulerInput({ ...input, dailyScheduleReviewMinutes: 481 }));
 });
