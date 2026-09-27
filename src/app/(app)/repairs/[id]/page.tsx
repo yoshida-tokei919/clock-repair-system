@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { RepairEntryForm } from "@/components/repairs/RepairEntryForm";
 import { RepairSchedulePanel } from "@/components/repairs/RepairSchedulePanel";
 import { RepairWorkTimerPanel } from "@/components/repairs/RepairWorkTimerPanel";
+import { RepairPlanningPanel } from "@/components/repairs/RepairPlanningPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -188,6 +189,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 scheduleLocked={repair.scheduleLocked}
                 priorityScore={repair.priorityScore}
             />
+            <RepairPlanningPanel repairId={repair.id} />
             <RepairWorkTimerPanel repairId={repair.id} laborLines={laborRepairLineItems.map(item => ({
                 id: item.id,
                 itemNameSnapshot: item.itemNameSnapshot,

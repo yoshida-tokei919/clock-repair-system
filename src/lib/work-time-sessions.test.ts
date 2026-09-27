@@ -2,14 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { PrismaClient } from "@prisma/client";
 import { parseStartInput } from "./work-time-session-domain";
-import { correctWorkTimeSession, invalidateWorkTimeSession, startWorkTimeSession, stopWorkTimeSession } from "./work-time-sessions";
+import { correctWorkTimeSession, invalidateWorkTimeSession, startWorkTimeSession, stopWorkTimeSession, stopWorkTimeSessionInTransaction } from "./work-time-sessions";
 
 function fakeDb() {
   type Row = {
     id: number; startedAt: Date; endedAt: Date | null; invalidatedAt: Date | null;
     originalStartedAt: Date | null; originalEndedAt: Date | null;
     adjustmentReason?: string; invalidationReason?: string;
-    contextSnapshot?: unknown; workLabelSnapshot?: string | null;
+    contextSnapshot?: unknown; workLabelSnapshot?: string | null; repairId?: number | null;
+    activityType?: string;
   };
   const rows: Row[] = [];
   let locks = 0;
@@ -26,6 +27,8 @@ function fakeDb() {
         id: rows.length + 1, startedAt: data.startedAt!, endedAt: null, invalidatedAt: null,
         originalStartedAt: null, originalEndedAt: null, contextSnapshot: data.contextSnapshot,
         workLabelSnapshot: data.workLabelSnapshot,
+        repairId: data.repairId,
+        activityType: data.activityType,
       };
       rows.push(row);
       return { ...row };
@@ -40,8 +43,32 @@ function fakeDb() {
     repairLineItem: { findFirst: async () => null },
     $transaction: async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx),
   };
-  return { db: db as unknown as PrismaClient, rows, get locks() { return locks; } };
+  return { db: db as unknown as PrismaClient, tx: tx as unknown as Parameters<typeof stopWorkTimeSessionInTransaction>[0], rows, get locks() { return locks; } };
 }
+
+test("transaction stop closes every activity for the requested repair only", async () => {
+  const fake = fakeDb();
+  await startWorkTimeSession(fake.db, parseStartInput({ activityType: "ADMIN", label: "事務" }));
+  const active = fake.rows[0];
+  for (const [repairId, activityType] of [
+    [null, "ADMIN"], [null, "REPAIR"], [2, "REPAIR"],
+  ] as const) {
+    active.repairId = repairId;
+    active.activityType = activityType;
+    assert.equal((await stopWorkTimeSessionInTransaction(fake.tx, { repairId: 1 })).stopped, false);
+    assert.equal(active.endedAt, null);
+  }
+  for (const activityType of [
+    "ADMIN", "CUSTOMER_CONTACT", "PARTS_ORDER", "INQUIRY", "OTHER",
+    "SHIPPING", "INTAKE", "REPAIR", "ESTIMATE",
+  ] as const) {
+    active.repairId = 1;
+    active.activityType = activityType;
+    assert.equal((await stopWorkTimeSessionInTransaction(fake.tx, { repairId: 1 })).stopped, true);
+    assert.ok(active.endedAt);
+    active.endedAt = null;
+  }
+});
 
 test("start without active, atomic switch, stop and idempotent stop", async () => {
   const fake = fakeDb();

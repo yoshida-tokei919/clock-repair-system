@@ -79,8 +79,17 @@ Production: Task191C complete
 14. Task191B: Supplier / ProcurementShippingMethod 設定操作 — production完了
 15. Task191C: OrderRequest入荷予定resolver / 配送方法接続 — production完了
 
-## 次に行うこと
+## 現在のTask: Task191D
 
-- Task191の残りである `partsReadyDate` 導出、RepairPlanningStateのblocked / resume、残作業時間との接続を次Task候補として実装前調査する。
-- Task184 schedulerへ「部品が揃う前は作業予定へ入れない」を接続する境界は、partsReady / block状態の正本を確定してから扱う。
-- 次Taskはユーザー承認なしに開始しない。
+Production: pending
+
+- `partsReadyDate` をEstimateItem・RepairPartAllocation・OrderRequestから導出するresolverを実装。
+- `RepairPlanningState` のblock/resume APIとRepair画面の操作を実装。
+- block時は同一Repairの稼働中WorkTimeSessionをPlanningState更新と同じtransactionで停止する。
+- schema / migration / seed / RLS / GRANT、Repair.status、Task184 schedulerは変更しない。
+- Task191Eで部品準備とblocked状態をschedulerの除外条件へ接続する。
+- 詳細: `docs/ai-tasks/191d-parts-readiness-repair-planning.md`。
+- ローカル実装・テスト・カタリ独立レビュー完了。初回レビュー指摘3点は修正済み。
+- validation: Parts readiness 7/7、Planning 2/2、WorkTimeSession 5/5、RepairPartAllocation 26/26、Order expected arrival 8/8、Prisma validate、TypeScript、diff checkすべてPASS。
+- local buildはWindows環境のPrisma DLL / worker `EPERM`により未確認。productionはpending。
+- commit後、production反映は別途判断する。
