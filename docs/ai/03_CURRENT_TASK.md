@@ -18,6 +18,16 @@
 
 Production: Task191B complete
 
+## 現在の実装 Task191C
+
+- `OrderRequest.expectedArrivalDate` の Asia/Tokyo 暦日 resolver と、発注管理の配送方法選択・予定日表示をローカル実装済み。
+- resolver test 8件、既存 RepairPartAllocation test 26件、Task191B 設定 test 6件、Prisma validate、TypeScript型チェックは PASS。認証付き実画面は未確認。
+- `pending` は配送方法を保持して予定日だけを消す。`ordered` の status-only 更新では予定日を維持し、注文への遷移・未設定の発注日時・配送方法変更時だけ再計算する。画面の発注済み操作は配送方法IDも送信する。
+- 既存の発注 status 更新、入荷時の在庫処理、RepairPartAllocation は維持する。
+- schema / migration / seed、partsReadyDate、RepairPlanningState、Task184 scheduler は Task191C の変更対象外。
+- 詳細: `docs/ai-tasks/191c-order-expected-arrival-resolver.md`
+- Production: pending。Task191C の commit / push / deploy は未実施。
+
 ## Task191B production確認
 
 - migrationなしのためproduction DB backupは不要。
@@ -74,7 +84,6 @@ Production: Task191B complete
 
 ## 次に行うこと
 
-- 次候補は Task191C。到着予定resolverとOrderRequestへの接続境界を実装前調査で確定する。
-- `expectedArrivalDate`、Supplier処理日数、配送方法輸送日数の採用条件と再計算タイミングを明文化する。
-- partsReadyDate、中断/再開、Task184 schedulerへの連携は境界を確認しながら後続Taskへ分ける。
-- 次Taskはユーザー承認なしに開始しない。
+- Task191C はローカル実装・テスト・カタリ独立レビュー完了。レビュー指摘3点は修正済み。production反映は未実施。
+- Task191C validation: resolver 8/8、RepairPartAllocation 26/26、Task191B procurement 6/6、Prisma validate、TypeScript、diff check すべてPASS。
+- partsReadyDate、中断/再開、Task184 schedulerへの連携は後続Taskで扱う。

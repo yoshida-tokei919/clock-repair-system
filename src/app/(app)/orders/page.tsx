@@ -15,6 +15,9 @@ type OrderRequest = {
   searchWordEn: string | null
   orderedAt: string | null
   receivedAt: string | null
+  procurementShippingMethodId: number | null
+  expectedArrivalDate: string | null
+  procurementShippingMethod: { id: number; name: string; carrierName: string | null; manualTransitLeadDays: number | null; isActive: boolean } | null
   supplier: { name: string } | null
   repair: { id: number; inquiryNumber: string; customer: { name: string } } | null
   partsMaster: {
@@ -49,7 +52,10 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderRequest[]>([])
+  const [shippingMethods, setShippingMethods] = useState<Array<{ id: number; name: string; isActive: boolean }>>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [savingId, setSavingId] = useState<number | null>(null)
   const [filteredOutIds, setFilteredOutIds] = useState<number[]>([])
   useAutoRefreshOnReturn()
 
@@ -61,25 +67,46 @@ export default function OrdersPage() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchOrders() }, [])
-
-  const updateStatus = async (id: number, status: string) => {
-    await fetch(`/api/orders/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    })
+  useEffect(() => {
     fetchOrders()
+    fetch('/api/settings/procurement').then(async res => {
+      if (!res.ok) throw new Error('配送方法を読み込めませんでした。')
+      return res.json()
+    }).then(data => setShippingMethods(data.shippingMethods)).catch(err => setError(err.message))
+  }, [])
+
+  const updateOrder = async (id: number, body: { status?: string; procurementShippingMethodId?: number | null }) => {
+    setError(null)
+    setSavingId(id)
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || '発注を更新できませんでした。')
+      }
+      await fetchOrders()
+      return true
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '発注を更新できませんでした。')
+      return false
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  const updateStatus = async (order: OrderRequest, status: string) => {
+    await updateOrder(order.id, status === 'ordered'
+      ? { status, procurementShippingMethodId: order.procurementShippingMethodId }
+      : { status })
   }
 
   const handleAssignToRepair = async (id: number) => {
-    await fetch(`/api/orders/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'assigned' })
-    })
-    setFilteredOutIds(prev => prev.includes(id) ? prev : [...prev, id])
-    fetchOrders()
+    if (await updateOrder(id, { status: 'assigned' }))
+      setFilteredOutIds(prev => prev.includes(id) ? prev : [...prev, id])
   }
 
   const getSearchWord = (order: OrderRequest) => ({
@@ -97,6 +124,7 @@ export default function OrdersPage() {
         <h1 className="text-xl font-bold">発注管理</h1>
         <span className="text-sm text-gray-500">{visibleOrders.length}件</span>
       </div>
+      {error && <div role="alert" className="mb-4 text-sm text-red-700">{error}</div>}
 
       {visibleOrders.length === 0 && (
         <div className="text-center py-16 text-gray-400">
@@ -137,6 +165,31 @@ export default function OrdersPage() {
                       発注日: {new Date(order.orderedAt).toLocaleDateString('ja-JP')}
                     </div>
                   )}
+                  <div className="text-xs text-gray-600">
+                    入荷予定日: {order.expectedArrivalDate ? order.expectedArrivalDate.slice(0, 10).replace(/-/g, '/') : '未算出'}
+                  </div>
+                  {(order.status === 'pending' || order.status === 'ordered') ? (
+                    <label className="block text-xs text-gray-600">
+                      調達配送方法
+                      <select
+                        aria-label={`${order.partNameJp}の調達配送方法`}
+                        className="ml-2 rounded border px-2 py-1 text-sm text-gray-800"
+                        value={order.procurementShippingMethodId ?? ''}
+                        disabled={savingId === order.id}
+                        onChange={event => updateOrder(order.id, { procurementShippingMethodId: event.target.value ? Number(event.target.value) : null })}
+                      >
+                        <option value="">未選択</option>
+                        {shippingMethods.filter(method => method.isActive || method.id === order.procurementShippingMethodId).map(method => (
+                          <option key={method.id} value={method.id}>{method.name}{method.isActive ? '' : '（無効）'}</option>
+                        ))}
+                        {order.procurementShippingMethod && !shippingMethods.some(method => method.id === order.procurementShippingMethodId) && (
+                          <option value={order.procurementShippingMethod.id}>{order.procurementShippingMethod.name}（無効）</option>
+                        )}
+                      </select>
+                    </label>
+                  ) : order.procurementShippingMethod && (
+                    <div className="text-xs text-gray-600">調達配送方法: {order.procurementShippingMethod.name}</div>
+                  )}
                   {order.receivedAt && (
                     <div className="text-xs text-green-600">
                       入荷日: {new Date(order.receivedAt).toLocaleDateString('ja-JP')}
@@ -153,7 +206,8 @@ export default function OrdersPage() {
                   {order.status === 'pending' && (
                     <button
                       type="button"
-                      onClick={() => updateStatus(order.id, 'ordered')}
+                      onClick={() => updateStatus(order, 'ordered')}
+                      disabled={savingId === order.id}
                       className="px-4 py-1.5 bg-yellow-500 text-white rounded text-sm font-medium hover:bg-yellow-600 whitespace-nowrap">
                       発注済みにする
                     </button>
@@ -161,7 +215,8 @@ export default function OrdersPage() {
                   {order.status === 'ordered' && (
                     <button
                       type="button"
-                      onClick={() => updateStatus(order.id, 'received')}
+                      onClick={() => updateStatus(order, 'received')}
+                      disabled={savingId === order.id}
                       className="px-4 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 whitespace-nowrap">
                       入荷済みにする
                     </button>
@@ -170,6 +225,7 @@ export default function OrdersPage() {
                     <button
                       type="button"
                       onClick={() => handleAssignToRepair(order.id)}
+                      disabled={savingId === order.id}
                       className="px-4 py-1.5 bg-white text-green-700 border border-green-300 rounded text-sm font-medium hover:bg-green-50 whitespace-nowrap">
                       案件へ割当
                     </button>

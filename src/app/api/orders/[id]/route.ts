@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { assertShippingMethodChangeAllowed, getOrderArrivalUpdate, OrderExpectedArrivalError, parseOrderUpdateInput, shouldRecalculateOrderArrival } from "@/lib/order-expected-arrival";
 import {
   addConfirmedRepairStatusLog,
   reconcileRepairPartAllocations,
@@ -19,18 +20,42 @@ import {
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   const orderId = Number(params.id);
-  const { status } = await req.json();
-
-  if (!Number.isInteger(orderId) || typeof status !== "string") {
-    return NextResponse.json({ error: "Invalid order or status" }, { status: 400 });
+  if (!Number.isSafeInteger(orderId) || orderId <= 0) {
+    return NextResponse.json({ error: "Invalid order" }, { status: 400 });
   }
 
   try {
+    const input = parseOrderUpdateInput(await req.json());
     const order = await prisma.$transaction(async (tx) => {
-      const previous = await tx.orderRequest.findUniqueOrThrow({
+      const previous = await tx.orderRequest.findUnique({
         where: { id: orderId },
-        select: { status: true, repairId: true, partsMasterId: true, quantity: true },
+        select: { status: true, repairId: true, partsMasterId: true, quantity: true,
+          supplierId: true, procurementShippingMethodId: true, orderedAt: true },
       });
+      if (!previous) throw new OrderExpectedArrivalError("発注が見つかりません。", 404);
+      const status = input.status ?? previous.status;
+      const methodProvided = Object.prototype.hasOwnProperty.call(input, "procurementShippingMethodId");
+      const methodId = methodProvided ? input.procurementShippingMethodId ?? null : previous.procurementShippingMethodId;
+      const shouldRecalculate = shouldRecalculateOrderArrival({
+        previousStatus: previous.status, status, previousOrderedAt: previous.orderedAt,
+        previousMethodId: previous.procurementShippingMethodId, methodId, methodProvided,
+      });
+      const methodChanged = methodProvided && methodId !== previous.procurementShippingMethodId;
+      const method = methodId === null || (!methodChanged && !shouldRecalculate) ? null : await tx.procurementShippingMethod.findUnique({
+        where: { id: methodId }, select: { id: true, isActive: true, manualTransitLeadDays: true },
+      });
+      if (methodId !== null && (methodChanged || shouldRecalculate) && !method)
+        throw new OrderExpectedArrivalError("配送方法が見つかりません。", 404);
+      assertShippingMethodChangeAllowed(previous.status, status, previous.procurementShippingMethodId,
+        methodId, methodProvided, method?.isActive ?? null);
+      const supplierSetting = shouldRecalculate && methodId !== null && previous.supplierId !== null
+        ? await tx.supplierLeadTimeSetting.findUnique({
+          where: { supplierId: previous.supplierId }, select: { manualProcessingLeadDays: true },
+        }) : null;
+      const arrivalUpdate = getOrderArrivalUpdate({ previousStatus: previous.status, status, previousOrderedAt: previous.orderedAt,
+        previousMethodId: previous.procurementShippingMethodId, methodId, methodProvided,
+        processingDays: supplierSetting?.manualProcessingLeadDays ?? null,
+        transitDays: method?.manualTransitLeadDays ?? null, now: new Date() });
       if (shouldAllocateForOrderStatus(status)) {
         if (previous.status !== "received") {
           throw new RepairPartAssignmentError("案件へ割当できません。入荷済みの発注だけを割り当てできます。");
@@ -61,7 +86,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       where: { id: orderId },
       data: {
         status,
-        orderedAt: status === "ordered" ? new Date() : undefined,
+        ...arrivalUpdate,
         receivedAt: status === "received" ? new Date() : undefined,
       },
       include: { repair: { select: { id: true } } },
@@ -116,6 +141,12 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
     return NextResponse.json(order);
   } catch (error) {
+    if (error instanceof OrderExpectedArrivalError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: "JSONの入力形式が正しくありません。" }, { status: 400 });
+    }
     if (error instanceof RepairPartAssignmentError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
