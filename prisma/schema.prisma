@@ -1135,6 +1135,7 @@ model RepairWorkAction {
   workNames   RepairWorkName[]
   repairLineItems RepairLineItem[] @relation("RepairLineItemWorkAction")
   pricingRules PricingRule[] @relation("PricingRuleWorkAction")
+  workTimeStandards RepairWorkTimeStandard[]
 }
 
 model RepairWorkCategory {
@@ -1154,7 +1155,9 @@ model RepairWorkCategory {
   workNames RepairWorkName[]
   repairLineItems RepairLineItem[] @relation("RepairLineItemWorkCategory")
   pricingRules PricingRule[] @relation("PricingRuleWorkCategory")
+  workTimeStandards RepairWorkTimeStandard[]
 
+  @@unique([id, repairType])
   @@unique([repairType, parentId, name])
   @@index([repairType])
   @@index([parentId])
@@ -1244,6 +1247,7 @@ model PartNameMaster {
   repairWorkNames RepairWorkName[]
   repairLineItems RepairLineItem[] @relation("RepairLineItemTargetPartName")
   pricingRules PricingRule[] @relation("PricingRuleTargetPartName")
+  workTimeStandards RepairWorkTimeStandard[]
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -1649,6 +1653,74 @@ enum WorkTimeActivityType {
   SHIPPING
   ADMIN
   OTHER
+}
+
+enum SchedulerLearningMode {
+  MANUAL
+  AUTO
+}
+
+enum SchedulerAggregationMethod {
+  MEAN
+  MEDIAN
+  P80
+}
+
+enum SchedulerOutlierMethod {
+  NONE
+  IQR
+}
+
+// One global row (id = 1). Task190B will define runtime adoption semantics.
+model SchedulerSetting {
+  id                           Int                        @id @default(1)
+  standardDailyMinutes         Int                        @default(480)
+  dailyScheduleReviewMinutes   Int                        @default(30)
+  repairLearningMode           SchedulerLearningMode      @default(AUTO)
+  repairLearningMinimumSamples Int                        @default(3)
+  repairFullSampleThreshold    Int                        @default(10)
+  repairEarlyAggregationMethod SchedulerAggregationMethod @default(MEDIAN)
+  defaultAggregationMethod     SchedulerAggregationMethod @default(MEAN)
+  repairLookbackMonths         Int                        @default(6)
+  repairOutlierMethod          SchedulerOutlierMethod     @default(NONE)
+  createdAt                    DateTime                   @default(now())
+  updatedAt                    DateTime                   @updatedAt
+}
+
+// REPAIR is governed by SchedulerSetting and RepairWorkTimeStandard.
+model SchedulerActivitySetting {
+  activityType          WorkTimeActivityType      @id
+  manualStandardMinutes Int?
+  dailyReservedMinutes  Int                       @default(0)
+  learningMode          SchedulerLearningMode     @default(MANUAL)
+  aggregationMethod     SchedulerAggregationMethod @default(MEAN)
+  lookbackMonths        Int                       @default(6)
+  fallbackLookbackMonths Int?
+  minimumSamples        Int                       @default(3)
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+}
+
+// General condition standard. No RepairLineItem or RepairWorkName ID dependency.
+model RepairWorkTimeStandard {
+  id               Int                 @id @default(autoincrement())
+  repairType       RepairWorkType
+  categoryId       Int
+  targetPartNameId String?
+  actionId         Int?
+  detailLabel      String?
+  driveType        WatchDriveType?
+  standardMinutes  Int
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  category       RepairWorkCategory @relation(fields: [categoryId, repairType], references: [id, repairType], onDelete: Restrict, onUpdate: Restrict)
+  targetPartName PartNameMaster?    @relation(fields: [targetPartNameId], references: [id], onDelete: Restrict)
+  action         RepairWorkAction?  @relation(fields: [actionId], references: [id], onDelete: Restrict)
+
+  @@index([repairType, categoryId])
+  @@index([targetPartNameId])
+  @@index([actionId])
 }
 
 model WorkTimeSession {
