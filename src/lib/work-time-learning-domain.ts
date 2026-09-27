@@ -88,6 +88,8 @@ type LearningBaseInput = {
   // a RepairWorkTimeStandard among overlapping nullable conditions.
   standardMinutes?: number | null;
   matchingDimensions?: Partial<RepairMatchingDimensions>;
+  // OR alternatives within one tier, applied after logical-sample grouping.
+  matchingDimensionsAny?: readonly Partial<RepairMatchingDimensions>[];
   now: Date;
 };
 
@@ -145,7 +147,7 @@ function increment<K extends string>(counts: Partial<Record<K, number>>, reason:
   counts[reason] = (counts[reason] ?? 0) + 1;
 }
 
-function conditionKey(condition: RepairCondition): string {
+export function conditionKey(condition: RepairCondition): string {
   return JSON.stringify([condition.repairType, condition.repairWorkCategoryId,
     condition.targetPartNameId, condition.repairWorkActionId, normalizeDetailLabel(condition.detailLabel)]);
 }
@@ -270,6 +272,9 @@ export function resolveWorkTimeLearning(input: LearningInput): LearningResult {
       return false;
     }
     if (input.matchingDimensions && !matchesDimensions(sample, input.matchingDimensions)) {
+      return false;
+    }
+    if (input.matchingDimensionsAny && !input.matchingDimensionsAny.some(filter => matchesDimensions(sample, filter))) {
       return false;
     }
     return true;
