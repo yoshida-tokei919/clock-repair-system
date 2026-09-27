@@ -51,6 +51,7 @@ import {
     getTargetPartKeysForRepairWorkCategory,
     hasTargetPartMappingForRepairWorkCategory,
 } from "@/lib/repair-work-target-part-filter";
+import { INTERNAL_REPAIR_WORK_ACTION_KEYS, EXTERNAL_REPAIR_WORK_ACTION_KEYS, isRepairWorkTargetPartApplicable } from "@/lib/repair-work-selection";
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { toast } from "@/components/ui/use-toast";
 import { RepairLineConversation } from "./RepairLineConversation";
@@ -102,44 +103,6 @@ type AddItemCategory = 'internal' | 'external_labor' | 'part_external';
 const toLineItemPartType = (partInputType: PartInputType): "interior" | "exterior" =>
     partInputType === "part_internal" ? "interior" : "exterior";
 
-const INTERNAL_REPAIR_WORK_ACTION_KEYS = new Set([
-    "exchange",
-    "repair",
-    "adjust",
-    "correction",
-    "polish",
-    "clean",
-    "oil",
-    "make",
-    "install",
-    "remove",
-    "hole_tightening",
-    "staking",
-    "overhaul",
-    "inspection",
-]);
-
-const EXTERNAL_REPAIR_WORK_ACTION_KEYS = new Set([
-    "exchange",
-    "install",
-    "repair",
-    "correction",
-    "adjust",
-    "processing",
-    "make",
-    "bonding",
-    "polish",
-    "finishing",
-    "light_finishing",
-    "clean",
-    "inspection",
-    "painting",
-    "rust_removal",
-    "drying",
-    "remove",
-    "welding",
-    "brazing",
-]);
 
 function FormRow({
     label,
@@ -852,15 +815,10 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, [isAddingExternalLaborItem, workTargetPartOptions]);
     const filteredWorkTargetPartOptions = useMemo(() => {
         if (!newWorkCategoryId) return visibleWorkTargetPartOptions;
-
-        const targetPartKeys = getTargetPartKeysForRepairWorkCategory(selectedRepairWorkCategoryKey);
-        if (!targetPartKeys) {
-            if (!isAddingExternalLaborItem || !selectedRepairWorkCategoryKey) return [];
-            return visibleWorkTargetPartOptions.filter((option) => option.categoryKey === selectedRepairWorkCategoryKey);
-        }
-
-        const keySet = new Set(targetPartKeys);
-        return visibleWorkTargetPartOptions.filter((option) => option.key ? keySet.has(option.key) : false);
+        if (!selectedRepairWorkCategoryKey) return [];
+        return visibleWorkTargetPartOptions.filter((option) => option.key &&
+            isRepairWorkTargetPartApplicable(isAddingExternalLaborItem ? "EXTERNAL" : "INTERNAL", selectedRepairWorkCategoryKey,
+                { key: option.key, partType: option.partType ?? null, categoryKey: option.categoryKey ?? null }));
     }, [isAddingExternalLaborItem, newWorkCategoryId, selectedRepairWorkCategoryKey, visibleWorkTargetPartOptions]);
     const targetPartCandidateMessage = useMemo(() => {
         if (!newWorkCategoryId) return "";
