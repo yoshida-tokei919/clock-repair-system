@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RepairWorkTimeStandard, SchedulerActivitySetting, SchedulerSetting } from "@prisma/client";
 import { AUTO_ACTIVITY_TYPES } from "@/lib/scheduler-settings-domain";
 import { isRepairWorkActionApplicable, isRepairWorkTargetPartApplicable } from "@/lib/repair-work-selection";
+import ProcurementSettingsEditor from "@/components/settings/ProcurementSettingsEditor";
 
 type Masters = {
   categories: { id: number; repairType: "INTERNAL" | "EXTERNAL"; key: string; name: string }[];
@@ -172,5 +173,6 @@ export default function SchedulerSettingsEditor() {
         </div>
       </section>
     </>}
+    <ProcurementSettingsEditor />
   </main>;
 }

@@ -86,13 +86,14 @@ Production: Task191A complete
 - 新3テーブルはserver-only、RLS有効、Data API向けGRANTなし。
 - Production: complete
 
-## 次に行うこと
+## 現在のTask
 
-- 次候補は Task191B「Supplier / ProcurementShippingMethod の設定操作」。
-- Task191Aで確定した保存形を前提に、設定API/UIの最小境界を確定してから実装する。
-- Supplier側処理日数と配送方法の輸送日数を混同しない。
-- Cousins、DHL、国内郵便等の所要日数をコードやseedへ推測でハードコードしない。
-- Task191C/Dで到着予定resolver、partsReadyDate、中断状態との業務連携を段階的に扱う。
-- production migration / deployを伴う場合は引き続き高リスク工程として独立レビューとユーザー承認を必須とする。
-- 既存 `docs/ai/02_PRODUCT_ROADMAP.md` の未commit差分（+271 / -57）はTask外として保護し、混ぜない。
-- 次Taskはユーザー承認なしに実装開始しない。
+### Task191B: Supplier / ProcurementShippingMethod の設定操作
+
+- Task191A の schema を使う設定 API / UI のローカル実装を完了。詳細は `docs/ai-tasks/191b-procurement-lead-time-settings.md`。
+- schema、migration、seed、OrderRequest、RepairPlanningState、Task184 scheduler は変更しない。
+- Supplier 処理日数と配送方法の輸送日数を分離し、null と 0 を区別する。
+- Cousins、DHL、国内郵便等の所要日数をコードや seed へ推測でハードコードしない。
+- ローカル実装・テスト・カタリ独立レビュー完了。コードレビュー指摘なし。
+- 現在の production application commit は `b09fc122b89690474239d0b997b2fcd9222e69aa`。Task191B Production: pending。
+- Task191C/D で到着予定 resolver、partsReadyDate、中断状態との業務連携を段階的に扱う。
