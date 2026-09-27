@@ -1,61 +1,52 @@
 # CURRENT TASK
 
-## 現在のcheckpoint — 2026-09-27
+## 現在のcheckpoint — 2026-09-28
 
 このファイルは、現在の実装Taskとproductionの現在地だけを管理する。
 過去Taskの詳細は `docs/ai-tasks/` と各runbookを参照し、ここへ長い履歴を残さない。
 
 ## Production
 
-- Production application commit: `3a5b53f5cbff979cd4d17f283298b3a5f3b9a34e`
-- Commit subject: `feat: add parts readiness and repair planning`
+- Production application commit: `122c2d9b3ed12ed7a62a0e258211fc3ae4f3aa8c`
+- Commit subject: `feat: connect scheduler readiness gates`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `b9a1c248-89d5-4713-bc92-d549131ac3c1`
+- Railway deployment: `b5a59b8a-7b09-4bc4-b863-062971e7f88f`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task191d-20260927`
+- Production tag: `production-task191e-20260928`
 - Region: `sin`
 - Schema / migration: なし。Task191Aのproduction schemaをそのまま利用。
 
-Production: Task191D complete
+Production: Task191E complete
 
-## Task191D production確認
+## Task191E production確認
 
 - schema / migrationなしのためproduction DB backup / migrationは不要。
-- Railway production build:
-  - Prisma Client v5.7.0生成成功
-  - Next.js production compile成功
-  - lint / type check通過
-  - static pages 66/66生成完了
-  - 既存 `/api/repairs/recent` の Dynamic server usageログはbuild失敗ではなくTask191D対象外
-- Runtime: `next start` 正常起動、`Ready in 757ms`
+- Railway production build: `npm run build` 完了、deployment `SUCCESS`。
+- Runtime: `next start` 正常起動、`Ready in 256ms`。
 - Non-destructive smoke:
   - `/` = 200
   - `/login` = 200
-  - 未認証 `/api/repairs/1/planning` = 401（想定どおり）
+  - 未認証 `/api/repairs/auto-schedule` = 401（想定どおり）
 
-## Task191D 実装内容
+## Task191E 実装内容
 
-- EstimateItem・RepairPartAllocation・OrderRequestから部品準備状態と `partsReadyDate` を保存せず導出。
-- `RepairPlanningState` のblock/update/resumeを認証付きAPIとRepair詳細画面へ接続。
-- 中断中も理由・メモ・残作業時間・再開可能日・再確認日を更新可能。
-- block/update時、同一Repairに紐づくactive WorkTimeSessionをactivityTypeに関係なく同一transaction内で停止。別Repair / global timerは停止しない。
-- `WAITING_PARTS` 選択時、空欄なら部品準備見込み日を再開可能日の入力候補にする。
-- Repair.status / scheduledDate / scheduleLocked / Task184 schedulerは変更していない。
+- Task184 schedulerの既存条件に、Task191Dの `RepairPlanningState.blocked` とderived parts readinessを除外条件として接続。
+- 除外判定の優先順は terminal → scheduleLocked → status → estimatedWorkMinutes → planning blocked → parts readiness。
+- `NOT_REQUIRED` / `READY` のみ既存のsort / capacity計算へ進み、`WAITING` / `WAITING_UNKNOWN` / `LEGACY_UNKNOWN` は除外。
+- `LEGACY_UNKNOWN` はfail-closedとし、status等へのfallbackは行わない。
+- locked案件の既存固定容量消費は維持。
+- routeはTask191Dのcanonical `resolveRepairPartsReadiness()` を利用し、readiness判定を重複実装していない。
+- preview revisionへraw sourceに加えてderived `planningBlocked` / `partsReadinessState` を明示し、GET後に状態が変わったpreviewのPOST適用を409で拒否できる。
+- Repair.status同期、partsReadyDate / resumeEligibleDate / reviewDateからscheduledDateへの転記、優先度式、WorkCalendar、分割Schedulerは変更していない。
 
 ## Validation / Review
 
-- Parts readiness: 7 / 7 PASS
-- Planning parser: 2 / 2 PASS
-- WorkTimeSession: 5 / 5 PASS
-- RepairPartAllocation: 26 / 26 PASS
-- Order expected arrival: 8 / 8 PASS
-- 合計48 / 48 PASS
-- `npx prisma validate`: PASS
+- Scheduler / parts readiness / WorkCalendar / repair schedule関連: 24 / 24 PASS
 - `npx tsc --noEmit --incremental false`: PASS
 - `git diff --check`: PASS
 - Codex実装 → カタリ独立レビュー完了。
-- 初回レビュー指摘3点（同Repair timer停止条件、中断中の編集UI、WAITING_PARTS時の再開可能日候補入力）は修正済み。
-- schema / migration / seed / roadmap / Task184 scheduler へのTask外差分なし。
+- 独立レビュー指摘1点（derived eligibilityをrevisionへ明示）は修正済み。
+- schema / migration / seed / roadmapへのTask外差分なし。
 
 ## Schedule / Scheduler の現在地
 
@@ -75,15 +66,16 @@ Production: Task191D complete
 14. Task191B: Supplier / ProcurementShippingMethod 設定操作 — production完了
 15. Task191C: OrderRequest入荷予定resolver / 配送方法接続 — production完了
 16. Task191D: 部品準備日・作業中断/再開 — production完了
+17. Task191E: 部品準備・中断状態をTask184 scheduler除外条件へ接続 — production完了
 
-## 現在のTask: Task191D
+## 現在のTask: Task191E
 
 Production: complete
 
-- Task191Dはproduction反映・smoke・tagまで完了。
-- Production application commit: `3a5b53f5cbff979cd4d17f283298b3a5f3b9a34e`
-- Railway deployment: `b9a1c248-89d5-4713-bc92-d549131ac3c1`
-- Production tag: `production-task191d-20260927`
-- 詳細: `docs/ai-tasks/191d-parts-readiness-repair-planning.md`
-- 次Task候補はTask191E: derived parts readiness + `RepairPlanningState.blocked` をTask184 schedulerの除外条件へ接続する。
-- 次Taskはユーザー承認なしに開始しない。
+- Task191Eはproduction反映・smoke・tagまで完了。
+- Production application commit: `122c2d9b3ed12ed7a62a0e258211fc3ae4f3aa8c`
+- Railway deployment: `b5a59b8a-7b09-4bc4-b863-062971e7f88f`
+- Production tag: `production-task191e-20260928`
+- 詳細: `docs/ai-tasks/191e-scheduler-readiness-gates.md`
+- 次Task候補はTask192: 納期逆算・実効容量 read-only preview。
+- 次Taskはユーザー承認なしに実装開始しない。
