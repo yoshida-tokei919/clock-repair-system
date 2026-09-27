@@ -850,6 +850,7 @@ model Repair {
   lineManagerSendOutboxes LineManagerSendOutbox[] @relation("LineManagerSendOutboxSourceRepair")
   workTimeSessions WorkTimeSession[]
   planningState RepairPlanningState?
+  scheduleSegments RepairScheduleSegment[]
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
@@ -872,6 +873,27 @@ model WorkCalendar {
   note             String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+enum RepairScheduleSegmentSource {
+  AUTO
+  MANUAL
+}
+
+model RepairScheduleSegment {
+  id             Int                         @id @default(autoincrement())
+  repairId       Int
+  workDate       DateTime                    @db.Date
+  plannedMinutes Int
+  source         RepairScheduleSegmentSource
+  sortOrder      Int                         @default(0)
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  repair Repair @relation(fields: [repairId], references: [id], onDelete: Cascade)
+
+  @@unique([repairId, workDate])
+  @@index([workDate, sortOrder])
 }
 
 model RepairStatusLog {
