@@ -7,33 +7,38 @@
 
 ## Production
 
-- Production application commit: `acfd69de856974301006d2089b788279145a973d`
-- Commit subject: `feat: add scheduler settings foundation`
+- Production application commit: `e5b90e01ecbaafe675bd33cf72e0f1f9a72c83c1`
+- Commit subject: `feat: add repair work time preview`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `557a6e87-8ab6-46e6-a46c-04adcd73b495`
+- Railway deployment: `d1e0f3bc-4636-4aca-b8d9-5b111dd6c1b8`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task190a-20260927`
+- Production tag: `production-task190d-20260927`
 - Region: `sin`
-- Supabase migration: `20260927004833 add_work_time_standard_settings`
+- Schema / migration: none
 
-Production: Task190A complete
+Production: Task190D complete
 
-## Task190A production確認
+## Task190D production確認
 
-- Railway source commit: `acfd69de856974301006d2089b788279145a973d`
+- Railway source commit: `e5b90e01ecbaafe675bd33cf72e0f1f9a72c83c1`
 - Runtime:
   - `next start` 正常起動
-  - `Ready in 574ms`
+  - `Ready in 298ms`
 - Non-destructive smoke:
   - `/` = 200
   - `/login` = 200
-  - unauthenticated `GET /api/work-time-sessions/active` = 401
-  - unauthenticated `GET /api/work-calendar?month=2026-09` = 401
-- local Task190A tests: 4 / 4 PASS
-- Prisma validate / TypeScript / `git diff --check`: PASS
-- production backup: `C:\\Users\\yoshi\\clock-repair-backups\\task190a-20260927T004725Z`
-- Supabase: 新3テーブルRLS有効、policy 0件、anon / authenticated / service_role のtable/sequence権限なし。
-- カタリ独立レビュー済み。migration順序、nullable一意条件、server-only権限を修正・再確認済み。
+  - unauthenticated `/settings/scheduler` = 307
+  - unauthenticated `GET /api/settings/scheduler` = 401
+  - unauthenticated `GET /api/repairs/1/work-time-preview` = 401
+- local validation:
+  - Task190D domain: 14 / 14 PASS
+  - Task190D server/read-only: 3 / 3 PASS
+  - Task190B domain regression: 11 / 11 PASS
+  - Task190B DB resolver regression: 3 / 3 PASS
+  - TypeScript / `git diff --check`: PASS
+- Independent review completed.
+- Current LABOR rows are grouped by Task190B-compatible structured condition into logical work units, preventing duplicate current rows from double-counting estimated minutes.
+- Read-only only: no `Repair.estimatedWorkMinutes` write, no Scheduler/WorkCalendar write.
 
 ## Schedule / Scheduler の現在地
 
@@ -45,23 +50,29 @@ Production: Task190A complete
 6. Task188: WorkTimeSession基盤 — production完了
 7. Task189: 共通業務タイマーUI — production完了
 8. Task190A: Scheduler設定・標準作業時間 schema foundation — production完了
+9. Task190B: WorkTimeSession実績集計・統計resolver — production完了
+10. Task190C: Scheduler設定UI/API — production完了
+11. Task190D: Repair作業時間 read-only preview — production完了
 
 ## 直近完了Task
 
-### Task190A: Scheduler設定・標準作業時間 schema foundation
+### Task190D: Repair作業時間 read-only preview
 
-- commit: `acfd69de856974301006d2089b788279145a973d`
-- 詳細: `docs/ai-tasks/190a-scheduler-schema-foundation.md`
-- `SchedulerSetting`、`SchedulerActivitySetting`、`RepairWorkTimeStandard` と型付きenum・DB制約を追加。
-- server-onlyとしてRLSを有効化し、Data API用roleへtable/sequence権限を付与しない。
-- 既存Scheduler / `estimatedWorkMinutes` / WorkCalendar容量計算にはまだ接続していない。
+- commit: `e5b90e01ecbaafe675bd33cf72e0f1f9a72c83c1`
+- 認証付き `GET /api/repairs/[id]/work-time-preview` を追加。
+- Task190B実績学習とTask190A/190C設定・標準時間を使って、案件ごとの作業時間推定根拠をread-onlyで返す。
+- INTERNALは Movement Cal → Base Movement Cal → Watch Cal → Watch Base Cal。
+- EXTERNALは Ref → Model → Brand。
+- 同一structured conditionの現行LABOR複数行は1 logical work unitへ集約し、二重計上しない。
+- 未構造化LABOR、標準時間曖昧、標準時間なし等は未解決として完全推定を作らない。
+- `Repair.estimatedWorkMinutes`、Scheduler、WorkCalendarにはまだ書き込まない。
 - Production: complete
 
 ## 次に行うこと
 
-- 次候補は Task190B「WorkTimeSession実績集計・統計resolver」。
-- Task190Aで作成した設定schemaを正本として使い、同一Repair + 同一作業条件の分割sessionを1 sampleへ集約する設計を実装する。
-- Task190Bでは原則schemaを増やさず、WorkTimeSession履歴を削除・上書きしない。
-- Task190Bはユーザー承認なしに開始しない。
-- 既存 `docs/ai/02_PRODUCT_ROADMAP.md` の未commit差分はTask190A外として保護し、混ぜない。
-- マスタデータ投入・復旧は別Taskとして並行可。Schedule差分と混ぜない。
+- 次候補は Task190E「Repair.estimatedWorkMinutes / Schedulerへの安全接続」。
+- Task190Dのcompleteなpreviewをどの条件で採用するか、整数分への丸め、手入力済みestimatedWorkMinutesとの優先関係、preview → apply / 自動更新境界を実装前に調査・確定する。
+- Task190E開始前に現行Task184 Scheduler、Repair.estimatedWorkMinutesの現行write/read経路、Task185設計を再確認する。
+- schema / migrationはTask190Eで必要性が確認されるまで増やさない。
+- 既存 `docs/ai/02_PRODUCT_ROADMAP.md` の未commit差分（+271 / -57）はTask外として保護し、混ぜない。
+- 次Taskはユーザー承認なしに実装開始しない。
