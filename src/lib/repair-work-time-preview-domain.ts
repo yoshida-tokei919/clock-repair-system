@@ -71,7 +71,9 @@ function attemptSummary(name: string, result: LearningResult) {
     excludedSampleCount: result.excludedSampleCount, mean: result.mean, median: result.median, p80: result.p80,
     lookback: result.lookback, adoptedReason: result.adoptedReason, adoptedMinutes: result.adoptedMinutes,
     adoptedMethod: result.adoptedMethod, sessionExclusions: result.sessionExclusions,
-    sampleExclusions: result.sampleExclusions };
+    sampleExclusions: result.sampleExclusions,
+    // Stable identity of the eligible set for revision checks at a lookback boundary.
+    usableSampleKeys: result.samples.map(sample => sample.key).sort() };
 }
 
 export function resolveRepairWorkTimePreview(input: { repair: Repair; standards: readonly Standard[];
