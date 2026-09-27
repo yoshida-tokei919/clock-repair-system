@@ -7,55 +7,40 @@
 
 ## Production
 
-- Production application commit: `3b8d372cbbca0a5379b6a7626eaf63130fe557ab`
-- Commit subject: `feat: add scheduler process buffer settings`
+- Production application commit: `8b65acdd8db584133857d9c6dad519b89f423116`
+- Commit subject: `feat: add deadline capacity preview`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `1152ec4b-11c6-4493-8d86-be0a7b061fc0`
+- Railway deployment: `4a394a7c-15ed-4916-a472-4c8ba4d22f38`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task192a-20260928`
+- Production tag: `production-task192b-20260928`
 - Region: `sin`
-- Supabase migration: `20260927163924 add_scheduler_process_buffers`
+- schema / migration / RLS / GRANT変更なし。migrationがないためproduction backup不要。
+- Railway runtime: `next start` / `Ready in 295ms`
 
-Production: Task192A complete
+Production: Task192B complete
 
-## Task192A production確認
+## Task192B production確認
 
-- production DB backup取得済み（schema / data）。
-- `SchedulerSetting` に以下3列を追加:
-  - `runningTestDays Int?`
-  - `reworkBufferDays Int?`
-  - `shippingBufferDays Int?`
-- 3列はいずれも nullable integer / defaultなし。
-- CHECK制約で `null` または0以上に制限。
-- Task186の3/3/1はbackfillしていない。
-- `SchedulerSetting(id=1)` の3値はmigration後もすべて `null`。
-- 新規table / Data API GRANT / RLS policy変更なし。
-- Railway production buildでPrisma Client生成・Next.js build完了、deployment `SUCCESS`。
 - Non-destructive smoke:
   - `/` = 200
   - `/login` = 200
-  - 未認証 `/api/settings/scheduler` = 401（想定どおり）
+  - 未認証 `/repairs/calendar` = 307 → `/api/auth/signin?callbackUrl=%2Frepairs%2Fcalendar`
+  - 未認証 `GET /api/repairs/deadline-capacity-preview` = 401（想定どおり）
+- 認証済みブラウザでの実画面と、認証済みproduction APIの動作確認は未実施。
 
-## Task192A 実装内容
+## Task192B 実装内容
 
-- Scheduler設定へランニングテスト・再調整余裕・発送余裕の暦日設定を追加。
-- `null` = 未設定、`0` = 明示的な0日。
-- settings API exact-key validationへ3項目を接続。
-- `/settings/scheduler` で編集可能。
-- UI上で空欄 / 0の意味と、現行auto schedulerへ未接続であることを明示。
-- Task184 auto scheduler、WorkCalendar、scheduledDate、deliveryDateExpected、Repair.status、parts readiness、priorityScore、estimatedWorkMinutesには接続していない。
-- `standardDailyMinutes` のWorkCalendar接続、`standardLeadDays`、Task192B、Task193は対象外。
+- Task192Aの工程日数設定、WorkCalendar、作業時間、Task191の部品準備・中断状態、既存予定負荷を組み合わせ、納期窓と日別実効容量をread-onlyで計算。
+- 認証必須の `GET /api/repairs/deadline-capacity-preview` と `/repairs/calendar` の分析欄を追加。
+- `snapshotRevision` は情報表示のみ。予定のapply、`scheduledDate`の更新、Task193の複数日分割は含まない。
+- 詳細: `docs/ai-tasks/192b-deadline-capacity-readonly-preview.md`
 
 ## Validation / Review
 
-- `npx prisma validate`: PASS
-- Scheduler settings domain: 7 / 7 PASS
-- Task190A schema regression: 4 / 4 PASS
-- Task192A schema: 1 / 1 PASS
+- 新規 + 既存回帰テスト: 47 / 47 PASS
 - `npx tsc --noEmit --incremental false`: PASS
 - `git diff --check`: PASS
-- Codex実装 → カタリ独立レビュー: 指摘なし / PASS
-- Supabase security advisor: 適用前後で既存指摘のみ、Task192A由来の新規指摘なし。
+- Codex実装 → 独立レビュー: 3点を修正し、再確認PASS（対象期間外の現予定、全日0分の納期窓、現予定日のUI表示）。
 
 ## Schedule / Scheduler の現在地
 
@@ -77,13 +62,13 @@ Production: Task192A complete
 16. Task191D: 部品準備日・作業中断/再開 — production完了
 17. Task191E: 部品準備・中断状態をTask184 scheduler除外条件へ接続 — production完了
 18. Task192A: Scheduler 工程日数設定 foundation — production完了
+19. Task192B: 納期逆算・実効容量 read-only preview — production完了
 
-## 現在のTask: Task192A
+## 現在のTask: Task192B
 
 Production: complete
 
-- 詳細: `docs/ai-tasks/192a-scheduler-process-buffer-foundation.md`
-- 次Task候補はTask192B: 納期逆算・実効容量 read-only preview。
-- Task192BではTask192Aの工程日数設定、WorkCalendar、estimatedWorkMinutes、Task191 parts readiness / planning stateをpure resolver中心で接続する。
-- Task193の複数日分割 / RepairScheduleSegmentへは踏み込まない。
+- 詳細: `docs/ai-tasks/192b-deadline-capacity-readonly-preview.md`
+- 次Task候補はTask193: 分割スケジュール基盤 + Scheduler v2。
+- Task193では複数日分割、`RepairScheduleSegment`、preview → 人間確認 → applyを扱う。
 - 次Taskはユーザー承認なしに実装開始しない。

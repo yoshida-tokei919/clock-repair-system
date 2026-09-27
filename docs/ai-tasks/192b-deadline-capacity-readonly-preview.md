@@ -1,6 +1,6 @@
 # Task192B: 納期逆算・実効容量 read-only preview
 
-Production: pending。Task192A production commit `3b8d372cbbca0a5379b6a7626eaf63130fe557ab` を土台にしたローカル実装。commit / push / deploy / production DB操作は行わない。
+Production: complete。Application commit `8b65acdd8db584133857d9c6dad519b89f423116` を GitHub `main` から Railway へ自動deploy済み。
 
 ## 範囲
 
@@ -24,12 +24,35 @@ Production: pending。Task192A production commit `3b8d372cbbca0a5379b6a7626eaf63
 
 ## 検証
 
+- レビュー後の修正3点を反映済み:
+  1. preview対象期間外の `scheduledDate` は、部品・納期制約を満たす限り固定/仮予定とも `BEYOND_PREVIEW_HORIZON` とする。期間外でも制約違反は `LOCKED_DATE_CONFLICT` / `CURRENT_PLAN_CONFLICT` とする。
+  2. 納期窓の実効容量が全日0分なら `NO_CAPACITY_IN_WINDOW` とし、正の容量があっても1日で収まらない場合に限り `REQUIRES_SPLIT_SCHEDULER` とする。
+  3. 案件別UIに現在の `scheduledDate` と固定/仮の区分を表示する。
 - pure domainのWorkCalendar、予約、固定/仮負荷、残作業時間、部品、中断、工程日数、納期窓、自己負荷除外、分割必要、容量不足、現予定競合、対象期間をテスト。
 - loaderのcanonical部品準備導出とread-only query、revisionの関連入力変更をテスト。
-- `npx tsx --test` で新規テストと既存Task184、Task191D、WorkCalendarテスト: 47 / 47 PASS。
+- 上記修正後、`npx tsx --test` で新規テストと既存Task184、Task191D、WorkCalendarテスト: 47 / 47 PASS。
 - `npx tsc --noEmit --incremental false`: PASS。
 - `git diff --check`: PASS。
-- 認証済みブラウザでの実画面とproduction APIの動作確認は未実施。
+- Codex実装後の独立レビューで指摘された上記3点を修正し、再確認PASS。
+- 認証済みブラウザでの実画面と、認証済みproduction APIの動作確認は未実施。未認証のproduction smoke結果は下記に記録。
+
+## Production
+
+- Production application commit: `8b65acdd8db584133857d9c6dad519b89f423116`
+- Commit subject: `feat: add deadline capacity preview`
+- Deploy source: GitHub `main` → Railway automatic deployment
+- Railway deployment: `4a394a7c-15ed-4916-a472-4c8ba4d22f38`
+- Deployment status: `SUCCESS`
+- Production tag: `production-task192b-20260928`
+- Region: `sin`
+- schema / migration / RLS / GRANT変更なし。migrationがないためproduction backupは不要。
+- Railway runtime: `next start` / `Ready in 295ms`。
+- Non-destructive smoke:
+  - `/` = 200
+  - `/login` = 200
+  - 未認証 `/repairs/calendar` = 307 → `/api/auth/signin?callbackUrl=%2Frepairs%2Fcalendar`
+  - 未認証 `GET /api/repairs/deadline-capacity-preview` = 401
+- GET-onlyのread-only preview。予定のapplyや`RepairScheduleSegment`による複数日分割はTask193の範囲。
 
 ## 対象外
 
