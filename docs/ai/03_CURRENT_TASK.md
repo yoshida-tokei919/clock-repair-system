@@ -7,40 +7,60 @@
 
 ## Production
 
-- Production application commit: `8b65acdd8db584133857d9c6dad519b89f423116`
-- Commit subject: `feat: add deadline capacity preview`
+- Production application commit: `33384b00a151573c815234841f4b1faef0b9c589`
+- Commit subject: `feat: add repair schedule segment foundation`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `4a394a7c-15ed-4916-a472-4c8ba4d22f38`
+- Railway deployment: `0dc0a7c4-ac17-4792-b2f5-a606e3c59054`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task192b-20260928`
+- Production tag: `production-task193a-20260928`
 - Region: `sin`
-- schema / migration / RLS / GRANT変更なし。migrationがないためproduction backup不要。
-- Railway runtime: `next start` / `Ready in 295ms`
+- Supabase migration: `20260927211044 add_repair_schedule_segment`
+- Railway runtime: `next start` / `Ready in 373ms`
 
-Production: Task192B complete
+Production: Task193A complete
 
-## Task192B production確認
+## Task193A production確認
 
+- Production backup:
+  - `C:\Users\yoshi\clock-repair-backups\task193a-20260928-060438`
+  - read-only SQLによるpublic data + XSD / schema metadata fallback snapshot。
+  - `public-data-and-xsd.xml` SHA256 `6A9AC4E767629F6836442096A92C25CB18AFAD84AE127B7DB56615738F368727`
+  - `schema-metadata.json` SHA256 `F5AE90CBE0D95F88C8FA8B0926044A5E6EEA7D77BD27EB8EEBF64D34E60265FF`
+  - Supabase Free planかつCLI未認証・未linkのためpg_dump archiveではない。Task192A時点のfull SQL dump baselineも保持。
+- Production DB:
+  - `RepairScheduleSegment` 0行。
+  - enum `AUTO / MANUAL`、CHECK、FK cascade、unique/indexを確認。
+  - RLS enabled、policy 0件。
+  - anon / authenticated / service_role のtable SELECT権限なし。
+  - 同3 roleのsequence USAGE権限なし。
+- Security Advisor:
+  - 新tableの `rls_enabled_no_policy` INFOはserver-only設計として意図どおり。
+  - 既存2関数の `function_search_path_mutable` WARNはTask外。
 - Non-destructive smoke:
   - `/` = 200
   - `/login` = 200
   - 未認証 `/repairs/calendar` = 307 → `/api/auth/signin?callbackUrl=%2Frepairs%2Fcalendar`
-  - 未認証 `GET /api/repairs/deadline-capacity-preview` = 401（想定どおり）
-- 認証済みブラウザでの実画面と、認証済みproduction APIの動作確認は未実施。
+  - 未認証 `GET /api/repairs/deadline-capacity-preview` = 401
 
-## Task192B 実装内容
+## Task193A 実装内容
 
-- Task192Aの工程日数設定、WorkCalendar、作業時間、Task191の部品準備・中断状態、既存予定負荷を組み合わせ、納期窓と日別実効容量をread-onlyで計算。
-- 認証必須の `GET /api/repairs/deadline-capacity-preview` と `/repairs/calendar` の分析欄を追加。
-- `snapshotRevision` は情報表示のみ。予定のapply、`scheduledDate`の更新、Task193の複数日分割は含まない。
-- 詳細: `docs/ai-tasks/192b-deadline-capacity-readonly-preview.md`
+- server-onlyの `RepairScheduleSegment` と `RepairScheduleSegmentSource(AUTO / MANUAL)` を追加。
+- 1 Repair + 1 workDate = 1日別集約segment。
+- `plannedMinutes > 0`、`sortOrder >= 0` をDB CHECKで保証。
+- `Repair.scheduledDate` は既存summaryのまま維持し、backfill・同期・正本切替は未実装。
+- Task193Bのplanner / preview / applyには未着手。
+- 詳細: `docs/ai-tasks/193a-repair-schedule-segment-foundation.md`
 
 ## Validation / Review
 
-- 新規 + 既存回帰テスト: 47 / 47 PASS
+- Task193A schema test: 4 / 4 PASS
+- Task191A regression: 4 / 4 PASS
+- Task192A regression: 1 / 1 PASS
+- `npx prisma validate`: PASS
 - `npx tsc --noEmit --incremental false`: PASS
 - `git diff --check`: PASS
-- Codex実装 → 独立レビュー: 3点を修正し、再確認PASS（対象期間外の現予定、全日0分の納期窓、現予定日のUI表示）。
+- Codex実装 → カタリ独立レビュー: 指摘なし / PASS。
+- `node --test` wrapperはWindows環境の `spawn EPERM`。各ファイル直接実行では全assertion PASS。
 
 ## Schedule / Scheduler の現在地
 
@@ -63,12 +83,13 @@ Production: Task192B complete
 17. Task191E: 部品準備・中断状態をTask184 scheduler除外条件へ接続 — production完了
 18. Task192A: Scheduler 工程日数設定 foundation — production完了
 19. Task192B: 納期逆算・実効容量 read-only preview — production完了
+20. Task193A: RepairScheduleSegment schema foundation — production完了
 
-## 現在のTask: Task192B
+## 現在のTask: Task193A
 
 Production: complete
 
-- 詳細: `docs/ai-tasks/192b-deadline-capacity-readonly-preview.md`
-- 次Task候補はTask193: 分割スケジュール基盤 + Scheduler v2。
-- Task193では複数日分割、`RepairScheduleSegment`、preview → 人間確認 → applyを扱う。
+- 詳細: `docs/ai-tasks/193a-repair-schedule-segment-foundation.md`
+- 次Task候補はTask193B: segment-based Scheduler v2 planner / read-only preview。
+- Task193Bの正確な境界は実装前調査で確定し、preview → applyの書き込み境界と `scheduledDate` summary同期を分離して安全に進める。
 - 次Taskはユーザー承認なしに実装開始しない。
