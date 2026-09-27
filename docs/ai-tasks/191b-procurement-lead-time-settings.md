@@ -2,7 +2,7 @@
 
 ## 範囲と状態
 
-Task191A の保存形を使い、仕入先の手動処理日数と調達配送方法の手動輸送日数を `/settings/scheduler` から管理できるようにした。新しい schema、migration、seed はない。Production: pending。現在の production application commit は `b09fc122b89690474239d0b997b2fcd9222e69aa`。
+Task191A の保存形を使い、仕入先の手動処理日数と調達配送方法の手動輸送日数を `/settings/scheduler` から管理できるようにした。新しい schema、migration、seed はない。Production: complete。production application commit は `0deae211300ac3a86f729fce2fc807b6ec5cf073`。
 
 ## API と画面
 
@@ -25,7 +25,18 @@ Task191A の保存形を使い、仕入先の手動処理日数と調達配送�
 - `git diff --check`: PASS。
 - カタリ独立レビュー: PASS。schema / migration / seed / OrderRequest / Task184 scheduler へのTask外差分なし。
 - `next lint` は repository に ESLint 設定がなく、設定選択の対話画面を表示したため実行できなかった。
-- 認証付き実画面のブラウザ確認は未実施。
-- Production deploy、production smoke test は未実施。
+- 認証付き実画面のブラウザ操作確認は未実施。ただしproduction smokeで `/` = 200、`/login` = 200、未認証 `/api/settings/procurement` = 401 を確認。
 
-Production: pending
+## Production反映
+
+- Production application commit: `0deae211300ac3a86f729fce2fc807b6ec5cf073`
+- Production tag: `production-task191b-20260927`
+- Railway deployment: `72d13243-70ba-48de-a50c-0a128bef040e`
+- status: `SUCCESS` / region `sin`
+- migrationなし。Task191Aのproduction schemaをそのまま使用するためproduction DB backupは不要。
+- Railway production buildで Prisma Client v5.7.0 再生成、Next.js production build / type check 成功。
+- Runtime: `next start` 正常起動、`Ready in 241ms`。
+- Non-destructive smoke: `/` = 200、`/login` = 200、未認証 `/api/settings/procurement` = 401。
+- 既存 `/api/repairs/recent` の Dynamic server usage ログはbuildを失敗させておらずTask191B対象外。
+
+Production: complete

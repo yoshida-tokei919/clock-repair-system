@@ -7,53 +7,40 @@
 
 ## Production
 
-- Production application commit: `b09fc122b89690474239d0b997b2fcd9222e69aa`
-- Commit subject: `feat: add order lead time blocking foundation`
+- Production application commit: `0deae211300ac3a86f729fce2fc807b6ec5cf073`
+- Commit subject: `feat: add procurement lead time settings`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `99b2d0e2-3ba0-4b1c-82d9-fe281af6253d`
+- Railway deployment: `72d13243-70ba-48de-a50c-0a128bef040e`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task191a-20260927`
+- Production tag: `production-task191b-20260927`
 - Region: `sin`
-- Schema / migration: `20260927122026 add_order_lead_time_blocking_foundation`
+- Schema / migration: なし。Task191Aのproduction schemaをそのまま利用。
 
-Production: Task191A complete
+Production: Task191B complete
 
-## Task191A production確認
+## Task191B production確認
 
-- Production backup: `C:\Users\yoshi\clock-repair-backups\task191a-20260927T121904Z`
-  - `public.dump` 344,178 bytes
-  - SHA256 `C9F55BDC00799FC6F0BAE31BFAE2EE52EA473F17BC36F853342189B792AF328C`
-  - TOC 776件 / public TABLE DATA 66件
-  - `pg_restore -l` 成功
-- Supabase migration: `20260927122026 add_order_lead_time_blocking_foundation`
-  - `SupplierLeadTimeSetting` / `ProcurementShippingMethod` / `RepairPlanningState` を作成
-  - `OrderRequest.expectedArrivalDate` / `procurementShippingMethodId` を追加
-  - 新3テーブルは初期0行
-  - RLS有効、policy 0件
-  - `anon` / `authenticated` / `service_role` のtable SELECT権限なし
-  - `ProcurementShippingMethod_id_seq` のUSAGE権限なし
-  - CHECK / FK / index / `RepairBlockReason` enumをproductionで確認
-- Security Advisor:
-  - 新3テーブルの `rls_enabled_no_policy` INFO はserver-only設計として意図どおり
-  - 既存2関数の `function_search_path_mutable` WARN はTask191A対象外
-- Railway:
-  - source commit `b09fc122b89690474239d0b997b2fcd9222e69aa`
-  - deployment `99b2d0e2-3ba0-4b1c-82d9-fe281af6253d`
-  - status `SUCCESS` / region `sin`
-  - production buildで Prisma Client v5.7.0 再生成成功
-- Runtime: `next start` 正常起動、`Ready in 355ms`
-- Non-destructive smoke: `/` = 200、`/login` = 200、`/api/orders` = 200
+- migrationなしのためproduction DB backupは不要。
+- Railway production build:
+  - Prisma Client v5.7.0 再生成成功
+  - Next.js production build / type check 成功
+  - 既存 `/api/repairs/recent` の Dynamic server usage ログはbuild失敗ではなくTask191B対象外
+- Runtime: `next start` 正常起動、`Ready in 241ms`
+- Non-destructive smoke:
+  - `/` = 200
+  - `/login` = 200
+  - 未認証 `/api/settings/procurement` = 401
 - local validation:
-  - Task191A schema test: 4 / 4 PASS
+  - Task191B domain / API helper test: 6 / 6 PASS
+  - 既存 scheduler settings domain test: 7 / 7 PASS
   - `npx prisma validate`: PASS
-  - `npx tsc --noEmit --incremental false`: PASS
-  - `git diff --check`: PASS
-  - isolated PostgreSQL 15 migration fixture: PASS
-- Codex実装 → カタリ独立レビュー完了。
-- `receivedAt` を実入荷日時の正本として維持し、`actualArrivalDate` は追加していない。
-- `partsReadyDate` は保存せず、後続resolverで `OrderRequest` + `RepairPartAllocation` から導出する。
-- Supplier処理日数と調達配送方法の輸送日数を別モデルで保持する。
-- Task184 scheduler、発注status遷移、RepairPartAllocation同期、runtime API/UIは変更していない。
+  - Task191A schema対応の一時Prisma Clientを用いた `tsc --noEmit --incremental false`: PASS
+  - 一時生成物は削除済み
+  - commit diff check: PASS
+- Codex実装 → カタリ独立レビュー完了。コードレビュー指摘なし。
+- schema / migration / seed / OrderRequest / RepairPlanningState / Task184 scheduler は変更していない。
+- Supplier処理日数と調達配送方法の輸送日数を分離し、null と 0 を区別する。
+- Cousins、DHL、国内郵便等の所要日数は推測でハードコードしていない。
 
 ## Schedule / Scheduler の現在地
 
@@ -70,30 +57,24 @@ Production: Task191A complete
 11. Task190D: Repair作業時間 read-only preview — production完了
 12. Task190E: Repair.estimatedWorkMinutesへの安全なpreview → apply接続 — production完了
 13. Task191A: 発注リードタイム・作業中断 schema foundation — production完了
+14. Task191B: Supplier / ProcurementShippingMethod 設定操作 — production完了
 
 ## 直近完了Task
 
-### Task191A: 発注リードタイム・作業中断 schema foundation
-
-- commit: `b09fc122b89690474239d0b997b2fcd9222e69aa`
-- Supplier側処理日数を `SupplierLeadTimeSetting` へ分離。
-- 調達配送方法と輸送日数を `ProcurementShippingMethod` へ分離。
-- `OrderRequest` に配送方法参照と `expectedArrivalDate` を追加。
-- `RepairPlanningState` に中断状態、理由、残作業時間、再開可能日、再確認日を追加。
-- `RepairBlockReason` を構造化。
-- `receivedAt` を実入荷日時の正本として維持。
-- `partsReadyDate` は保存せず後続Taskで導出。
-- 新3テーブルはserver-only、RLS有効、Data API向けGRANTなし。
-- Production: complete
-
-## 現在のTask
-
 ### Task191B: Supplier / ProcurementShippingMethod の設定操作
 
-- Task191A の schema を使う設定 API / UI のローカル実装を完了。詳細は `docs/ai-tasks/191b-procurement-lead-time-settings.md`。
-- schema、migration、seed、OrderRequest、RepairPlanningState、Task184 scheduler は変更しない。
-- Supplier 処理日数と配送方法の輸送日数を分離し、null と 0 を区別する。
-- Cousins、DHL、国内郵便等の所要日数をコードや seed へ推測でハードコードしない。
-- ローカル実装・テスト・カタリ独立レビュー完了。コードレビュー指摘なし。
-- 現在の production application commit は `b09fc122b89690474239d0b997b2fcd9222e69aa`。Task191B Production: pending。
-- Task191C/D で到着予定 resolver、partsReadyDate、中断状態との業務連携を段階的に扱う。
+- production application commit: `0deae211300ac3a86f729fce2fc807b6ec5cf073`
+- `/settings/scheduler` に調達リードタイム設定を追加。
+- Supplierごとの手動処理日数を設定可能。
+- ProcurementShippingMethodの作成・編集・有効/無効化と手動輸送日数を設定可能。
+- 設定APIは認証必須。入力不正400、ID不在404、配送方法名重複409。
+- 削除APIは設けず履歴参照を保護する。
+- 到着予定resolver、partsReadyDate、中断状態との業務連携、scheduler連携は未実装。
+- Production: complete
+
+## 次に行うこと
+
+- 次候補は Task191C。到着予定resolverとOrderRequestへの接続境界を実装前調査で確定する。
+- `expectedArrivalDate`、Supplier処理日数、配送方法輸送日数の採用条件と再計算タイミングを明文化する。
+- partsReadyDate、中断/再開、Task184 schedulerへの連携は境界を確認しながら後続Taskへ分ける。
+- 次Taskはユーザー承認なしに開始しない。
