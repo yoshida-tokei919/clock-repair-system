@@ -849,6 +849,7 @@ model Repair {
   inquiryMessageLinks InquiryMessageRepairLink[]
   lineManagerSendOutboxes LineManagerSendOutbox[] @relation("LineManagerSendOutboxSourceRepair")
   workTimeSessions WorkTimeSession[]
+  planningState RepairPlanningState?
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
@@ -1205,6 +1206,52 @@ model Supplier {
 
   parts         PartsMaster[]
   orderRequests OrderRequest[]
+  leadTimeSetting SupplierLeadTimeSetting?
+}
+
+model SupplierLeadTimeSetting {
+  supplierId               Int      @id
+  manualProcessingLeadDays Int?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+model ProcurementShippingMethod {
+  id                    Int      @id @default(autoincrement())
+  name                  String   @unique
+  carrierName           String?
+  manualTransitLeadDays Int?
+  isActive              Boolean  @default(true)
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  orderRequests OrderRequest[]
+}
+
+enum RepairBlockReason {
+  ADDITIONAL_PART_POSSIBLE
+  REPAIR_METHOD_REVIEW
+  WAITING_CUSTOMER
+  WAITING_OUTSOURCE
+  WAITING_PARTS
+  OTHER
+}
+
+model RepairPlanningState {
+  repairId             Int                @id
+  blocked              Boolean            @default(false)
+  blockReason          RepairBlockReason?
+  blockReasonNote      String?
+  remainingWorkMinutes Int?
+  resumeEligibleDate   DateTime?          @db.Date
+  reviewDate           DateTime?          @db.Date
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  repair Repair @relation(fields: [repairId], references: [id], onDelete: Cascade)
 }
 
 // §13 部品マスタ（内装・外装統合）
@@ -1621,6 +1668,9 @@ model OrderRequest {
   quantity      Int      @default(1)
   supplierId    Int?
   supplier      Supplier? @relation(fields: [supplierId], references: [id])
+  procurementShippingMethodId Int?
+  procurementShippingMethod ProcurementShippingMethod? @relation(fields: [procurementShippingMethodId], references: [id], onDelete: SetNull)
+  expectedArrivalDate DateTime? @db.Date
 
   // ステータス
   // pending（未発注）/ ordered（注文済み）/ received（入荷済み）/ cancelled（キャンセル）
@@ -1641,6 +1691,9 @@ model OrderRequest {
   receivedAt    DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([procurementShippingMethodId])
+  @@index([expectedArrivalDate])
 }
 
 enum WorkTimeActivityType {
