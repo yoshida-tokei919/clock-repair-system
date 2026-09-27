@@ -1,6 +1,6 @@
 # Task191D: 部品準備日と作業中断・再開
 
-Production: pending
+Production: complete
 
 ## 範囲
 
@@ -34,6 +34,27 @@ Production: pending
 - 合計48 tests PASS（Parts readiness 7 + Planning 2 + WorkTimeSession 5 + RepairPartAllocation 26 + Order expected arrival 8）。
 - schema / migration / seed / roadmap / Task184 scheduler へのTask外差分なし。
 - `npm run lint`: ESLint設定がまだないため対話的な初期設定プロンプトとなり、lint結果は未確認。
-- `npm run build`: `prisma generate` が既存Windows Prisma DLLのunlinkで `EPERM`。`npx next build` もworkerの `spawn EPERM` で停止。アプリケーションのビルド結果は未確認（assertion failureではない）。
+- `npm run build`: local Windowsでは `prisma generate` が既存Prisma DLLのunlinkで `EPERM`、`npx next build` もworkerの `spawn EPERM` で停止したためlocal buildは未確認だった。
 
-Production: pending
+## Production確認
+
+- Production application commit: `3a5b53f5cbff979cd4d17f283298b3a5f3b9a34e`
+- Commit subject: `feat: add parts readiness and repair planning`
+- Railway deployment: `b9a1c248-89d5-4713-bc92-d549131ac3c1`
+- Deployment status: `SUCCESS`
+- Region: `sin`
+- Production tag: `production-task191d-20260927`
+- schema / migration: なし。production DB backup / migration不要。
+- Railway production build:
+  - Prisma Client v5.7.0生成成功
+  - Next.js production compile成功
+  - lint / type check通過
+  - static pages 66/66生成完了
+  - 既存 `/api/repairs/recent` Dynamic server usageログはbuild失敗ではなくTask外
+- Runtime: `next start` 正常起動、`Ready in 757ms`
+- Non-destructive smoke:
+  - `/` = 200
+  - `/login` = 200
+  - 未認証 `/api/repairs/1/planning` = 401（想定どおり）
+
+Production: complete
