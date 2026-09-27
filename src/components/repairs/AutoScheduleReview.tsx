@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { isScheduleChange } from "@/lib/simple-auto-scheduler";
+import { isScheduleChange, type ScheduleExclusion } from "@/lib/simple-auto-scheduler";
 
 type Placement = {
   id: number;
@@ -15,14 +15,13 @@ type Placement = {
 };
 type DayItem = { id: number; inquiryNumber: string; minutes: number };
 type Day = { date: string; availableMinutes: number; lockedMinutes: number; proposedMinutes: number; lockedItems: DayItem[]; proposedItems: DayItem[] };
-type Exclusion = { id: number; inquiryNumber: string; status: string; scheduledDate: string | null; estimatedWorkMinutes: number; reason: string };
 type PreviewResponse = {
   revision: string;
   preview: {
     startDate: string;
     endDate: string;
     placements: Placement[];
-    exclusions: Exclusion[];
+    exclusions: ScheduleExclusion[];
     days: Day[];
     lockedWithoutDate: number;
     lockedWithoutEstimate: number;
@@ -91,7 +90,7 @@ export function AutoScheduleReview() {
   return (
     <section className="mt-8 rounded border bg-white p-4 shadow-sm" aria-label="自動スケジュールの確認">
       <h2 className="text-lg font-semibold">自動スケジュール案</h2>
-      <p className="mt-1 text-sm text-slate-600">「作業待ち」で予定日が固定されていない案件を、優先度・納品予定日・受付日順に配置します。確認後に反映してください。</p>
+      <p className="mt-1 text-sm text-slate-600">「作業待ち」で予定日が固定されず、作業中断がなく、部品が準備済みか不要な案件を、優先度・納品予定日・受付日順に配置します。確認後に反映してください。</p>
       <button type="button" onClick={preview} disabled={busy} className="mt-4 rounded border px-4 py-2 hover:bg-slate-50 disabled:opacity-50">
         {busy ? "処理中..." : result ? "プレビューを更新" : "予定案をプレビュー"}
       </button>
@@ -127,7 +126,7 @@ export function AutoScheduleReview() {
             </div>)}</div>
           </details>
           <button type="button" onClick={apply} disabled={busy || changes.length === 0} className="rounded bg-blue-700 px-4 py-2 text-white hover:bg-blue-800 disabled:opacity-50">{busy ? "反映中..." : `${changes.length}件の予定日を反映`}</button>
-          <p className="text-xs text-slate-500">プレビュー後に案件や作業カレンダーが変更された場合、反映は中止されます。再プレビューしてください。</p>
+          <p className="text-xs text-slate-500">プレビュー後に案件、作業中断、部品の準備状態、作業カレンダーが変更された場合、反映は中止されます。再プレビューしてください。</p>
         </div>
       )}
     </section>

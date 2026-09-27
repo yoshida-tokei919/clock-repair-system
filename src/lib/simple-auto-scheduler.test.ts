@@ -8,7 +8,8 @@ function repair(id: number, overrides: Partial<ScheduleRepair> = {}): ScheduleRe
   return {
     id, inquiryNumber: `R-${id}`, status: "作業待ち", scheduleLocked: false,
     scheduledDate: null, estimatedWorkMinutes: 240, priorityScore: 0,
-    deliveryDateExpected: null, receptionDate: null, ...overrides,
+    deliveryDateExpected: null, receptionDate: null,
+    planningBlocked: false, partsReadinessState: "NOT_REQUIRED", ...overrides,
   };
 }
 
@@ -22,7 +23,7 @@ test("Japan calendar day and default 480-minute capacity", () => {
 
 test("WorkCalendar exceptions, locked reservations, and overbooked days", () => {
   const plan = buildSchedulePreview("2026-09-25", [
-    repair(1, { scheduleLocked: true, scheduledDate: parseWorkDate("2026-09-25"), estimatedWorkMinutes: 300 }),
+    repair(1, { scheduleLocked: true, scheduledDate: parseWorkDate("2026-09-25"), estimatedWorkMinutes: 300, planningBlocked: true, partsReadinessState: "WAITING" }),
     repair(2, { scheduleLocked: true, scheduledDate: parseWorkDate("2026-09-26"), estimatedWorkMinutes: 500 }),
     repair(3, { scheduledDate: parseWorkDate("2026-09-25"), estimatedWorkMinutes: 240 }),
     repair(4, { scheduleLocked: true, scheduledDate: null }),
@@ -77,8 +78,8 @@ test("remaining-capacity shortage has a distinct reason and preserves an existin
   assert.equal(isScheduleChange(plan.placements[0]), false);
 });
 
-test("readiness reasons use Repair status and schedule fields only", () => {
-  assert.deepEqual(workReadiness(repair(1)), { kind: "ready", reason: null });
+test("readiness reasons preserve Repair status and schedule precedence", () => {
+  assert.deepEqual(workReadiness(repair(1)), { kind: "ready", reason: null, reasonCode: null });
   assert.equal(workReadiness(repair(2, { scheduleLocked: true })).reason, "予定日が固定されています");
   assert.equal(workReadiness(repair(3, { estimatedWorkMinutes: 0 })).reason, "想定作業時間が未入力です");
   const reasons: Record<string, string> = {
@@ -92,8 +93,32 @@ test("readiness reasons use Repair status and schedule fields only", () => {
   assert.equal(workReadiness(repair(5, { status: "独自状態" })).reason, "作業待ち以外の状態（独自状態）");
   assert.equal(workReadiness(repair(5, { status: "constructor" })).reason, "作業待ち以外の状態（constructor）");
   assert.equal(workReadiness(repair(6, { status: "作業完了" })).kind, "completed");
+  assert.equal(workReadiness(repair(6, { status: "作業完了", planningBlocked: true, partsReadinessState: "WAITING" })).kind, "completed");
+  assert.equal(workReadiness(repair(6, { scheduleLocked: true, planningBlocked: true, partsReadinessState: "WAITING" })).reason, "予定日が固定されています");
+  assert.equal(workReadiness(repair(6, { status: "保留", planningBlocked: true })).reason, "保留中");
+  assert.equal(workReadiness(repair(6, { estimatedWorkMinutes: 0, planningBlocked: true })).reason, "想定作業時間が未入力です");
   const plan = buildSchedulePreview("2026-09-25", [repair(7, { status: "保留" }), repair(8, { estimatedWorkMinutes: 0 })], [], 1);
   assert.deepEqual(plan.exclusions.map(row => row.reason), ["保留中", "想定作業時間が未入力です"]);
+});
+
+test("planning block and derived parts readiness exclude work-waiting repairs", () => {
+  const rows = [
+    repair(1, { partsReadinessState: "NOT_REQUIRED" }),
+    repair(2, { partsReadinessState: "READY" }),
+    repair(3, { planningBlocked: true, partsReadinessState: "READY", scheduledDate: parseWorkDate("2026-09-26") }),
+    repair(4, { partsReadinessState: "WAITING", scheduledDate: parseWorkDate("2026-09-26") }),
+    repair(5, { partsReadinessState: "WAITING_UNKNOWN" }),
+    repair(6, { partsReadinessState: "LEGACY_UNKNOWN" }),
+    repair(7, { planningBlocked: true, partsReadinessState: "WAITING" }),
+  ];
+  const plan = buildSchedulePreview("2026-09-25", rows, [], 2);
+  assert.deepEqual(plan.placements.map(row => row.id), [1, 2]);
+  assert.deepEqual(plan.exclusions.map(row => row.reasonCode), [
+    "PLANNING_BLOCKED", "PARTS_WAITING", "PARTS_WAITING_UNKNOWN", "PARTS_LEGACY_UNKNOWN", "PLANNING_BLOCKED",
+  ]);
+  assert.equal(rows[2].scheduledDate?.toISOString().slice(0, 10), "2026-09-26");
+  assert.equal(rows[3].scheduledDate?.toISOString().slice(0, 10), "2026-09-26");
+  assert.deepEqual(plan.days.map(day => day.proposedMinutes), [480, 0]);
 });
 
 test("an unlocked existing date is reconsidered while a locked date stays fixed", () => {
@@ -112,4 +137,34 @@ test("snapshot revision rejects stale preview when repair or calendar state chan
   assertScheduleRevision(revision, scheduleRevision(original));
   assert.throws(() => assertScheduleRevision(revision, scheduleRevision({ ...original, repairs: [repair(1, { status: "保留" })] })), StaleScheduleError);
   assert.throws(() => assertScheduleRevision(revision, scheduleRevision({ ...original, exceptions: [{ date: "2026-09-25", availableMinutes: 0 }] })), StaleScheduleError);
+  assert.throws(() => assertScheduleRevision(revision, scheduleRevision({ ...original, repairs: [repair(1, { planningBlocked: true })] })), StaleScheduleError);
+  assert.throws(() => assertScheduleRevision(revision, scheduleRevision({ ...original, repairs: [repair(1, { partsReadinessState: "WAITING" })] })), StaleScheduleError);
+  const partsSnapshot = {
+    ...original,
+    repairs: [{ ...repair(1, { partsReadinessState: "WAITING" }),
+      orderRequests: [{ id: 3, status: "ordered", expectedArrivalDate: "2026-10-01" }] }],
+  };
+  const partsRevision = scheduleRevision(partsSnapshot);
+  assert.throws(() => assertScheduleRevision(partsRevision, scheduleRevision({
+    ...partsSnapshot,
+    repairs: [{ ...partsSnapshot.repairs[0], orderRequests: [{ id: 3, status: "ordered", expectedArrivalDate: "2026-10-02" }] }],
+  })), StaleScheduleError);
+});
+
+test("revision includes derived scheduler eligibility independently of source rows", () => {
+  const snapshot = {
+    startDate: "2026-09-25",
+    repairs: [{ id: 1, updatedAt: "2026-09-24T00:00:00Z" }],
+    schedulerEligibility: [{ id: 1, planningBlocked: false, partsReadinessState: "READY" }],
+    exceptions: [],
+  };
+  const revision = scheduleRevision(snapshot);
+  assert.throws(() => assertScheduleRevision(revision, scheduleRevision({
+    ...snapshot,
+    schedulerEligibility: [{ id: 1, planningBlocked: true, partsReadinessState: "READY" }],
+  })), StaleScheduleError);
+  assert.throws(() => assertScheduleRevision(revision, scheduleRevision({
+    ...snapshot,
+    schedulerEligibility: [{ id: 1, planningBlocked: false, partsReadinessState: "WAITING" }],
+  })), StaleScheduleError);
 });

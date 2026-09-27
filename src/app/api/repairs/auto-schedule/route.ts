@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { assertScheduleRevision, scheduleRevision, StaleScheduleError } from "@/lib/auto-schedule-revision";
 import { buildSchedulePreview, isScheduleChange, SCHEDULABLE_STATUS, SCHEDULE_HORIZON_DAYS, todayInJapan } from "@/lib/simple-auto-scheduler";
 import { parseWorkDate } from "@/lib/work-calendar";
+import { resolveRepairPartsReadiness } from "@/lib/repair-parts-readiness";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,23 @@ async function loadSchedule(tx: Prisma.TransactionClient, startDate: string) {
         id: true, inquiryNumber: true, status: true, scheduleLocked: true,
         scheduledDate: true, estimatedWorkMinutes: true, priorityScore: true,
         deliveryDateExpected: true, receptionDate: true, updatedAt: true,
+        partsAllocationLegacy: true,
+        planningState: { select: { blocked: true, updatedAt: true } },
+        estimate: { select: { items: {
+          select: { id: true, type: true, partsMasterId: true, quantity: true },
+          orderBy: { id: "asc" },
+        } } },
+        partAllocations: {
+          select: { id: true, partsMasterId: true, quantity: true, state: true, updatedAt: true },
+          orderBy: { id: "asc" },
+        },
+        orderRequests: {
+          select: {
+            id: true, repairId: true, partsMasterId: true, quantity: true, status: true,
+            expectedArrivalDate: true, receivedAt: true, updatedAt: true,
+          },
+          orderBy: { id: "asc" },
+        },
       },
       orderBy: { id: "asc" },
     }),
@@ -28,8 +46,23 @@ async function loadSchedule(tx: Prisma.TransactionClient, startDate: string) {
       orderBy: { workDate: "asc" },
     }),
   ]);
-  const preview = buildSchedulePreview(startDate, repairs, exceptions);
-  const revision = scheduleRevision({ startDate, repairs, exceptions });
+  const scheduleRepairs = repairs.map(repair => ({
+    id: repair.id, inquiryNumber: repair.inquiryNumber, status: repair.status,
+    scheduleLocked: repair.scheduleLocked, scheduledDate: repair.scheduledDate,
+    estimatedWorkMinutes: repair.estimatedWorkMinutes, priorityScore: repair.priorityScore,
+    deliveryDateExpected: repair.deliveryDateExpected, receptionDate: repair.receptionDate,
+    planningBlocked: repair.planningState?.blocked ?? false,
+    partsReadinessState: resolveRepairPartsReadiness({
+      repairId: repair.id, partsAllocationLegacy: repair.partsAllocationLegacy,
+      estimateItems: repair.estimate?.items ?? [], allocations: repair.partAllocations,
+      orders: repair.orderRequests,
+    }).state,
+  }));
+  const preview = buildSchedulePreview(startDate, scheduleRepairs, exceptions);
+  const schedulerEligibility = scheduleRepairs.map(({ id, planningBlocked, partsReadinessState }) => ({
+    id, planningBlocked, partsReadinessState,
+  }));
+  const revision = scheduleRevision({ startDate, repairs, schedulerEligibility, exceptions });
   return { preview, revision };
 }
 

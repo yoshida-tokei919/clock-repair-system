@@ -1,4 +1,5 @@
 import { availableMinutesForDate, parseWorkDate, serializeWorkDate, type WorkCalendarException } from "./work-calendar";
+import type { PartsReadiness } from "./repair-parts-readiness";
 
 export const SCHEDULABLE_STATUS = "作業待ち";
 export const SCHEDULE_HORIZON_DAYS = 180;
@@ -14,6 +15,8 @@ export type ScheduleRepair = {
   priorityScore: number;
   deliveryDateExpected: Date | null;
   receptionDate: Date | null;
+  planningBlocked: boolean;
+  partsReadinessState: PartsReadiness["state"];
 };
 
 export type SchedulePlacement = {
@@ -45,6 +48,7 @@ export type ScheduleExclusion = {
   scheduledDate: string | null;
   estimatedWorkMinutes: number;
   reason: string;
+  reasonCode: "PLANNING_BLOCKED" | "PARTS_WAITING" | "PARTS_WAITING_UNKNOWN" | "PARTS_LEGACY_UNKNOWN" | null;
 };
 
 export type SchedulePreview = {
@@ -69,18 +73,27 @@ const STATUS_REASONS: Record<string, string> = {
   "保留": "保留中",
 };
 
-export function workReadiness(repair: Pick<ScheduleRepair, "status" | "scheduleLocked" | "estimatedWorkMinutes">):
-  { kind: "ready" | "completed" | "excluded"; reason: string | null } {
-  if (TERMINAL_STATUSES.has(repair.status)) return { kind: "completed", reason: null };
-  if (repair.scheduleLocked) return { kind: "excluded", reason: "予定日が固定されています" };
+export function workReadiness(repair: Pick<ScheduleRepair, "status" | "scheduleLocked" | "estimatedWorkMinutes" | "planningBlocked" | "partsReadinessState">):
+  { kind: "ready" | "completed" | "excluded"; reason: string | null; reasonCode: ScheduleExclusion["reasonCode"] } {
+  if (TERMINAL_STATUSES.has(repair.status)) return { kind: "completed", reason: null, reasonCode: null };
+  if (repair.scheduleLocked) return { kind: "excluded", reason: "予定日が固定されています", reasonCode: null };
   if (repair.status !== SCHEDULABLE_STATUS) {
     const reason = Object.prototype.hasOwnProperty.call(STATUS_REASONS, repair.status)
       ? STATUS_REASONS[repair.status]
       : `作業待ち以外の状態（${repair.status}）`;
-    return { kind: "excluded", reason };
+    return { kind: "excluded", reason, reasonCode: null };
   }
-  if (repair.estimatedWorkMinutes <= 0) return { kind: "excluded", reason: "想定作業時間が未入力です" };
-  return { kind: "ready", reason: null };
+  if (repair.estimatedWorkMinutes <= 0) return { kind: "excluded", reason: "想定作業時間が未入力です", reasonCode: null };
+  if (repair.planningBlocked) return { kind: "excluded", reason: "作業が中断されています", reasonCode: "PLANNING_BLOCKED" };
+  const partsReasons = {
+    WAITING: { reason: "部品の準備待ちです", reasonCode: "PARTS_WAITING" },
+    WAITING_UNKNOWN: { reason: "部品の準備見込み日が不明です", reasonCode: "PARTS_WAITING_UNKNOWN" },
+    LEGACY_UNKNOWN: { reason: "旧データの部品準備状態が不明です", reasonCode: "PARTS_LEGACY_UNKNOWN" },
+  } as const;
+  if (repair.partsReadinessState in partsReasons) {
+    return { kind: "excluded", ...partsReasons[repair.partsReadinessState as keyof typeof partsReasons] };
+  }
+  return { kind: "ready", reason: null, reasonCode: null };
 }
 
 export function isScheduleChange(placement: SchedulePlacement): placement is SchedulePlacement & { proposedDate: string } {
@@ -151,6 +164,7 @@ export function buildSchedulePreview(
       scheduledDate: dateOrNull(repair.scheduledDate),
       estimatedWorkMinutes: repair.estimatedWorkMinutes,
       reason: readiness.reason!,
+      reasonCode: readiness.reasonCode,
     }] : [];
   });
   const candidates = repairs
