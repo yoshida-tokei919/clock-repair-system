@@ -11,6 +11,18 @@ When handling LINE inquiries, Slack inquiry notifications, or AI intake processi
 Follow the current Task boundary.
 Do not modify files or behavior outside the current Task unless the user explicitly expands the scope.
 
+## ツール選択・Desktop Commander節約
+
+- 専用プラグイン / connectorで安全に完結できる作業は、Desktop Commanderより専用プラグインを優先する。
+- GitHub上のremote repository確認、Issue、PR、remote側操作はGitHubプラグインを優先する。
+- Railwayのdeployment確認、status、logs、service設定確認等はRailwayプラグインを優先する。
+- SupabaseのDB確認・query・project操作等はSupabaseプラグインを優先する。
+- Notion、Gmail、Slack等も対応する専用プラグインが利用可能ならそちらを優先する。
+- Desktop Commanderは、ローカルworking tree、未commit差分、ローカルGit操作、ローカルファイル、CLI、Codex受け渡し、Windowsアプリ操作など、ローカルPCへ直接アクセスする必要がある作業に限定する。
+- remote側の状態確認だけのためにDesktop Commanderを使わない。
+- ただし、localとremoteの差分確認やstage / commit / local push等、ローカルGit状態そのものが必要な操作はDesktop Commanderを使用してよい。
+- 正確性と安全性を損なわない範囲でDesktop Commanderの呼び出し回数を最小化する。
+
 ## 動作確認の役割分担
 
 - ユーザーの手動実画面確認は原則としてTask完了条件にしない。
