@@ -2,7 +2,7 @@
 
 ## 範囲と状態
 
-Task185〜187の設計を受け、`SchedulerSetting`、`SchedulerActivitySetting`、`RepairWorkTimeStandard` のPrisma schemaとmigrationを追加する。Task190B以降のresolver、実績採用、設定UI/API、自動スケジューラ接続は含まない。Production: pending。migrationは未適用、deployも未実施。
+Task185〜187の設計を受け、`SchedulerSetting`、`SchedulerActivitySetting`、`RepairWorkTimeStandard` のPrisma schemaとmigrationを追加する。Task190B以降のresolver、実績採用、設定UI/API、自動スケジューラ接続は含まない。Production: complete。application commit `acfd69de856974301006d2089b788279145a973d`、Supabase migration `20260927004833 add_work_time_standard_settings`、Railway deployment `557a6e87-8ab6-46e6-a46c-04adcd73b495`。
 
 ## 設定の正本
 
@@ -29,11 +29,22 @@ Task185〜187の設計を受け、`SchedulerSetting`、`SchedulerActivitySetting
 
 - `npx prisma validate`: PASS。
 - `npx tsc --noEmit --incremental false`: PASS。新モデルを使うruntimeコードはまだない。
-- `tests/task190a-schema.test.mjs`: 直接実行で確認。`node --test` は環境の `spawn EPERM` で起動できなかった。
+- `tests/task190a-schema.test.mjs`: 4 / 4 PASS（直接実行）。`node --test` は環境の `spawn EPERM` で起動できなかった。
 - `npx prisma generate`: Windowsの既存query engine DLL置換が `EPERM`。`PRISMA_GENERATE_NO_ENGINE=1` もネットワーク制限でschema engineを取得できず、生成は未確認。
 - PostgreSQL 17の一時Dockerコンテナへ初版migrationを適用: PASS。初期行数・値、重複条件、一致しない内外装category、外装driveType、正の標準分、singleton、件数閾値、REPAIR行禁止、RLS、anon / authenticated / service_role のtable / sequence権限を確認。コンテナは削除済み。この検証は既存schema全体を再現せず、参照先マスタを最小定義したisolated fixtureである。
 - `git diff --check`: PASS。
 - 独立レビュー: migrationがWorkTimeSessionより先に並ぶ問題と、NULL代替値 `''` / `-1` が有効マスタIDと衝突し得る問題を指摘。migration名を既存WorkTimeSessionより後へ変更し、一意索引を `NULLS NOT DISTINCT` に修正。`RepairWorkAction` / `PartNameMaster` の内外装適用可否は現行schemaだけではDB保証できないため、後続UI/API validation境界として明記した。
 - 修正後のmigrationをPostgreSQL 15 isolated fixtureへ適用してPASS。NULL条件の重複拒否と、マスタID `''` / `-1` を使う別条件の許容を確認。初期行、singleton、閾値、REPAIR除外、内外装category、外装driveType、正の標準分、RLS、3 roleのtable/sequence権限も再確認。コンテナは削除済み。保護対象 `docs/ai/02_PRODUCT_ROADMAP.md` は `+271 / -57` のまま維持。
 
-production DB適用・Supabase migration・deploy・pushは未実施。別プロセスにより基礎実装のlocal commit `20cc592` が作成され、今回の一意索引修正は未commit。Production: pending。production権限の実測は未確認。
+## Production反映
+
+- production backup: `C:\\Users\\yoshi\\clock-repair-backups\\task190a-20260927T004725Z`。`public.dump` 330,203 bytes、SHA256 `953882D8C5BB9E9D8309CD3392C9822B85483BEDAEAB3ED4B03B0977E10B858E`、TOC 749件、public TABLE DATA 63件。`pg_restore -l` でarchive整合を確認。
+- Supabase migration: `20260927004833 add_work_time_standard_settings`。新3テーブル、enum、FK/CHECK/index、初期設定をproductionへ適用。
+- production DB verification: `SchedulerSetting` 1行、`SchedulerActivitySetting` 8行、`RepairWorkTimeStandard` 0行。RLSは新3テーブルすべて有効、policy 0件、anon / authenticated / service_role のtable権限と `RepairWorkTimeStandard_id_seq` usage権限はいずれもなし。
+- Security Advisor: 新3テーブルの `rls_enabled_no_policy` INFO はserver-only設計として意図どおり。既存関数2件の `function_search_path_mutable` WARN はTask190A対象外。
+- Railway source commit: `acfd69de856974301006d2089b788279145a973d`。
+- Railway deployment: `557a6e87-8ab6-46e6-a46c-04adcd73b495`、status `SUCCESS`、region `sin`、`next start` → `Ready in 574ms`。
+- production smoke: `/` = 200、`/login` = 200、未認証 `GET /api/work-time-sessions/active` = 401、未認証 `GET /api/work-calendar?month=2026-09` = 401。
+- production tag: `production-task190a-20260927`。
+
+Production: complete。

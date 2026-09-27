@@ -7,33 +7,33 @@
 
 ## Production
 
-- Production application commit: `c17ed635cc85c73cd4b3bf45935685a74e3487a7`
-- Commit subject: `feat: add shared work timer UI`
+- Production application commit: `acfd69de856974301006d2089b788279145a973d`
+- Commit subject: `feat: add scheduler settings foundation`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `6c0785a5-6f0d-4dc5-a472-daa591b4295e`
+- Railway deployment: `557a6e87-8ab6-46e6-a46c-04adcd73b495`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task189-20260927`
+- Production tag: `production-task190a-20260927`
 - Region: `sin`
-- Supabase migration: none for Task189
+- Supabase migration: `20260927004833 add_work_time_standard_settings`
 
-Production: Task189 complete
+Production: Task190A complete
 
-## Task189 production確認
+## Task190A production確認
 
-- Railway source commit: `c17ed635cc85c73cd4b3bf45935685a74e3487a7`
+- Railway source commit: `acfd69de856974301006d2089b788279145a973d`
 - Runtime:
   - `next start` 正常起動
-  - `Ready in 346ms`
+  - `Ready in 574ms`
 - Non-destructive smoke:
   - `/` = 200
   - `/login` = 200
   - unauthenticated `GET /api/work-time-sessions/active` = 401
-  - `/orders` = 200
-- local related tests: 12 / 12 PASS
-- TypeScript / local Next build / `git diff --check`: PASS
-- schema / migration / RLS / GRANT変更なし
-- カタリ独立レビュー済み。LABOR同一作業の再開始による不要session分割を `workLabelSnapshot` 判定で修正。
-- 認証済みブラウザのタイマー実操作は未確認。
+  - unauthenticated `GET /api/work-calendar?month=2026-09` = 401
+- local Task190A tests: 4 / 4 PASS
+- Prisma validate / TypeScript / `git diff --check`: PASS
+- production backup: `C:\\Users\\yoshi\\clock-repair-backups\\task190a-20260927T004725Z`
+- Supabase: 新3テーブルRLS有効、policy 0件、anon / authenticated / service_role のtable/sequence権限なし。
+- カタリ独立レビュー済み。migration順序、nullable一意条件、server-only権限を修正・再確認済み。
 
 ## Schedule / Scheduler の現在地
 
@@ -44,22 +44,24 @@ Production: Task189 complete
 5. Task187: 実装前調査・Task分割 — docs-only完了
 6. Task188: WorkTimeSession基盤 — production完了
 7. Task189: 共通業務タイマーUI — production完了
+8. Task190A: Scheduler設定・標準作業時間 schema foundation — production完了
 
 ## 直近完了Task
 
-### Task189: 共通業務タイマーUI
+### Task190A: Scheduler設定・標準作業時間 schema foundation
 
-- commit: `c17ed635cc85c73cd4b3bf45935685a74e3487a7`
-- 詳細: `docs/ai-tasks/189-common-work-timer-ui.md`
-- Repair / Inquiry / OrderRequest / 共通業務をTask188 WorkTimeSession基盤へ接続。
-- app常駐タイマーバー、開始・停止、HH:MM:SS表示、共通業務クイック開始を実装。
-- Repairは見積とLABOR明細単位で開始可能。PART行は対象外。
+- commit: `acfd69de856974301006d2089b788279145a973d`
+- 詳細: `docs/ai-tasks/190a-scheduler-schema-foundation.md`
+- `SchedulerSetting`、`SchedulerActivitySetting`、`RepairWorkTimeStandard` と型付きenum・DB制約を追加。
+- server-onlyとしてRLSを有効化し、Data API用roleへtable/sequence権限を付与しない。
+- 既存Scheduler / `estimatedWorkMinutes` / WorkCalendar容量計算にはまだ接続していない。
 - Production: complete
 
 ## 次に行うこと
 
-- 次候補は Task190「Scheduler設定・標準作業時間・実績学習」。
-- Task190は `docs/ai-tasks/185-work-time-estimation-design.md`、`docs/ai-tasks/186-scheduler-deadline-capacity-timer-design.md`、Task187調査結果を前提に、実装前にTask境界・schemaを再確認する。
-- Task190はユーザー承認なしに開始しない。
-- 既存 `docs/ai/02_PRODUCT_ROADMAP.md` の未commit差分はTask189外として保護し、混ぜない。
+- 次候補は Task190B「WorkTimeSession実績集計・統計resolver」。
+- Task190Aで作成した設定schemaを正本として使い、同一Repair + 同一作業条件の分割sessionを1 sampleへ集約する設計を実装する。
+- Task190Bでは原則schemaを増やさず、WorkTimeSession履歴を削除・上書きしない。
+- Task190Bはユーザー承認なしに開始しない。
+- 既存 `docs/ai/02_PRODUCT_ROADMAP.md` の未commit差分はTask190A外として保護し、混ぜない。
 - マスタデータ投入・復旧は別Taskとして並行可。Schedule差分と混ぜない。
