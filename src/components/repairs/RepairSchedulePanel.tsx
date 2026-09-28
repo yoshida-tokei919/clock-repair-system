@@ -26,6 +26,7 @@ type Props = {
     estimatedWorkMinutes: number;
     deliveryDateExpected: string | null;
     scheduleLocked: boolean;
+    hasScheduleSegments: boolean;
     priorityScore: number;
 };
 
@@ -152,7 +153,8 @@ export function RepairSchedulePanel(props: Props) {
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
                 <label className="block text-sm font-medium text-zinc-700">作業予定日
-                    <input type="date" value={values.scheduledDate} onChange={(event) => setValues({ ...values, scheduledDate: event.target.value })} className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2" />
+                    <input type="date" value={values.scheduledDate} onChange={(event) => setValues({ ...values, scheduledDate: event.target.value })} disabled={props.hasScheduleSegments} className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 disabled:bg-zinc-100" />
+                    {props.hasScheduleSegments && <span className="mt-1 block text-xs font-normal text-zinc-500">分割予定があるため、代表日はここで変更できません。Scheduler v2で予定を確認してください。</span>}
                 </label>
                 <label className="block text-sm font-medium text-zinc-700">想定作業時間（分）
                     <input type="number" min="0" step="1" value={values.estimatedWorkMinutes} onChange={(event) => setValues({ ...values, estimatedWorkMinutes: event.target.value })} className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2" />

@@ -32,7 +32,6 @@ export function AutoScheduleReview() {
   const [result, setResult] = useState<PreviewResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   async function fetchPreview(): Promise<PreviewResponse> {
     const response = await fetch("/api/repairs/auto-schedule", { cache: "no-store" });
@@ -45,39 +44,10 @@ export function AutoScheduleReview() {
     setBusy(true);
     setResult(null);
     setError("");
-    setMessage("");
     try {
       setResult(await fetchPreview());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "プレビューを取得できませんでした。");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function apply() {
-    if (!result || busy) return;
-    setBusy(true);
-    setError("");
-    setMessage("");
-    try {
-      const response = await fetch("/api/repairs/auto-schedule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ revision: result.revision }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "予定を反映できませんでした。");
-      setResult(null);
-      setMessage(`${body.updated}件の作業予定日を反映しました。`);
-      try {
-        setResult(await fetchPreview());
-      } catch {
-        setError("反映後の予定案を取得できませんでした。再プレビューしてください。");
-      }
-    } catch (cause) {
-      setResult(null);
-      setError(cause instanceof Error ? cause.message : "予定を反映できませんでした。");
     } finally {
       setBusy(false);
     }
@@ -90,12 +60,11 @@ export function AutoScheduleReview() {
   return (
     <section className="mt-8 rounded border bg-white p-4 shadow-sm" aria-label="自動スケジュールの確認">
       <h2 className="text-lg font-semibold">自動スケジュール案</h2>
-      <p className="mt-1 text-sm text-slate-600">「作業待ち」で予定日が固定されず、作業中断がなく、部品が準備済みか不要な案件を、優先度・納品予定日・受付日順に配置します。確認後に反映してください。</p>
+      <p className="mt-1 text-sm text-slate-600">旧方式の予定案を参照できます。予定の反映には下の <a href="#scheduler-v2-preview" className="text-blue-700 underline">Scheduler v2 分割予定案</a>を使用してください。</p>
       <button type="button" onClick={preview} disabled={busy} className="mt-4 rounded border px-4 py-2 hover:bg-slate-50 disabled:opacity-50">
         {busy ? "処理中..." : result ? "プレビューを更新" : "予定案をプレビュー"}
       </button>
       {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
-      {message && <p role="status" className="mt-3 text-sm text-green-700">{message}</p>}
       {result && (
         <div className="mt-5 space-y-4">
           <p className="text-sm text-slate-700">対象期間: {result.preview.startDate}〜{result.preview.endDate}（180日） / 配置対象: {result.preview.placements.length}件 / 変更: {changes.length}件 / 配置不可: {unscheduled.length}件 / 対象外: {result.preview.exclusions.length}件</p>
@@ -125,8 +94,7 @@ export function AutoScheduleReview() {
               {day.proposedItems.map(item => <p key={`proposed-${item.id}`} className="pl-3 text-blue-700">予定案: {item.inquiryNumber} (#{item.id}) · {item.minutes}分</p>)}
             </div>)}</div>
           </details>
-          <button type="button" onClick={apply} disabled={busy || changes.length === 0} className="rounded bg-blue-700 px-4 py-2 text-white hover:bg-blue-800 disabled:opacity-50">{busy ? "反映中..." : `${changes.length}件の予定日を反映`}</button>
-          <p className="text-xs text-slate-500">プレビュー後に案件、作業中断、部品の準備状態、作業カレンダーが変更された場合、反映は中止されます。再プレビューしてください。</p>
+          <p className="text-xs text-slate-500">この旧方式プレビューは閲覧専用です。予定の更新にはScheduler v2を使用してください。</p>
         </div>
       )}
     </section>

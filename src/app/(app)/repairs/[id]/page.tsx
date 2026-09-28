@@ -14,6 +14,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
     const repair = await prisma.repair.findUnique({
         where: { id: repairId },
         include: {
+            _count: { select: { scheduleSegments: true } },
             customer: true,
             movementMaker: true,
             movementCaliber: true,
@@ -187,6 +188,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 estimatedWorkMinutes={repair.estimatedWorkMinutes}
                 deliveryDateExpected={repair.deliveryDateExpected?.toISOString() ?? null}
                 scheduleLocked={repair.scheduleLocked}
+                hasScheduleSegments={repair._count.scheduleSegments > 0}
                 priorityScore={repair.priorityScore}
             />
             <RepairPlanningPanel repairId={repair.id} />
