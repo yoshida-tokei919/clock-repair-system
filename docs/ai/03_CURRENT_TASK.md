@@ -7,52 +7,32 @@
 
 ## Production
 
-- Production application commit: `c768119f17e72dbaf7d10ba132bbcfb0747142bb`
-- Commit subject: `feat: add scheduler v2 segment preview`
+- Production application commit: `9e2fe9d3260e2adb94039d0408afbbfa544a4e0a`
+- Commit subject: `fix: make scheduler v2 planning apply-safe`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `3bbe6916-a371-42b7-83c1-a70bdf81a688`
+- Railway deployment: `dc08e8ef-c826-4046-a904-67dd96e152ea`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task193b-20260928`
+- Production tag: `production-task193c1-20260928`
 - Region: `sin`
 - Supabase migration: none
-- Railway runtime: `next start` / `Ready in 397ms`
 
-Production: Task193B complete
+Production: Task193C1 complete
 
-## Task193B production確認
+## Task193C1 production確認
 
 - schema / migration / RLS / GRANT変更なし。
-- production backupは不要（DB schema / data mutationなし）。
-- Railway build: `prisma generate && next build` SUCCESS。
-- 新route `/api/repairs/scheduler-v2-preview` がproduction buildへ含まれることを確認。
+- DB write / apply API / apply UIなし。
+- apply-safe fixed-point planner correctionのみ。
+- Codex実装 → カタリ独立レビュー: blocking issueなし / PASS。
+- 関連回帰test: 101 / 101 PASS。
+- `npx tsc --noEmit --incremental false`: PASS。
+- `git diff --check`: PASS。
+- Railway deployment: `SUCCESS`。
 - Non-destructive smoke:
   - `/` = 200
   - `/login` = 200
-  - 未認証 `/repairs/calendar` = 307 → `/api/auth/signin?callbackUrl=%2Frepairs%2Fcalendar`
   - 未認証 `GET /api/repairs/scheduler-v2-preview` = 401
-
-## Task193B 実装内容
-
-- Task192Bの納期逆算・実効容量・部品準備・中断判定を再利用するScheduler v2 pure plannerを追加。
-- 1案件を複数日へ1分単位で分割し、日別容量内でAUTO segment案を生成。
-- candidate単位でtentative allocationし、全量配置できない場合は完全rollback。
-- fixed / preserved provisional / replaceable provisionalを分離し、MANUAL segmentとschedule lockを保護。
-- segment存在時はlegacy `scheduledDate` を二重負荷計上しない。
-- Task184互換のpriority orderingを維持。
-- GET-only / RepeatableRead / auth必須のread-only preview APIを追加。
-- `/repairs/calendar` にScheduler v2 preview sectionを追加し、apply操作は未実装。
-- 詳細: `docs/ai-tasks/193b-scheduler-v2-readonly-preview.md`
-
-## Validation / Review
-
-- Codex実装 → カタリ独立レビュー: 指摘なし / PASS。
-- Codex最終test: 62 / 62 PASS。
-- カタリ独立回帰test: 61 / 61 PASS。
-- `npx tsc --noEmit --incremental false`: PASS。
-- `git diff --check`: PASS。
-- Scheduler v2新規コードのPrisma write操作スキャン: 0件。
-- Task184 / Task192B / Task191D / WorkCalendar regression: PASS。
-- `npm run lint` は既存repoにESLint設定がなく、Next.js初期設定の対話プロンプトになるため対象外。
+- 詳細: `docs/ai-tasks/193c1-scheduler-v2-apply-safe-planner.md`
 
 ## Schedule / Scheduler の現在地
 
@@ -63,13 +43,36 @@ Production: Task193B complete
 5. Task192A–192B: 工程日数設定 / 納期逆算・実効容量preview — production完了
 6. Task193A: RepairScheduleSegment schema foundation — production完了
 7. Task193B: segment-based Scheduler v2 read-only preview — production完了
+8. Task193C1: Scheduler v2 apply-safe planner correction — production完了
 
-## 現在のTask: Task193B
+## 現在のTask: Task193C2
 
-Production: complete
+Status: implementation authorized
 
-- 実装commit: `c768119`
-- production tag: `production-task193b-20260928`
-- 次Task候補はTask193C: Scheduler v2 apply境界・segment永続化・`scheduledDate` summary同期の実装前調査。
-- apply / DB write / manual segment編集はTask193Bには含めていない。
-- 次Taskはユーザー承認なしに実装開始しない。
+### 目的
+
+Scheduler v2 previewをrevision一致時のみ原子的にDBへ反映するapply backendを実装する。
+
+### 実装境界
+
+- clientからはpreview `revision`のみを受け取る。
+- server側でpreview入力を再読込・再計算し、revision一致時だけapplyする。
+- whole-preview atomic transaction / Serializableを基本とする。
+- MANUAL segment / `scheduleLocked=true`は変更しない。
+- changed AUTO candidateのみ既存AUTO segmentを置換し、no-opは書き換えない。
+- legacy fallbackからsegmentへ移行する場合はproposed AUTO segmentを作成する。
+- segmentが存在するRepairは`scheduledDate = min(workDate)`へ同期する。
+- stale revision / serialization conflictは409。
+- schema / migration / seed / RLS / GRANT変更なしを基本とする。
+- apply UIとlegacy writer cutoverはTask193C3へ分離する。
+
+### 高リスク扱い
+
+このTaskはproduction data mutation経路を追加するため高リスク。
+Codex実装 → カタリ独立レビューを行い、productionへpush / deployする前にユーザーの明示承認で停止する。
+
+### 参照
+
+- `docs/ai-tasks/193a-repair-schedule-segment-foundation.md`
+- `docs/ai-tasks/193b-scheduler-v2-readonly-preview.md`
+- `docs/ai-tasks/193c1-scheduler-v2-apply-safe-planner.md`
