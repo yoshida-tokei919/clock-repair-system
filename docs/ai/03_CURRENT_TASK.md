@@ -7,32 +7,38 @@
 
 ## Production
 
-- Production application commit: `9e2fe9d3260e2adb94039d0408afbbfa544a4e0a`
-- Commit subject: `fix: make scheduler v2 planning apply-safe`
+- Production application commit: `40002b773c4ec604cdbf23e7cfac95b22d39b700`
+- Commit subject: `feat: add scheduler v2 atomic apply backend`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `dc08e8ef-c826-4046-a904-67dd96e152ea`
+- Railway deployment: `057e36bb-f940-444c-900d-fee037131f10`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task193c1-20260928`
+- Production tag: `production-task193c2-20260928`
 - Region: `sin`
 - Supabase migration: none
 
-Production: Task193C1 complete
+Production: Task193C2 complete
 
-## Task193C1 production確認
+## Task193C2 production確認
 
-- schema / migration / RLS / GRANT変更なし。
-- DB write / apply API / apply UIなし。
-- apply-safe fixed-point planner correctionのみ。
-- Codex実装 → カタリ独立レビュー: blocking issueなし / PASS。
-- 関連回帰test: 101 / 101 PASS。
+- Scheduler v2 atomic apply backendを追加。
+- clientからはpreview `revision`のみを受け取り、server側で同一Serializable transaction内にてpreviewを再計算する。
+- revision一致時だけapplyし、stale revision / Prisma P2034 / apply経路のP2002 conflictは409。
+- MANUAL segment / `scheduleLocked=true` は保護。
+- `NO_CHANGE` / `PRESERVE_UNPLACED` / `PROTECTED` はwriteなし。
+- `SUMMARY_ONLY_SYNC` は `Repair.scheduledDate` のみ同期。
+- `CREATE_AUTO` / `CREATE_FROM_LEGACY` はAUTO segmentを作成。
+- `REPLACE_AUTO` は対象RepairのAUTO segmentだけを置換し、MANUALは削除しない。
+- schema / migration / seed / RLS / GRANT変更なし。
+- apply UI / legacy writer cutoverは未実装。
+- Codex実装 → カタリ独立レビュー: P2002 conflict handlingを追加修正後、blocking issueなし / PASS。
+- 関連回帰test: 116 / 116 PASS。
+- 独立レビュー修正後重点test: 42 / 42 PASS。
 - `npx tsc --noEmit --incremental false`: PASS。
-- `git diff --check`: PASS。
-- Railway deployment: `SUCCESS`。
+- staged `git diff --check`: PASS。
+- Railway build / deploy: SUCCESS。
 - Non-destructive smoke:
-  - `/` = 200
-  - `/login` = 200
-  - 未認証 `GET /api/repairs/scheduler-v2-preview` = 401
-- 詳細: `docs/ai-tasks/193c1-scheduler-v2-apply-safe-planner.md`
+  - 未認証 `POST /api/repairs/scheduler-v2-apply` = 401
+- 詳細: `docs/ai-tasks/193c2-scheduler-v2-atomic-apply-backend.md`
 
 ## Schedule / Scheduler の現在地
 
@@ -44,35 +50,47 @@ Production: Task193C1 complete
 6. Task193A: RepairScheduleSegment schema foundation — production完了
 7. Task193B: segment-based Scheduler v2 read-only preview — production完了
 8. Task193C1: Scheduler v2 apply-safe planner correction — production完了
+9. Task193C2: Scheduler v2 atomic apply backend — production完了
 
-## 現在のTask: Task193C2
+## 現在のTask: Task193C3
 
 Status: implementation authorized
 
 ### 目的
 
-Scheduler v2 previewをrevision一致時のみ原子的にDBへ反映するapply backendを実装する。
+Scheduler v2 previewを人間の確認後にapplyできるUIへ接続し、segment正本化後に旧writerが予定を破壊しないようcutoverする。
 
 ### 実装境界
 
-- clientからはpreview `revision`のみを受け取る。
-- server側でpreview入力を再読込・再計算し、revision一致時だけapplyする。
-- whole-preview atomic transaction / Serializableを基本とする。
-- MANUAL segment / `scheduleLocked=true`は変更しない。
-- changed AUTO candidateのみ既存AUTO segmentを置換し、no-opは書き換えない。
-- legacy fallbackからsegmentへ移行する場合はproposed AUTO segmentを作成する。
-- segmentが存在するRepairは`scheduledDate = min(workDate)`へ同期する。
-- stale revision / serialization conflictは409。
+- Scheduler v2 preview UIに明示的なapply確認操作を追加する。
+- applyはTask193C2の `POST /api/repairs/scheduler-v2-apply` を利用し、clientからはrevisionのみ送る。
+- apply成功後はpreviewを再取得して最新状態を表示する。
+- 409 stale/conflict時はpreviewを再取得し、内容を更新するが自動再applyしない。
+- apply前に「予定が更新される」ことを人間が確認できる導線を残す。
+- Task184 legacy auto-schedule writerと直接 `Repair.scheduledDate` を更新する経路を調査し、segmentが正本になったRepairを破壊しないguard / cutoverを行う。
+- MANUAL segment / `scheduleLocked=true` 保護を壊さない。
+- `Repair.scheduledDate` はsegmentが存在する場合のcompatibility summaryとして扱う。
 - schema / migration / seed / RLS / GRANT変更なしを基本とする。
-- apply UIとlegacy writer cutoverはTask193C3へ分離する。
+- PhysicalTag / NFC / QR / ScanSession要件はTask196–197へ分離し、このTaskには含めない。
+
+### 調査対象
+
+- `src/components/repairs/SchedulerV2Preview.tsx`
+- `src/app/api/repairs/scheduler-v2-preview/route.ts`
+- `src/app/api/repairs/scheduler-v2-apply/route.ts`
+- `src/app/api/repairs/auto-schedule/route.ts`
+- `src/app/api/repairs/[id]/schedule/route.ts`
+- `RepairSchedulePanel`および予定編集UI
+- Scheduler v2 / Task184 / schedule input関連test
 
 ### 高リスク扱い
 
-このTaskはproduction data mutation経路を追加するため高リスク。
+このTaskはproductionの予定更新経路を切り替えるため高リスク。
 Codex実装 → カタリ独立レビューを行い、productionへpush / deployする前にユーザーの明示承認で停止する。
 
-### 参照
+### 保護中のTask外差分
 
-- `docs/ai-tasks/193a-repair-schedule-segment-foundation.md`
-- `docs/ai-tasks/193b-scheduler-v2-readonly-preview.md`
-- `docs/ai-tasks/193c1-scheduler-v2-apply-safe-planner.md`
+以下はPhysicalTag / NFC・QR要件であり、Task193C3へ混ぜない。
+
+- `docs/ai/02_PRODUCT_ROADMAP.md`
+- `docs/ai-tasks/196-physical-tag-nfc-design.md`
