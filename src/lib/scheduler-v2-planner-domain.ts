@@ -1,7 +1,10 @@
 import type { PreviewDay, PreviewRepairAnalysis } from "./deadline-capacity-preview-domain";
 import { SCHEDULABLE_STATUS } from "./simple-auto-scheduler";
 
-export const SCHEDULER_V2_PLANNER_VERSION = "193B-1";
+export const SCHEDULER_V2_PLANNER_VERSION = "193C1-1";
+
+export type SchedulerV2FutureApplyAction = "NO_CHANGE" | "CREATE_AUTO" | "CREATE_FROM_LEGACY" |
+  "REPLACE_AUTO" | "SUMMARY_ONLY_SYNC" | "PRESERVE_UNPLACED" | "PROTECTED";
 
 export type CurrentSegment = {
   id: number; repairId: number; workDate: string; plannedMinutes: number;
@@ -21,16 +24,33 @@ export type SchedulerV2Repair = PreviewRepairAnalysis & PlannerMetadata & {
   proposedSegments: ProposedSegment[];
   proposedSummaryDate: string | null;
   unplacedReason: string | null;
+  futureApplyAction: SchedulerV2FutureApplyAction;
 };
 export type SchedulerV2Day = Pick<PreviewDay, "date" | "grossCapacityMinutes" |
   "totalReservedMinutes" | "effectiveRepairCapacityMinutes"> & {
   fixedLoadMinutes: number; preservedProvisionalLoadMinutes: number;
+  // Current-plan fields remain a snapshot of the input, regardless of the proposed replacements.
   replaceableCurrentLoadMinutes: number; currentPlanLoadMinutes: number;
-  proposedLoadMinutes: number; remainingCapacityMinutes: number;
+  // The apply-safe result keeps old load for candidates that could not be fully replaced.
+  preservedForApplyLoadMinutes: number; proposedLoadMinutes: number;
+  resultingPlanLoadMinutes: number; remainingCapacityMinutes: number;
 };
 
 const TERMINAL = new Set(["作業完了", "納品済み", "キャンセル"]);
 const compareDate = (a: string | null, b: string | null) => a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1;
+
+export function classifySchedulerV2FutureApply(repair: SchedulerV2Repair): SchedulerV2FutureApplyAction {
+  if (!repair.autoCandidate) return "PROTECTED";
+  if (repair.proposedSegments.length === 0) return "PRESERVE_UNPLACED";
+  if (repair.currentSegments.length === 0) return repair.currentScheduledDate ? "CREATE_FROM_LEGACY" : "CREATE_AUTO";
+  const current = [...repair.currentSegments].sort((a, b) => a.workDate.localeCompare(b.workDate));
+  const proposed = [...repair.proposedSegments].sort((a, b) => a.workDate.localeCompare(b.workDate));
+  const sameSegments = current.length === proposed.length && current.every((row, index) =>
+    row.source === "AUTO" && row.workDate === proposed[index].workDate &&
+    row.plannedMinutes === proposed[index].plannedMinutes && row.sortOrder === proposed[index].sortOrder);
+  if (!sameSegments) return "REPLACE_AUTO";
+  return repair.currentScheduledDate === repair.proposedSummaryDate ? "NO_CHANGE" : "SUMMARY_ONLY_SYNC";
+}
 
 export function resolveSchedulerV2Planner(input: {
   repairs: readonly PreviewRepairAnalysis[];
@@ -51,7 +71,8 @@ export function resolveSchedulerV2Planner(input: {
     effectiveRepairCapacityMinutes: day.effectiveRepairCapacityMinutes,
     fixedLoadMinutes: 0, preservedProvisionalLoadMinutes: 0,
     replaceableCurrentLoadMinutes: 0, currentPlanLoadMinutes: 0,
-    proposedLoadMinutes: 0, remainingCapacityMinutes: 0,
+    preservedForApplyLoadMinutes: 0, proposedLoadMinutes: 0,
+    resultingPlanLoadMinutes: 0, remainingCapacityMinutes: 0,
   }));
   const byDate = new Map(days.map(day => [day.date, day]));
   const repairs: SchedulerV2Repair[] = input.repairs.map(repair => {
@@ -68,7 +89,7 @@ export function resolveSchedulerV2Planner(input: {
       : hasLoad ? "PRESERVED_PROVISIONAL" : "NONE";
     return { ...repair, ...meta, currentScheduledDate: repair.scheduledDate,
       autoCandidate: eligible, currentPlanClass, currentSegments, proposedSegments: [], proposedSummaryDate: null,
-      unplacedReason: null };
+      unplacedReason: null, futureApplyAction: "PROTECTED" };
   });
   for (const repair of repairs) {
     if (TERMINAL.has(repair.status)) continue;
@@ -89,27 +110,56 @@ export function resolveSchedulerV2Planner(input: {
     .sort((a, b) => b.priorityScore - a.priorityScore
       || compareDate(a.deliveryDateExpected, b.deliveryDateExpected)
       || compareDate(a.receptionDate, b.receptionDate) || a.id - b.id);
-  for (const repair of candidates) {
-    let remaining = repair.workMinutes!;
-    const tentative: ProposedSegment[] = [];
+  const preservedForApply = new Set<number>();
+  // Each failed replacement can only enter the preserved set once. The final pass has no new entries.
+  for (let pass = 0; pass <= candidates.length; pass++) {
+    let promoted = false;
     for (const day of days) {
-      if (day.date < repair.projectedEarliestDate! || day.date > repair.latestWorkCompletionDate!) continue;
-      const available = Math.max(0, day.effectiveRepairCapacityMinutes - day.fixedLoadMinutes
-        - day.preservedProvisionalLoadMinutes - day.proposedLoadMinutes);
-      const minutes = Math.min(remaining, available);
-      if (minutes > 0) tentative.push({ repairId: repair.id, workDate: day.date,
-        plannedMinutes: minutes, source: "AUTO", sortOrder: 0 });
-      remaining -= minutes;
-      if (remaining === 0) break;
+      day.proposedLoadMinutes = 0;
+      day.preservedForApplyLoadMinutes = 0;
     }
-    if (remaining > 0) {
-      repair.unplacedReason = repair.latestWorkCompletionDate! > days.at(-1)!.date
-        ? "BEYOND_PREVIEW_HORIZON" : "NO_CAPACITY_IN_WINDOW";
-      continue;
+    for (const repair of candidates) {
+      repair.proposedSegments = [];
+      repair.proposedSummaryDate = null;
+      if (!preservedForApply.has(repair.id)) repair.unplacedReason = null;
+      else {
+        const current = repair.currentSegments.length > 0 ? repair.currentSegments.map(segment => ({
+          date: segment.workDate, minutes: segment.plannedMinutes,
+        })) : [{ date: repair.currentScheduledDate!, minutes: repair.workMinutes! }];
+        for (const item of current) {
+          const day = byDate.get(item.date);
+          if (day) day.preservedForApplyLoadMinutes += item.minutes;
+        }
+      }
     }
-    repair.proposedSegments = tentative;
-    repair.proposedSummaryDate = tentative[0].workDate;
-    for (const segment of tentative) byDate.get(segment.workDate)!.proposedLoadMinutes += segment.plannedMinutes;
+    for (const repair of candidates) {
+      if (preservedForApply.has(repair.id)) continue;
+      let remaining = repair.workMinutes!;
+      const tentative: ProposedSegment[] = [];
+      for (const day of days) {
+        if (day.date < repair.projectedEarliestDate! || day.date > repair.latestWorkCompletionDate!) continue;
+        const available = Math.max(0, day.effectiveRepairCapacityMinutes - day.fixedLoadMinutes
+          - day.preservedProvisionalLoadMinutes - day.preservedForApplyLoadMinutes - day.proposedLoadMinutes);
+        const minutes = Math.min(remaining, available);
+        if (minutes > 0) tentative.push({ repairId: repair.id, workDate: day.date,
+          plannedMinutes: minutes, source: "AUTO", sortOrder: 0 });
+        remaining -= minutes;
+        if (remaining === 0) break;
+      }
+      if (remaining > 0) {
+        repair.unplacedReason = repair.latestWorkCompletionDate! > days.at(-1)!.date
+          ? "BEYOND_PREVIEW_HORIZON" : "NO_CAPACITY_IN_WINDOW";
+        if (repair.currentPlanClass === "REPLACEABLE_PROVISIONAL") {
+          preservedForApply.add(repair.id);
+          promoted = true;
+        }
+        continue;
+      }
+      repair.proposedSegments = tentative;
+      repair.proposedSummaryDate = tentative[0].workDate;
+      for (const segment of tentative) byDate.get(segment.workDate)!.proposedLoadMinutes += segment.plannedMinutes;
+    }
+    if (!promoted) break;
   }
   // Candidate order is the display order within every work day.
   const dailyOrder = new Map<string, number>();
@@ -129,7 +179,11 @@ export function resolveSchedulerV2Planner(input: {
             ? "PARTS_WAITING_UNKNOWN" : repair.partsReadinessState === "LEGACY_UNKNOWN"
               ? "PARTS_LEGACY_UNKNOWN" : repair.analysisReason;
   }
-  for (const day of days) day.remainingCapacityMinutes = Math.max(0, day.effectiveRepairCapacityMinutes
-    - day.fixedLoadMinutes - day.preservedProvisionalLoadMinutes - day.proposedLoadMinutes);
+  for (const day of days) {
+    day.resultingPlanLoadMinutes = day.fixedLoadMinutes + day.preservedProvisionalLoadMinutes +
+      day.preservedForApplyLoadMinutes + day.proposedLoadMinutes;
+    day.remainingCapacityMinutes = Math.max(0, day.effectiveRepairCapacityMinutes - day.resultingPlanLoadMinutes);
+  }
+  for (const repair of repairs) repair.futureApplyAction = classifySchedulerV2FutureApply(repair);
   return { days, repairs };
 }

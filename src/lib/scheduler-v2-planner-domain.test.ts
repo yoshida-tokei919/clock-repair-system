@@ -41,6 +41,7 @@ test("600 minutes split across effective 300/240/300 as 300/240/60", () => {
   ]);
   assert.equal(result.repairs[0].proposedSummaryDate, "2026-10-01");
   assert.equal(result.repairs[0].currentPlanClass, "NONE");
+  assert.equal(result.repairs[0].futureApplyAction, "CREATE_AUTO");
   assert.deepEqual(result.days.map(day => day.remainingCapacityMinutes), [0, 0, 240]);
 });
 
@@ -61,6 +62,7 @@ test("fixed segment and locked legacy fallback reserve capacity without double-c
   ], { capacities: [300, 300, 300], segments: [segment(1, 1, "2026-10-01", 100)] });
   assert.equal(result.days[0].fixedLoadMinutes, 500);
   assert.equal(result.repairs[2].proposedSummaryDate, "2026-10-02");
+  assert.deepEqual(result.repairs.slice(0, 2).map(row => row.futureApplyAction), ["PROTECTED", "PROTECTED"]);
 });
 
 test("manual segment protects its repair, while excluded provisional load is preserved", () => {
@@ -71,7 +73,9 @@ test("manual segment protects its repair, while excluded provisional load is pre
   ], { capacities: [300, 300, 300], segments: [segment(1, 1, "2026-10-01", 100, "MANUAL")] });
   assert.equal(result.days[0].fixedLoadMinutes, 100);
   assert.equal(result.days[0].preservedProvisionalLoadMinutes, 120);
+  assert.equal(result.repairs[1].currentPlanClass, "PRESERVED_PROVISIONAL");
   assert.equal(result.repairs[0].unplacedReason, "MANUAL_SEGMENT_PROTECTED");
+  assert.deepEqual(result.repairs.slice(0, 2).map(row => row.futureApplyAction), ["PROTECTED", "PROTECTED"]);
   assert.deepEqual(result.repairs[2].proposedSegments.map(row => row.plannedMinutes), [80, 120]);
 });
 
@@ -84,6 +88,8 @@ test("replaceable current AUTO load is removed from proposed baseline and sortOr
   assert.equal(result.days[0].replaceableCurrentLoadMinutes, 200);
   assert.equal(result.days[0].currentPlanLoadMinutes, 200);
   assert.equal(result.days[0].proposedLoadMinutes, 200);
+  assert.equal(result.days[0].resultingPlanLoadMinutes, 200);
+  assert.equal(result.repairs[0].futureApplyAction, "REPLACE_AUTO");
   assert.deepEqual(result.repairs.map(row => row.proposedSegments[0].sortOrder), [1, 0]);
 });
 
@@ -95,6 +101,76 @@ test("failed candidate rolls back every tentative minute before next candidate",
   assert.deepEqual(result.repairs[0].proposedSegments, []);
   assert.equal(result.repairs[1].proposedSummaryDate, "2026-10-01");
   assert.equal(result.days[0].proposedLoadMinutes, 100);
+  assert.equal(result.days[0].preservedForApplyLoadMinutes, 0);
+  assert.equal(result.repairs[0].futureApplyAction, "PRESERVE_UNPLACED");
+});
+
+test("failed AUTO replacement keeps its old load while a lower-priority repair is planned", () => {
+  const result = preview([
+    repair(1, { scheduledDate: "2026-10-01", estimatedWorkMinutes: 700 }),
+    repair(2, { estimatedWorkMinutes: 100 }),
+  ], { capacities: [300, 0, 300], priorities: { 1: 10 },
+    segments: [segment(1, 1, "2026-10-01", 200)] });
+  assert.deepEqual(result.repairs[0].proposedSegments, []);
+  assert.equal(result.repairs[0].futureApplyAction, "PRESERVE_UNPLACED");
+  assert.equal(result.repairs[1].proposedSummaryDate, "2026-10-01");
+  assert.equal(result.days[0].currentPlanLoadMinutes, 200);
+  assert.equal(result.days[0].preservedForApplyLoadMinutes, 200);
+  assert.equal(result.days[0].resultingPlanLoadMinutes, 300);
+  assert.equal(result.days[0].remainingCapacityMinutes, 0);
+});
+
+test("restored AUTO load moves a lower-priority proposal to another day", () => {
+  const result = preview([
+    repair(1, { scheduledDate: "2026-10-01", estimatedWorkMinutes: 700 }),
+    repair(2, { estimatedWorkMinutes: 100 }),
+  ], { capacities: [300, 300, 0], priorities: { 1: 10 },
+    segments: [segment(1, 1, "2026-10-01", 250)] });
+  assert.deepEqual(result.repairs[1].proposedSegments.map(row => [row.workDate, row.plannedMinutes]), [
+    ["2026-10-01", 50], ["2026-10-02", 50],
+  ]);
+  assert.deepEqual(result.days.map(day => day.resultingPlanLoadMinutes), [300, 50, 0]);
+  assert.equal(result.repairs[1].proposedSummaryDate, "2026-10-01");
+});
+
+test("failed legacy replacement retains scheduledDate load; successful legacy creates segments", () => {
+  const failed = preview([
+    repair(1, { scheduledDate: "2026-10-01", estimatedWorkMinutes: 200,
+      partsReadinessState: "WAITING", partsReadyDate: "2026-10-02" }),
+    repair(2, { estimatedWorkMinutes: 100 }),
+  ], { capacities: [200, 0, 100], priorities: { 1: 10 } });
+  assert.equal(failed.days[0].preservedForApplyLoadMinutes, 200);
+  assert.equal(failed.repairs[1].proposedSummaryDate, "2026-10-03");
+  assert.equal(failed.days[0].resultingPlanLoadMinutes, 200);
+  assert.equal(failed.repairs[0].futureApplyAction, "PRESERVE_UNPLACED");
+  const placed = preview([repair(1, { scheduledDate: "2026-10-02", estimatedWorkMinutes: 60 })],
+    { capacities: [100, 100, 100] });
+  assert.equal(placed.repairs[0].futureApplyAction, "CREATE_FROM_LEGACY");
+  assert.equal(placed.repairs[0].proposedSummaryDate, "2026-10-01");
+});
+
+test("restoring one old plan can cascade to another; final proposal is recomputed", () => {
+  const result = preview([
+    repair(1, { scheduledDate: "2026-10-01", estimatedWorkMinutes: 700 }),
+    repair(2, { scheduledDate: "2026-10-02", estimatedWorkMinutes: 500 }),
+    repair(3, { estimatedWorkMinutes: 300 }),
+  ], { capacities: [300, 300, 0], priorities: { 1: 30, 2: 20, 3: 10 },
+    segments: [segment(1, 1, "2026-10-01", 200), segment(2, 2, "2026-10-02", 200)] });
+  assert.deepEqual(result.repairs.map(row => row.proposedSegments), [[], [], []]);
+  assert.deepEqual(result.days.map(day => day.preservedForApplyLoadMinutes), [200, 200, 0]);
+  assert.deepEqual(result.days.map(day => day.resultingPlanLoadMinutes), [200, 200, 0]);
+  assert.deepEqual(result.days.map(day => day.remainingCapacityMinutes), [100, 100, 0]);
+  assert.ok(result.days.every(day => day.resultingPlanLoadMinutes <= day.effectiveRepairCapacityMinutes));
+});
+
+test("unchanged AUTO segments need no apply; a mismatched summary alone needs sync", () => {
+  const rows = [segment(1, 1, "2026-10-01", 60)];
+  const unchanged = preview([repair(1, { scheduledDate: "2026-10-01" })],
+    { capacities: [100, 100, 100], segments: rows });
+  assert.equal(unchanged.repairs[0].futureApplyAction, "NO_CHANGE");
+  const summary = preview([repair(1, { scheduledDate: "2026-10-02" })],
+    { capacities: [100, 100, 100], segments: rows });
+  assert.equal(summary.repairs[0].futureApplyAction, "SUMMARY_ONLY_SYNC");
 });
 
 test("remaining work overrides estimate; zero is unavailable", () => {
