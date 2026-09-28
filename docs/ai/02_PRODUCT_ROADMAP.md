@@ -113,40 +113,66 @@
 - 部品価格をクリック操作で明細へ反映できる
 - 発注が必要な部品を発注管理へ連携できる
 
-## Phase 3: 現場運用・QRタグ
+## Phase 3: 現場運用・PhysicalTag / NFC・QR
 
 ### 目的
 
-時計1本ごとの現物とアプリ上の案件を素早く対応付ける。
+時計1本ごとの現物とアプリ上のRepair（修理案件）を、作業場のPCから高速かつ取り違えに強い形で対応付ける。
+単なる案件遷移用QRではなく、受付・作業タイマー・納品書・Shipment・棚卸し等で共通利用できる「現物識別基盤」とする。
 
 ### 対象
 
-- 案件ごとのQRコード生成
-- 小型タグ印刷
-- 時計収納袋へのタグ同梱
-- コードリーダー読み取り
+- PhysicalTag（物理タグ）とRepairの割当履歴
+- NFC UIDによる識別
+- QR tokenによる識別
+- 人間が読めるshortCode
+- QR付き小型ラベル印刷
+- NFCタグ / QRラベルの時計収納袋・トレーへの付与
+- PC常設USB NFC / QRリーダー
 - 案件詳細画面への遷移
+- ScanSessionによる連続読み取り
+- タイマー開始 / 切替
+- 納品書対象の連続選択
+- Shipment梱包対象の連続選択・確認
+- 将来の現物所在確認 / 棚卸し
 
 ### 方針
 
-- 時計1本につき1枚の小型QRタグを作る
-- QRタグは時計の収納袋に同梱する
-- コードリーダーで読み取ると管理画面の案件詳細へ遷移する
-- 管理画面の認証方針を壊さない
+- 主運用はNFC、QRはフォールバック、人間向けshortCodeを第3の識別手段とする
+- NFC / QR / shortCodeは同じ論理PhysicalTagへ解決する
+- タグには顧客名・電話番号等の個人情報を保存しない
+- NFC UIDは検索キーとして扱い、認証情報・秘密鍵として扱わない
+- QRには推測困難なtokenを使い、連番Repair IDを直接埋め込まない
+- Repair情報の表示・更新には既存の管理画面認証を必須とする
+- PhysicalTagとRepairの割当を分離し、タグを再利用可能にして履歴を残す
+- 1 PhysicalTagにつきactiveな割当は最大1件、1 Repairにつきactiveな論理タグは原則1件とする
+- タグは時計本体へ直接貼らず、収納袋・保管トレー等へ付ける
+- 初期実装はブラウザWeb NFCへ依存せず、PC常設USBリーダーのkeyboard-wedge/HID入力を優先する
+- 読み取りモードに応じて、案件表示・タイマー・一括選択・発送確認等へ同じscan基盤を再利用する
+- 連続読取では重複scan抑止、未割当/無効タグ、別顧客混入等を明示する
+- 納品書生成・Shipment確定・ステータス変更等の状態変更は、scanだけで即確定せず人間の確認操作を残す
+- 詳細設計は `docs/ai-tasks/196-physical-tag-nfc-design.md` を参照する
 
 ### 作業順
 
-1. QRコードの識別単位とURL設計
-2. 案件ごとのQRコード生成
-3. QRコード表示
-4. 小型タグ印刷レイアウト
-5. コードリーダー読み取りから案件詳細画面への遷移確認
+1. 実機PoC（NFCタグ / USB NFCリーダー / QRリーダーの読み取り安定性）
+2. PhysicalTag / PhysicalTagAssignmentの物理設計
+3. NFC UID / QR token / shortCode解決API
+4. タグ割当・解除・再利用
+5. QR付き小型ラベル印刷
+6. 共通scan receiver / ScanSession
+7. 案件表示・タイマー開始/切替
+8. 納品書・Shipment向け連続選択
+9. 現物所在確認 / 棚卸しへの拡張
 
 ### 完了条件
 
-- 時計1本につき1枚の小型QRタグを印刷できる
-- QRタグを時計収納袋へ同梱できる
-- QRをコードリーダーで読み取ると該当案件詳細画面を開ける
+- 時計現物のタグをNFCで読むと該当Repairへ到達できる
+- QRとshortCodeでも同じPhysicalTag / Repairへ到達できる
+- タグの再利用と過去の割当履歴を追跡できる
+- 作業タイマー開始/切替を現物scanから行える
+- 複数Repairを連続scanして納品書・Shipment対象へ安全に追加できる
+- 別顧客混入、重複scan、未割当/無効タグを検知できる
 - 管理画面の認証方針を壊さない
 
 ## Phase 4: 作業可能判定・優先順位・スケジュール
@@ -404,11 +430,37 @@ RepairScheduleSegment（予定明細・仮称）等を使い、1案件を複数�
 
 本格運用開始前に学習基盤まで実装するが、十分な件数が必要な統計精度向上そのものは運用後も継続する。
 
-### Stage B: Shipment・郵送・LINE連携
+### Stage B: PhysicalTag・NFC / QR現物連携
+
+詳細要件は `docs/ai-tasks/196-physical-tag-nfc-design.md` を参照し、実装前に実機PoCと現行schemaを再照合する。
+
+#### Task196: PhysicalTag / NFC・QR基盤
+
+- PhysicalTagとRepairのactive割当・履歴を分離する
+- NFC UID / QR token / shortCodeを同じPhysicalTagへ解決する
+- タグを再利用でき、交換・解除履歴を残せるようにする
+- QR付き小型ラベルを収納袋・トレーへ付与する
+- タグ上へ個人情報や推測可能なRepair IDを直接保存しない
+- 初期構成はPC常設USBリーダーを前提とし、ブラウザWeb NFCへ依存しない
+- schema / migration / RLS / GRANT変更は高リスク変更として独立レビューする
+
+#### Task197: ScanSession・連続読取業務連携
+
+- USB NFC / QRリーダーのkeyboard-wedge/HID入力を共通scan receiverで受ける
+- 通常scanはRepair表示へ接続する
+- scanからWorkTimeSessionの開始 / 切替へ接続する
+- 複数Repairの連続scanで納品書対象を選択できる
+- Shipment向けの複数Repair selectionを後続Taskへ渡せる共通契約を作る
+- 実Shipment作成・梱包照合はTask198以降で接続する
+- 重複scan、未割当/無効タグ、別顧客混入を検知する
+- 状態変更はscanだけで即確定せず、確認操作を残す
+- 将来の現物所在確認 / 棚卸しへ拡張可能にする
+
+### Stage C: Shipment・郵送・LINE連携
 
 詳細設計はNotion「発送管理・自動スケジュール・発注連携 設計方針（2026-09-25）」を正本候補として参照し、実装前に現行schemaと再照合する。
 
-#### Task196: Shipment（発送）基盤
+#### Task198: Shipment（発送）基盤
 
 Repair（修理案件）とShipment（発送1個口）を分離する。
 
@@ -421,6 +473,7 @@ Repair（修理案件）とShipment（発送1個口）を分離する。
 - actualShippedAt（実発送日時）
 - ShipmentStatus（発送ステータス）
 - 配送会社非依存のRepairStatus
+- Task197のScanSession / SHIPMENT_SELECTから複数RepairをShipment作成へ取り込める
 
 Shipmentには将来の入庫郵送へ拡張可能な direction（配送方向）を持たせる方向を優先する。
 
@@ -429,7 +482,7 @@ Shipmentには将来の入庫郵送へ拡張可能な direction（配送方向�
 
 初期自動化対象はOUTBOUND（返送）を優先し、INBOUND（入庫）はschema上の拡張余地を確保する。
 
-#### Task197: 発送スケジュール
+#### Task199: 発送スケジュール
 
 plannedShipDate（発送予定日）を基準に発送予定を一覧化する。
 
@@ -447,10 +500,12 @@ plannedShipDate（発送予定日）を基準に発送予定を一覧化する�
 - B2B / B2C
 - 配送会社
 - 同一顧客の近接発送予定
+- PhysicalTagの連続scanによる梱包内容照合
+- 発送前の再利用PhysicalTag release確認
 
 同一顧客の複数Repairを自動で勝手に統合せず、まとめ発送候補を提示して人間がShipmentを確定する。
 
-#### Task198: ゆうプリR CSV出力
+#### Task200: ゆうプリR CSV出力
 
 既存PoCで確認済みの標準フォーマットV3を利用し、アプリからゆうプリRへCSV出力する。
 
@@ -462,7 +517,7 @@ plannedShipDate（発送予定日）を基準に発送予定を一覧化する�
 
 Windows workerによる完全自動化は必須条件にせず、まずCSVベースの安定運用を完成させる。
 
-#### Task199: ゆうプリR結果取込・配送状態同期
+#### Task201: ゆうプリR結果取込・配送状態同期
 
 ゆうプリR発送履歴CSVから以下を回収する。
 
@@ -479,7 +534,7 @@ Windows workerによる完全自動化は必須条件にせず、まずCSVベー
 PoCではCSV取込、送り状印刷、お問い合わせ番号採番、発送履歴CSV出力、照合、配達状況照会、10 / 0A = 引受予定まで確認済み。
 実際の郵便局引受後の引受確定・配達完了コードは実発送時に確認する。
 
-#### Task200: LINE作業完了連絡・配達希望日時
+#### Task202: LINE作業完了連絡・配達希望日時
 
 RepairStatusが作業完了になった瞬間には自動送信しない。
 
@@ -497,7 +552,7 @@ RepairStatusが作業完了になった瞬間には自動送信しない。
 
 をRepairStatusとは分離して管理する。
 
-#### Task201: 発送・配達自動連携
+#### Task203: 発送・配達自動連携
 
 配送会社の「引受」を検知した時点で、
 
@@ -529,6 +584,11 @@ shippingNoticeSentAt（発送連絡送信日時）等で二重送信を防止す
 - Scheduler v2
 - 今日の作業
 - 納期逆算
+- PhysicalTag（現物識別）
+- NFC / QR / shortCodeによるRepair解決
+- ScanSession（連続読取）
+- scanからのタイマー開始 / 切替
+- 納品書・Shipment対象の連続選択
 - plannedShipDate（発送予定日）
 - Shipment（発送）
 - 発送スケジュール
@@ -541,7 +601,7 @@ shippingNoticeSentAt（発送連絡送信日時）等で二重送信を防止す
 
 ### 目標業務フロー
 
-受付・見積 → 納期算出 → 承認 → 部品準備 → Scheduler v2 → 今日の作業 / 実績計測 → 作業完了 → ランニングテスト → plannedShipDate → Shipment → ゆうプリR → 日本郵便引受 → 発送LINE → 配送追跡 → 配達完了 → Repair納品済み
+受付・見積 → 現物受領 / PhysicalTag割当 → 納期算出 → 承認 → 部品準備 → Scheduler v2 → NFC/QR scan → 今日の作業 / 実績計測 → 作業完了 → ランニングテスト → 納品対象連続scan → plannedShipDate → Shipment / 梱包確認 → ゆうプリR → 日本郵便引受 → 発送LINE → 配送追跡 → 配達完了 → Repair納品済み
 
 ### 実施順
 
@@ -555,15 +615,17 @@ shippingNoticeSentAt（発送連絡送信日時）等で二重送信を防止す
 6. Task193 分割スケジュール + Scheduler v2
 7. Task194 今日の作業
 8. Task195 実績フィードバック基盤
-9. Task196 Shipment基盤
-10. Task197 発送スケジュール
-11. Task198 ゆうプリR CSV出力
-12. Task199 ゆうプリR結果取込・配送状態同期
-13. Task200 LINE作業完了連絡・配達希望日時
-14. Task201 発送・配達自動連携
-15. **本格運用開始**
-16. 運用実績によるScheduler・納期・リードタイム精度向上
-17. 事例公開・QR等の未完機能
+9. Task196 PhysicalTag / NFC・QR基盤
+10. Task197 ScanSession・連続読取業務連携
+11. Task198 Shipment基盤
+12. Task199 発送スケジュール
+13. Task200 ゆうプリR CSV出力
+14. Task201 ゆうプリR結果取込・配送状態同期
+15. Task202 LINE作業完了連絡・配達希望日時
+16. Task203 発送・配達自動連携
+17. **本格運用開始**
+18. 運用実績によるScheduler・納期・リードタイム精度向上
+19. 事例公開・その他未完機能
 
 Task番号・境界は各Task実装前の調査で必要に応じて再分割してよい。
 schema / migration / RLS / GRANT / LINE自動送信 / production DBを伴う高リスクTaskでは、実装担当と独立レビュー担当を分離し、本番変更前にユーザー承認を必須とする。
