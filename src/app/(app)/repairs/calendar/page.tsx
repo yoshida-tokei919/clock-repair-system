@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AutoScheduleReview } from "@/components/repairs/AutoScheduleReview";
 import { DeadlineCapacityPreview } from "@/components/repairs/DeadlineCapacityPreview";
+import { SchedulerV2Preview } from "@/components/repairs/SchedulerV2Preview";
 
 type CalendarException = { date: string; availableMinutes: number; note: string | null };
 type CalendarResponse = { month: string; defaultAvailableMinutes: number; exceptions: CalendarException[] };
@@ -188,6 +189,7 @@ export default function WorkCalendarPage() {
       )}
       <AutoScheduleReview />
       <DeadlineCapacityPreview />
+      <SchedulerV2Preview />
     </div>
   );
 }
