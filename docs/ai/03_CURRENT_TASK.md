@@ -1,56 +1,62 @@
 # CURRENT TASK
 
-## 現在のcheckpoint — 2026-09-29
+## 現在のcheckpoint — 2026-09-30
 
 このファイルは、現在の実装Taskとproductionの現在地だけを管理する。
 過去Taskの詳細は `docs/ai-tasks/` と各runbookを参照し、ここへ長い履歴を残さない。
 
 ## Production
 
-- Production application commit: `e8f5eb97d4955d8d01547c250f1ebd010e860ff6`
-- Commit subject: `feat: add procurement lead-time feedback`
+- Production application commit: `829314f63c2e8d431e18249e54f03956feb83fec`
+- Commit subject: `feat: add activity reservation feedback`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `24cc4192-7999-4497-9da1-1166b0f5e833`
+- Railway deployment: `a1a3426e-468e-4df9-8130-1858ce6e7daa`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task195b-20260929`
+- Production tag: `production-task195c-20260930`
 - Region: `sin`
 - Supabase migration: none
 
-Production: Task195B complete
+Production: Task195C complete
 
-## Task195B production確認
+## Task195C production確認
 
-- `OrderRequest.orderedAt -> receivedAt` の実績から調達総リードタイムをread-only集計。
-- 実績日数はTask191と同じAsia/Tokyo暦日基準。
-- 集計単位はSupplier × ProcurementShippingMethodの組。
-- 片側が欠ける実績は「不明」dimensionとして保持し、もう片側へ原因帰属しない。
-- 未受領 / 不正interval / cancelledは集計対象外。
-- 表示項目:
-  - sampleCount
-  - median
-  - mean
-  - P80
-  - min / max
-  - 現在設定の合計日数
-  - 現在設定との差
-- 現在設定合計はTask191と同じ `manualProcessingLeadDays + manualTransitLeadDays` の成立条件を使用。
-- 観測できるのは総リードタイムのみで、Supplier処理日数と輸送日数へ分解しない。
-- Supplier / ShippingMethod設定値の自動更新なし。
-- expectedArrivalDate / parts readiness / Scheduler挙動の変更なし。
-- feedback APIは既存procurement設定APIから分離し、feedback取得失敗時も設定編集を継続可能。
-- APIは認証必須・read-only。
-- カタリ独立レビュー: blocking issueなし。
-- Task195B + Task191周辺回帰: 27 / 27 PASS。
+- WorkTimeSessionの非REPAIR実績をSchedulerActivitySetting単位でread-only集計。
+- 対象:
+  - ESTIMATE
+  - INTAKE
+  - INQUIRY
+  - CUSTOMER_CONTACT
+  - PARTS_ORDER
+  - SHIPPING
+  - ADMIN
+  - OTHER
+- REPAIRはTask190 / Task195Aの正本を維持し、Task195C集計から除外。
+- `dailyReservedMinutes` は1日単位の容量控除なので、主比較はAsia/Tokyoの日別合計実績。
+- 日別実績は計測がある日だけを分母とし、未計測日を0分として扱わない。
+- 予約枠との差は日別平均を主指標とする。
+- 中央値 / 平均 / P80 / min / maxを参考表示。
+- 1セッション単位統計は日次予約とは別の参考値として表示。
+- ESTIMATE / INQUIRY / PARTS_ORDERはTask190の既存1対象あたり学習値を補助表示として再利用。
+- open session / invalidated session / 不正interval / future sessionは実績対象外。
+- 東京時間0時跨ぎは日別合計を正しく分割。
+- feedback APIは認証必須・read-only。
+- feedback取得失敗時も既存Scheduler設定の編集・保存は継続可能。
+- SchedulerActivitySettingの自動更新なし。
+- Task192実効容量計算 / Scheduler v2 planner・applyの変更なし。
+- schema / migration / seed / RLS / GRANT変更なし。
+- カタリ独立レビューで、予約枠との差の主比較を中央値から日別平均へ修正。
+- 最終関連回帰: 55 / 55 PASS。
 - `npx tsc --noEmit --incremental false`: PASS。
 - `git diff --check`: PASS。
-- schema / migration / seed / RLS / GRANT変更なし。
+- API auth / read-only boundary: PASS。
+- Scheduler core unchanged: PASS。
 - Railway deploy: SUCCESS。
 - Non-destructive smoke:
   - `/` = 200
   - `/login` = 200
   - 未認証 `/settings/scheduler` = 307
-  - 未認証 `GET /api/settings/procurement/feedback` = 401
-- 詳細: `docs/ai-tasks/195b-procurement-lead-time-feedback.md`
+  - 未認証 `GET /api/settings/scheduler/activities/feedback` = 401
+- 詳細: `docs/ai-tasks/195c-activity-reservation-feedback.md`
 
 ## Scheduler / Feedback の現在地
 
@@ -63,33 +69,22 @@ Production: Task195B complete
 7. Task194: 今日の作業dashboard — production完了
 8. Task195A: Repair作業時間実績feedbackをScheduler v2へ表示 — production完了
 9. Task195B: 調達総リードタイム実績feedback — production完了
+10. Task195C: 非REPAIR共通業務の実績と日次予約枠feedback — production完了
 
-## 次のTask: Task195C
+## 次のTask候補: Task195D
 
 Status: awaiting user approval
 
-### 目的
+### 目的候補
 
-WorkTimeSessionの非REPAIR実績とSchedulerActivitySettingの予約枠を比較し、共通業務の実績feedbackをread-onlyで可視化する。
-
-### 想定対象
-
-- ESTIMATE
-- INQUIRY
-- PARTS_ORDER
-- INTAKE
-- CUSTOMER_CONTACT
-- SHIPPING
-- ADMIN
-- OTHER
+実作業実績を実効作業容量へ戻すfeedbackをread-onlyで可視化する。
 
 ### 境界
 
-- REPAIR実績はTask190 / Task195Aの正本を維持し、混在させない。
-- まず実績と現在の `dailyReservedMinutes` / manual standard / learning設定を比較表示する。
-- Task195Cでは予約枠を自動更新しない。
-- 既存WorkTimeSessionのactivityType別集計helperを優先再利用する。
+- 詳細な集計単位・期間・分母は実装前調査で既存設計と照合して確定する。
+- Task192の実効容量計算を自動変更しない。
+- Scheduler v2へ学習値を自動反映しない。
+- 遅延buffer学習、調達内訳学習、Task196以降は開始しない。
 - schema変更が必要なら別高リスクTaskへ分離する。
-- Task195D/Eの実効容量・遅延buffer・調達内訳学習は開始しない。
 
-Task195Cはユーザー承認後に開始する。
+Task195Dはユーザー承認後に実装前調査から開始する。
