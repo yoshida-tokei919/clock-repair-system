@@ -2,6 +2,14 @@ export class OrderExpectedArrivalError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
 
+export function tokyoCalendarDate(value: Date): Date {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: string) => Number(parts.find(item => item.type === type)?.value);
+  return new Date(Date.UTC(part("year"), part("month") - 1, part("day")));
+}
+
 export function resolveExpectedArrivalDate(
   orderedAt: Date | null,
   manualProcessingLeadDays: number | null,
@@ -12,11 +20,7 @@ export function resolveExpectedArrivalDate(
       !Number.isSafeInteger(manualProcessingLeadDays) || manualProcessingLeadDays < 0 ||
       !Number.isSafeInteger(manualTransitLeadDays) || manualTransitLeadDays < 0) return null;
 
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(orderedAt);
-  const value = (type: string) => Number(parts.find(part => part.type === type)?.value);
-  const date = new Date(Date.UTC(value("year"), value("month") - 1, value("day")));
+  const date = tokyoCalendarDate(orderedAt);
   date.setUTCDate(date.getUTCDate() + manualProcessingLeadDays + manualTransitLeadDays);
   return Number.isFinite(date.getTime()) ? date : null;
 }
