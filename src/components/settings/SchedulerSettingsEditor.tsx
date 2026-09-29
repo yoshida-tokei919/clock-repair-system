@@ -8,6 +8,8 @@ import ProcurementSettingsEditor from "@/components/settings/ProcurementSettings
 import type { ActivityReservationFeedbackRow } from "@/lib/activity-reservation-feedback";
 import type { CapacityObservationFeedback as CapacityFeedback } from "@/lib/capacity-observation-feedback";
 import CapacityObservationFeedback from "@/components/settings/CapacityObservationFeedback";
+import type { DeadlineFeedbackReadiness as DeadlineReadiness } from "@/lib/deadline-feedback-readiness";
+import DeadlineFeedbackReadiness from "@/components/settings/DeadlineFeedbackReadiness";
 
 type Masters = {
   categories: { id: number; repairType: "INTERNAL" | "EXTERNAL"; key: string; name: string }[];
@@ -53,12 +55,13 @@ async function api(url: string, method = "GET", body?: unknown) {
 }
 
 export async function loadSchedulerSettingsWithFeedback() {
-  const [data, feedback, capacityFeedback] = await Promise.all([
+  const [data, feedback, capacityFeedback, deadlineReadiness] = await Promise.all([
     api("/api/settings/scheduler") as Promise<Data>,
     (api("/api/settings/scheduler/activities/feedback") as Promise<ActivityReservationFeedbackRow[]>).catch(() => null),
     (api("/api/settings/scheduler/capacity-feedback") as Promise<CapacityFeedback>).catch(() => null),
+    (api("/api/settings/scheduler/deadline-feedback-readiness") as Promise<DeadlineReadiness>).catch(() => null),
   ]);
-  return { data, feedback, capacityFeedback };
+  return { data, feedback, capacityFeedback, deadlineReadiness };
 }
 
 function NumberField({ label, value, onChange, min = 0, nullable = false }: {
@@ -84,15 +87,18 @@ export default function SchedulerSettingsEditor() {
   const [activityFeedbackError, setActivityFeedbackError] = useState(false);
   const [capacityFeedback, setCapacityFeedback] = useState<CapacityFeedback | null>(null);
   const [capacityFeedbackError, setCapacityFeedbackError] = useState(false);
+  const [deadlineReadiness, setDeadlineReadiness] = useState<DeadlineReadiness | null>(null);
+  const [deadlineReadinessError, setDeadlineReadinessError] = useState(false);
   const [draft, setDraft] = useState<StandardDraft>(emptyDraft);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const reload = useCallback(async () => {
-    const { data: next, feedback, capacityFeedback: capacity } = await loadSchedulerSettingsWithFeedback();
+    const { data: next, feedback, capacityFeedback: capacity, deadlineReadiness: deadline } = await loadSchedulerSettingsWithFeedback();
     setData(next); setSetting(next.setting); setActivities(next.activities);
     setActivityFeedback(feedback); setActivityFeedbackError(feedback === null);
     setCapacityFeedback(capacity); setCapacityFeedbackError(capacity === null);
+    setDeadlineReadiness(deadline); setDeadlineReadinessError(deadline === null);
   }, []);
   useEffect(() => { reload().catch(err => setError(err.message)); }, [reload]);
   async function run(operation: () => Promise<unknown>, success: string) {
@@ -170,6 +176,8 @@ export default function SchedulerSettingsEditor() {
 
       {capacityFeedback && <CapacityObservationFeedback feedback={capacityFeedback} />}
       {capacityFeedbackError && <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">容量比較の計測実績を読み込めませんでした。設定の編集・保存は続けられます。</p>}
+      {deadlineReadiness && <DeadlineFeedbackReadiness readiness={deadlineReadiness} />}
+      {deadlineReadinessError && <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">納期フィードバックのデータ状況を読み込めませんでした。設定の編集・保存は続けられます。</p>}
 
       <section className="space-y-4 rounded border bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold">修理以外の業務</h2>

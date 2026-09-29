@@ -137,7 +137,7 @@ test("feedback fetch failure leaves scheduler settings available for editing", a
   const calls: string[] = [];
   globalThis.fetch = (async (url: string) => {
     calls.push(url);
-    return url.endsWith("/feedback") || url.endsWith("/capacity-feedback")
+    return url.endsWith("/feedback") || url.endsWith("/capacity-feedback") || url.endsWith("/deadline-feedback-readiness")
       ? { ok: false, json: async () => ({ error: "failed" }) }
       : { ok: true, json: async () => ({ setting: { id: 1 }, activities: settings, standards: [], masters: {} }) };
   }) as typeof fetch;
@@ -147,8 +147,9 @@ test("feedback fetch failure leaves scheduler settings available for editing", a
     assert.equal(result.data.activities.length, 8);
     assert.equal(result.feedback, null);
     assert.equal(result.capacityFeedback, null);
+    assert.equal(result.deadlineReadiness, null);
     assert.deepEqual(calls.sort(), ["/api/settings/scheduler", "/api/settings/scheduler/activities/feedback",
-      "/api/settings/scheduler/capacity-feedback"].sort());
+      "/api/settings/scheduler/capacity-feedback", "/api/settings/scheduler/deadline-feedback-readiness"].sort());
   } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -157,6 +158,7 @@ test("capacity feedback failure does not prevent scheduler settings or activity 
   globalThis.fetch = (async (url: string) => url.endsWith("/capacity-feedback")
     ? { ok: false, json: async () => ({ error: "failed" }) }
     : { ok: true, json: async () => url.endsWith("/activities/feedback") ? []
+      : url.endsWith("/deadline-feedback-readiness") ? { currentBuffers: {}, repairCounts: {} }
       : { setting: { id: 1 }, activities: settings, standards: [], masters: {} } }) as typeof fetch;
   try {
     const result = await loadSchedulerSettingsWithFeedback();
@@ -164,5 +166,23 @@ test("capacity feedback failure does not prevent scheduler settings or activity 
     assert.equal(result.data.activities.length, 8);
     assert.deepEqual(result.feedback, []);
     assert.equal(result.capacityFeedback, null);
+    assert.deepEqual(result.deadlineReadiness, { currentBuffers: {}, repairCounts: {} });
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("deadline readiness failure does not prevent scheduler settings or other feedback from loading", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => url.endsWith("/deadline-feedback-readiness")
+    ? { ok: false, json: async () => ({ error: "failed" }) }
+    : { ok: true, json: async () => url.endsWith("/activities/feedback") ? []
+      : url.endsWith("/capacity-feedback") ? { days: [] }
+      : { setting: { id: 1 }, activities: settings, standards: [], masters: {} } }) as typeof fetch;
+  try {
+    const result = await loadSchedulerSettingsWithFeedback();
+    assert.equal(result.data.setting.id, 1);
+    assert.equal(result.data.activities.length, 8);
+    assert.deepEqual(result.feedback, []);
+    assert.deepEqual(result.capacityFeedback, { days: [] });
+    assert.equal(result.deadlineReadiness, null);
   } finally { globalThis.fetch = originalFetch; }
 });
