@@ -1,52 +1,49 @@
 # CURRENT TASK
 
-## 現在のcheckpoint — 2026-09-28
+## 現在のcheckpoint — 2026-09-29
 
 このファイルは、現在の実装Taskとproductionの現在地だけを管理する。
 過去Taskの詳細は `docs/ai-tasks/` と各runbookを参照し、ここへ長い履歴を残さない。
 
 ## Production
 
-- Production application commit: `c62e756d784179980e50dfdc127cfd2a6158b524`
-- Commit subject: `feat: add today work dashboard`
+- Production application commit: `df8db7b0408d97c7c458a10e9e6c52efebd54d9f`
+- Commit subject: `feat: surface scheduler work-time feedback`
 - Deploy source: GitHub `main` → Railway automatic deployment
-- Railway deployment: `427d78f8-e624-4c59-90cb-f357a079f327`
+- Railway deployment: `0a9a0517-2406-4a23-98e6-42beb3dd0ee1`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task194-20260928`
+- Production tag: `production-task195a-20260929`
 - Region: `sin`
 - Supabase migration: none
 
-Production: Task194 complete
+Production: Task195A complete
 
-## Task194 production確認
+## Task195A production確認
 
-- `/repairs/today` に「今日の作業」画面を追加。
-- RepairScheduleSegmentが存在するRepairはsegmentを予定正本として使用し、今日のsegmentのみ当日負荷へ計上。
-- segmentが0件のRepairだけlegacy `scheduledDate` をfallbackとして使用。
-- legacy fallbackの作業時間はTask192が導出済みの `workMinutes` を再利用し、`remainingWorkMinutes=0` を推定時間へ戻さない。
-- Task192のWorkCalendar / Scheduler予約容量 / parts readiness / planning分析を再利用。
-- 総容量 / 実効容量 / 予定負荷 / 残容量 / over-reserved / overbookedを表示。
-- 実行可能 / 再開可能日到来 / 中断中 / 部品待ち / 状態確認を重複しないsectionで表示。
-- Task184/193と同じ優先順: priorityScore DESC → deliveryDateExpected ASC null-last → receptionDate ASC null-last → id ASC。
-- 納期超過 / 工程期限超過等の注意表示を既存日付から導出。
-- 実行可能Repairは既存WorkTimeSession共通タイマーをその場で開始可能。
-- Repair詳細のタイマーsectionへの導線も維持。
-- schema / migration / seed / RLS / GRANT変更なし。
-- Codex実装 → カタリ独立レビュー。
-- 独立レビュー指摘: legacy fallbackで `remainingWorkMinutes=0` がestimatedへ戻る差異を修正。
-- Codex関連回帰: 111 tests PASS。
-- 独立レビュー修正後重点回帰: 33 / 33 PASS。
+- Task190で既に実装済みのRepair作業時間実績学習をScheduler v2 previewへ接続。
+- Scheduler v2各Repairに、保存中推定時間 / 推奨時間 / 差分 / 採用理由 / tier / 有効サンプル数を表示。
+- 推奨値は情報表示のみで、Scheduler v2から `estimatedWorkMinutes` を自動更新しない。
+- 推奨採用は既存Repair詳細のTask190 preview/apply導線を利用。
+- planner / Scheduler v2 applyは従来どおりpersist済み `estimatedWorkMinutes` / `remainingWorkMinutes` のみ使用。
+- feedback情報はScheduler revisionへ含めない。
+- GET previewだけ `loadSchedulerV2PreviewWithFeedback` を使用。
+- Serializable apply transactionはcore `loadSchedulerV2Preview` を使用し、WorkTimeSession履歴 / RepairWorkTimeStandardを読まない。
+- Task190元loaderと同じ4入力・同じ全REPAIR実績母集団・同じresolverを再利用。
+- カタリ独立レビューで、feedback readがapply transactionへ入る初版設計をblockingとして分離修正。
+- 最終主要回帰: 106 / 106 PASS。
+- Scheduler focused: 39 / 39 PASS。
+- Task190/192回帰: 67 / 67 PASS。
 - `npx tsc --noEmit --incremental false`: PASS。
 - `git diff --check`: PASS。
-- Railway build / deploy: SUCCESS。
-- Runtime: Next.js Ready in 793ms。
+- schema / migration / seed / RLS / GRANT変更なし。
+- Railway deploy: SUCCESS。
 - Non-destructive smoke:
   - `/` = 200
   - `/login` = 200
-  - 未認証 `/repairs/today` = 307（login redirect）
-- 詳細: `docs/ai-tasks/194-today-work-dashboard.md`
+  - 未認証 `GET /api/repairs/scheduler-v2-preview` = 401
+- 詳細: `docs/ai-tasks/195a-scheduler-work-time-feedback.md`
 
-## Scheduler / Operations の現在地
+## Scheduler / Feedback の現在地
 
 1. Task182–184: Schedule MVP / WorkCalendar / simple scheduler — production完了
 2. Task185–187: 作業時間・納期/容量設計 / 実装前調査 — docs-only完了
@@ -55,31 +52,39 @@ Production: Task194 complete
 5. Task192A–192B: 工程日数設定 / 納期逆算・実効容量preview — production完了
 6. Task193A–193C3: RepairScheduleSegment / Scheduler v2 preview・apply・writer cutover — production完了
 7. Task194: 今日の作業dashboard — production完了
+8. Task195A: Repair作業時間実績feedbackをScheduler v2へ表示 — production完了
 
-## 次のTask: Task195
+## 現在のTask: Task195B
 
-Status: awaiting user approval
+Status: investigation / implementation authorized
 
 ### 目的
 
-実績フィードバック基盤。
-既存の実績データを、将来案件の作業時間・調達リードタイム・実効容量・納期安全バッファ等の算出へ戻せる基盤を作る。
+既存の `OrderRequest.orderedAt` / `receivedAt` 実績から、調達リードタイムの実績feedbackをread-onlyで可視化する。
 
-### 想定対象
+### 境界
 
-- WorkTimeSession実作業時間 → 推定作業時間
-- OrderRequest orderedAt / receivedAt → Supplier / ShippingMethodリードタイム
-- 実績作業量 → 実効作業容量
-- 遅延実績 → 納期・安全バッファ
-- 見積り等の共通業務実績 → Scheduler予約容量
-- Task190の集計期間 / 件数閾値 / 平均・中央値・P80設定との接続
+- Supplier処理日数とProcurementShippingMethod輸送日数は概念上分離したまま維持する。
+- `orderedAt -> receivedAt` だけではSupplier処理と輸送を分解できないため、Task195Bで個別値を自動学習・自動更新しない。
+- まず既存データから観測可能な「総リードタイム」を集計し、現在設定との比較を表示する。
+- read-only / recommendation-only。
+- Supplier / ShippingMethod設定値を自動applyしない。
+- schema / migration / seed / RLS / GRANT変更なしを基本とする。
+- 新business ruleを推測で追加しない。
+- Task190既存の統計設定を流用できる場合のみ流用し、意味が合わない場合は独自流用しない。
+- 自動反映や個別Supplier/ShippingMethod学習は後続Taskへ分離する。
 
-### 開始時に確認すること
+### まず確認すること
 
-- Task190で既に実装済みの実績学習範囲とTask195との差分。
-- WorkTimeSession集計helper / API / settingsの現状。
-- Supplier / ProcurementShippingMethodのリードタイム実績集計の現状。
-- 新規schemaが本当に必要か、既存データからread-time集計で成立するか。
-- 自動反映とpreview / 人間確認の境界。
+- `OrderRequest` のSupplier / ShippingMethod参照と `orderedAt` / `receivedAt`。
+- Task191のexpectedArrivalDate算出helperとfallback優先順位。
+- Supplier処理日数 / ProcurementShippingMethod輸送日数の現行field。
+- 既存のprocurement settings・集計UI。
+- 日数の定義（暦日 / 稼働日 / timestamp差分）。
+- 未受領 / キャンセル / 不正intervalの扱い。
+- Supplier単独、ShippingMethod単独、組合せ単位のどこまで観測値として安全に出せるか。
 
-Task195はユーザー承認後に開始する。
+### 高リスク境界
+
+Task195Bはread-onlyを基本とし、production data mutationは追加しない。
+schema変更が必要と判明した場合は実装せず別Taskへ分離する。
