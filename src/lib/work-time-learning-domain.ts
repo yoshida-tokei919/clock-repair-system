@@ -187,7 +187,7 @@ function filterIqr(samples: readonly LogicalSample[]): LogicalSample[] {
   return samples.filter(sample => sample.seconds >= q1 - 1.5 * spread && sample.seconds <= q3 + 1.5 * spread);
 }
 
-function monthsBefore(now: Date, months: number): Date {
+export function monthsBefore(now: Date, months: number): Date {
   const result = new Date(now);
   const day = result.getUTCDate();
   result.setUTCDate(1);

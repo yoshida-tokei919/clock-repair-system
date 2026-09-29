@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { RepairWorkTimeStandard, SchedulerActivitySetting, SchedulerSetting } from "@prisma/client";
 import { AUTO_ACTIVITY_TYPES } from "@/lib/scheduler-settings-domain";
 import { isRepairWorkActionApplicable, isRepairWorkTargetPartApplicable } from "@/lib/repair-work-selection";
 import ProcurementSettingsEditor from "@/components/settings/ProcurementSettingsEditor";
+import type { ActivityReservationFeedbackRow } from "@/lib/activity-reservation-feedback";
 
 type Masters = {
   categories: { id: number; repairType: "INTERNAL" | "EXTERNAL"; key: string; name: string }[];
@@ -25,6 +26,21 @@ const activityNames: Record<string, string> = {
 const aggregationNames: Record<string, string> = { MEAN: "平均", MEDIAN: "中央値", P80: "80パーセンタイル" };
 const inputClass = "w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm";
 const buttonClass = "rounded bg-blue-700 px-3 py-1.5 text-sm text-white disabled:opacity-50";
+const minutes = (value: number | null) => value === null ? "—" : `${Number(value.toFixed(1))}分`;
+
+export function ActivityReservationFeedback({ row }: { row: ActivityReservationFeedbackRow }) {
+  const { current, daily, sessions, learning } = row;
+  return <div className="mt-4 space-y-2 border-t pt-4 text-sm">
+    <h4 className="font-medium">実績と保存済み現在設定（参照のみ）</h4>
+    <p className="text-zinc-600">日次予約 {current.dailyReservedMinutes}分／日、手動標準 {minutes(current.manualStandardMinutes)}／件、{current.learningMode}・{aggregationNames[current.aggregationMethod]}・主期間{current.lookbackMonths}ヶ月・最低{current.minimumSamples}件。代替期間: {current.fallbackLookbackMonths === null ? "なし" : `${current.fallbackLookbackMonths}ヶ月`}。</p>
+    <p className="text-xs text-zinc-600">主期間: {new Date(row.lookback.since).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}〜{new Date(row.lookback.through).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}。日次実績は東京時間の日付ごとに集計し、計測がある日だけを対象にします。未計測の日を0分とみなしません。期間端の部分日を含みます。代替期間と最低件数はTask190の対象別学習にのみ適用します。予約枠の自動更新はしません。</p>
+    <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead><tr className="border-b bg-zinc-50">{["実績の単位", "件数／日数", "中央値", "平均", "P80", "最小〜最大"].map(label => <th key={label} className="whitespace-nowrap p-2">{label}</th>)}</tr></thead><tbody>
+      <tr className="border-b"><td className="p-2">日別合計（予約枠との比較）</td><td className="p-2">{daily.observedDayCount}日</td><td className="p-2">{minutes(daily.median)}</td><td className="whitespace-nowrap p-2">{minutes(daily.mean)}{daily.meanDeltaFromReservation !== null && `（予約比 ${daily.meanDeltaFromReservation > 0 ? "+" : ""}${minutes(daily.meanDeltaFromReservation)}）`}</td><td className="p-2">{minutes(daily.p80)}</td><td className="whitespace-nowrap p-2">{minutes(daily.min)}〜{minutes(daily.max)}</td></tr>
+      <tr><td className="p-2">1セッション（期間内に終了、全区間）</td><td className="p-2">{sessions.sampleCount}件</td><td className="p-2">{minutes(sessions.median)}</td><td className="p-2">{minutes(sessions.mean)}</td><td className="p-2">{minutes(sessions.p80)}</td><td className="whitespace-nowrap p-2">{minutes(sessions.min)}〜{minutes(sessions.max)}</td></tr>
+    </tbody></table></div>
+    {learning && <p className="text-xs text-zinc-600">Task190の1対象あたり学習: 有効{learning.usableSampleCount}件、現在採用 {minutes(learning.adoptedMinutes)}（{learning.adoptedReason}）{learning.usedFallback ? "、代替期間を使用" : ""}。1セッション統計とは集計単位が異なります。</p>}
+  </div>;
+}
 
 async function api(url: string, method = "GET", body?: unknown) {
   const response = await fetch(url, { method, headers: body === undefined ? undefined : { "Content-Type": "application/json" },
@@ -32,6 +48,14 @@ async function api(url: string, method = "GET", body?: unknown) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "通信に失敗しました。");
   return data;
+}
+
+export async function loadSchedulerSettingsWithFeedback() {
+  const [data, feedback] = await Promise.all([
+    api("/api/settings/scheduler") as Promise<Data>,
+    (api("/api/settings/scheduler/activities/feedback") as Promise<ActivityReservationFeedbackRow[]>).catch(() => null),
+  ]);
+  return { data, feedback };
 }
 
 function NumberField({ label, value, onChange, min = 0, nullable = false }: {
@@ -53,13 +77,16 @@ export default function SchedulerSettingsEditor() {
   const [data, setData] = useState<Data | null>(null);
   const [setting, setSetting] = useState<SchedulerSetting | null>(null);
   const [activities, setActivities] = useState<SchedulerActivitySetting[]>([]);
+  const [activityFeedback, setActivityFeedback] = useState<ActivityReservationFeedbackRow[] | null>(null);
+  const [activityFeedbackError, setActivityFeedbackError] = useState(false);
   const [draft, setDraft] = useState<StandardDraft>(emptyDraft);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const reload = useCallback(async () => {
-    const next = await api("/api/settings/scheduler") as Data;
+    const { data: next, feedback } = await loadSchedulerSettingsWithFeedback();
     setData(next); setSetting(next.setting); setActivities(next.activities);
+    setActivityFeedback(feedback); setActivityFeedbackError(feedback === null);
   }, []);
   useEffect(() => { reload().catch(err => setError(err.message)); }, [reload]);
   async function run(operation: () => Promise<unknown>, success: string) {
@@ -155,7 +182,10 @@ export default function SchedulerSettingsEditor() {
             learningMode: row.learningMode, aggregationMethod: row.aggregationMethod, lookbackMonths: row.lookbackMonths,
             fallbackLookbackMonths: row.fallbackLookbackMonths, minimumSamples: row.minimumSamples,
           }), `${activityNames[row.activityType]}の設定を保存しました。`)}>この業務を保存</button>
+          {activityFeedback?.find(item => item.activityType === row.activityType) &&
+            <ActivityReservationFeedback row={activityFeedback.find(item => item.activityType === row.activityType)!} />}
         </div>)}</div>
+        {activityFeedbackError && <p role="alert" className="text-sm text-red-700">共通業務の実績を読み込めませんでした。設定の編集・保存は続けられます。</p>}
       </section>
 
       <section className="space-y-4 rounded border bg-white p-5 shadow-sm">
