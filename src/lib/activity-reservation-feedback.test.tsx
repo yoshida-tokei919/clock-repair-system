@@ -137,7 +137,7 @@ test("feedback fetch failure leaves scheduler settings available for editing", a
   const calls: string[] = [];
   globalThis.fetch = (async (url: string) => {
     calls.push(url);
-    return url.endsWith("/feedback")
+    return url.endsWith("/feedback") || url.endsWith("/capacity-feedback")
       ? { ok: false, json: async () => ({ error: "failed" }) }
       : { ok: true, json: async () => ({ setting: { id: 1 }, activities: settings, standards: [], masters: {} }) };
   }) as typeof fetch;
@@ -146,6 +146,23 @@ test("feedback fetch failure leaves scheduler settings available for editing", a
     assert.equal(result.data.setting.id, 1);
     assert.equal(result.data.activities.length, 8);
     assert.equal(result.feedback, null);
-    assert.deepEqual(calls.sort(), ["/api/settings/scheduler", "/api/settings/scheduler/activities/feedback"].sort());
+    assert.equal(result.capacityFeedback, null);
+    assert.deepEqual(calls.sort(), ["/api/settings/scheduler", "/api/settings/scheduler/activities/feedback",
+      "/api/settings/scheduler/capacity-feedback"].sort());
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("capacity feedback failure does not prevent scheduler settings or activity feedback from loading", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => url.endsWith("/capacity-feedback")
+    ? { ok: false, json: async () => ({ error: "failed" }) }
+    : { ok: true, json: async () => url.endsWith("/activities/feedback") ? []
+      : { setting: { id: 1 }, activities: settings, standards: [], masters: {} } }) as typeof fetch;
+  try {
+    const result = await loadSchedulerSettingsWithFeedback();
+    assert.equal(result.data.setting.id, 1);
+    assert.equal(result.data.activities.length, 8);
+    assert.deepEqual(result.feedback, []);
+    assert.equal(result.capacityFeedback, null);
   } finally { globalThis.fetch = originalFetch; }
 });

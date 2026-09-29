@@ -6,6 +6,8 @@ import { AUTO_ACTIVITY_TYPES } from "@/lib/scheduler-settings-domain";
 import { isRepairWorkActionApplicable, isRepairWorkTargetPartApplicable } from "@/lib/repair-work-selection";
 import ProcurementSettingsEditor from "@/components/settings/ProcurementSettingsEditor";
 import type { ActivityReservationFeedbackRow } from "@/lib/activity-reservation-feedback";
+import type { CapacityObservationFeedback as CapacityFeedback } from "@/lib/capacity-observation-feedback";
+import CapacityObservationFeedback from "@/components/settings/CapacityObservationFeedback";
 
 type Masters = {
   categories: { id: number; repairType: "INTERNAL" | "EXTERNAL"; key: string; name: string }[];
@@ -51,11 +53,12 @@ async function api(url: string, method = "GET", body?: unknown) {
 }
 
 export async function loadSchedulerSettingsWithFeedback() {
-  const [data, feedback] = await Promise.all([
+  const [data, feedback, capacityFeedback] = await Promise.all([
     api("/api/settings/scheduler") as Promise<Data>,
     (api("/api/settings/scheduler/activities/feedback") as Promise<ActivityReservationFeedbackRow[]>).catch(() => null),
+    (api("/api/settings/scheduler/capacity-feedback") as Promise<CapacityFeedback>).catch(() => null),
   ]);
-  return { data, feedback };
+  return { data, feedback, capacityFeedback };
 }
 
 function NumberField({ label, value, onChange, min = 0, nullable = false }: {
@@ -79,14 +82,17 @@ export default function SchedulerSettingsEditor() {
   const [activities, setActivities] = useState<SchedulerActivitySetting[]>([]);
   const [activityFeedback, setActivityFeedback] = useState<ActivityReservationFeedbackRow[] | null>(null);
   const [activityFeedbackError, setActivityFeedbackError] = useState(false);
+  const [capacityFeedback, setCapacityFeedback] = useState<CapacityFeedback | null>(null);
+  const [capacityFeedbackError, setCapacityFeedbackError] = useState(false);
   const [draft, setDraft] = useState<StandardDraft>(emptyDraft);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const reload = useCallback(async () => {
-    const { data: next, feedback } = await loadSchedulerSettingsWithFeedback();
+    const { data: next, feedback, capacityFeedback: capacity } = await loadSchedulerSettingsWithFeedback();
     setData(next); setSetting(next.setting); setActivities(next.activities);
     setActivityFeedback(feedback); setActivityFeedbackError(feedback === null);
+    setCapacityFeedback(capacity); setCapacityFeedbackError(capacity === null);
   }, []);
   useEffect(() => { reload().catch(err => setError(err.message)); }, [reload]);
   async function run(operation: () => Promise<unknown>, success: string) {
@@ -161,6 +167,9 @@ export default function SchedulerSettingsEditor() {
           shippingBufferDays: setting.shippingBufferDays,
         }), "共通設定を保存しました。")}>共通設定を保存</button>
       </section>
+
+      {capacityFeedback && <CapacityObservationFeedback feedback={capacityFeedback} />}
+      {capacityFeedbackError && <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">容量比較の計測実績を読み込めませんでした。設定の編集・保存は続けられます。</p>}
 
       <section className="space-y-4 rounded border bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold">修理以外の業務</h2>
