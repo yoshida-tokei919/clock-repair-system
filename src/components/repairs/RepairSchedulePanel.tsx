@@ -173,7 +173,7 @@ export function RepairSchedulePanel(props: Props) {
                 {error && <span role="alert" className="text-sm text-red-700">{error}</span>}
             </div>
             <div className="mt-5 border-t border-zinc-200 pt-4 text-sm text-zinc-700">
-                <h3 className="font-semibold text-zinc-900">作業時間プレビュー</h3>
+                <h3 id="repair-work-time-preview" className="font-semibold text-zinc-900">作業時間プレビュー</h3>
                 {previewLoading && <p className="mt-2">計算中…</p>}
                 {preview && <div className="mt-2 space-y-1">
                     <p>現在の保存値: {preview.currentEstimatedWorkMinutes}分</p>

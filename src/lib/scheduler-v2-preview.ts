@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { scheduleRevision } from "./auto-schedule-revision";
 import { loadDeadlineCapacityPreview } from "./deadline-capacity-preview";
 import { resolveSchedulerV2Planner, SCHEDULER_V2_PLANNER_VERSION } from "./scheduler-v2-planner-domain";
+import { loadSchedulerV2WorkTimeFeedback } from "./scheduler-v2-work-time-feedback";
 import { serializeWorkDate } from "./work-calendar";
 
 type SegmentRow = { id: number; repairId: number; workDate: Date; plannedMinutes: number;
@@ -38,4 +39,10 @@ export async function loadSchedulerV2Preview(tx: Prisma.TransactionClient, now =
     segments: segmentRows });
   return { plannerVersion: SCHEDULER_V2_PLANNER_VERSION, snapshotRevision,
     asOfDate: base.asOfDate, horizonEndDate: base.horizonEndDate, ...planned };
+}
+
+export async function loadSchedulerV2PreviewWithFeedback(tx: Prisma.TransactionClient, now = new Date()) {
+  const core = await loadSchedulerV2Preview(tx, now);
+  const workTimeFeedback = await loadSchedulerV2WorkTimeFeedback(tx, core.repairs.map(repair => repair.id), now);
+  return { ...core, workTimeFeedback };
 }
