@@ -93,7 +93,7 @@ scanの意味を画面ごとに個別実装せず、共通のscan receiver / ses
 - LOCATION_CHECK: 将来の所在確認 / 棚卸し
 
 Task197ではShipment schemaへ先行依存せず、SHIPMENT_SELECTはRepair選択結果を後続Taskへ渡せる共通契約までとする。
-実Shipment作成・梱包照合はTask198以降で接続する。
+Task198でStorageLocation・現物保管場所管理へ接続し、実Shipment作成・梱包照合はTask199以降で接続する。
 
 ## 連続scanの安全要件
 
@@ -146,7 +146,13 @@ Task197ではShipment schemaへ先行依存せず、SHIPMENT_SELECTはRepair選�
 - 重複/未割当/別顧客等のguard
 - 実Shipmentへの書込は行わない
 
-### Task198以降
+### Task198
+
+- StorageLocation / 現物保管場所管理へscan基盤を接続
+- ケース / 棚のLocationタグをscanし、時計の移動先を記録できるようにする
+- 案件状態と実保管場所の不一致検知へ利用する
+
+### Task199以降
 
 - SHIPMENT_SELECTをShipment作成へ接続
 - 梱包時に連続scanしてShipment構成と照合
