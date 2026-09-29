@@ -851,6 +851,7 @@ model Repair {
   workTimeSessions WorkTimeSession[]
   planningState RepairPlanningState?
   scheduleSegments RepairScheduleSegment[]
+  physicalTagAssignments PhysicalTagAssignment[]
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
@@ -865,6 +866,46 @@ model Repair {
   warranty   Warranty? @relation(fields: [warrantyId], references: [id])
 
   @@index([repairIntakeInviteId])
+}
+
+enum PhysicalTagStatus {
+  ACTIVE
+  RETIRED
+}
+
+model PhysicalTag {
+  id           Int               @id @default(autoincrement())
+  shortCode    String            @unique
+  nfcUid       String?           @unique
+  qrToken      String            @unique
+  status       PhysicalTagStatus @default(ACTIVE)
+  retiredAt    DateTime?
+  retireReason String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  assignments PhysicalTagAssignment[]
+}
+
+model PhysicalTagAssignment {
+  id            Int       @id @default(autoincrement())
+  physicalTagId Int
+  repairId      Int
+  assignedAt    DateTime  @default(now())
+  releasedAt    DateTime?
+  assignReason  String?
+  releaseReason String?
+  assignedBy    Int?      // Admin ID; matches RepairStatusLog.changedBy convention.
+  releasedBy    Int?      // Admin ID; no auth relation in Task196A.
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  physicalTag PhysicalTag @relation(fields: [physicalTagId], references: [id], onDelete: Restrict)
+  repair      Repair      @relation(fields: [repairId], references: [id], onDelete: Restrict)
+
+  // Active uniqueness (releasedAt IS NULL) is enforced by migration-only partial indexes.
+  @@index([physicalTagId, assignedAt])
+  @@index([repairId, assignedAt])
 }
 
 model WorkCalendar {
