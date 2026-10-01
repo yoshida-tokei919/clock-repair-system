@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `684a5cff462f2b3713e7ee67993d12fb7946530a`
-- Commit subject: `feat: add scan session receiver`
-- Deploy source: GitHub `main` → Railway, exact feature commit `684a5cff462f2b3713e7ee67993d12fb7946530a`
-- Railway deployment: `54274dcf-d047-4dc3-92e6-b2e63295c55b`
+- Production application commit: `4f0664281933761f28cf27f519e62ddbb2b868ac`
+- Commit subject: `feat: add storage location schema foundation`
+- Deploy source: GitHub `main` → Railway, exact feature commit `4f0664281933761f28cf27f519e62ddbb2b868ac`
+- Railway deployment: `ceecb7e7-f90a-498b-9fec-dc420de09ec9`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task197-20261002`
+- Production tag: `production-task198a-20261002`
 - Region: `sin`
-- Runtime: Next.js Ready in 347ms
-- Task197 migration: none
+- Runtime: Next.js Ready in 274ms
+- Supabase migration: `20261001204201 add_storage_location_foundation`
 
-Production: Task197 complete
+Production: Task198A complete
 
 ## Stage B 現在地
 
@@ -58,31 +58,46 @@ Status: production complete
 - Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、resolver valid/malformed=401、WorkTimer active/start未認証=401。
 - 詳細: `docs/ai-tasks/197-scan-session-receiver.md`
 
+### Task198A — StorageLocation schema foundation
+
+Status: production complete
+
+- Application commit: `4f0664281933761f28cf27f519e62ddbb2b868ac`
+- Railway deployment: `ceecb7e7-f90a-498b-9fec-dc420de09ec9` — SUCCESS
+- Production tag: `production-task198a-20261002`
+- Supabase migration: `20261001204201 add_storage_location_foundation`
+- StorageLocation / StorageLocationAssignment / StorageLocationTypeを追加。
+- StorageLocationはRepair.status / RepairWorkPlan / PhysicalTagから独立。
+- 1 Repairにつきactive StorageLocationAssignmentは最大1件。
+- 1 StorageLocationには複数Repairを配置可能。
+- location hierarchyは parentId により ZONE / SHELF / BOX / TRAY / OTHER を表現可能。
+- shortCode / nfcUid / qrToken は将来のlocation scan識別用にnullable uniqueで確保。
+- 既存Repairのbackfill、初期zone seed、Repair status変更なし。
+- server-only: RLS enabled、policyなし、anon/authenticated/service_roleへtable/sequence権限なし。
+- production migration前backup: `C:\Users\yoshi\clock-repair-backups\task198a-20261002-0540`
+- production read-back: 新2テーブル0件、enum/partial unique/CHECK/RLS/privileges確認済み。
+- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、PhysicalTag resolver valid/malformed未認証=401。
+- 詳細: `docs/ai-tasks/198a-storage-location-schema-foundation.md`
+
 ## Scheduler / Feedback の現在地
 
 Stage AのTask182–184とTask188–195Eはproduction完了。Task185–187はdocs-only完了。Task195Eの納期・安全buffer feedbackのdata readinessは `docs/ai-tasks/195e-deadline-feedback-readiness.md` を参照する。
 
-## Stage B — 次の候補: Task198
+## Stage B — 次の候補: Task198B
 
-Status: implementation prep authorized
+Status: awaiting user approval
 
-Task198ではPhysicalTag / ScanSession基盤の次段として、現物所在確認・StorageLocation / 棚運用を扱う。
-実装前に現行Repair status、物理ゾーン運用、schema、既存scan modesとの責務境界を確認し、Repair statusと物理保管場所を混同しない設計にする。
+Task198BではTask198Aのschema foundationを利用し、StorageLocationへの実移動を安全に記録するAPI / domain層と、Task197 ScanSessionとの接続境界を扱う候補とする。
 
-想定している物理ゾーン案:
-- 受付処理待ち
-- 受付済み
-- 見積り調査中
-- 承認待ち
-- 部品待ち
-- 作業待ち
-- 作業中
-- ランニングテスト中
-- 作業完了
-- 返送準備
-- 発送済み
+想定境界:
+- current active StorageLocationAssignmentの取得
+- Repairを別StorageLocationへ移動するtransaction
+- 旧assignment release → 新assignment createを履歴保持してatomicに実行
+- authenticated Admin IDを監査用に保存
+- inactive location / nonexistent location / stale state / concurrency conflictを明示
+- scanだけでRepair.statusを自動変更しない
+- Shipment作成、PhysicalTag lifecycle、初期zone seed、不一致判定UIはTask198Bへ混ぜず、必要なら198C以降へ分離する
 
-ただし上記名称・永続化方法・履歴・scan操作はTask198の実装前調査で正本/現行実装と照合して確定する。
-Repair status自体の自動変更は別責務とし、scanだけで不可逆な状態変更を行わない。
+Task198Bの具体的API・scan mode・location resolver/issuance境界は、実装前調査で現行Task197契約と再照合して確定する。
 
-Task198以外の次Taskを連続開始しない。
+Task198B以外の次Taskを連続開始しない。
