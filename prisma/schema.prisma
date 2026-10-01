@@ -852,6 +852,7 @@ model Repair {
   planningState RepairPlanningState?
   scheduleSegments RepairScheduleSegment[]
   physicalTagAssignments PhysicalTagAssignment[]
+  storageLocationAssignments StorageLocationAssignment[]
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
@@ -905,6 +906,56 @@ model PhysicalTagAssignment {
 
   // Active uniqueness (releasedAt IS NULL) is enforced by migration-only partial indexes.
   @@index([physicalTagId, assignedAt])
+  @@index([repairId, assignedAt])
+}
+
+enum StorageLocationType {
+  ZONE
+  SHELF
+  BOX
+  TRAY
+  OTHER
+}
+
+model StorageLocation {
+  id           Int                 @id @default(autoincrement())
+  name         String
+  locationType StorageLocationType @default(ZONE)
+  parentId     Int?
+  shortCode    String?             @unique
+  nfcUid       String?             @unique
+  qrToken      String?             @unique
+  isActive     Boolean             @default(true)
+  sortOrder    Int                 @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  parent      StorageLocation?            @relation("StorageLocationTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children    StorageLocation[]           @relation("StorageLocationTree")
+  assignments StorageLocationAssignment[]
+
+  @@index([parentId])
+  @@index([locationType, isActive, sortOrder])
+}
+
+model StorageLocationAssignment {
+  id                Int       @id @default(autoincrement())
+  storageLocationId Int
+  repairId          Int
+  assignedAt        DateTime  @default(now())
+  releasedAt        DateTime?
+  assignReason      String?
+  releaseReason     String?
+  assignedBy        Int?
+  releasedBy        Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  storageLocation StorageLocation @relation(fields: [storageLocationId], references: [id], onDelete: Restrict)
+  repair          Repair          @relation(fields: [repairId], references: [id], onDelete: Restrict)
+
+  // Active uniqueness (releasedAt IS NULL) is enforced by a migration-only partial index.
+  @@index([storageLocationId, assignedAt])
   @@index([repairId, assignedAt])
 }
 
