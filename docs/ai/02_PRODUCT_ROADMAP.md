@@ -526,12 +526,16 @@ Repair（修理案件）とShipment（発送1個口）を分離する。
 - 1個口に複数Repair
 - 1Repairを複数個口
 - carrier（配送会社）
-- handoffMethod（集荷 / 郵便窓口持込）
+- handoffMethod（集荷 / 郵便窓口持込等）
 - plannedShipDate（発送予定日）
 - actualShippedAt（実発送日時）
+- trackingNumber（追跡番号）
 - ShipmentStatus（発送ステータス）
 - 配送会社非依存のRepairStatus
 - Task197のScanSession / SHIPMENT_SELECTから複数RepairをShipment作成へ取り込める
+- 宛先、配達希望日時、荷物情報等は配送会社へ渡す前の共通発送データとして保持する
+- 日本郵便 / ヤマト運輸等のCSV・API固有項目はadapter層で変換し、Shipment正本を特定配送会社のフォーマットへ固定しない
+- 配送会社固有の送り状発行結果・追跡イベントを共通ShipmentStatusへ正規化できる境界を設ける
 
 Shipmentには将来の入庫郵送へ拡張可能な direction（配送方向）を持たせる方向を優先する。
 
@@ -563,9 +567,10 @@ plannedShipDate（発送予定日）を基準に発送予定を一覧化する�
 
 同一顧客の複数Repairを自動で勝手に統合せず、まとめ発送候補を提示して人間がShipmentを確定する。
 
-#### Task201: ゆうプリR CSV出力
+#### Task201: ゆうプリR CSV出力（配送会社adapter第1実装）
 
-既存PoCで確認済みの標準フォーマットV3を利用し、アプリからゆうプリRへCSV出力する。
+Task199の共通Shipmentデータを、既存PoCで確認済みの標準フォーマットV3へ変換し、アプリからゆうプリRへCSV出力する。
+日本郵便固有の列・コード・validationはadapter内へ閉じ込め、Shipment正本へ持ち込まない。
 
 - お客様側管理番号
 - 宛先情報
@@ -574,6 +579,18 @@ plannedShipDate（発送予定日）を基準に発送予定を一覧化する�
 - その他送り状作成に必要な項目
 
 Windows workerによる完全自動化は必須条件にせず、まずCSVベースの安定運用を完成させる。
+
+#### Task201B: ヤマトB2クラウド CSV出力adapter
+
+Task199の共通ShipmentデータをヤマトB2クラウド取込用CSVへ変換できるようにする。
+
+- Shipment / Repair側へヤマト専用schemaを作らず、Task201と同じ共通発送データから変換する
+- 初期実装はB2クラウドのCSV取込を優先し、公式B2クラウドAPIの導入を必須にしない
+- B2クラウド固有の列・コード・validationはヤマトadapter内へ閉じ込める
+- 将来B2クラウドAPIを採用する場合も、Shipment共通契約を維持したままCSV adapterをAPI adapterへ差し替えられる構造とする
+- 佐川急便等を追加する場合も同じadapter境界を再利用できるようにする
+
+Task201Bはヤマト利用開始時に独立Taskとして実装し、Task201のゆうプリR安定運用を壊さない。
 
 #### Task202: ゆうプリR結果取込・配送状態同期
 
@@ -682,12 +699,13 @@ shippingNoticeSentAt（発送連絡送信日時）等で二重送信を防止す
 12. Task199 Shipment基盤
 13. Task200 発送スケジュール
 14. Task201 ゆうプリR CSV出力
-15. Task202 ゆうプリR結果取込・配送状態同期
-16. Task203 LINE作業完了連絡・配達希望日時
-17. Task204 発送・配達自動連携
-18. **本格運用開始**
-19. 運用実績によるScheduler・納期・リードタイム精度向上
-20. 事例公開・その他未完機能
+15. Task201B ヤマトB2クラウド CSV出力adapter
+16. Task202 ゆうプリR結果取込・配送状態同期
+17. Task203 LINE作業完了連絡・配達希望日時
+18. Task204 発送・配達自動連携
+19. **本格運用開始**
+20. 運用実績によるScheduler・納期・リードタイム精度向上
+21. 事例公開・その他未完機能
 
 Task番号・境界は各Task実装前の調査で必要に応じて再分割してよい。
 schema / migration / RLS / GRANT / LINE自動送信 / production DBを伴う高リスクTaskでは、実装担当と独立レビュー担当を分離し、本番変更前にユーザー承認を必須とする。
