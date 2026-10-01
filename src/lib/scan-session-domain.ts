@@ -1,6 +1,7 @@
 import { parsePhysicalTagIdentifier, type PhysicalTagIdentifier } from "./physical-tag-resolver";
+import type { SelectedStorageLocation, StorageLocationIdentifier } from "./storage-location-resolver";
 
-export const SCAN_MODES = ["OPEN_REPAIR", "TIMER", "BATCH_SELECT", "DELIVERY_NOTE", "SHIPMENT_SELECT"] as const;
+export const SCAN_MODES = ["OPEN_REPAIR", "TIMER", "BATCH_SELECT", "DELIVERY_NOTE", "SHIPMENT_SELECT", "LOCATION_MOVE"] as const;
 export type ScanMode = typeof SCAN_MODES[number];
 export type SelectedRepair = {
   repairId: number;
@@ -34,6 +35,38 @@ export function scanCandidates(raw: string): PhysicalTagIdentifier[] {
     candidates.findIndex(other => other.type === candidate.type && other.value === candidate.value) === index);
 }
 
+export function locationScanCandidates(raw: string): StorageLocationIdentifier[] {
+  const value = raw.trim();
+  if (!value) return [];
+  const candidates: StorageLocationIdentifier[] = /^LOC-[0-9]{6,}$/i.test(value)
+    ? [{ type: "SHORT_CODE", value }] : [{ type: "QR_TOKEN", value }];
+  if (COMPLETE_HEX_BYTES.test(value)) {
+    candidates.push({ type: "NFC_UID", value: parsePhysicalTagIdentifier({ type: "NFC_UID", value }).value });
+  }
+  return candidates.filter((candidate, index) => candidates.findIndex(other =>
+    other.type === candidate.type && other.value === candidate.value) === index);
+}
+
+export type LocationScanResult = { status: "NOT_FOUND" } | { status: "AMBIGUOUS" } |
+  ({ status: "INACTIVE" | "RESOLVED" } & SelectedStorageLocation);
+
+export function combineLocationScanResults(results: LocationScanResult[]): LocationScanResult {
+  if (results.some(result => result.status === "AMBIGUOUS")) return { status: "AMBIGUOUS" };
+  const found = results.filter((result): result is Extract<LocationScanResult, { storageLocationId: number }> =>
+    result.status === "INACTIVE" || result.status === "RESOLVED");
+  if (found.length === 0) return { status: "NOT_FOUND" };
+  const first = found[0];
+  if (found.some(result => result.storageLocationId !== first.storageLocationId || result.status !== first.status ||
+    result.name !== first.name || result.locationType !== first.locationType || result.shortCode !== first.shortCode)) {
+    return { status: "AMBIGUOUS" };
+  }
+  return first;
+}
+
+export function scanPhase(mode: ScanMode, destination: SelectedStorageLocation | null): "LOCATION" | "REPAIR" {
+  return mode === "LOCATION_MOVE" && !destination ? "LOCATION" : "REPAIR";
+}
+
 export function combineScanResults(results: ScanResult[]): ScanResult {
   const found = results.filter((result): result is Extract<ScanResult, { physicalTagId: number }> =>
     result.status !== "NOT_FOUND" && result.status !== "AMBIGUOUS");
@@ -49,10 +82,12 @@ export function combineScanResults(results: ScanResult[]): ScanResult {
   return first;
 }
 
-export type SelectionOutcome = "ADDED" | "DUPLICATE" | "MIXED_CUSTOMER";
+export const MAX_LOCATION_MOVE_REPAIRS = 100;
+export type SelectionOutcome = "ADDED" | "DUPLICATE" | "MIXED_CUSTOMER" | "LIMIT_REACHED";
 export function addSelection(mode: ScanMode, selected: SelectedRepair[], repair: SelectedRepair):
   { outcome: SelectionOutcome; selected: SelectedRepair[] } {
   if (selected.some(item => item.repairId === repair.repairId)) return { outcome: "DUPLICATE", selected };
+  if (mode === "LOCATION_MOVE" && selected.length >= MAX_LOCATION_MOVE_REPAIRS) return { outcome: "LIMIT_REACHED", selected };
   if ((mode === "DELIVERY_NOTE" || mode === "SHIPMENT_SELECT") &&
       selected.length > 0 && selected[0].customerId !== repair.customerId) {
     return { outcome: "MIXED_CUSTOMER", selected };

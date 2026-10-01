@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  addSelection, combineScanResults, enqueueQueuedScan, MAX_QUEUED_SCANS,
-  nextQueuedScan, scanCandidates, SCAN_DEBOUNCE_MS, shouldDebounceScan, timerDecision, type SelectedRepair,
+  addSelection, combineScanResults, enqueueQueuedScan, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS,
+  nextQueuedScan, scanCandidates, scanPhase, SCAN_DEBOUNCE_MS, shouldDebounceScan, timerDecision, type SelectedRepair,
 } from "./scan-session-domain";
 
 const repair: SelectedRepair = {
@@ -34,6 +34,10 @@ test("scan result combination rejects collisions and inconsistent same-tag statu
 test("selection guards duplicates and mixed customers only for delivery and shipment", () => {
   const other = { ...repair, repairId: 13, physicalTagId: 5, customerId: 8 };
   assert.equal(addSelection("BATCH_SELECT", [repair], other).outcome, "ADDED");
+  assert.equal(addSelection("LOCATION_MOVE", [repair], other).outcome, "ADDED");
+  assert.deepEqual(addSelection("LOCATION_MOVE", [repair], repair), { outcome: "DUPLICATE", selected: [repair] });
+  const full = Array.from({ length: MAX_LOCATION_MOVE_REPAIRS }, (_, index) => ({ ...repair, repairId: index + 100 }));
+  assert.deepEqual(addSelection("LOCATION_MOVE", full, other), { outcome: "LIMIT_REACHED", selected: full });
   for (const mode of ["DELIVERY_NOTE", "SHIPMENT_SELECT"] as const) {
     assert.deepEqual(addSelection(mode, [repair], other), { outcome: "MIXED_CUSTOMER", selected: [repair] });
     assert.deepEqual(addSelection(mode, [repair], repair), { outcome: "DUPLICATE", selected: [repair] });
@@ -88,4 +92,19 @@ test("pending scan queue has a fixed limit and does not discard existing entries
   assert.deepEqual(enqueueQueuedScan(queue, 99), { queued: false, queue });
   assert.deepEqual(enqueueQueuedScan(queue.slice(1), 99),
     { queued: true, queue: [...queue.slice(1), 99] });
+});
+
+test("queued raw scan uses live destination when processed after location resolution", () => {
+  const first = { raw: "LOC-000001", mode: "LOCATION_MOVE" as const, generation: 1 };
+  const second = { raw: "PT-000004", mode: "LOCATION_MOVE" as const, generation: 1 };
+  let queue = enqueueQueuedScan([], first).queue;
+  let destination: { storageLocationId: number; name: string; locationType: string; shortCode: string | null } | null = null;
+  const inFlight = nextQueuedScan(queue, "LOCATION_MOVE", 1);
+  queue = enqueueQueuedScan(inFlight.remaining, second).queue;
+  assert.equal(scanPhase(inFlight.next!.mode, destination), "LOCATION");
+  destination = { storageLocationId: 7, name: "棚", locationType: "SHELF", shortCode: "LOC-000001" };
+  const pending = nextQueuedScan(queue, "LOCATION_MOVE", 1);
+  assert.equal(pending.next?.raw, "PT-000004");
+  assert.equal(scanPhase(pending.next!.mode, destination), "REPAIR");
+  assert.deepEqual(scanCandidates(pending.next!.raw), [{ type: "SHORT_CODE", value: "PT-000004" }]);
 });

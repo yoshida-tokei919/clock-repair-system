@@ -5,12 +5,12 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkTimer } from "@/components/work-time/WorkTimerProvider";
 import {
-  addSelection, combineScanResults, enqueueQueuedScan, MAX_QUEUED_SCANS,
-  nextQueuedScan, scanCandidates, shouldDebounceScan, timerDecision,
-  type ScanDebounceState, type ScanMode, type ScanResult, type SelectedRepair,
+  addSelection, combineLocationScanResults, combineScanResults, enqueueQueuedScan, locationScanCandidates, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS,
+  nextQueuedScan, scanCandidates, scanPhase, shouldDebounceScan, timerDecision,
+  type LocationScanResult, type ScanDebounceState, type ScanMode, type ScanResult, type SelectedRepair,
 } from "@/lib/scan-session-domain";
 import { advanceWedgeBuffer, EMPTY_WEDGE_BUFFER } from "@/lib/scan-wedge";
-import type { PhysicalTagIdentifier } from "@/lib/physical-tag-resolver";
+import type { SelectedStorageLocation } from "@/lib/storage-location-resolver";
 
 type Feedback = { kind: "success" | "error" | "info"; message: string } | null;
 type ScanSessionContextValue = {
@@ -20,15 +20,19 @@ type ScanSessionContextValue = {
   feedback: Feedback;
   scanning: boolean;
   queuedCount: number;
+  destination: SelectedStorageLocation | null;
+  moving: boolean;
   setMode: (mode: ScanMode) => void;
   scan: (raw: string) => void;
   remove: (repairId: number) => void;
   clear: () => void;
   confirmTimer: () => Promise<void>;
+  confirmLocationMove: () => Promise<void>;
+  resetLocationDestination: () => void;
 };
 
 const ScanSessionContext = createContext<ScanSessionContextValue | null>(null);
-type PendingScan = { candidates: PhysicalTagIdentifier[]; mode: ScanMode; generation: number };
+type PendingScan = { raw: string; mode: ScanMode; generation: number };
 
 function isPositiveId(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
@@ -51,6 +55,20 @@ function parseResult(value: unknown): ScanResult {
   throw new Error("タグの応答形式が不正です。");
 }
 
+function parseLocationResult(value: unknown): LocationScanResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("保管場所の応答形式が不正です。");
+  const result = value as Record<string, unknown>;
+  if (result.status === "NOT_FOUND") return { status: "NOT_FOUND" };
+  if (!isPositiveId(result.storageLocationId) || typeof result.name !== "string" ||
+      typeof result.locationType !== "string" ||
+      (result.shortCode !== null && typeof result.shortCode !== "string") ||
+      (result.status !== "INACTIVE" && result.status !== "RESOLVED")) {
+    throw new Error("保管場所の応答形式が不正です。");
+  }
+  return { status: result.status, storageLocationId: result.storageLocationId,
+    name: result.name, locationType: result.locationType, shortCode: result.shortCode };
+}
+
 async function resolveCandidate(identifier: { type: string; value: string }): Promise<ScanResult> {
   const response = await fetch("/api/physical-tags/resolve", {
     method: "POST",
@@ -65,6 +83,18 @@ async function resolveCandidate(identifier: { type: string; value: string }): Pr
   return parseResult(await response.json());
 }
 
+async function resolveLocationCandidate(identifier: { type: string; value: string }): Promise<LocationScanResult> {
+  const response = await fetch("/api/storage-locations/resolve", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(identifier), cache: "no-store",
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("認証が必要です。再ログインしてください。");
+    throw new Error("保管場所を照合できませんでした。もう一度お試しください。");
+  }
+  return parseLocationResult(await response.json());
+}
+
 export function ScanSessionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const timer = useWorkTimer();
@@ -74,7 +104,11 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [scanning, setScanning] = useState(false);
   const [queuedCount, setQueuedCount] = useState(0);
+  const [destination, setDestination] = useState<SelectedStorageLocation | null>(null);
+  const [moving, setMoving] = useState(false);
   const modeRef = useRef<ScanMode>(mode);
+  const destinationRef = useRef<SelectedStorageLocation | null>(null);
+  const movingRef = useRef(false);
   const selectedRef = useRef<SelectedRepair[]>([]);
   const scanBusyRef = useRef(false);
   const queueRef = useRef<PendingScan[]>([]);
@@ -89,6 +123,8 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
     queueRef.current = [];
     setQueuedCount(0);
     selectedRef.current = [];
+    destinationRef.current = null;
+    setDestination(null);
     setModeState(next);
     setSelected([]);
     setCandidate(null);
@@ -97,9 +133,29 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
     debounceRef.current = null;
   }, []);
 
-  const processScan = useCallback(async ({ candidates, mode: scanMode, generation }: PendingScan) => {
+  const processScan = useCallback(async ({ raw, mode: scanMode, generation }: PendingScan) => {
     try {
-      const result = combineScanResults(await Promise.all(candidates.map(resolveCandidate)));
+      if (scanPhase(scanMode, destinationRef.current) === "LOCATION") {
+        const locationResult = combineLocationScanResults(await Promise.all(locationScanCandidates(raw).map(resolveLocationCandidate)));
+        if (generation !== generationRef.current) return;
+        if (locationResult.status === "NOT_FOUND") {
+          setFeedback({ kind: "error", message: "未登録の保管場所タグです。" });
+        } else if (locationResult.status === "AMBIGUOUS") {
+          setFeedback({ kind: "error", message: "識別子が複数の保管場所に一致しました。確認が必要です。" });
+        } else if (locationResult.status === "INACTIVE") {
+          setFeedback({ kind: "error", message: `無効な保管場所です: ${locationResult.name}` });
+        } else {
+          const nextDestination: SelectedStorageLocation = {
+            storageLocationId: locationResult.storageLocationId, name: locationResult.name,
+            locationType: locationResult.locationType, shortCode: locationResult.shortCode,
+          };
+          destinationRef.current = nextDestination;
+          setDestination(nextDestination);
+          setFeedback({ kind: "success", message: `移動先「${nextDestination.name}」を選択しました。時計のタグを読み取ってください。` });
+        }
+        return;
+      }
+      const result = combineScanResults(await Promise.all(scanCandidates(raw).map(resolveCandidate)));
       if (generation !== generationRef.current) return;
       if (result.status === "NOT_FOUND") {
         setCandidate(null);
@@ -136,6 +192,8 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
           const next = addSelection(scanMode, selectedRef.current, repair);
           if (next.outcome === "DUPLICATE") {
             setFeedback({ kind: "info", message: `${repair.inquiryNumber} は選択済みです（重複）。` });
+          } else if (next.outcome === "LIMIT_REACHED") {
+            setFeedback({ kind: "error", message: `一度に移動できるのは${MAX_LOCATION_MOVE_REPAIRS}件までです。先に選択済みの案件を移動してください。` });
           } else if (next.outcome === "MIXED_CUSTOMER") {
             setFeedback({ kind: "error", message: `${repair.inquiryNumber} は別顧客のため追加できません。` });
           } else {
@@ -173,6 +231,10 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const scan = useCallback((raw: string) => {
+    if (movingRef.current) {
+      setFeedback({ kind: "info", message: "移動処理中です。完了後に読み取ってください。" });
+      return;
+    }
     const value = raw.trim();
     if (!value) {
       setFeedback({ kind: "error", message: "読み取り値を入力してください。" });
@@ -180,9 +242,8 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
     }
     const now = performance.now();
     if (shouldDebounceScan(debounceRef.current, value, now)) return;
-    const candidates = scanCandidates(value);
     const queued = enqueueQueuedScan(queueRef.current,
-      { candidates, mode: modeRef.current, generation: generationRef.current });
+      { raw: value, mode: modeRef.current, generation: generationRef.current });
     if (!queued.queued) {
       setFeedback({ kind: "error", message: `読取待機が${MAX_QUEUED_SCANS}件に達しました。処理が進んでから再度読み取ってください。` });
       return;
@@ -226,6 +287,57 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
     setSelected([]);
     setFeedback({ kind: "info", message: "選択をクリアしました。" });
   }, []);
+  const resetLocationDestination = useCallback(() => {
+    generationRef.current += 1;
+    queueRef.current = [];
+    setQueuedCount(0);
+    destinationRef.current = null;
+    setDestination(null);
+    selectedRef.current = [];
+    setSelected([]);
+    setCandidate(null);
+    wedgeRef.current = EMPTY_WEDGE_BUFFER;
+    debounceRef.current = null;
+    setFeedback({ kind: "info", message: "移動先と選択をクリアしました。" });
+  }, []);
+  const confirmLocationMove = useCallback(async () => {
+    if (modeRef.current !== "LOCATION_MOVE" || !destinationRef.current || !selectedRef.current.length ||
+        movingRef.current || scanBusyRef.current || queueRef.current.length > 0) return;
+    movingRef.current = true;
+    setMoving(true);
+    const currentGeneration = generationRef.current;
+    const currentDestinationId = destinationRef.current.storageLocationId;
+    const repairIds = selectedRef.current.map(item => item.repairId);
+    try {
+      const response = await fetch("/api/storage-locations/move", {
+        method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+        body: JSON.stringify({ storageLocationId: currentDestinationId, repairIds }),
+      });
+      if (!response.ok) {
+        if (response.status === 401) throw new Error("認証が必要です。再ログインしてください。");
+        if (response.status === 409) throw new Error("保管場所の状態が変わりました。確認して再実行してください。");
+        throw new Error("保管場所の移動に失敗しました。");
+      }
+      const result: unknown = await response.json();
+      if (!result || typeof result !== "object" || Array.isArray(result) ||
+          !Array.isArray((result as { moved?: unknown }).moved) ||
+          !Array.isArray((result as { unchangedRepairIds?: unknown }).unchangedRepairIds)) {
+        throw new Error("移動結果の応答形式が不正です。");
+      }
+      if (currentGeneration === generationRef.current && currentDestinationId === destinationRef.current?.storageLocationId) {
+        selectedRef.current = [];
+        setSelected([]);
+        setFeedback({ kind: "success", message: `移動しました: ${(result as { moved: unknown[] }).moved.length}件、変更なし: ${(result as { unchangedRepairIds: unknown[] }).unchangedRepairIds.length}件。` });
+      }
+    } catch (cause) {
+      if (currentGeneration === generationRef.current) {
+        setFeedback({ kind: "error", message: cause instanceof Error ? cause.message : "保管場所の移動に失敗しました。" });
+      }
+    } finally {
+      movingRef.current = false;
+      setMoving(false);
+    }
+  }, []);
   const confirmTimer = useCallback(async () => {
     if (!candidate || timer.loading || !timer.ready || timer.busy) return;
     if (timerDecision(timer.active, candidate.repairId) === "ALREADY_ACTIVE") {
@@ -245,7 +357,7 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   }, [candidate, timer.active]);
 
   return <ScanSessionContext.Provider value={{ mode, selected, candidate, feedback, scanning, queuedCount,
-    setMode, scan, remove, clear, confirmTimer }}>{children}</ScanSessionContext.Provider>;
+    destination, moving, setMode, scan, remove, clear, confirmTimer, confirmLocationMove, resetLocationDestination }}>{children}</ScanSessionContext.Provider>;
 }
 
 export function useScanSession() {
