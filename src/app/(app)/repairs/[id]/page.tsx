@@ -4,6 +4,7 @@ import { RepairEntryForm } from "@/components/repairs/RepairEntryForm";
 import { RepairSchedulePanel } from "@/components/repairs/RepairSchedulePanel";
 import { RepairWorkTimerPanel } from "@/components/repairs/RepairWorkTimerPanel";
 import { RepairPlanningPanel } from "@/components/repairs/RepairPlanningPanel";
+import { PhysicalTagPanel } from "@/components/repairs/PhysicalTagPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +103,13 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
 
     if (!repair) return notFound();
 
+    const activeTagAssignment = await prisma.physicalTagAssignment.findFirst({
+        where: { repairId: repair.id, releasedAt: null },
+        select: {
+            physicalTag: { select: { id: true, shortCode: true, qrToken: true, nfcUid: true } },
+        },
+    });
+
     const publicCase = await prisma.publicCase.findUnique({
         where: {
             sourceType_sourceRepairId: {
@@ -192,6 +200,21 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 priorityScore={repair.priorityScore}
             />
             <RepairPlanningPanel repairId={repair.id} />
+            <PhysicalTagPanel
+                repairId={repair.id}
+                inquiryNumber={repair.inquiryNumber}
+                customerName={repair.customer.companyName || repair.customer.name}
+                brand={repair.watch.brand.nameJp || repair.watch.brand.name}
+                model={repair.watch.model?.nameJp || repair.watch.modelNameInput || ""}
+                reference={repair.watch.reference?.name || ""}
+                receptionDate={repair.receptionDate?.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) ?? null}
+                initialTag={activeTagAssignment ? {
+                    physicalTagId: activeTagAssignment.physicalTag.id,
+                    shortCode: activeTagAssignment.physicalTag.shortCode,
+                    qrToken: activeTagAssignment.physicalTag.qrToken,
+                    nfcUid: activeTagAssignment.physicalTag.nfcUid,
+                } : null}
+            />
             <RepairWorkTimerPanel repairId={repair.id} laborLines={laborRepairLineItems.map(item => ({
                 id: item.id,
                 itemNameSnapshot: item.itemNameSnapshot,
