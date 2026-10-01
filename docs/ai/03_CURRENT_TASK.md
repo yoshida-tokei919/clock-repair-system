@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `4f0664281933761f28cf27f519e62ddbb2b868ac`
-- Commit subject: `feat: add storage location schema foundation`
-- Deploy source: GitHub `main` → Railway, exact feature commit `4f0664281933761f28cf27f519e62ddbb2b868ac`
-- Railway deployment: `ceecb7e7-f90a-498b-9fec-dc420de09ec9`
+- Production application commit: `aeaa0be6723b526de87af74e18c9faac61c3a5b1`
+- Commit subject: `feat: add storage location move flow`
+- Deploy source: GitHub `main` → Railway, exact feature commit `aeaa0be6723b526de87af74e18c9faac61c3a5b1`
+- Railway deployment: `b457c062-0330-4699-9646-25703fdd0967`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task198a-20261002`
+- Production tag: `production-task198b-20261002`
 - Region: `sin`
-- Runtime: Next.js Ready in 274ms
-- Supabase migration: `20261001204201 add_storage_location_foundation`
+- Runtime: Next.js Ready in 300ms
+- Task198B migration: none
 
-Production: Task198A complete
+Production: Task198B complete
 
 ## Stage B 現在地
 
@@ -52,10 +52,8 @@ Status: production complete
 - resolver APIを再利用し、NOT_FOUND / RETIRED / UNASSIGNED / AMBIGUOUSを明示。
 - TIMERはscanだけで状態変更せず、人間の確認後に開始/切替。
 - DELIVERY_NOTE / SHIPMENT_SELECTは別顧客混入をblockし、実際の帳票・Shipment作成は行わない。
-- 後続scanを落とさないFIFO queue、最大16件、750ms同一raw scan debounceを実装。
+- FIFO queue、最大16件、750ms同一raw scan debounceを実装。
 - R65固有UID形式は未推測のまま。
-- Final regression: 28/28 tests PASS、TypeScript PASS、`git diff --check` PASS、`npm run build` PASS。
-- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、resolver valid/malformed=401、WorkTimer active/start未認証=401。
 - 詳細: `docs/ai-tasks/197-scan-session-receiver.md`
 
 ### Task198A — StorageLocation schema foundation
@@ -70,34 +68,56 @@ Status: production complete
 - StorageLocationはRepair.status / RepairWorkPlan / PhysicalTagから独立。
 - 1 Repairにつきactive StorageLocationAssignmentは最大1件。
 - 1 StorageLocationには複数Repairを配置可能。
-- location hierarchyは parentId により ZONE / SHELF / BOX / TRAY / OTHER を表現可能。
-- shortCode / nfcUid / qrToken は将来のlocation scan識別用にnullable uniqueで確保。
-- 既存Repairのbackfill、初期zone seed、Repair status変更なし。
 - server-only: RLS enabled、policyなし、anon/authenticated/service_roleへtable/sequence権限なし。
-- production migration前backup: `C:\Users\yoshi\clock-repair-backups\task198a-20261002-0540`
-- production read-back: 新2テーブル0件、enum/partial unique/CHECK/RLS/privileges確認済み。
-- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、PhysicalTag resolver valid/malformed未認証=401。
 - 詳細: `docs/ai-tasks/198a-storage-location-schema-foundation.md`
+
+### Task198B — StorageLocation move flow / ScanSession接続
+
+Status: production complete
+
+- Application commit: `aeaa0be6723b526de87af74e18c9faac61c3a5b1`
+- Railway deployment: `b457c062-0330-4699-9646-25703fdd0967` — SUCCESS
+- Production tag: `production-task198b-20261002`
+- schema / migration変更なし。
+- authenticated StorageLocation resolverを追加。
+- identifier types: NFC_UID / QR_TOKEN / SHORT_CODE。
+- resolver status: NOT_FOUND / INACTIVE / RESOLVED。
+- authenticated StorageLocation move APIを追加。
+- 最大100 Repairを1つのSerializable transactionで同一Locationへ移動可能。
+- 旧assignment release → 新assignment createで履歴保持。
+- 同一Locationはno-op。
+- actual Admin.idを監査保存。
+- stale state / P2002 / P2034は409。
+- ScanSessionへ `LOCATION_MOVE` modeを追加。
+- 先に移動先Locationをscanし、その後PhysicalTag/Repairを複数scan。
+- scanだけではDB変更せず、明示確認後に移動。
+- 移動成功後はdestinationを保持し、次のbatchを同じ場所へ連続移動可能。
+- 連続scanのphaseはenqueue時ではなく処理時点のcurrent destinationで判定。
+- Repair.statusは変更しない。
+- Task198B + ScanSession + PhysicalTag regression: 42/42 PASS。
+- TypeScript PASS、`git diff --check` PASS、`npm run build` PASS。
+- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、StorageLocation resolve valid/malformed未認証=401、move valid/malformed未認証=401。
+- StorageLocationはproductionでまだ0件のため、実移動mutation smokeは未実施。
+- 詳細: `docs/ai-tasks/198b-storage-location-move-flow.md`
 
 ## Scheduler / Feedback の現在地
 
 Stage AのTask182–184とTask188–195Eはproduction完了。Task185–187はdocs-only完了。Task195Eの納期・安全buffer feedbackのdata readinessは `docs/ai-tasks/195e-deadline-feedback-readiness.md` を参照する。
 
-## Stage B — 次の候補: Task198B
+## Stage B — 次の候補: Task198C
 
 Status: awaiting user approval
 
-Task198BではTask198Aのschema foundationを利用し、StorageLocationへの実移動を安全に記録するAPI / domain層と、Task197 ScanSessionとの接続境界を扱う候補とする。
+Task198Cでは、Task198A/Bで作成したStorageLocation基盤を実運用可能にするため、初期StorageLocationの作成/投入方法、現在地表示、Location確認・不一致検知の境界を実装前調査で確定する候補とする。
 
-想定境界:
-- current active StorageLocationAssignmentの取得
-- Repairを別StorageLocationへ移動するtransaction
-- 旧assignment release → 新assignment createを履歴保持してatomicに実行
-- authenticated Admin IDを監査用に保存
-- inactive location / nonexistent location / stale state / concurrency conflictを明示
-- scanだけでRepair.statusを自動変更しない
-- Shipment作成、PhysicalTag lifecycle、初期zone seed、不一致判定UIはTask198Bへ混ぜず、必要なら198C以降へ分離する
+候補:
+- 初期日本語StorageLocationの定義・投入方法
+- StorageLocation作成/無効化/表示の最小管理導線
+- Repairの現在保管場所表示
+- Location単位の収容Repair一覧
+- 現在地確認 / 棚卸しscan mode
+- Repair.statusから推奨zoneを導く場合は自動変更せず、警告/候補として分離
+- 実際の物理ゾーン名称と運用順序をユーザー業務に照合してから固定する
 
-Task198Bの具体的API・scan mode・location resolver/issuance境界は、実装前調査で現行Task197契約と再照合して確定する。
-
-Task198B以外の次Taskを連続開始しない。
+Task198Cの具体的Task境界は、実装前調査で正本・現行運用・PhysicalTag/ScanSession契約と再照合して確定する。
+Task198C以外の次Taskを連続開始しない。
