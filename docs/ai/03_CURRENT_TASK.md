@@ -7,18 +7,17 @@
 
 ## Production
 
-- Production application commit: `2a2a4fe491675e6c67de87b784262226782d0fee`
-- Commit subject: `feat: add shipment schema foundation`
-- Deploy source: GitHub `main` → Railway, exact commit `2a2a4fe491675e6c67de87b784262226782d0fee`
-- Railway deployment: `83f71fb9-0a51-4a87-bc64-1066fa7bba89`
+- Production application commit: `165530378a6713c188a33585142b2b1a96420529`
+- Commit subject: `feat: add shipment server foundation`
+- Deploy source: GitHub `main` → Railway, exact commit `165530378a6713c188a33585142b2b1a96420529`
+- Railway deployment: `59a1a9c3-d9be-454b-9f34-49f31355890f`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task199a-20261002`
+- Production tag: `production-task199b-20261002`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 618ms
-- Supabase migration: `20261002074103 add_shipment_foundation`
-- Pre-production backup: `C:\\Users\\yoshi\\clock-repair-backups\\task199a-20261002-163314`
+- Runtime: Next.js 15.5.27, Ready in 345ms
+- Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Task199A complete. Task199B is awaiting user approval.
+Production: Task199B complete. Task199C is awaiting user approval.
 
 ## Stage B 現在地
 
@@ -219,19 +218,41 @@ Status: production complete
 
 ### Task199B — Shipment server-side create/read/update foundation
 
+Status: production complete
+
+- Application commit: `165530378a6713c188a33585142b2b1a96420529`
+- Railway deployment: `59a1a9c3-d9be-454b-9f34-49f31355890f` — SUCCESS
+- Production tag: `production-task199b-20261002`
+- schema / migration / RLS / GRANT変更なし。
+- `POST /api/shipments` でexplicit `confirmed: true` を要求し、repairIdsをserver-side再取得。
+- missing Repairは404、別customer混在・返送先snapshot欠損/不正/不一致は409でfail closed。
+- duplicate repairIdsはdeduplicate。
+- Customer.typeだけでは作成可否を決めず、individual / business共通でRepair return-address snapshotを正本として検証。
+- Customer current addressへのfallbackなし。
+- validな場合のみSerializable transactionでShipment + ShipmentRepairを作成。
+- `GET /api/shipments/[id]` で必要最小限のCustomer / Repair relationをread。
+- `PATCH /api/shipments/[id]` はDRAFTのplanning fieldだけ更新可能。
+- ShipmentStatus / trackingNumber / labelIssuedAt / actualShippedAt / deliveredAtはTask199Bでは変更不可。
+- Repair.status / StorageLocation / DeliveryNote / ScanSession / carrier adapter / LINEには接続していない。
+- 独立レビューでB2B一律拒否を検出し、complete + valid + identicalなRepair snapshotならbusinessも共通Shipmentを作成できるよう修正。
+- Prisma validate / TypeScript / focused tests 11/11 / staged diff check / production build PASS。
+- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、Shipment POST/GET/PATCH未認証=401。
+- 詳細: `docs/ai-tasks/199b-shipment-server-foundation.md`
+
+### Task199C — ScanSession SHIPMENT_SELECT connection
+
 Status: awaiting user approval
 
-次候補はTask199B。
+次候補はTask199C。
 
 少なくとも以下を扱う。
 
-- Shipment create / read / updateのserver-side domain
-- ScanSession等から渡されるselected Repairのserver-side再取得
-- same-customer validation
-- destination snapshot確定
-- Repairごとのreturn address snapshot不一致時のfail-closed
-- 明示的なhuman confirmation
+- ScanSession `SHIPMENT_SELECT` のselected Repairsを確認画面へ接続
+- scanだけではShipmentを作成しない
+- 人間の明示確認後にTask199Bのserver contractへPOST
+- server-sideでRepair / customer / return-address snapshotを再検証
+- 別顧客 / 宛先不一致はblock
 - Repair.status / StorageLocationの自動変更はまだ行わない
-- carrier固有adapter / CSV / LINEはTask201以降へ残す
+- Task200の発送スケジュールUIは先取りしない
 
-Task199Bはuser approvalなしに開始しない。
+Task199Cはuser approvalなしに開始しない。
