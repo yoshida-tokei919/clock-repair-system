@@ -51,6 +51,7 @@ model Customer {
 
   watches           Watch[]
   repairs           Repair[]
+  shipments         Shipment[]
   deliveryNotes     DeliveryNote[]
   invoices          Invoice[]
   estimateDocuments EstimateDocument[]
@@ -853,6 +854,7 @@ model Repair {
   scheduleSegments RepairScheduleSegment[]
   physicalTagAssignments PhysicalTagAssignment[]
   storageLocationAssignments StorageLocationAssignment[]
+  shipmentRepairs ShipmentRepair[]
   
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
@@ -957,6 +959,76 @@ model StorageLocationAssignment {
   // Active uniqueness (releasedAt IS NULL) is enforced by a migration-only partial index.
   @@index([storageLocationId, assignedAt])
   @@index([repairId, assignedAt])
+}
+
+enum ShipmentDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum ShipmentStatus {
+  DRAFT
+  READY
+  LABEL_ISSUED
+  AWAITING_ACCEPTANCE
+  SHIPPED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  EXCEPTION
+  CANCELLED
+}
+
+enum ShipmentHandoffMethod {
+  PICKUP
+  COUNTER_DROP_OFF
+  OTHER
+}
+
+model Shipment {
+  id                        Int                    @id @default(autoincrement())
+  customerId                Int
+  direction                 ShipmentDirection      @default(OUTBOUND)
+  status                    ShipmentStatus         @default(DRAFT)
+  carrierCode               String?
+  serviceCode               String?
+  handoffMethod             ShipmentHandoffMethod?
+  plannedShipDate           DateTime?              @db.Date
+  labelIssuedAt             DateTime?
+  handoffRequestedAt        DateTime?
+  actualShippedAt           DateTime?
+  deliveredAt               DateTime?
+  trackingNumber            String?
+  destinationRecipientName  String
+  destinationPostalCode     String
+  destinationPrefecture     String
+  destinationCity           String
+  destinationStreet         String
+  destinationBuilding       String?
+  destinationPhone          String
+  requestedDeliveryDate     DateTime?              @db.Date
+  requestedDeliveryTimeSlot String?
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+
+  customer Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  repairs  ShipmentRepair[]
+
+  @@index([customerId, plannedShipDate])
+  @@index([status, plannedShipDate])
+  @@index([trackingNumber])
+}
+
+model ShipmentRepair {
+  shipmentId Int
+  repairId   Int
+  createdAt  DateTime @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+  repair   Repair   @relation(fields: [repairId], references: [id], onDelete: Restrict)
+
+  @@id([shipmentId, repairId])
+  @@index([repairId])
 }
 
 model WorkCalendar {
