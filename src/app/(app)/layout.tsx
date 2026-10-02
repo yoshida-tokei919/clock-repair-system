@@ -1,4 +1,5 @@
 import Sidebar from '@/components/layout/Sidebar'
+import { AdminPageArtwork } from '@/components/layout/AdminPageArtwork'
 import { WorkTimerProvider } from '@/components/work-time/WorkTimerProvider'
 import { WorkTimerBar } from '@/components/work-time/WorkTimerBar'
 import { ScanSessionProvider } from '@/components/scan/ScanSessionProvider'
@@ -13,7 +14,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <WorkTimerBar />
           <ScanReceiverBar />
           <main className="flex-1">
-            {children}
+            <AdminPageArtwork>{children}</AdminPageArtwork>
           </main>
         </ScanSessionProvider>
       </WorkTimerProvider>

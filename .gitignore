@@ -44,6 +44,7 @@ deploy_key.pub
 # Playwright MCP / 動作確認用スクリーンショット
 .playwright-mcp/
 *.png
+!public/images/app-background-watch.png
 tsconfig.tsbuildinfo
 
 # recovery tools
