@@ -1,6 +1,6 @@
 # Task200A — 発送予定一覧とDRAFT計画UI
 
-Status: local implementation + independent review complete — Production: pending
+Status: production complete — 2026-10-02
 
 ## Scope
 
@@ -31,4 +31,29 @@ schema / migration / seed / Supabase / RLS / GRANT、ShipmentStatus遷移、trac
 - `npm run build`: PASS（Next.js 15.5.27、static pages 56/56、`/shipments` dynamic route生成）
 - independent review: 409エラー表示、Repair件数/作業完了集計、納品書集計、ランニングテスト表記を確認・修正後、blocking findingなし
 
-Push / deployは行っていない。productionはTask199Cのまま。
+## Production
+
+- Application commit: `61af74f99afd0ad3f1186366d45bbecd2f5a8aed`
+- Commit subject: `feat: add shipment schedule planning`
+- Deploy source: GitHub `main` → Railway, exact commit `61af74f99afd0ad3f1186366d45bbecd2f5a8aed`
+- Railway deployment: `7e22cbb0-fa30-4b49-bded-1ed14734d89e` — SUCCESS
+- Region: `sin`
+- Runtime: Next.js 15.5.27, Ready in 252ms
+- Production tag: `production-task200a-20261002`
+- Supabase migration: none
+- schema / migration / production DB mutationなし
+
+Production smoke:
+
+- `/` = 200
+- `/login` = 200
+- `/shipments` unauthenticated = 307
+- `/repairs` unauthenticated = 307
+- `GET /api/shipments/1` unauthenticated = 401
+- Railway HTTP logs: smoke対象requestの `upstreamErrors` は空
+
+認証済みproduction mutation smokeは実Shipment更新を避けるため実施していない。既存PATCH契約はfocused testで確認済み。
+
+## Next
+
+Task200B/C/Dは未着手。次候補はTask200Bで、user approvalなしに開始しない。

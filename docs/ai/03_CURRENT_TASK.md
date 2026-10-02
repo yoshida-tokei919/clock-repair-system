@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `4fdcb074dfa6fb8a29074bcb3aa6dd40496720b0`
-- Commit subject: `feat: connect shipment scan selection`
-- Deploy source: GitHub `main` → Railway, exact commit `4fdcb074dfa6fb8a29074bcb3aa6dd40496720b0`
-- Railway deployment: `a692dd3a-9c06-45fb-98b9-0cb4dda80e0f`
+- Production application commit: `61af74f99afd0ad3f1186366d45bbecd2f5a8aed`
+- Commit subject: `feat: add shipment schedule planning`
+- Deploy source: GitHub `main` → Railway, exact commit `61af74f99afd0ad3f1186366d45bbecd2f5a8aed`
+- Railway deployment: `7e22cbb0-fa30-4b49-bded-1ed14734d89e`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task199c-20261002`
+- Production tag: `production-task200a-20261002`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 263ms
+- Runtime: Next.js 15.5.27, Ready in 252ms
 - Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Task199C complete. Task200A local implementation and independent review complete; Production: pending.
+Production: Task200A complete. Task200B is awaiting user approval.
 
 ## Stage B 現在地
 
@@ -259,12 +259,17 @@ Status: production complete
 
 ### Task200A — 発送予定一覧とDRAFT計画UI
 
-Status: local implementation + independent review complete; Production: pending
+Status: production complete
 
+- Application commit: `61af74f99afd0ad3f1186366d45bbecd2f5a8aed`
+- Railway deployment: `7e22cbb0-fa30-4b49-bded-1ed14734d89e` — SUCCESS
+- Production tag: `production-task200a-20261002`
+- schema / migration / production DB mutationなし。
 - `/shipments` にOUTBOUND・未発送・未取消の予定一覧を追加。日本時間の今日 / 明日 / 今週 / 来週 / 遅延 / それ以降 / 未設定で表示。
 - Shipment単位のRepair件数・作業完了件数・納品書発行集計と、各Repairの問い合わせ番号・現在status・納品書IDを表示。
 - ランニングテスト完了の正本イベントは未実装のため判定不可と表示。`RepairStatusLog`や`runningTestDays`から推定しない。
 - DRAFTの6計画項目だけを既存PATCH APIで編集。401 / 409 / その他の失敗を画面に表示。
-- schema / migration / seed / RLS / GRANT、ShipmentStatus、Repair.status、StorageLocation、PhysicalTag、DeliveryNote、tracking、CSV、LINEは変更しない。
+- focused Shipment regression 17/17 PASS、TypeScript / `git diff --check` / production build（56/56）PASS。
+- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
 - Task200B/C/Dは未着手。詳細: `docs/ai-tasks/200a-shipment-schedule.md`。
-- local validation / independent review完了。push / deployは未実施。production application commitとdeploymentは上記Task199Cのまま。
+- 次候補はTask200B。user approvalなしに開始しない。
