@@ -104,3 +104,19 @@ test("read includes relations; update only permits planning fields on DRAFT", as
   instance.client.shipment.findUnique = (async () => detail) as unknown as typeof instance.client.shipment.findUnique;
   assert.deepEqual(await readShipment(instance.client, 10), detail);
 });
+
+test("planning update accepts clearing optional fields and rejects malformed input", () => {
+  assert.deepEqual(parseShipmentUpdate({
+    plannedShipDate: null, carrierCode: null, serviceCode: null, handoffMethod: null,
+    requestedDeliveryDate: null, requestedDeliveryTimeSlot: null,
+  }), {
+    plannedShipDate: null, carrierCode: null, serviceCode: null, handoffMethod: null,
+    requestedDeliveryDate: null, requestedDeliveryTimeSlot: null,
+  });
+  for (const input of [
+    {}, { plannedShipDate: "2026-13-01" }, { plannedShipDate: "" },
+    { handoffMethod: "INVALID" }, { carrierCode: " " }, { requestedDeliveryTimeSlot: 123 },
+  ]) {
+    assert.throws(() => parseShipmentUpdate(input), (error: ShipmentError) => error.status === 400);
+  }
+});

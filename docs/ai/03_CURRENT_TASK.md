@@ -17,7 +17,7 @@
 - Runtime: Next.js 15.5.27, Ready in 263ms
 - Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Task199C complete. Task200 is awaiting user approval.
+Production: Task199C complete. Task200A local implementation and independent review complete; Production: pending.
 
 ## Stage B 現在地
 
@@ -257,20 +257,14 @@ Status: production complete
 - Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、`POST /api/shipments`未認証=401。Railway HTTP logsのupstreamErrorsなし。
 - 詳細: `docs/ai-tasks/199c-scan-session-shipment-connection.md`
 
-### Task200 — 発送スケジュール
+### Task200A — 発送予定一覧とDRAFT計画UI
 
-Status: awaiting user approval
+Status: local implementation + independent review complete; Production: pending
 
-次候補はTask200。
-
-少なくとも以下を扱う。
-
-- `plannedShipDate` を基準に今日 / 明日 / 今週 / 来週 / 遅延を一覧化
-- 作業完了 / ランニングテスト完了 / 納品書発行状態 / 配達希望日時 / 送り状発行状態を表示
-- 集荷 / 窓口持込、B2B / B2C、配送会社を発送予定の判断材料として扱う
-- 同一顧客の近接発送予定は候補提示のみとし、自動統合しない
-- PhysicalTag連続scanによる梱包内容照合
-- 発送前の再利用PhysicalTag release確認
-- Task201以降の配送会社固有CSV / 追跡状態同期 / LINE連携は先取りしない
-
-Task200はuser approvalなしに開始しない。
+- `/shipments` にOUTBOUND・未発送・未取消の予定一覧を追加。日本時間の今日 / 明日 / 今週 / 来週 / 遅延 / それ以降 / 未設定で表示。
+- Shipment単位のRepair件数・作業完了件数・納品書発行集計と、各Repairの問い合わせ番号・現在status・納品書IDを表示。
+- ランニングテスト完了の正本イベントは未実装のため判定不可と表示。`RepairStatusLog`や`runningTestDays`から推定しない。
+- DRAFTの6計画項目だけを既存PATCH APIで編集。401 / 409 / その他の失敗を画面に表示。
+- schema / migration / seed / RLS / GRANT、ShipmentStatus、Repair.status、StorageLocation、PhysicalTag、DeliveryNote、tracking、CSV、LINEは変更しない。
+- Task200B/C/Dは未着手。詳細: `docs/ai-tasks/200a-shipment-schedule.md`。
+- local validation / independent review完了。push / deployは未実施。production application commitとdeploymentは上記Task199Cのまま。

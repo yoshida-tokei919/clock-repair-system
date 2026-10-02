@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { href: '/admin', label: 'ダッシュボード', icon: '🏠' },
   { href: '/repairs', label: '修理一覧', icon: '🔧' },
   { href: '/storage-locations', label: '保管場所', icon: '📍' },
+  { href: '/shipments', label: '発送予定', icon: '🚚' },
   { href: '/repairs/today', label: '今日の作業', icon: '🛠️' },
   { href: '/repairs/calendar', label: '作業カレンダー', icon: '📅' },
   { href: '/inquiries', label: '\u304a\u554f\u3044\u5408\u308f\u305b', icon: '\uD83D\uDCAC' },

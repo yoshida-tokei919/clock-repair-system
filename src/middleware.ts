@@ -5,6 +5,7 @@ export const config = {
     matcher: [
         "/repairs/:path*",
         "/storage-locations/:path*",
+        "/shipments/:path*",
         "/board/:path*",
         "/customers/:path*",
         "/line-users/:path*",
