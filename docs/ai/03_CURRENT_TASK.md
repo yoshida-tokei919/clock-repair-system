@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `61af74f99afd0ad3f1186366d45bbecd2f5a8aed`
-- Commit subject: `feat: add shipment schedule planning`
-- Deploy source: GitHub `main` → Railway, exact commit `61af74f99afd0ad3f1186366d45bbecd2f5a8aed`
-- Railway deployment: `7e22cbb0-fa30-4b49-bded-1ed14734d89e`
+- Production application commit: `b368e5c9886ab44a7c0edc2e436d1022e5bf413a`
+- Commit subject: `feat: add shipment readiness context`
+- Deploy source: GitHub `main` → Railway, exact commit `b368e5c9886ab44a7c0edc2e436d1022e5bf413a`
+- Railway deployment: `96ac3283-8014-4bab-821c-133b1382eb4f`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task200a-20261002`
+- Production tag: `production-task200b-20261002`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 252ms
+- Runtime: Next.js 15.5.27, Ready in 399ms
 - Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Task200A complete. Task200B is awaiting user approval.
+Production: Task200B complete. Task200C is awaiting user approval.
 
 ## Stage B 現在地
 
@@ -271,5 +271,22 @@ Status: production complete
 - DRAFTの6計画項目だけを既存PATCH APIで編集。401 / 409 / その他の失敗を画面に表示。
 - focused Shipment regression 17/17 PASS、TypeScript / `git diff --check` / production build（56/56）PASS。
 - Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
-- Task200B/C/Dは未着手。詳細: `docs/ai-tasks/200a-shipment-schedule.md`。
-- 次候補はTask200B。user approvalなしに開始しない。
+- Task200A詳細: `docs/ai-tasks/200a-shipment-schedule.md`。
+
+### Task200B — 発送準備情報と同一顧客の他個口
+
+Status: production complete
+
+- Application commit: `b368e5c9886ab44a7c0edc2e436d1022e5bf413a`
+- Railway deployment: `96ac3283-8014-4bab-821c-133b1382eb4f` — SUCCESS
+- Production tag: `production-task200b-20261002`
+- schema / migration / production DB mutationなし。
+- `/shipments` で各Repairのactive StorageLocation（name / shortCode / type）とactive PhysicalTag shortCodeをread-only表示。qrTokenは取得・表示しない。
+- 同じ一覧で取得済みの同一Customer・他の未発送OUTBOUND Shipmentを参考情報として表示。Shipment ID / status / plannedShipDate / 暦日差 / Repair問い合わせ番号を表示し、近接日数閾値・順位・統合可否判定は設けない。
+- `labelIssuedAt` の日本時間表示と配達希望時間帯未設定の明示を追加。ランニングテスト完了は引き続き「判定不可」。
+- Task200AのDRAFT計画編集を維持。Shipment / Repair / StorageLocation / PhysicalTagのmutation、Shipment merge、ScanSession、CSV、tracking、LINEは変更なし。
+- focused Shipment regression 20/20 PASS、TypeScript / `git diff --check` / production build（56/56）PASS。
+- 独立レビューで同一顧客候補Shipment内のRepair番号表示不足を検出し、修正後blocking findingなし。
+- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307。Railway HTTP logsの`upstreamErrors`なし。
+- 詳細: `docs/ai-tasks/200b-shipment-readiness-context.md`
+- Task200C/Dは未着手。次候補はTask200C。user approvalなしに開始しない。

@@ -1,6 +1,6 @@
 # Task200B — 発送準備情報と同一顧客の他個口
 
-Status: local implementation complete; Production: pending
+Status: production complete — 2026-10-02
 
 ## Scope
 
@@ -19,5 +19,22 @@ Status: local implementation complete; Production: pending
 - `npx --no-install tsc --noEmit --incremental false`: PASS
 - `git diff --check`: PASS
 - `npm run build`: PASS（Next.js 15.5.27、static pages 56/56）
+- independent review: 同一顧客候補Shipment内のRepair番号表示不足を1件検出し、修正後blocking findingなし。
 
-認証済み画面の実データ表示は未確認。production変更は未実施。
+認証済み画面の実データ表示は未確認。
+
+## Production
+
+- Application commit: `b368e5c9886ab44a7c0edc2e436d1022e5bf413a`
+- Commit subject: `feat: add shipment readiness context`
+- Deploy source: GitHub `main` → Railway
+- Railway deployment: `96ac3283-8014-4bab-821c-133b1382eb4f` — SUCCESS
+- Production tag: `production-task200b-20261002`
+- Region: `sin`
+- Runtime: Next.js 15.5.27, Ready in 399ms
+- Supabase migration: none; schema / migration / production DB mutationなし
+- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307。Railway HTTP logsの`upstreamErrors`なし。
+
+## Next
+
+Task200C/Dは未着手。次候補はTask200Cで、user approvalなしに開始しない。
