@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { ShipmentHandoffMethod, ShipmentStatus } from "@prisma/client";
-import { SCHEDULE_GROUPS, shipmentRepairSummary, shipmentScheduleGroup } from "@/lib/shipment-schedule";
+import type { ShipmentDirection, ShipmentHandoffMethod, ShipmentStatus, StorageLocationType } from "@prisma/client";
+import { activePhysicalTag, activeStorageLocation, sameCustomerShipmentContext, SCHEDULE_GROUPS, shipmentRepairSummary, shipmentScheduleGroup } from "@/lib/shipment-schedule";
 
 export type ScheduleShipment = {
   id: number;
+  direction: ShipmentDirection;
   status: ShipmentStatus;
   plannedShipDate: string | null;
   actualShippedAt: string | null;
@@ -18,7 +19,11 @@ export type ScheduleShipment = {
   serviceCode: string | null;
   handoffMethod: ShipmentHandoffMethod | null;
   customer: { id: number; name: string; type: string };
-  repairs: { repair: { id: number; inquiryNumber: string; status: string; deliveryNoteId: number | null } }[];
+  repairs: { repair: {
+    id: number; inquiryNumber: string; status: string; deliveryNoteId: number | null;
+    storageLocationAssignments: { releasedAt: Date | string | null; storageLocation: { name: string; shortCode: string | null; locationType: StorageLocationType } }[];
+    physicalTagAssignments: { releasedAt: Date | string | null; physicalTag: { shortCode: string } }[];
+  } }[];
 };
 
 type PlanningForm = {
@@ -95,6 +100,7 @@ export default function ShipmentsClient({ rows, today }: { rows: ScheduleShipmen
         <h1 className="text-3xl font-bold">発送予定</h1>
         <p className="mt-2 text-sm text-gray-600">OUTBOUND の未発送・未取消 Shipment。日付区分は日本時間、週は月曜から日曜です。</p>
         <p className="text-sm text-gray-600">ランニングテスト完了の正本イベントは未実装です。現在のデータでは完了を判定できません。</p>
+        <p className="text-sm text-gray-600">同一顧客の他個口はまとめ発送を検討するための参考情報です。統合可否は判定していません。</p>
       </div>
       {error && <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       {SCHEDULE_GROUPS.map(group => {
@@ -102,17 +108,18 @@ export default function ShipmentsClient({ rows, today }: { rows: ScheduleShipmen
         return <section key={group.key} className="space-y-3">
           <h2 className="text-xl font-semibold">{group.label} <span className="text-base font-normal text-gray-600">{groupRows.length}件</span></h2>
           {groupRows.length === 0 ? <p className="text-sm text-gray-500">該当なし</p> : <div className="overflow-x-auto rounded-lg border bg-white">
-            <table className="w-full min-w-[1300px] text-left text-sm">
+            <table className="w-full min-w-[1600px] text-left text-sm">
               <thead className="border-b bg-gray-50"><tr>
                 <th className="p-3">Shipment / 顧客</th><th className="p-3">発送状態</th>
                 <th className="p-3">Repair / 作業</th><th className="p-3">ランニングテスト</th>
-                <th className="p-3">納品書</th><th className="p-3">発送予定日</th>
+                <th className="p-3">納品書</th><th className="p-3">現物の所在 / タグ</th><th className="p-3">発送予定日</th>
                 <th className="p-3">配達希望</th><th className="p-3">送り状</th>
-                <th className="p-3">配送 / 引渡</th><th className="p-3">計画</th>
+                <th className="p-3">配送 / 引渡</th><th className="p-3">同一顧客の他の未発送個口</th><th className="p-3">計画</th>
               </tr></thead>
               <tbody>{groupRows.map(row => {
                 const summary = shipmentRepairSummary(row.repairs);
-                return <tr key={row.id} className="border-b align-top last:border-0">
+                const otherShipments = sameCustomerShipmentContext(row, rows);
+                return <tr key={row.id} id={`shipment-${row.id}`} className="border-b align-top last:border-0">
                 <td className="p-3"><p className="font-semibold">#{row.id}</p><p>{row.customer.name}</p>
                   <p className="text-gray-600">{row.customer.type === "business" ? "B2B" : row.customer.type === "individual" ? "B2C" : "区分要確認"}</p></td>
                 <td className="p-3">{statusLabels[row.status]}</td>
@@ -125,11 +132,28 @@ export default function ShipmentsClient({ rows, today }: { rows: ScheduleShipmen
                 <td className="p-3"><p className="mb-2 font-medium">{summary.deliveryNoteState} ({summary.notesIssued}/{summary.total})</p>{row.repairs.map(({ repair }) => <p key={repair.id} className="mb-1">
                   {repair.inquiryNumber}: {repair.deliveryNoteId === null ? "未発行" : `発行済み (#${repair.deliveryNoteId})`}
                 </p>)}</td>
+                <td className="p-3">{row.repairs.map(({ repair }) => {
+                  const location = activeStorageLocation(repair.storageLocationAssignments);
+                  const tag = activePhysicalTag(repair.physicalTagAssignments);
+                  return <p key={repair.id} className="mb-2">
+                    <span className="font-medium">{repair.inquiryNumber}</span><br />
+                    保管場所: {location ? `${location.name}${location.shortCode ? ` (${location.shortCode})` : ""} / ${location.locationType}` : "未登録"}<br />
+                    PhysicalTag: {tag?.shortCode ?? "未割当"}
+                  </p>;
+                })}</td>
                 <td className="p-3">{row.plannedShipDate ?? "未設定"}</td>
-                <td className="p-3">{row.requestedDeliveryDate ?? "未設定"}<br />{row.requestedDeliveryTimeSlot ?? ""}</td>
-                <td className="p-3">{row.labelIssuedAt ? "発行済み" : "未発行"}</td>
+                <td className="p-3">{row.requestedDeliveryDate ?? "未設定"}<br />{row.requestedDeliveryTimeSlot ?? "時間帯未設定"}</td>
+                <td className="p-3">{row.labelIssuedAt ? <>発行済み<br /><span className="text-xs text-gray-600">{new Date(row.labelIssuedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</span></> : "未発行"}</td>
                 <td className="p-3">{row.carrierCode ?? "未設定"} / {row.serviceCode ?? "未設定"}<br />
                   {row.handoffMethod ? handoffLabels[row.handoffMethod] : "未設定"}</td>
+                <td className="p-3">{otherShipments.length === 0 ? "なし" : otherShipments.map(({ shipment, dayDifference }) =>
+                  <p key={shipment.id} className="mb-2">
+                    <a className="text-blue-700 hover:underline" href={`#shipment-${shipment.id}`}>#{shipment.id}</a>
+                    <span className="ml-2">{statusLabels[shipment.status]}</span><br />
+                    発送予定日: {shipment.plannedShipDate ?? "未設定"}<br />
+                    この個口からの日付差: {dayDifference === null ? "比較不可（予定日未設定）" : `${dayDifference > 0 ? "+" : ""}${dayDifference}日`}<br />
+                    Repair: {shipment.repairs.map(({ repair }) => repair.inquiryNumber).join("、") || "なし"}
+                  </p>)}</td>
                 <td className="p-3">{row.status === "DRAFT" && <button type="button" className="text-blue-700 hover:underline disabled:opacity-50"
                   disabled={saving} onClick={() => { setEditingId(row.id); setForm(planningForm(row)); setError(""); }}>編集</button>}</td>
               </tr>})}</tbody>

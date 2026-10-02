@@ -1,4 +1,4 @@
-import type { ShipmentStatus } from "@prisma/client";
+import type { ShipmentDirection, ShipmentStatus } from "@prisma/client";
 
 export type ScheduleGroup = "OVERDUE" | "TODAY" | "TOMORROW" | "THIS_WEEK" | "NEXT_WEEK" | "LATER" | "UNPLANNED";
 
@@ -18,6 +18,47 @@ export function shipmentRepairSummary(repairs: readonly { repair: { status: stri
   const notesIssued = repairs.filter(({ repair }) => repair.deliveryNoteId !== null).length;
   const deliveryNoteState = notesIssued === 0 ? "未発行" : notesIssued === total ? "全件発行済み" : "一部発行済み";
   return { total, workCompleted, notesIssued, deliveryNoteState };
+}
+
+export function activeStorageLocation<T extends { releasedAt: Date | string | null; storageLocation: unknown }>(
+  assignments: readonly T[],
+): T["storageLocation"] | null {
+  return assignments.find(assignment => assignment.releasedAt === null)?.storageLocation ?? null;
+}
+
+export function activePhysicalTag<T extends { releasedAt: Date | string | null; physicalTag: unknown }>(
+  assignments: readonly T[],
+): T["physicalTag"] | null {
+  return assignments.find(assignment => assignment.releasedAt === null)?.physicalTag ?? null;
+}
+
+type OpenShipmentContext = {
+  id: number;
+  customer: { id: number };
+  direction: ShipmentDirection;
+  status: ShipmentStatus;
+  actualShippedAt: string | null;
+  plannedShipDate: string | null;
+};
+
+function calendarDayDifference(from: string, to: string): number {
+  const utcDay = (dateKey: string) => Date.parse(`${dateKey}T00:00:00.000Z`) / 86_400_000;
+  return utcDay(to) - utcDay(from);
+}
+
+export function sameCustomerShipmentContext<T extends OpenShipmentContext>(
+  current: T,
+  shipments: readonly T[],
+): { shipment: T; dayDifference: number | null }[] {
+  return shipments
+    .filter(shipment => shipment.id !== current.id && shipment.customer.id === current.customer.id
+      && shipment.direction === "OUTBOUND"
+      && shipment.actualShippedAt === null && shipment.status !== "CANCELLED")
+    .map(shipment => ({
+      shipment,
+      dayDifference: current.plannedShipDate && shipment.plannedShipDate
+        ? calendarDayDifference(current.plannedShipDate, shipment.plannedShipDate) : null,
+    }));
 }
 
 export function tokyoDateKey(now: Date): string {

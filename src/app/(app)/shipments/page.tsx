@@ -17,12 +17,20 @@ export default async function ShipmentsPage() {
     where: { direction: "OUTBOUND", actualShippedAt: null, status: { not: "CANCELLED" } },
     orderBy: [{ plannedShipDate: "asc" }, { id: "asc" }],
     select: {
-      id: true, status: true, plannedShipDate: true, actualShippedAt: true,
+      id: true, direction: true, status: true, plannedShipDate: true, actualShippedAt: true,
       requestedDeliveryDate: true, requestedDeliveryTimeSlot: true, labelIssuedAt: true,
       carrierCode: true, serviceCode: true, handoffMethod: true,
       customer: { select: { id: true, name: true, type: true } },
       repairs: { select: { repair: { select: {
         id: true, inquiryNumber: true, status: true, deliveryNoteId: true,
+        storageLocationAssignments: {
+          where: { releasedAt: null },
+          select: { releasedAt: true, storageLocation: { select: { name: true, shortCode: true, locationType: true } } },
+        },
+        physicalTagAssignments: {
+          where: { releasedAt: null },
+          select: { releasedAt: true, physicalTag: { select: { shortCode: true } } },
+        },
       } } } },
     },
   });
