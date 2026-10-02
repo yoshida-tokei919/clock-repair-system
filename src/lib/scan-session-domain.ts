@@ -176,6 +176,44 @@ export function packingResponseIsCurrent(request: { mode: ScanMode; generation: 
     current.generation === request.generation && current.shipmentId === request.shipmentId &&
     current.requestId === request.requestId;
 }
+export type PackingReleaseTarget = { repairId: number; inquiryNumber: string; assignmentId: number | null;
+  physicalTagId: number | null; shortCode: string | null;
+  status: "READY" | "NO_ACTIVE_ASSIGNMENT" | "MULTIPLE_ACTIVE_ASSIGNMENTS" | "TAG_NOT_ACTIVE" };
+export type PackingReleasePreview = { shipmentId: number; releasable: boolean; blockers: string[];
+  targets: PackingReleaseTarget[] };
+
+export function parsePackingReleasePreview(value: unknown, shipmentId: number): PackingReleasePreview {
+  const data = object(value);
+  if (!data || data.shipmentId !== shipmentId || typeof data.releasable !== "boolean" ||
+      !Array.isArray(data.blockers) || data.blockers.some(item => typeof item !== "string") ||
+      !Array.isArray(data.targets) || data.targets.length > MAX_SHIPMENT_REPAIRS)
+    throw new Error("タグ解放対象の応答形式が不正です。");
+  const statuses = ["READY", "NO_ACTIVE_ASSIGNMENT", "MULTIPLE_ACTIVE_ASSIGNMENTS", "TAG_NOT_ACTIVE"];
+  const targets = data.targets.map(value => {
+    const item = object(value);
+    if (!item || !positiveId(item.repairId) || typeof item.inquiryNumber !== "string" ||
+        !statuses.includes(item.status as string) ||
+        (item.assignmentId !== null && !positiveId(item.assignmentId)) ||
+        (item.physicalTagId !== null && !positiveId(item.physicalTagId)) ||
+        (item.shortCode !== null && typeof item.shortCode !== "string"))
+      throw new Error("タグ解放対象の応答形式が不正です。");
+    return item as PackingReleaseTarget;
+  });
+  if (new Set(targets.map(item => item.repairId)).size !== targets.length ||
+      (data.releasable && (data.blockers.length > 0 || targets.length === 0 ||
+        targets.some(item => item.status !== "READY" || item.assignmentId === null || item.physicalTagId === null))))
+    throw new Error("タグ解放対象の応答形式が不正です。");
+  return { shipmentId, releasable: data.releasable as boolean, blockers: data.blockers as string[], targets };
+}
+
+export function packingReleaseReady(target: PackingShipment | null, matched: SelectedRepair[],
+  confirmed: boolean, preview: PackingReleasePreview | null): boolean {
+  if (!target || !confirmed || !preview || !preview.releasable || preview.shipmentId !== target.shipmentId ||
+      !packingLocallyComplete(target, matched, []) || preview.targets.length !== target.repairs.length) return false;
+  return preview.targets.every(item => item.status === "READY" && item.assignmentId !== null &&
+    item.physicalTagId !== null && target.repairs.some(repair => repair.repairId === item.repairId) &&
+    matched.some(scan => scan.repairId === item.repairId && scan.physicalTagId === item.physicalTagId));
+}
 export function shipmentConfirmationBlockAfterSelectionChange(
   blocked: boolean, previous: SelectedRepair[], next: SelectedRepair[],
 ): boolean {

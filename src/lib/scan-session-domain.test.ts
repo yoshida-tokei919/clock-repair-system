@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   addPackingScan, addSelection, combineScanResults, enqueueQueuedScan, MAX_LOCATION_AUDIT_REPAIRS, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS, MAX_SHIPMENT_REPAIRS,
-  packingEligibilityError, packingLocallyComplete, packingReadRequest, packingResponseIsCurrent,
-  packingSnapshotChanged, parsePackingShipment, parsePackingShipmentId,
+  packingEligibilityError, packingLocallyComplete, packingReadRequest, packingReleaseReady, packingResponseIsCurrent,
+  packingSnapshotChanged, parsePackingReleasePreview, parsePackingShipment, parsePackingShipmentId,
   nextQueuedScan, scanCandidates, scanPhase, SCAN_DEBOUNCE_MS, shipmentConfirmationBlockAfterSelectionChange,
   shouldDebounceScan, timerDecision, type SelectedRepair,
 } from "./scan-session-domain";
@@ -160,6 +160,25 @@ const shipmentResponse = {
     { repairId: 13, repair: { id: 13, inquiryNumber: "T-13", customerId: 3 } },
   ],
 };
+
+test("release preview only enables a separately confirmed packing session with exact scanned tags", () => {
+  const target = parsePackingShipment(shipmentResponse, 42);
+  const matched = [repair, { ...repair, repairId: 13, inquiryNumber: "T-13", physicalTagId: 5 }];
+  const preview = parsePackingReleasePreview({ shipmentId: 42, releasable: true, blockers: [], targets: [
+    { repairId: 10, inquiryNumber: "T-10", assignmentId: 100, physicalTagId: 4, shortCode: "PT-000004", status: "READY" },
+    { repairId: 13, inquiryNumber: "T-13", assignmentId: 101, physicalTagId: 5, shortCode: "PT-000005", status: "READY" },
+  ] }, 42);
+  assert.equal(packingReleaseReady(target, matched, false, preview), false);
+  assert.equal(packingReleaseReady(target, matched, true, preview), false);
+  const exact = { ...preview, targets: [{ ...preview.targets[0], repairId: 12 }, preview.targets[1]] };
+  assert.equal(packingReleaseReady(target, matched, true, exact), true);
+  assert.equal(packingReleaseReady(target, matched, true,
+    { ...exact, targets: [{ ...exact.targets[0], physicalTagId: 999 }, exact.targets[1]] }), false);
+  assert.equal(packingReleaseReady(target, matched, true, { ...exact, releasable: false }), false);
+  assert.throws(() => parsePackingReleasePreview({ ...preview, shipmentId: 43 }, 42));
+  assert.throws(() => parsePackingReleasePreview({ ...preview, targets: [preview.targets[0], preview.targets[0]] }, 42));
+  assert.throws(() => parsePackingReleasePreview({ ...preview, targets: [{ ...preview.targets[0], status: "TAG_NOT_ACTIVE" }] }, 42));
+});
 
 test("packing parses Shipment GET and uses a read-only request", () => {
   assert.equal(parsePackingShipmentId(" 42 "), 42);

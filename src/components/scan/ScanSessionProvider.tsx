@@ -9,6 +9,7 @@ import {
   nextQueuedScan, scanCandidates, scanPhase, shipmentConfirmationBlockAfterSelectionChange,
   shouldDebounceScan, timerDecision, packingEligibilityError, packingLocallyComplete, packingReadRequest,
   packingResponseIsCurrent, packingSnapshotChanged, parsePackingShipment, parsePackingShipmentId,
+  packingReleaseReady, parsePackingReleasePreview, type PackingReleasePreview,
   type LocationScanResult, type PackingMismatch, type PackingShipment, type ScanDebounceState, type ScanMode, type ScanResult, type SelectedRepair,
 } from "@/lib/scan-session-domain";
 import { advanceWedgeBuffer, EMPTY_WEDGE_BUFFER } from "@/lib/scan-wedge";
@@ -37,10 +38,15 @@ type ScanSessionContextValue = {
   packingLoading: boolean;
   packingRechecking: boolean;
   packingConfirmed: boolean;
+  releasePreview: PackingReleasePreview | null;
+  releasePhase: "idle" | "loading" | "ready" | "releasing" | "completed" | "error" | "uncertain";
+  releaseError: string | null;
   setMode: (mode: ScanMode) => void;
   setPackingShipmentId: (id: string) => void;
   loadPackingShipment: () => Promise<void>;
   confirmPacking: () => Promise<void>;
+  loadReleasePreview: () => Promise<void>;
+  confirmTagRelease: () => Promise<void>;
   scan: (raw: string) => void;
   remove: (repairId: number) => void;
   clear: () => void;
@@ -137,6 +143,9 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   const [packingLoading, setPackingLoading] = useState(false);
   const [packingRechecking, setPackingRechecking] = useState(false);
   const [packingConfirmed, setPackingConfirmed] = useState(false);
+  const [releasePreview, setReleasePreview] = useState<PackingReleasePreview | null>(null);
+  const [releasePhase, setReleasePhase] = useState<ScanSessionContextValue["releasePhase"]>("idle");
+  const [releaseError, setReleaseError] = useState<string | null>(null);
   const modeRef = useRef<ScanMode>(mode);
   const destinationRef = useRef<SelectedStorageLocation | null>(null);
   const movingRef = useRef(false);
@@ -157,9 +166,24 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   const packingLoadingRef = useRef(false);
   const packingRecheckingRef = useRef(false);
   const packingRequestRef = useRef(0);
+  const packingConfirmedRef = useRef(false);
+  const releasePreviewRef = useRef<PackingReleasePreview | null>(null);
+  const releasePhaseRef = useRef<ScanSessionContextValue["releasePhase"]>("idle");
+  const releaseRequestRef = useRef(0);
+
+  const resetRelease = useCallback(() => {
+    releaseRequestRef.current += 1;
+    releasePreviewRef.current = null;
+    releasePhaseRef.current = "idle";
+    setReleasePreview(null);
+    setReleasePhase("idle");
+    setReleaseError(null);
+  }, []);
 
   const resetPacking = useCallback(() => {
     packingRequestRef.current += 1;
+    resetRelease();
+    packingConfirmedRef.current = false;
     packingTargetRef.current = null;
     packingMatchedRef.current = [];
     packingMismatchesRef.current = [];
@@ -171,7 +195,7 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
     setPackingLoading(false);
     setPackingRechecking(false);
     setPackingConfirmed(false);
-  }, []);
+  }, [resetRelease]);
 
   const setMode = useCallback((next: ScanMode) => {
     if (creatingShipmentRef.current) return;
@@ -270,10 +294,14 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   const confirmPacking = useCallback(async () => {
     const target = packingTargetRef.current;
     if (modeRef.current !== "SHIPMENT_PACKING" || !target || packingLoadingRef.current || packingRecheckingRef.current ||
+        releasePhaseRef.current === "releasing" || releasePhaseRef.current === "completed" ||
+        releasePhaseRef.current === "uncertain" ||
         scanBusyRef.current || queueRef.current.length > 0 ||
         !packingLocallyComplete(target, packingMatchedRef.current, packingMismatchesRef.current)) return;
     packingRecheckingRef.current = true;
     setPackingRechecking(true);
+    resetRelease();
+    packingConfirmedRef.current = false;
     setPackingConfirmed(false);
     const request = { mode: "SHIPMENT_PACKING" as const, generation: generationRef.current,
       shipmentId: target.shipmentId, requestId: ++packingRequestRef.current };
@@ -287,6 +315,7 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!packingLocallyComplete(target, packingMatchedRef.current, packingMismatchesRef.current)) return;
+      packingConfirmedRef.current = true;
       setPackingConfirmed(true);
       setFeedback({ kind: "success", message: "梱包内容一致" });
     } catch (cause) {
@@ -300,7 +329,99 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
         setPackingRechecking(false);
       }
     }
-  }, [fetchPackingShipment, packingRequestCurrent, resetPacking]);
+  }, [fetchPackingShipment, packingRequestCurrent, resetPacking, resetRelease]);
+
+  const releaseResponseCurrent = useCallback((request: { mode: ScanMode; generation: number; shipmentId: number; requestId: number }) => {
+    let shipmentId: number | null = null;
+    try { shipmentId = parsePackingShipmentId(packingShipmentIdRef.current); } catch { /* cleared */ }
+    return packingResponseIsCurrent(request, { mode: modeRef.current, generation: generationRef.current,
+      shipmentId, requestId: releaseRequestRef.current });
+  }, []);
+
+  const loadReleasePreview = useCallback(async () => {
+    const target = packingTargetRef.current;
+    if (modeRef.current !== "SHIPMENT_PACKING" || !target || !packingConfirmedRef.current ||
+        releasePhaseRef.current === "releasing" || releasePhaseRef.current === "completed" ||
+        releasePhaseRef.current === "uncertain" ||
+        scanBusyRef.current || queueRef.current.length > 0) return;
+    resetRelease();
+    releasePhaseRef.current = "loading";
+    setReleasePhase("loading");
+    const request = { mode: "SHIPMENT_PACKING" as const, generation: generationRef.current,
+      shipmentId: target.shipmentId, requestId: releaseRequestRef.current };
+    try {
+      const response = await fetch(`/api/shipments/${target.shipmentId}/physical-tag-release`,
+        { method: "GET", cache: "no-store" });
+      if (!response.ok) throw new Error(response.status === 401 ? "認証が必要です。再ログインしてください。" :
+        "タグ解放対象を取得できませんでした。");
+      const preview = parsePackingReleasePreview(await response.json(), target.shipmentId);
+      if (!releaseResponseCurrent(request) || !packingConfirmedRef.current) return;
+      releasePreviewRef.current = preview;
+      setReleasePreview(preview);
+      releasePhaseRef.current = "ready";
+      setReleasePhase("ready");
+    } catch (cause) {
+      if (releaseResponseCurrent(request)) {
+        releasePhaseRef.current = "error";
+        setReleasePhase("error");
+        setReleaseError(cause instanceof Error ? cause.message : "タグ解放対象を取得できませんでした。");
+      }
+    }
+  }, [releaseResponseCurrent, resetRelease]);
+
+  const confirmTagRelease = useCallback(async () => {
+    const target = packingTargetRef.current;
+    const preview = releasePreviewRef.current;
+    if (modeRef.current !== "SHIPMENT_PACKING" || !target || releasePhaseRef.current !== "ready" ||
+        !packingReleaseReady(target, packingMatchedRef.current, packingConfirmedRef.current, preview) ||
+        scanBusyRef.current || queueRef.current.length > 0) return;
+    releasePhaseRef.current = "releasing";
+    setReleasePhase("releasing");
+    setReleaseError(null);
+    const request = { mode: "SHIPMENT_PACKING" as const, generation: generationRef.current,
+      shipmentId: target.shipmentId, requestId: ++releaseRequestRef.current };
+    try {
+      const response = await fetch(`/api/shipments/${target.shipmentId}/physical-tag-release`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+        body: JSON.stringify({ confirmed: true, targets: preview!.targets.map(item => ({
+          repairId: item.repairId, assignmentId: item.assignmentId, physicalTagId: item.physicalTagId })) }),
+      });
+      if (!releaseResponseCurrent(request)) return;
+      if (!response.ok) {
+        let message = response.status === 409 ? "発送またはタグ割当が変更されました。梱包から再確認してください。" :
+          response.status === 401 ? "認証が必要です。再ログインしてください。" : "タグ解放に失敗しました。";
+        try { const body = await response.json(); if (typeof body?.error === "string") message = body.error; } catch { /* keep fallback */ }
+        if (!releaseResponseCurrent(request)) return;
+        if (response.status !== 400 && response.status !== 401 && response.status !== 404 && response.status !== 409) {
+          releasePhaseRef.current = "uncertain";
+          setReleasePhase("uncertain");
+          setReleaseError(`${message} 結果が不明なため再送できません。発送とタグ割当を確認してください。`);
+        } else {
+          resetPacking();
+          setFeedback({ kind: "error", message: `${message} 発送IDを再読込し、梱包から確認してください。` });
+          return;
+        }
+        releasePreviewRef.current = null;
+        setReleasePreview(null);
+        return;
+      }
+      const body: unknown = await response.json();
+      if (!releaseResponseCurrent(request)) return;
+      if (!body || typeof body !== "object" || Array.isArray(body) ||
+          (body as { shipmentId?: unknown }).shipmentId !== target.shipmentId ||
+          (body as { releasedCount?: unknown }).releasedCount !== preview!.targets.length)
+        throw new Error("タグ解放結果を確認できませんでした。");
+      releasePhaseRef.current = "completed";
+      setReleasePhase("completed");
+      setFeedback({ kind: "success", message: `${preview!.targets.length}件のPhysicalTagを発送前に解放しました。` });
+    } catch (cause) {
+      if (releaseResponseCurrent(request)) {
+        releasePhaseRef.current = "uncertain";
+        setReleasePhase("uncertain");
+        setReleaseError(`${cause instanceof Error ? cause.message : "通信に失敗しました。"} 結果が不明なため再送できません。発送とタグ割当を確認してください。`);
+      }
+    }
+  }, [releaseResponseCurrent, resetPacking]);
 
   const processScan = useCallback(async ({ raw, mode: scanMode, generation }: PendingScan) => {
     try {
@@ -443,6 +564,11 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (modeRef.current === "SHIPMENT_PACKING") {
+      if (releasePhaseRef.current === "releasing" || releasePhaseRef.current === "completed" ||
+          releasePhaseRef.current === "uncertain") {
+        setFeedback({ kind: "info", message: "タグ解放処理後は発送IDを再読込して確認してください。" });
+        return;
+      }
       if (packingRecheckingRef.current) {
         setFeedback({ kind: "info", message: "発送の再確認中です。完了後に読み取ってください。" });
         return;
@@ -467,6 +593,8 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
     }
     if (modeRef.current === "LOCATION_AUDIT") setAuditResult(null);
     if (modeRef.current === "SHIPMENT_PACKING") {
+      resetRelease();
+      packingConfirmedRef.current = false;
       setPackingConfirmed(false);
       setFeedback(null);
     }
@@ -474,7 +602,7 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
     queueRef.current = queued.queue;
     setQueuedCount(queueRef.current.length);
     void drainQueue();
-  }, [drainQueue]);
+  }, [drainQueue, resetRelease]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -683,7 +811,8 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   return <ScanSessionContext.Provider value={{ mode, selected, candidate, feedback, scanning, queuedCount,
     destination, moving, auditResult, auditing, creatingShipment, shipmentConfirmationBlocked,
     packingShipmentId, packingTarget, packingMatched, packingMismatches, packingLoading, packingRechecking, packingConfirmed,
-    setMode, setPackingShipmentId, loadPackingShipment, confirmPacking, scan, remove, clear, confirmTimer,
+    releasePreview, releasePhase, releaseError,
+    setMode, setPackingShipmentId, loadPackingShipment, confirmPacking, loadReleasePreview, confirmTagRelease, scan, remove, clear, confirmTimer,
     confirmLocationMove, confirmLocationAudit, confirmShipment, resetLocationDestination }}>{children}</ScanSessionContext.Provider>;
 }
 

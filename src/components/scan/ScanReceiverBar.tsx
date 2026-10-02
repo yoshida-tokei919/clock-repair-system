@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useWorkTimer } from "@/components/work-time/WorkTimerProvider";
-import { packingLocallyComplete, SCAN_MODES, timerDecision, type ScanMode } from "@/lib/scan-session-domain";
+import { packingLocallyComplete, packingReleaseReady, SCAN_MODES, timerDecision, type ScanMode } from "@/lib/scan-session-domain";
 import { useScanSession } from "./ScanSessionProvider";
 
 const MODE_LABELS: Record<ScanMode, string> = {
@@ -22,7 +22,8 @@ export function ScanReceiverBar() {
     creatingShipment, shipmentConfirmationBlocked, setMode, scan, remove, clear, confirmTimer,
     confirmLocationMove, confirmLocationAudit, confirmShipment,
     packingShipmentId, packingTarget, packingMatched, packingMismatches, packingLoading, packingRechecking,
-    packingConfirmed, setPackingShipmentId, loadPackingShipment, confirmPacking,
+    packingConfirmed, releasePreview, releasePhase, releaseError, setPackingShipmentId,
+    loadPackingShipment, confirmPacking, loadReleasePreview, confirmTagRelease,
     resetLocationDestination } = useScanSession();
   const timer = useWorkTimer();
   const [manual, setManual] = useState("");
@@ -30,6 +31,8 @@ export function ScanReceiverBar() {
     mode === "LOCATION_MOVE" || mode === "LOCATION_AUDIT";
   const timerAction = candidate ? timerDecision(timer.active, candidate.repairId) : null;
   const packingComplete = packingLocallyComplete(packingTarget, packingMatched, packingMismatches);
+  const releaseReady = releasePhase === "ready" &&
+    packingReleaseReady(packingTarget, packingMatched, packingConfirmed, releasePreview);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -91,10 +94,41 @@ export function ScanReceiverBar() {
               </li>)}</ul>
             </div>}
             <button type="button" onClick={() => void confirmPacking()}
-              disabled={!packingComplete || packingRechecking || scanning || queuedCount > 0 || packingConfirmed}
+              disabled={!packingComplete || packingRechecking || scanning || queuedCount > 0 || packingConfirmed ||
+                releasePhase === "releasing" || releasePhase === "completed" || releasePhase === "uncertain"}
               className="rounded bg-blue-700 px-3 py-1.5 text-white disabled:opacity-50">
               {packingRechecking ? "発送を再確認中..." : "発送を再確認して梱包一致を確定"}
             </button>
+            {packingConfirmed && <div className="space-y-2 border-t border-zinc-200 pt-2">
+              <p className="font-medium">発送前PhysicalTag解放</p>
+              <p className="text-zinc-700">対象タグを確認した後、別の確認操作で割当を解放します。梱包確認だけでは解放しません。</p>
+              <button type="button" onClick={() => void loadReleasePreview()}
+                disabled={releasePhase === "loading" || releasePhase === "releasing" || releasePhase === "completed" ||
+                  releasePhase === "uncertain" || scanning || queuedCount > 0}
+                className="rounded border border-blue-700 px-3 py-1.5 text-blue-700 disabled:opacity-50">
+                {releasePhase === "loading" ? "対象を確認中..." : "タグ解放対象を確認"}
+              </button>
+              {releaseError && <p role="alert" className="text-red-700">{releaseError}</p>}
+              {releasePreview && <div className="space-y-2">
+                {releasePreview.blockers.length > 0 && <ul className="list-disc pl-5 text-red-700">
+                  {releasePreview.blockers.map((blocker, index) => <li key={index}>{blocker}</li>)}
+                </ul>}
+                <ul className="space-y-1">
+                  {releasePreview.targets.map(item => <li key={item.repairId}>
+                    {item.inquiryNumber}（案件ID {item.repairId}）/ {item.shortCode ?? "タグなし"}：
+                    {item.status === "READY" ? "解放可能" : item.status === "NO_ACTIVE_ASSIGNMENT" ? "有効な割当なし" :
+                      item.status === "MULTIPLE_ACTIVE_ASSIGNMENTS" ? "有効な割当が複数" : "タグがACTIVEではありません"}
+                  </li>)}
+                </ul>
+                <button type="button" onClick={() => void confirmTagRelease()}
+                  disabled={!releaseReady || scanning || queuedCount > 0}
+                  className="rounded bg-red-700 px-3 py-1.5 font-medium text-white disabled:opacity-50">
+                  この{releasePreview.targets.length}件のPhysicalTag割当を解放する
+                </button>
+              </div>}
+              {releasePhase === "releasing" && <p role="status">タグ割当を解放中...</p>}
+              {releasePhase === "completed" && <p role="status" className="font-semibold text-green-700">タグ割当を解放しました。再送はできません。</p>}
+            </div>}
           </> : <p className="text-zinc-600">発送IDを読み込んでからPhysicalTagを読み取ってください。</p>}
         </div>}
         {mode === "LOCATION_MOVE" && <div className="flex flex-wrap items-center gap-2">
