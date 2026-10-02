@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `72c80913f2adf4bbec70af0f064ef341af7f31e5`
-- Commit subject: `feat: add yu-pri v3 shipment export`
-- Deploy source: GitHub `main` → Railway, exact commit `72c80913f2adf4bbec70af0f064ef341af7f31e5`
-- Railway deployment: `42baa5f7-3b3b-4462-bbc5-88772065e3ff`
+- Production application commit: `df4753cc50e84ab8f692924fb78e4408359531c6`
+- Commit subject: `feat: add shipment physical tag release`
+- Deploy source: GitHub `main` → Railway, exact commit `df4753cc50e84ab8f692924fb78e4408359531c6`
+- Railway deployment: `174eaa26-0374-41c6-aa48-94a06ac9b2f7`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task201-20261003`
+- Production tag: `production-task200d-20261003`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 336ms
+- Runtime: Next.js 15.5.27, Ready in 389ms
 - Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Task201 complete. Task200D remains pending. No next Task has been started.
+Production: Task200D complete. Task202A is implemented and independently reviewed on `task/202A`; main integration / production are pending.
 
 ## Stage B 現在地
 
@@ -307,7 +307,23 @@ Status: production complete
 - Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
 - 詳細: `docs/ai-tasks/200c-shipment-packing-verification.md`
 
-Task200Dは未着手。
+### Task200D — 発送前の再利用PhysicalTag release確認
+
+Status: production complete
+
+- Application commit: `df4753cc50e84ab8f692924fb78e4408359531c6`
+- Railway deployment: `174eaa26-0374-41c6-aa48-94a06ac9b2f7` — SUCCESS
+- Production tag: `production-task200d-20261003`
+- schema / migration / production DB変更なし。
+- Task200Cの`SHIPMENT_PACKING`を拡張し、梱包一致後にread-only release preview → 明示確認 → batch releaseを追加。新scan modeは増やしていない。
+- scan / 梱包確認 / previewではDB mutationなし。release対象を人間が確認し、明示POSTした場合のみPhysicalTagAssignmentの`releasedAt / releasedBy / releaseReason`を更新する。
+- release POSTはShipment / ShipmentRepair集合 / active PhysicalTagAssignment / PhysicalTag ACTIVEをserver-side再検証し、Serializable transaction内のguarded updateで全件atomic releaseする。
+- active assignmentなし・複数active・非ACTIVE tag・Shipment状態変化はfail closed。通信結果不明時は`uncertain`として同sessionからの盲目的再送を禁止。
+- PhysicalTag本体はACTIVEを維持し再利用可能。Shipment / Repair / StorageLocation / tracking / statusは変更しない。
+- 独立レビュー: blocking findingなし。active assignmentのpartial unique index、既存PhysicalTag lifecycle監査fieldとの整合を確認。
+- local validation: Task200D / ScanSession / PhysicalTag / Shipment regression 67/67 PASS、TypeScript / `git diff --check` / `npm run build` PASS。統括側core regression 32/32 PASS。
+- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、Shipment GET未認証=401、PhysicalTag release GET/POST未認証=401。Railway HTTP logsの`upstreamErrors`なし。
+- 詳細: `docs/ai-tasks/200d-shipment-physical-tag-release.md`
 
 ### Task201 — ゆうプリR 標準フォーマットV3 CSV出力adapter
 
@@ -328,4 +344,4 @@ Status: production complete
 - Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401、`GET /api/shipments/1/yupuri-v3`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
 - 詳細: `docs/ai-tasks/201-yu-pri-v3-export.md`
 
-Task200Dは未着手。次Taskはuser approvalなしに開始しない。
+Task202Aは`task/202A`で実装・独立レビュー済み。main統合 / production pending。Task202A production完了後は次Taskへ進まず、BC-NL3000U-W + Brother QL-800 / DK-2205の実機PoCを先に実施する。
