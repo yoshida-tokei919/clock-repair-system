@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `42281b9114b580443e89e192894d1b2b75b81170`
-- Commit subject: `feat: add storage location visibility`
-- Deploy source: GitHub `main` → Railway, exact feature commit `42281b9114b580443e89e192894d1b2b75b81170`
-- Railway deployment: `a78de541-a17a-4419-b05d-78b55fc3810d`
+- Production application commit: `957d675d210b42baeec7cfa37b0596ec825178c9`
+- Commit subject: `fix: pin trigger function search paths`
+- Deploy source: GitHub `main` → Railway, exact commit `957d675d210b42baeec7cfa37b0596ec825178c9`
+- Railway deployment: `4df54bcf-ad0d-4ca6-9a4f-59f33edcf5d6`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task198c-20261002`
+- Production tag: `production-security-hardening-20261002`
 - Region: `sin`
-- Runtime: Next.js Ready in 314ms
-- Supabase migration: `20261002005051 seed_initial_storage_locations`
+- Runtime: Next.js Ready in 607ms
+- Supabase migration: `20261002013945 harden_trigger_function_search_paths`
 
-Production: Task198C complete
+Production: Supabase security hardening complete; Task198C remains complete.
 
 ## Stage B 現在地
 
@@ -120,6 +120,16 @@ Status: production complete
 - Production read-back: canonical 9 zones、StorageLocationAssignment 0件。
 - Production smoke: `/`=200、`/login`=200、`/storage-locations`未認証=307、`/repairs`未認証=307。
 - 詳細: `docs/ai-tasks/198c-storage-location-visibility.md`
+
+## Supabase security hardening — 2026-10-02
+
+Status: production complete
+
+- Security AdvisorのFunction Search Path Mutable WARN対象だった2つのtrigger functionだけに空の`search_path`を設定。function body、table/data、RLS、GRANTの変更なし。
+- 独立レビュー、production function signature確認、migration前backupを完了。Supabase migration `20261002013945 harden_trigger_function_search_paths`を適用。
+- 適用後、両functionの`proconfig`に`search_path=""`を確認し、`security_definer=false`を維持。Function Search Path Mutable WARNは0件。
+- Railway deployment `4df54bcf-ad0d-4ca6-9a4f-59f33edcf5d6`成功。Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307。
+- 詳細・backup・対象外follow-up: `docs/ai-tasks/supabase-security-hardening-20261002.md`
 
 ## Scheduler / Feedback の現在地
 
