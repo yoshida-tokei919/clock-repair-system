@@ -110,6 +110,16 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
         },
     });
 
+    const activeLocationAssignment = await prisma.storageLocationAssignment.findFirst({
+        where: { repairId: repair.id, releasedAt: null },
+        select: {
+            assignedAt: true,
+            storageLocation: {
+                select: { name: true, shortCode: true, locationType: true },
+            },
+        },
+    });
+
     const publicCase = await prisma.publicCase.findUnique({
         where: {
             sourceType_sourceRepairId: {
@@ -215,6 +225,17 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                     nfcUid: activeTagAssignment.physicalTag.nfcUid,
                 } : null}
             />
+            <section className="mx-8 mt-4 rounded-lg border bg-white p-4" aria-label="現在の保管場所">
+                <h2 className="font-semibold">現在の保管場所</h2>
+                {activeLocationAssignment ? (
+                    <div className="mt-2 text-sm text-gray-700">
+                        <p className="font-medium text-gray-900">{activeLocationAssignment.storageLocation.name}</p>
+                        <p>管理コード: {activeLocationAssignment.storageLocation.shortCode ?? "未設定"}</p>
+                        <p>種別: {activeLocationAssignment.storageLocation.locationType}</p>
+                        <p>割当日時: {activeLocationAssignment.assignedAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</p>
+                    </div>
+                ) : <p className="mt-2 text-sm text-gray-700">保管場所未登録</p>}
+            </section>
             <RepairWorkTimerPanel repairId={repair.id} laborLines={laborRepairLineItems.map(item => ({
                 id: item.id,
                 itemNameSnapshot: item.itemNameSnapshot,
