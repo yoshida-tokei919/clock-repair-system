@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `aeaa0be6723b526de87af74e18c9faac61c3a5b1`
-- Commit subject: `feat: add storage location move flow`
-- Deploy source: GitHub `main` → Railway, exact feature commit `aeaa0be6723b526de87af74e18c9faac61c3a5b1`
-- Railway deployment: `b457c062-0330-4699-9646-25703fdd0967`
+- Production application commit: `42281b9114b580443e89e192894d1b2b75b81170`
+- Commit subject: `feat: add storage location visibility`
+- Deploy source: GitHub `main` → Railway, exact feature commit `42281b9114b580443e89e192894d1b2b75b81170`
+- Railway deployment: `a78de541-a17a-4419-b05d-78b55fc3810d`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task198b-20261002`
+- Production tag: `production-task198c-20261002`
 - Region: `sin`
-- Runtime: Next.js Ready in 300ms
-- Task198B migration: none
+- Runtime: Next.js Ready in 314ms
+- Supabase migration: `20261002005051 seed_initial_storage_locations`
 
-Production: Task198B complete
+Production: Task198C complete
 
 ## Stage B 現在地
 
@@ -100,24 +100,46 @@ Status: production complete
 - StorageLocationはproductionでまだ0件のため、実移動mutation smokeは未実施。
 - 詳細: `docs/ai-tasks/198b-storage-location-move-flow.md`
 
+### Task198C — StorageLocation visibility / initial zones
+
+Status: production complete
+
+- Application commit: `42281b9114b580443e89e192894d1b2b75b81170`
+- Railway deployment: `a78de541-a17a-4419-b05d-78b55fc3810d` — SUCCESS
+- Production tag: `production-task198c-20261002`
+- Supabase migration: `20261002005051 seed_initial_storage_locations`
+- 初期StorageLocation 9ゾーンをdata-only migrationで投入。
+- 既存shortCode / nameが正本定義と衝突する場合はfail closed。既存行のUPDATE / DELETEなし。
+- StorageLocation / StorageLocationAssignmentはRLS enabled、policyなし、anon/authenticated/service_roleへのtable権限なしを維持。
+- Repair詳細にactive StorageLocationAssignmentを現在保管場所として表示。未割当は「保管場所未登録」。
+- `/storage-locations` にactive Location一覧、active Repair件数、Location単位のRepair一覧を追加。
+- Sidebar導線とNextAuth middleware保護を追加。
+- LOCATION_AUDIT / 棚卸しscan、推奨zone判定、status自動変更は対象外。
+- StorageLocation / ScanSession regression: 20/20 PASS。
+- Prisma validate / TypeScript / `git diff --check` / production build PASS。
+- Production read-back: canonical 9 zones、StorageLocationAssignment 0件。
+- Production smoke: `/`=200、`/login`=200、`/storage-locations`未認証=307、`/repairs`未認証=307。
+- 詳細: `docs/ai-tasks/198c-storage-location-visibility.md`
+
 ## Scheduler / Feedback の現在地
 
 Stage AのTask182–184とTask188–195Eはproduction完了。Task185–187はdocs-only完了。Task195Eの納期・安全buffer feedbackのdata readinessは `docs/ai-tasks/195e-deadline-feedback-readiness.md` を参照する。
 
-## Stage B — 次の候補: Task198C
+## Stage B — 次の候補: Task198D
 
 Status: awaiting user approval
 
-Task198Cでは、Task198A/Bで作成したStorageLocation基盤を実運用可能にするため、初期StorageLocationの作成/投入方法、現在地表示、Location確認・不一致検知の境界を実装前調査で確定する候補とする。
+Task198D候補は、Task198Cで投入・可視化したStorageLocationを使った現在地確認 / 棚卸しscanに限定する。
 
-候補:
-- 初期日本語StorageLocationの定義・投入方法
-- StorageLocation作成/無効化/表示の最小管理導線
-- Repairの現在保管場所表示
-- Location単位の収容Repair一覧
-- 現在地確認 / 棚卸しscan mode
-- Repair.statusから推奨zoneを導く場合は自動変更せず、警告/候補として分離
-- 実際の物理ゾーン名称と運用順序をユーザー業務に照合してから固定する
+候補境界:
 
-Task198Cの具体的Task境界は、実装前調査で正本・現行運用・PhysicalTag/ScanSession契約と再照合して確定する。
-Task198C以外の次Taskを連続開始しない。
+- LOCATION_AUDIT / 棚卸しscan mode
+- PhysicalTag / Repair scanとStorageLocationAssignment現在地の照合
+- 現物とDB現在地の不一致を明示
+- scanだけで自動移動しない
+- Repair.statusを自動変更しない
+- 不一致解消は人間の確認操作を残す
+
+Repair.status / approvalStatus / RepairPlanningState等から推奨zoneを導くロジックはTask198Dへ混ぜず、Task198E候補として分離する。
+
+Task198D以外の次Taskを連続開始しない。
