@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  addSelection, combineScanResults, enqueueQueuedScan, MAX_LOCATION_AUDIT_REPAIRS, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS, MAX_SHIPMENT_REPAIRS,
+  addPackingScan, addSelection, combineScanResults, enqueueQueuedScan, MAX_LOCATION_AUDIT_REPAIRS, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS, MAX_SHIPMENT_REPAIRS,
+  packingEligibilityError, packingLocallyComplete, packingReadRequest, packingResponseIsCurrent,
+  packingSnapshotChanged, parsePackingShipment, parsePackingShipmentId,
   nextQueuedScan, scanCandidates, scanPhase, SCAN_DEBOUNCE_MS, shipmentConfirmationBlockAfterSelectionChange,
   shouldDebounceScan, timerDecision, type SelectedRepair,
 } from "./scan-session-domain";
@@ -145,7 +147,82 @@ test("audit scan phase changes from Location to Repair without changing existing
     assert.equal(scanPhase(mode, null), "LOCATION");
     assert.equal(scanPhase(mode, location), "REPAIR");
   }
-  for (const mode of ["OPEN_REPAIR", "TIMER", "BATCH_SELECT", "DELIVERY_NOTE", "SHIPMENT_SELECT"] as const) {
+  for (const mode of ["OPEN_REPAIR", "TIMER", "BATCH_SELECT", "DELIVERY_NOTE", "SHIPMENT_SELECT", "SHIPMENT_PACKING"] as const) {
     assert.equal(scanPhase(mode, null), "REPAIR");
   }
+});
+
+const shipmentResponse = {
+  id: 42, customerId: 3, customer: { id: 3, name: "顧客A", type: "individual" },
+  direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null,
+  repairs: [
+    { repairId: 12, repair: { id: 12, inquiryNumber: "T-12", customerId: 3 } },
+    { repairId: 13, repair: { id: 13, inquiryNumber: "T-13", customerId: 3 } },
+  ],
+};
+
+test("packing parses Shipment GET and uses a read-only request", () => {
+  assert.equal(parsePackingShipmentId(" 42 "), 42);
+  assert.throws(() => parsePackingShipmentId("42x"));
+  assert.throws(() => parsePackingShipmentId("0"));
+  const target = parsePackingShipment(shipmentResponse, 42);
+  assert.deepEqual(target.repairs, [{ repairId: 12, inquiryNumber: "T-12" }, { repairId: 13, inquiryNumber: "T-13" }]);
+  assert.equal(packingEligibilityError(target), null);
+  assert.deepEqual(packingReadRequest(42), { url: "/api/shipments/42", init: { method: "GET", cache: "no-store" } });
+  assert.throws(() => parsePackingShipment({ ...shipmentResponse, id: 43 }, 42));
+  assert.throws(() => parsePackingShipment({ ...shipmentResponse, repairs: [{ repairId: 12 }] }, 42));
+  assert.throws(() => parsePackingShipment({ ...shipmentResponse, repairs: [shipmentResponse.repairs[0], shipmentResponse.repairs[0]] }, 42));
+  assert.throws(() => parsePackingShipment({ ...shipmentResponse, repairs: Array.from({ length: 101 }, () => shipmentResponse.repairs[0]) }, 42));
+});
+
+test("packing blocks inbound, cancelled, shipped and empty Shipments", () => {
+  assert.match(packingEligibilityError(parsePackingShipment({ ...shipmentResponse, direction: "INBOUND" }, 42))!, /OUTBOUND/);
+  assert.match(packingEligibilityError(parsePackingShipment({ ...shipmentResponse, status: "CANCELLED" }, 42))!, /取消/);
+  assert.match(packingEligibilityError(parsePackingShipment({ ...shipmentResponse, actualShippedAt: "2026-10-02T00:00:00.000Z" }, 42))!, /発送済み/);
+  const empty = parsePackingShipment({ ...shipmentResponse, repairs: [] }, 42);
+  assert.match(packingEligibilityError(empty)!, /0件/);
+  assert.equal(packingLocallyComplete(empty, [], []), false);
+});
+
+test("packing membership, duplicates, mismatches and local completion", () => {
+  const target = parsePackingShipment(shipmentResponse, 42);
+  const second = { ...repair, repairId: 13, inquiryNumber: "T-13", physicalTagId: 5 };
+  const sameCustomerNonMember = { ...repair, repairId: 99, inquiryNumber: "T-99", physicalTagId: 9 };
+  const first = addPackingScan(target, [], [], repair);
+  assert.equal(first.outcome, "MATCHED");
+  assert.equal(packingLocallyComplete(target, first.matched, first.mismatches), false);
+  assert.deepEqual(addPackingScan(target, first.matched, [], repair),
+    { outcome: "DUPLICATE", matched: first.matched, mismatches: [] });
+  const mismatch = addPackingScan(target, first.matched, [], sameCustomerNonMember);
+  assert.equal(mismatch.outcome, "MISMATCH");
+  assert.deepEqual(mismatch.matched, first.matched);
+  assert.deepEqual(mismatch.mismatches, [sameCustomerNonMember]);
+  assert.deepEqual(addPackingScan(target, mismatch.matched, mismatch.mismatches, sameCustomerNonMember),
+    { outcome: "DUPLICATE", matched: mismatch.matched, mismatches: mismatch.mismatches });
+  const complete = addPackingScan(target, first.matched, [], second);
+  assert.equal(packingLocallyComplete(target, complete.matched, []), true);
+  assert.equal(packingLocallyComplete(target, complete.matched, mismatch.mismatches), false);
+});
+
+test("packing final snapshot ignores order but detects Repair set and eligibility changes", () => {
+  const loaded = parsePackingShipment(shipmentResponse, 42);
+  assert.equal(packingSnapshotChanged(loaded, parsePackingShipment({ ...shipmentResponse,
+    repairs: [...shipmentResponse.repairs].reverse() }, 42)), false);
+  assert.equal(packingSnapshotChanged(loaded, parsePackingShipment({ ...shipmentResponse,
+    repairs: [shipmentResponse.repairs[0]] }, 42)), true);
+  assert.equal(packingSnapshotChanged(loaded, parsePackingShipment({ ...shipmentResponse,
+    repairs: [shipmentResponse.repairs[0], { repairId: 99, repair: { id: 99, inquiryNumber: "T-99", customerId: 3 } }] }, 42)), true);
+  for (const change of [{ direction: "INBOUND" }, { status: "CANCELLED" }, { status: "READY" },
+    { actualShippedAt: "2026-10-02T00:00:00.000Z" }]) {
+    assert.equal(packingSnapshotChanged(loaded, parsePackingShipment({ ...shipmentResponse, ...change }, 42)), true);
+  }
+});
+
+test("packing response guard rejects obsolete mode, Shipment, clear and request", () => {
+  const request = { mode: "SHIPMENT_PACKING" as const, generation: 4, shipmentId: 42, requestId: 7 };
+  assert.equal(packingResponseIsCurrent(request, request), true);
+  assert.equal(packingResponseIsCurrent(request, { ...request, generation: 5 }), false);
+  assert.equal(packingResponseIsCurrent(request, { ...request, mode: "TIMER" }), false);
+  assert.equal(packingResponseIsCurrent(request, { ...request, shipmentId: 43 }), false);
+  assert.equal(packingResponseIsCurrent(request, { ...request, requestId: 8 }), false);
 });

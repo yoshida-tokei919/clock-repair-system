@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useWorkTimer } from "@/components/work-time/WorkTimerProvider";
-import { SCAN_MODES, timerDecision, type ScanMode } from "@/lib/scan-session-domain";
+import { packingLocallyComplete, SCAN_MODES, timerDecision, type ScanMode } from "@/lib/scan-session-domain";
 import { useScanSession } from "./ScanSessionProvider";
 
 const MODE_LABELS: Record<ScanMode, string> = {
@@ -12,6 +12,7 @@ const MODE_LABELS: Record<ScanMode, string> = {
   BATCH_SELECT: "一括選択",
   DELIVERY_NOTE: "納品書対象",
   SHIPMENT_SELECT: "発送対象",
+  SHIPMENT_PACKING: "梱包照合",
   LOCATION_MOVE: "保管場所移動",
   LOCATION_AUDIT: "保管場所棚卸し",
 };
@@ -20,12 +21,15 @@ export function ScanReceiverBar() {
   const { mode, selected, candidate, feedback, scanning, queuedCount, destination, moving, auditResult, auditing,
     creatingShipment, shipmentConfirmationBlocked, setMode, scan, remove, clear, confirmTimer,
     confirmLocationMove, confirmLocationAudit, confirmShipment,
+    packingShipmentId, packingTarget, packingMatched, packingMismatches, packingLoading, packingRechecking,
+    packingConfirmed, setPackingShipmentId, loadPackingShipment, confirmPacking,
     resetLocationDestination } = useScanSession();
   const timer = useWorkTimer();
   const [manual, setManual] = useState("");
   const selecting = mode === "BATCH_SELECT" || mode === "DELIVERY_NOTE" || mode === "SHIPMENT_SELECT" ||
     mode === "LOCATION_MOVE" || mode === "LOCATION_AUDIT";
   const timerAction = candidate ? timerDecision(timer.active, candidate.repairId) : null;
+  const packingComplete = packingLocallyComplete(packingTarget, packingMatched, packingMismatches);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -57,6 +61,42 @@ export function ScanReceiverBar() {
         </div>
         {feedback && <p role={feedback.kind === "error" ? "alert" : "status"}
           className={feedback.kind === "error" ? "text-red-700" : "text-zinc-700"}>{feedback.message}</p>}
+        {mode === "SHIPMENT_PACKING" && <div className="space-y-2 rounded border border-zinc-300 bg-white px-3 py-2">
+          <form onSubmit={event => { event.preventDefault(); void loadPackingShipment(); }} className="flex flex-wrap items-center gap-2">
+            <label htmlFor="packing-shipment-id" className="font-medium">発送ID</label>
+            <input id="packing-shipment-id" value={packingShipmentId} onChange={event => setPackingShipmentId(event.target.value)}
+              inputMode="numeric" autoComplete="off" placeholder="発送IDを入力"
+              className="w-36 rounded border border-zinc-300 px-2 py-1.5" />
+            <button type="submit" disabled={packingLoading} className="rounded bg-blue-700 px-3 py-1.5 text-white disabled:opacity-50">
+              {packingLoading ? "読込中..." : "発送を読込"}
+            </button>
+            <button type="button" onClick={clear} className="text-blue-700 underline">クリア</button>
+          </form>
+          {packingTarget ? <>
+            <p>発送 ID <strong>{packingTarget.shipmentId}</strong> / 顧客: <strong>{packingTarget.customer.name}</strong> / 修理案件 {packingTarget.repairs.length}件</p>
+            <p className="font-medium">照合済み {packingMatched.length} / {packingTarget.repairs.length}件・不一致スキャン {packingMismatches.length}件</p>
+            <p role="status" className={packingConfirmed ? "font-semibold text-green-700" : packingMismatches.length ? "text-red-700" : "text-zinc-700"}>
+              {packingConfirmed ? "梱包内容一致" : packingMismatches.length ? "不一致あり。クリアして最初から確認してください。" :
+                packingComplete ? "全件読み取り済み。最終確認待ちです。" : "読み取り中"}
+            </p>
+            <ul className="flex flex-wrap gap-2">
+              {packingTarget.repairs.map(item => <li key={item.repairId} className="rounded border border-zinc-300 px-2 py-1">
+                {item.inquiryNumber}（案件ID {item.repairId}）: {packingMatched.some(repair => repair.repairId === item.repairId) ? "読取済み" : "未読取"}
+              </li>)}
+            </ul>
+            {packingMismatches.length > 0 && <div className="text-red-700">
+              <p className="font-medium">発送に含まれない読み取り</p>
+              <ul>{packingMismatches.map((item, index) => <li key={`${item.repairId}-${index}`}>
+                {item.inquiryNumber}（案件ID {item.repairId}）/ {item.shortCode}
+              </li>)}</ul>
+            </div>}
+            <button type="button" onClick={() => void confirmPacking()}
+              disabled={!packingComplete || packingRechecking || scanning || queuedCount > 0 || packingConfirmed}
+              className="rounded bg-blue-700 px-3 py-1.5 text-white disabled:opacity-50">
+              {packingRechecking ? "発送を再確認中..." : "発送を再確認して梱包一致を確定"}
+            </button>
+          </> : <p className="text-zinc-600">発送IDを読み込んでからPhysicalTagを読み取ってください。</p>}
+        </div>}
         {mode === "LOCATION_MOVE" && <div className="flex flex-wrap items-center gap-2">
           {destination ? <span>移動先: <strong>{destination.name}</strong> / {destination.locationType}
             {destination.shortCode ? ` / ${destination.shortCode}` : ""}</span>

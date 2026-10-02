@@ -5,10 +5,11 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkTimer } from "@/components/work-time/WorkTimerProvider";
 import {
-  addSelection, combineLocationScanResults, combineScanResults, enqueueQueuedScan, locationScanCandidates, MAX_LOCATION_AUDIT_REPAIRS, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS, MAX_SHIPMENT_REPAIRS,
+  addPackingScan, addSelection, combineLocationScanResults, combineScanResults, enqueueQueuedScan, locationScanCandidates, MAX_LOCATION_AUDIT_REPAIRS, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS, MAX_SHIPMENT_REPAIRS,
   nextQueuedScan, scanCandidates, scanPhase, shipmentConfirmationBlockAfterSelectionChange,
-  shouldDebounceScan, timerDecision,
-  type LocationScanResult, type ScanDebounceState, type ScanMode, type ScanResult, type SelectedRepair,
+  shouldDebounceScan, timerDecision, packingEligibilityError, packingLocallyComplete, packingReadRequest,
+  packingResponseIsCurrent, packingSnapshotChanged, parsePackingShipment, parsePackingShipmentId,
+  type LocationScanResult, type PackingMismatch, type PackingShipment, type ScanDebounceState, type ScanMode, type ScanResult, type SelectedRepair,
 } from "@/lib/scan-session-domain";
 import { advanceWedgeBuffer, EMPTY_WEDGE_BUFFER } from "@/lib/scan-wedge";
 import type { SelectedStorageLocation } from "@/lib/storage-location-resolver";
@@ -29,7 +30,17 @@ type ScanSessionContextValue = {
   auditing: boolean;
   creatingShipment: boolean;
   shipmentConfirmationBlocked: boolean;
+  packingShipmentId: string;
+  packingTarget: PackingShipment | null;
+  packingMatched: SelectedRepair[];
+  packingMismatches: PackingMismatch[];
+  packingLoading: boolean;
+  packingRechecking: boolean;
+  packingConfirmed: boolean;
   setMode: (mode: ScanMode) => void;
+  setPackingShipmentId: (id: string) => void;
+  loadPackingShipment: () => Promise<void>;
+  confirmPacking: () => Promise<void>;
   scan: (raw: string) => void;
   remove: (repairId: number) => void;
   clear: () => void;
@@ -119,6 +130,13 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   const [auditing, setAuditing] = useState(false);
   const [creatingShipment, setCreatingShipment] = useState(false);
   const [shipmentConfirmationBlocked, setShipmentConfirmationBlocked] = useState(false);
+  const [packingShipmentId, setPackingShipmentIdState] = useState("");
+  const [packingTarget, setPackingTarget] = useState<PackingShipment | null>(null);
+  const [packingMatched, setPackingMatched] = useState<SelectedRepair[]>([]);
+  const [packingMismatches, setPackingMismatches] = useState<PackingMismatch[]>([]);
+  const [packingLoading, setPackingLoading] = useState(false);
+  const [packingRechecking, setPackingRechecking] = useState(false);
+  const [packingConfirmed, setPackingConfirmed] = useState(false);
   const modeRef = useRef<ScanMode>(mode);
   const destinationRef = useRef<SelectedStorageLocation | null>(null);
   const movingRef = useRef(false);
@@ -132,12 +150,37 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   const generationRef = useRef(0);
   const wedgeRef = useRef(EMPTY_WEDGE_BUFFER);
   const debounceRef = useRef<ScanDebounceState>(null);
+  const packingShipmentIdRef = useRef("");
+  const packingTargetRef = useRef<PackingShipment | null>(null);
+  const packingMatchedRef = useRef<SelectedRepair[]>([]);
+  const packingMismatchesRef = useRef<PackingMismatch[]>([]);
+  const packingLoadingRef = useRef(false);
+  const packingRecheckingRef = useRef(false);
+  const packingRequestRef = useRef(0);
+
+  const resetPacking = useCallback(() => {
+    packingRequestRef.current += 1;
+    packingTargetRef.current = null;
+    packingMatchedRef.current = [];
+    packingMismatchesRef.current = [];
+    packingLoadingRef.current = false;
+    packingRecheckingRef.current = false;
+    setPackingTarget(null);
+    setPackingMatched([]);
+    setPackingMismatches([]);
+    setPackingLoading(false);
+    setPackingRechecking(false);
+    setPackingConfirmed(false);
+  }, []);
 
   const setMode = useCallback((next: ScanMode) => {
     if (creatingShipmentRef.current) return;
     if (next === modeRef.current) return;
     modeRef.current = next;
     generationRef.current += 1;
+    resetPacking();
+    packingShipmentIdRef.current = "";
+    setPackingShipmentIdState("");
     auditRequestRef.current += 1;
     auditingRef.current = false;
     setAuditing(false);
@@ -155,7 +198,109 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
     setFeedback({ kind: "info", message: "モードを切り替えました。選択をクリアしました。" });
     wedgeRef.current = EMPTY_WEDGE_BUFFER;
     debounceRef.current = null;
+  }, [resetPacking]);
+
+  const setPackingShipmentId = useCallback((id: string) => {
+    if (id === packingShipmentIdRef.current) return;
+    generationRef.current += 1;
+    queueRef.current = [];
+    setQueuedCount(0);
+    debounceRef.current = null;
+    wedgeRef.current = EMPTY_WEDGE_BUFFER;
+    resetPacking();
+    packingShipmentIdRef.current = id;
+    setPackingShipmentIdState(id);
+    setFeedback(null);
+  }, [resetPacking]);
+
+  const packingRequestCurrent = useCallback((request: { mode: ScanMode; generation: number; shipmentId: number; requestId: number }) => {
+    let shipmentId: number | null = null;
+    try { shipmentId = parsePackingShipmentId(packingShipmentIdRef.current); } catch { /* invalid input */ }
+    return packingResponseIsCurrent(request, { mode: modeRef.current, generation: generationRef.current,
+      shipmentId, requestId: packingRequestRef.current });
   }, []);
+
+  const fetchPackingShipment = useCallback(async (id: number): Promise<PackingShipment> => {
+    const { url, init } = packingReadRequest(id);
+    const response = await fetch(url, init);
+    if (!response.ok) {
+      if (response.status === 401) throw new Error("認証が必要です。再ログインしてください。");
+      if (response.status === 404) throw new Error("発送が見つかりません。");
+      throw new Error("発送を取得できませんでした。");
+    }
+    return parsePackingShipment(await response.json(), id);
+  }, []);
+
+  const loadPackingShipment = useCallback(async () => {
+    if (modeRef.current !== "SHIPMENT_PACKING") return;
+    let id: number;
+    try { id = parsePackingShipmentId(packingShipmentIdRef.current); }
+    catch (cause) {
+      setFeedback({ kind: "error", message: cause instanceof Error ? cause.message : "発送IDが不正です。" });
+      return;
+    }
+    generationRef.current += 1;
+    queueRef.current = [];
+    setQueuedCount(0);
+    debounceRef.current = null;
+    resetPacking();
+    packingLoadingRef.current = true;
+    setPackingLoading(true);
+    setFeedback({ kind: "info", message: `発送 ID ${id} を読み込んでいます。` });
+    const request = { mode: "SHIPMENT_PACKING" as const, generation: generationRef.current,
+      shipmentId: id, requestId: packingRequestRef.current };
+    try {
+      const target = await fetchPackingShipment(id);
+      if (!packingRequestCurrent(request)) return;
+      const eligibilityError = packingEligibilityError(target);
+      if (eligibilityError) throw new Error(eligibilityError);
+      packingTargetRef.current = target;
+      setPackingTarget(target);
+      setFeedback({ kind: "success", message: `発送 ID ${id} を読み込みました。タグを読み取ってください。` });
+    } catch (cause) {
+      if (packingRequestCurrent(request)) setFeedback({ kind: "error", message: cause instanceof Error ? cause.message : "発送を読み込めませんでした。" });
+    } finally {
+      if (packingRequestCurrent(request)) {
+        packingLoadingRef.current = false;
+        setPackingLoading(false);
+      }
+    }
+  }, [fetchPackingShipment, packingRequestCurrent, resetPacking]);
+
+  const confirmPacking = useCallback(async () => {
+    const target = packingTargetRef.current;
+    if (modeRef.current !== "SHIPMENT_PACKING" || !target || packingLoadingRef.current || packingRecheckingRef.current ||
+        scanBusyRef.current || queueRef.current.length > 0 ||
+        !packingLocallyComplete(target, packingMatchedRef.current, packingMismatchesRef.current)) return;
+    packingRecheckingRef.current = true;
+    setPackingRechecking(true);
+    setPackingConfirmed(false);
+    const request = { mode: "SHIPMENT_PACKING" as const, generation: generationRef.current,
+      shipmentId: target.shipmentId, requestId: ++packingRequestRef.current };
+    try {
+      const current = await fetchPackingShipment(target.shipmentId);
+      if (!packingRequestCurrent(request)) return;
+      const eligibilityError = packingEligibilityError(current);
+      if (eligibilityError || packingSnapshotChanged(target, current)) {
+        resetPacking();
+        setFeedback({ kind: "error", message: `発送の内容または状態が変更されました。${eligibilityError ?? ""}発送IDを再読込し、最初から梱包確認してください。` });
+        return;
+      }
+      if (!packingLocallyComplete(target, packingMatchedRef.current, packingMismatchesRef.current)) return;
+      setPackingConfirmed(true);
+      setFeedback({ kind: "success", message: "梱包内容一致" });
+    } catch (cause) {
+      if (packingRequestCurrent(request)) {
+        resetPacking();
+        setFeedback({ kind: "error", message: `${cause instanceof Error ? cause.message : "再確認に失敗しました。"} 発送IDを再読込し、最初から梱包確認してください。` });
+      }
+    } finally {
+      if (packingRequestCurrent(request)) {
+        packingRecheckingRef.current = false;
+        setPackingRechecking(false);
+      }
+    }
+  }, [fetchPackingShipment, packingRequestCurrent, resetPacking]);
 
   const processScan = useCallback(async ({ raw, mode: scanMode, generation }: PendingScan) => {
     try {
@@ -212,6 +357,24 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
           } else {
             setCandidate(repair);
             setFeedback({ kind: "info", message: `${repair.inquiryNumber} / ${repair.shortCode} を確認してタイマーを開始してください。` });
+          }
+        } else if (scanMode === "SHIPMENT_PACKING") {
+          const target = packingTargetRef.current;
+          if (!target) {
+            setFeedback({ kind: "error", message: "先に発送IDを読み込んでください。" });
+            return;
+          }
+          const next = addPackingScan(target, packingMatchedRef.current, packingMismatchesRef.current, repair);
+          packingMatchedRef.current = next.matched;
+          packingMismatchesRef.current = next.mismatches;
+          setPackingMatched(next.matched);
+          setPackingMismatches(next.mismatches);
+          if (next.outcome === "DUPLICATE") {
+            setFeedback({ kind: "info", message: `${repair.inquiryNumber} は読み取り済みです（重複）。` });
+          } else if (next.outcome === "MISMATCH") {
+            setFeedback({ kind: "error", message: `${repair.inquiryNumber} はこの発送に含まれません。不一致を記録しました。` });
+          } else {
+            setFeedback({ kind: "success", message: `${repair.inquiryNumber} を梱包対象として照合しました。` });
           }
         } else {
           const next = addSelection(scanMode, selectedRef.current, repair);
@@ -279,6 +442,16 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
       setFeedback({ kind: "info", message: "移動処理中です。完了後に読み取ってください。" });
       return;
     }
+    if (modeRef.current === "SHIPMENT_PACKING") {
+      if (packingRecheckingRef.current) {
+        setFeedback({ kind: "info", message: "発送の再確認中です。完了後に読み取ってください。" });
+        return;
+      }
+      if (packingLoadingRef.current || !packingTargetRef.current) {
+        setFeedback({ kind: "error", message: "先に発送IDを読み込んでください。" });
+        return;
+      }
+    }
     const value = raw.trim();
     if (!value) {
       setFeedback({ kind: "error", message: "読み取り値を入力してください。" });
@@ -293,6 +466,10 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (modeRef.current === "LOCATION_AUDIT") setAuditResult(null);
+    if (modeRef.current === "SHIPMENT_PACKING") {
+      setPackingConfirmed(false);
+      setFeedback(null);
+    }
     debounceRef.current = { raw: value, acceptedAt: now };
     queueRef.current = queued.queue;
     setQueuedCount(queueRef.current.length);
@@ -337,13 +514,25 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   }, []);
   const clear = useCallback(() => {
     if (auditingRef.current || creatingShipmentRef.current) return;
+    if (modeRef.current === "SHIPMENT_PACKING") {
+      generationRef.current += 1;
+      queueRef.current = [];
+      setQueuedCount(0);
+      debounceRef.current = null;
+      wedgeRef.current = EMPTY_WEDGE_BUFFER;
+      resetPacking();
+      packingShipmentIdRef.current = "";
+      setPackingShipmentIdState("");
+      setFeedback({ kind: "info", message: "梱包確認をクリアしました。" });
+      return;
+    }
     setAuditResult(null);
     shipmentConfirmationBlockedRef.current = false;
     setShipmentConfirmationBlocked(false);
     selectedRef.current = [];
     setSelected([]);
     setFeedback({ kind: "info", message: "選択をクリアしました。" });
-  }, []);
+  }, [resetPacking]);
   const resetLocationDestination = useCallback(() => {
     if (creatingShipmentRef.current) return;
     generationRef.current += 1;
@@ -493,7 +682,8 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
 
   return <ScanSessionContext.Provider value={{ mode, selected, candidate, feedback, scanning, queuedCount,
     destination, moving, auditResult, auditing, creatingShipment, shipmentConfirmationBlocked,
-    setMode, scan, remove, clear, confirmTimer,
+    packingShipmentId, packingTarget, packingMatched, packingMismatches, packingLoading, packingRechecking, packingConfirmed,
+    setMode, setPackingShipmentId, loadPackingShipment, confirmPacking, scan, remove, clear, confirmTimer,
     confirmLocationMove, confirmLocationAudit, confirmShipment, resetLocationDestination }}>{children}</ScanSessionContext.Provider>;
 }
 
