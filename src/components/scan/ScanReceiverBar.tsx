@@ -13,14 +13,17 @@ const MODE_LABELS: Record<ScanMode, string> = {
   DELIVERY_NOTE: "納品書対象",
   SHIPMENT_SELECT: "発送対象",
   LOCATION_MOVE: "保管場所移動",
+  LOCATION_AUDIT: "保管場所棚卸し",
 };
 
 export function ScanReceiverBar() {
-  const { mode, selected, candidate, feedback, scanning, queuedCount, destination, moving,
-    setMode, scan, remove, clear, confirmTimer, confirmLocationMove, resetLocationDestination } = useScanSession();
+  const { mode, selected, candidate, feedback, scanning, queuedCount, destination, moving, auditResult, auditing,
+    setMode, scan, remove, clear, confirmTimer, confirmLocationMove, confirmLocationAudit,
+    resetLocationDestination } = useScanSession();
   const timer = useWorkTimer();
   const [manual, setManual] = useState("");
-  const selecting = mode === "BATCH_SELECT" || mode === "DELIVERY_NOTE" || mode === "SHIPMENT_SELECT" || mode === "LOCATION_MOVE";
+  const selecting = mode === "BATCH_SELECT" || mode === "DELIVERY_NOTE" || mode === "SHIPMENT_SELECT" ||
+    mode === "LOCATION_MOVE" || mode === "LOCATION_AUDIT";
   const timerAction = candidate ? timerDecision(timer.active, candidate.repairId) : null;
 
   const submit = (event: FormEvent) => {
@@ -41,9 +44,10 @@ export function ScanReceiverBar() {
           <form onSubmit={submit} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <label htmlFor="scan-manual" className="sr-only">タグの読み取り値を手入力</label>
             <input id="scan-manual" value={manual} onChange={event => setManual(event.target.value)}
-              autoComplete="off" placeholder={mode === "LOCATION_MOVE" && !destination ? "Locationタグ / LOCコード" : "タグの読み取り値 / PTコード"}
+              autoComplete="off" placeholder={(mode === "LOCATION_MOVE" || mode === "LOCATION_AUDIT") && !destination ?
+                "Locationタグ / LOCコード" : "PhysicalTag / PTコード"}
               className="min-w-48 flex-1 rounded border border-zinc-300 bg-white px-2 py-1.5" />
-            <button type="submit" className="rounded bg-blue-700 px-3 py-1.5 font-medium text-white">
+            <button type="submit" disabled={auditing} className="rounded bg-blue-700 px-3 py-1.5 font-medium text-white disabled:opacity-50">
               照合
             </button>
           </form>
@@ -63,6 +67,31 @@ export function ScanReceiverBar() {
             {moving ? "移動中..." : "この保管場所へ移動"}
           </button>
         </div>}
+        {mode === "LOCATION_AUDIT" && <div className="flex flex-wrap items-center gap-2">
+          {destination ? <span>棚卸し場所: <strong>{destination.name}</strong> / {destination.locationType}
+            {destination.shortCode ? ` / ${destination.shortCode}` : ""}</span>
+            : <span>棚卸し場所のLocationタグ / LOCコードを読み取ってください</span>}
+          {destination && <button type="button" onClick={resetLocationDestination}
+            disabled={auditing} className="text-blue-700 underline disabled:opacity-50">棚卸し場所を変更</button>}
+          <button type="button" onClick={() => void confirmLocationAudit()}
+            disabled={!destination || auditing || scanning || queuedCount > 0}
+            className="rounded bg-blue-700 px-3 py-1 text-white disabled:opacity-50">
+            {auditing ? "確認中..." : "棚卸し結果を確認"}
+          </button>
+        </div>}
+        {mode === "LOCATION_AUDIT" && auditResult && <div className="space-y-1 rounded border border-zinc-300 bg-white px-3 py-2">
+          <p className="font-medium">棚卸し結果: 一致 {auditResult.counts.match}件 / 別場所 {auditResult.counts.otherLocation}件 /
+            保管場所未登録 {auditResult.counts.unassigned}件 / 未検出 {auditResult.counts.missing}件</p>
+          {auditResult.scanned.filter(item => item.classification !== "MATCH").map(item => {
+            const selectedItem = selected.find(repair => repair.repairId === item.repairId);
+            return <p key={item.repairId}>
+              {item.classification === "OTHER_LOCATION" ? "別場所" : "保管場所未登録"}: {item.inquiryNumber}
+              {selectedItem ? ` / ${selectedItem.shortCode}` : ""}
+              {item.classification === "OTHER_LOCATION" ? ` / 現在地: ${item.currentLocation?.name ?? "不明"}` : ""}
+            </p>;
+          })}
+          {auditResult.missing.map(item => <p key={item.repairId}>未検出: {item.inquiryNumber}（案件ID {item.repairId}）</p>)}
+        </div>}
         {mode === "TIMER" && candidate && (
           <div className="flex flex-wrap items-center gap-2 rounded border border-blue-200 bg-white px-2 py-1.5">
             <span>候補: <strong>{candidate.inquiryNumber}</strong> / {candidate.shortCode}</span>
@@ -79,14 +108,16 @@ export function ScanReceiverBar() {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-medium">選択中: {selected.length}件</span>
-              {selected.length > 0 && <button type="button" onClick={clear} className="text-blue-700 underline">すべて解除</button>}
+              {selected.length > 0 && <button type="button" onClick={clear} disabled={auditing}
+                className="text-blue-700 underline disabled:opacity-50">すべて解除</button>}
               <span className="text-zinc-600">モード切替時に選択はクリアされます。</span>
             </div>
             {selected.length > 0 && <ul className="flex flex-wrap gap-2 pt-1">
               {selected.map(item => <li key={item.repairId} className="rounded border border-zinc-300 bg-white px-2 py-1">
                 {item.inquiryNumber} / {item.shortCode}{" "}
                 <button type="button" onClick={() => remove(item.repairId)}
-                  aria-label={`${item.inquiryNumber} を選択から外す`} className="text-blue-700 underline">解除</button>
+                  disabled={auditing} aria-label={`${item.inquiryNumber} を選択から外す`}
+                  className="text-blue-700 underline disabled:opacity-50">解除</button>
               </li>)}
             </ul>}
           </div>

@@ -1,7 +1,7 @@
 import { parsePhysicalTagIdentifier, type PhysicalTagIdentifier } from "./physical-tag-resolver";
 import type { SelectedStorageLocation, StorageLocationIdentifier } from "./storage-location-resolver";
 
-export const SCAN_MODES = ["OPEN_REPAIR", "TIMER", "BATCH_SELECT", "DELIVERY_NOTE", "SHIPMENT_SELECT", "LOCATION_MOVE"] as const;
+export const SCAN_MODES = ["OPEN_REPAIR", "TIMER", "BATCH_SELECT", "DELIVERY_NOTE", "SHIPMENT_SELECT", "LOCATION_MOVE", "LOCATION_AUDIT"] as const;
 export type ScanMode = typeof SCAN_MODES[number];
 export type SelectedRepair = {
   repairId: number;
@@ -64,7 +64,7 @@ export function combineLocationScanResults(results: LocationScanResult[]): Locat
 }
 
 export function scanPhase(mode: ScanMode, destination: SelectedStorageLocation | null): "LOCATION" | "REPAIR" {
-  return mode === "LOCATION_MOVE" && !destination ? "LOCATION" : "REPAIR";
+  return (mode === "LOCATION_MOVE" || mode === "LOCATION_AUDIT") && !destination ? "LOCATION" : "REPAIR";
 }
 
 export function combineScanResults(results: ScanResult[]): ScanResult {
@@ -83,11 +83,13 @@ export function combineScanResults(results: ScanResult[]): ScanResult {
 }
 
 export const MAX_LOCATION_MOVE_REPAIRS = 100;
+export const MAX_LOCATION_AUDIT_REPAIRS = 100;
 export type SelectionOutcome = "ADDED" | "DUPLICATE" | "MIXED_CUSTOMER" | "LIMIT_REACHED";
 export function addSelection(mode: ScanMode, selected: SelectedRepair[], repair: SelectedRepair):
   { outcome: SelectionOutcome; selected: SelectedRepair[] } {
   if (selected.some(item => item.repairId === repair.repairId)) return { outcome: "DUPLICATE", selected };
-  if (mode === "LOCATION_MOVE" && selected.length >= MAX_LOCATION_MOVE_REPAIRS) return { outcome: "LIMIT_REACHED", selected };
+  if (((mode === "LOCATION_MOVE" && selected.length >= MAX_LOCATION_MOVE_REPAIRS) ||
+      (mode === "LOCATION_AUDIT" && selected.length >= MAX_LOCATION_AUDIT_REPAIRS))) return { outcome: "LIMIT_REACHED", selected };
   if ((mode === "DELIVERY_NOTE" || mode === "SHIPMENT_SELECT") &&
       selected.length > 0 && selected[0].customerId !== repair.customerId) {
     return { outcome: "MIXED_CUSTOMER", selected };

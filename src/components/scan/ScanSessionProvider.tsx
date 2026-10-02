@@ -5,12 +5,13 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkTimer } from "@/components/work-time/WorkTimerProvider";
 import {
-  addSelection, combineLocationScanResults, combineScanResults, enqueueQueuedScan, locationScanCandidates, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS,
+  addSelection, combineLocationScanResults, combineScanResults, enqueueQueuedScan, locationScanCandidates, MAX_LOCATION_AUDIT_REPAIRS, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS,
   nextQueuedScan, scanCandidates, scanPhase, shouldDebounceScan, timerDecision,
   type LocationScanResult, type ScanDebounceState, type ScanMode, type ScanResult, type SelectedRepair,
 } from "@/lib/scan-session-domain";
 import { advanceWedgeBuffer, EMPTY_WEDGE_BUFFER } from "@/lib/scan-wedge";
 import type { SelectedStorageLocation } from "@/lib/storage-location-resolver";
+import type { StorageLocationAuditResult } from "@/lib/storage-location-audit";
 
 type Feedback = { kind: "success" | "error" | "info"; message: string } | null;
 type ScanSessionContextValue = {
@@ -22,12 +23,15 @@ type ScanSessionContextValue = {
   queuedCount: number;
   destination: SelectedStorageLocation | null;
   moving: boolean;
+  auditResult: StorageLocationAuditResult | null;
+  auditing: boolean;
   setMode: (mode: ScanMode) => void;
   scan: (raw: string) => void;
   remove: (repairId: number) => void;
   clear: () => void;
   confirmTimer: () => Promise<void>;
   confirmLocationMove: () => Promise<void>;
+  confirmLocationAudit: () => Promise<void>;
   resetLocationDestination: () => void;
 };
 
@@ -106,9 +110,13 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   const [queuedCount, setQueuedCount] = useState(0);
   const [destination, setDestination] = useState<SelectedStorageLocation | null>(null);
   const [moving, setMoving] = useState(false);
+  const [auditResult, setAuditResult] = useState<StorageLocationAuditResult | null>(null);
+  const [auditing, setAuditing] = useState(false);
   const modeRef = useRef<ScanMode>(mode);
   const destinationRef = useRef<SelectedStorageLocation | null>(null);
   const movingRef = useRef(false);
+  const auditingRef = useRef(false);
+  const auditRequestRef = useRef(0);
   const selectedRef = useRef<SelectedRepair[]>([]);
   const scanBusyRef = useRef(false);
   const queueRef = useRef<PendingScan[]>([]);
@@ -120,6 +128,10 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
     if (next === modeRef.current) return;
     modeRef.current = next;
     generationRef.current += 1;
+    auditRequestRef.current += 1;
+    auditingRef.current = false;
+    setAuditing(false);
+    setAuditResult(null);
     queueRef.current = [];
     setQueuedCount(0);
     selectedRef.current = [];
@@ -151,7 +163,8 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
           };
           destinationRef.current = nextDestination;
           setDestination(nextDestination);
-          setFeedback({ kind: "success", message: `移動先「${nextDestination.name}」を選択しました。時計のタグを読み取ってください。` });
+          setAuditResult(null);
+          setFeedback({ kind: "success", message: `${scanMode === "LOCATION_AUDIT" ? "棚卸し場所" : "移動先"}「${nextDestination.name}」を選択しました。時計のタグを読み取ってください。` });
         }
         return;
       }
@@ -193,10 +206,13 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
           if (next.outcome === "DUPLICATE") {
             setFeedback({ kind: "info", message: `${repair.inquiryNumber} は選択済みです（重複）。` });
           } else if (next.outcome === "LIMIT_REACHED") {
-            setFeedback({ kind: "error", message: `一度に移動できるのは${MAX_LOCATION_MOVE_REPAIRS}件までです。先に選択済みの案件を移動してください。` });
+            setFeedback({ kind: "error", message: scanMode === "LOCATION_AUDIT" ?
+              `一度に棚卸しできるのは${MAX_LOCATION_AUDIT_REPAIRS}件までです。選択を整理してから確認してください。` :
+              `一度に移動できるのは${MAX_LOCATION_MOVE_REPAIRS}件までです。先に選択済みの案件を移動してください。` });
           } else if (next.outcome === "MIXED_CUSTOMER") {
             setFeedback({ kind: "error", message: `${repair.inquiryNumber} は別顧客のため追加できません。` });
           } else {
+            if (scanMode === "LOCATION_AUDIT") setAuditResult(null);
             selectedRef.current = next.selected;
             setSelected(next.selected);
             setFeedback({ kind: "success", message: `${repair.inquiryNumber} / ${repair.shortCode} を選択しました。` });
@@ -231,6 +247,10 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const scan = useCallback((raw: string) => {
+    if (auditingRef.current) {
+      setFeedback({ kind: "info", message: "棚卸し結果の確認中です。完了後に読み取ってください。" });
+      return;
+    }
     if (movingRef.current) {
       setFeedback({ kind: "info", message: "移動処理中です。完了後に読み取ってください。" });
       return;
@@ -248,6 +268,7 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
       setFeedback({ kind: "error", message: `読取待機が${MAX_QUEUED_SCANS}件に達しました。処理が進んでから再度読み取ってください。` });
       return;
     }
+    if (modeRef.current === "LOCATION_AUDIT") setAuditResult(null);
     debounceRef.current = { raw: value, acceptedAt: now };
     queueRef.current = queued.queue;
     setQueuedCount(queueRef.current.length);
@@ -278,17 +299,25 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   }, [scan]);
 
   const remove = useCallback((repairId: number) => {
+    if (auditingRef.current) return;
+    setAuditResult(null);
     selectedRef.current = selectedRef.current.filter(item => item.repairId !== repairId);
     setSelected(selectedRef.current);
     setFeedback({ kind: "info", message: "選択から外しました。" });
   }, []);
   const clear = useCallback(() => {
+    if (auditingRef.current) return;
+    setAuditResult(null);
     selectedRef.current = [];
     setSelected([]);
     setFeedback({ kind: "info", message: "選択をクリアしました。" });
   }, []);
   const resetLocationDestination = useCallback(() => {
     generationRef.current += 1;
+    auditRequestRef.current += 1;
+    auditingRef.current = false;
+    setAuditing(false);
+    setAuditResult(null);
     queueRef.current = [];
     setQueuedCount(0);
     destinationRef.current = null;
@@ -298,7 +327,50 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
     setCandidate(null);
     wedgeRef.current = EMPTY_WEDGE_BUFFER;
     debounceRef.current = null;
-    setFeedback({ kind: "info", message: "移動先と選択をクリアしました。" });
+    setFeedback({ kind: "info", message: modeRef.current === "LOCATION_AUDIT" ?
+      "棚卸し場所と選択をクリアしました。" : "移動先と選択をクリアしました。" });
+  }, []);
+  const confirmLocationAudit = useCallback(async () => {
+    if (modeRef.current !== "LOCATION_AUDIT" || !destinationRef.current || auditingRef.current ||
+        scanBusyRef.current || queueRef.current.length > 0) return;
+    auditingRef.current = true;
+    setAuditing(true);
+    setAuditResult(null);
+    const requestId = ++auditRequestRef.current;
+    const currentGeneration = generationRef.current;
+    const currentLocationId = destinationRef.current.storageLocationId;
+    const repairIds = selectedRef.current.map(item => item.repairId);
+    try {
+      const response = await fetch("/api/storage-locations/audit", {
+        method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+        body: JSON.stringify({ storageLocationId: currentLocationId, repairIds }),
+      });
+      if (!response.ok) {
+        if (response.status === 401) throw new Error("認証が必要です。再ログインしてください。");
+        if (response.status === 404) throw new Error("棚卸し場所または修理案件が見つかりません。再確認してください。");
+        if (response.status === 409) throw new Error("棚卸し場所は使用できません。再確認してください。");
+        throw new Error("棚卸し結果を確認できませんでした。");
+      }
+      const result: StorageLocationAuditResult = await response.json();
+      if (!result || result.storageLocation?.storageLocationId !== currentLocationId ||
+          !Array.isArray(result.scanned) || !Array.isArray(result.missing) || !result.counts ||
+          result.scanned.length !== repairIds.length) throw new Error("棚卸し結果の応答形式が不正です。");
+      if (requestId === auditRequestRef.current && currentGeneration === generationRef.current &&
+          currentLocationId === destinationRef.current?.storageLocationId && modeRef.current === "LOCATION_AUDIT") {
+        setAuditResult(result);
+        setFeedback({ kind: "success", message: "棚卸し結果を確認しました。" });
+      }
+    } catch (cause) {
+      if (requestId === auditRequestRef.current && currentGeneration === generationRef.current &&
+          currentLocationId === destinationRef.current?.storageLocationId && modeRef.current === "LOCATION_AUDIT") {
+        setFeedback({ kind: "error", message: cause instanceof Error ? cause.message : "棚卸し結果を確認できませんでした。" });
+      }
+    } finally {
+      if (requestId === auditRequestRef.current) {
+        auditingRef.current = false;
+        setAuditing(false);
+      }
+    }
   }, []);
   const confirmLocationMove = useCallback(async () => {
     if (modeRef.current !== "LOCATION_MOVE" || !destinationRef.current || !selectedRef.current.length ||
@@ -357,7 +429,8 @@ export function ScanSessionProvider({ children }: { children: ReactNode }) {
   }, [candidate, timer.active]);
 
   return <ScanSessionContext.Provider value={{ mode, selected, candidate, feedback, scanning, queuedCount,
-    destination, moving, setMode, scan, remove, clear, confirmTimer, confirmLocationMove, resetLocationDestination }}>{children}</ScanSessionContext.Provider>;
+    destination, moving, auditResult, auditing, setMode, scan, remove, clear, confirmTimer, confirmLocationMove,
+    confirmLocationAudit, resetLocationDestination }}>{children}</ScanSessionContext.Provider>;
 }
 
 export function useScanSession() {

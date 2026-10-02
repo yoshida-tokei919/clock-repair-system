@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  addSelection, combineScanResults, enqueueQueuedScan, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS,
+  addSelection, combineScanResults, enqueueQueuedScan, MAX_LOCATION_AUDIT_REPAIRS, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS,
   nextQueuedScan, scanCandidates, scanPhase, SCAN_DEBOUNCE_MS, shouldDebounceScan, timerDecision, type SelectedRepair,
 } from "./scan-session-domain";
 
@@ -35,9 +35,13 @@ test("selection guards duplicates and mixed customers only for delivery and ship
   const other = { ...repair, repairId: 13, physicalTagId: 5, customerId: 8 };
   assert.equal(addSelection("BATCH_SELECT", [repair], other).outcome, "ADDED");
   assert.equal(addSelection("LOCATION_MOVE", [repair], other).outcome, "ADDED");
+  assert.equal(addSelection("LOCATION_AUDIT", [repair], other).outcome, "ADDED");
   assert.deepEqual(addSelection("LOCATION_MOVE", [repair], repair), { outcome: "DUPLICATE", selected: [repair] });
+  assert.deepEqual(addSelection("LOCATION_AUDIT", [repair], repair), { outcome: "DUPLICATE", selected: [repair] });
   const full = Array.from({ length: MAX_LOCATION_MOVE_REPAIRS }, (_, index) => ({ ...repair, repairId: index + 100 }));
   assert.deepEqual(addSelection("LOCATION_MOVE", full, other), { outcome: "LIMIT_REACHED", selected: full });
+  assert.equal(MAX_LOCATION_AUDIT_REPAIRS, 100);
+  assert.deepEqual(addSelection("LOCATION_AUDIT", full, other), { outcome: "LIMIT_REACHED", selected: full });
   for (const mode of ["DELIVERY_NOTE", "SHIPMENT_SELECT"] as const) {
     assert.deepEqual(addSelection(mode, [repair], other), { outcome: "MIXED_CUSTOMER", selected: [repair] });
     assert.deepEqual(addSelection(mode, [repair], repair), { outcome: "DUPLICATE", selected: [repair] });
@@ -107,4 +111,15 @@ test("queued raw scan uses live destination when processed after location resolu
   assert.equal(pending.next?.raw, "PT-000004");
   assert.equal(scanPhase(pending.next!.mode, destination), "REPAIR");
   assert.deepEqual(scanCandidates(pending.next!.raw), [{ type: "SHORT_CODE", value: "PT-000004" }]);
+});
+
+test("audit scan phase changes from Location to Repair without changing existing modes", () => {
+  const location = { storageLocationId: 7, name: "棚", locationType: "SHELF", shortCode: "LOC-000001" };
+  for (const mode of ["LOCATION_MOVE", "LOCATION_AUDIT"] as const) {
+    assert.equal(scanPhase(mode, null), "LOCATION");
+    assert.equal(scanPhase(mode, location), "REPAIR");
+  }
+  for (const mode of ["OPEN_REPAIR", "TIMER", "BATCH_SELECT", "DELIVERY_NOTE", "SHIPMENT_SELECT"] as const) {
+    assert.equal(scanPhase(mode, null), "REPAIR");
+  }
 });
