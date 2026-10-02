@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `957d675d210b42baeec7cfa37b0596ec825178c9`
-- Commit subject: `fix: pin trigger function search paths`
-- Deploy source: GitHub `main` → Railway, exact commit `957d675d210b42baeec7cfa37b0596ec825178c9`
-- Railway deployment: `4df54bcf-ad0d-4ca6-9a4f-59f33edcf5d6`
+- Production application commit: `ebffadf870d3092f84e649fb5c142c369a58bb88`
+- Commit subject: `fix: upgrade Next.js security stack`
+- Deploy source: GitHub `main` → Railway, exact commit `ebffadf870d3092f84e649fb5c142c369a58bb88`
+- Railway deployment: `cfe7be54-9a60-4be2-ade9-083611482b23`
 - Deployment status: `SUCCESS`
-- Production tag: `production-security-hardening-20261002`
+- Production tag: `production-next15-security-20261002`
 - Region: `sin`
-- Runtime: Next.js Ready in 607ms
-- Supabase migration: `20261002013945 harden_trigger_function_search_paths`
+- Runtime: Next.js 15.5.27, Ready in 451ms
+- Supabase migration: none for this task; schema / migration / DB変更なし
 
-Production: Supabase security hardening complete; Task198C remains complete.
+Production: Next.js 15 security migration complete; prior Supabase security hardening and Task198C remain complete.
 
 ## Stage B 現在地
 
@@ -130,6 +130,16 @@ Status: production complete
 - 適用後、両functionの`proconfig`に`search_path=""`を確認し、`security_definer=false`を維持。Function Search Path Mutable WARNは0件。
 - Railway deployment `4df54bcf-ad0d-4ca6-9a4f-59f33edcf5d6`成功。Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307。
 - 詳細・backup・対象外follow-up: `docs/ai-tasks/supabase-security-hardening-20261002.md`
+
+## Next.js 15 security migration — 2026-10-02
+
+Status: production complete
+
+- Next.js 14.1.0 → 15.5.27、React / ReactDOM 19.3.0へ更新。Next 15 Async Request API、React-PDF互換、build設定を移行。
+- 独立read-onlyレビューでblocking findingなし。TypeScript、関連regression 20/20、local build、Railway build（static pages 56/56）がPASS。
+- Railway deployment `cfe7be54-9a60-4be2-ade9-083611482b23`成功。Production smoke: `/`、`/login`、`/cases/gallery`=200、`/repairs`と`/storage-locations`未認証=307、`/api/repairs/1/planning`未認証=401。対象リクエストのRailway HTTP logsにupstream errorなし。
+- `npm audit` production findingsは8件→5件。`next-auth` 4.24.13のcriticalを含む残存advisoryは未解消で、別follow-up対象。
+- 詳細: `docs/ai-tasks/next15-security-migration-20261002.md`
 
 ## Scheduler / Feedback の現在地
 
