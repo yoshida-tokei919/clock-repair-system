@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `ebffadf870d3092f84e649fb5c142c369a58bb88`
-- Commit subject: `fix: upgrade Next.js security stack`
-- Deploy source: GitHub `main` → Railway, exact commit `ebffadf870d3092f84e649fb5c142c369a58bb88`
-- Railway deployment: `cfe7be54-9a60-4be2-ade9-083611482b23`
+- Production application commit: `af0555a3847275d4e17961d392f79cabb8f8109d`
+- Commit subject: `feat: add storage location audit scan`
+- Deploy source: GitHub `main` → Railway, exact commit `af0555a3847275d4e17961d392f79cabb8f8109d`
+- Railway deployment: `2a99e732-a6db-4fad-93bc-f6cb5873e9d3`
 - Deployment status: `SUCCESS`
-- Production tag: `production-next15-security-20261002`
+- Production tag: `production-task198d-20261002`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 451ms
-- Supabase migration: none for this task; schema / migration / DB変更なし
+- Runtime: Next.js 15.5.27, Ready in 270ms
+- Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Next.js 15 security migration complete; prior Supabase security hardening and Task198C remain complete.
+Production: Task198D complete; prior Next.js 15 security migration, Supabase security hardening, and Task198C remain complete.
 
 ## Stage B 現在地
 
@@ -121,6 +121,30 @@ Status: production complete
 - Production smoke: `/`=200、`/login`=200、`/storage-locations`未認証=307、`/repairs`未認証=307。
 - 詳細: `docs/ai-tasks/198c-storage-location-visibility.md`
 
+### Task198D — StorageLocation audit scan
+
+Status: production complete
+
+- Application commit: `af0555a3847275d4e17961d392f79cabb8f8109d`
+- Railway deployment: `2a99e732-a6db-4fad-93bc-f6cb5873e9d3` — SUCCESS
+- Production tag: `production-task198d-20261002`
+- schema / migration / production DB mutationなし。
+- ScanSessionへ `LOCATION_AUDIT` modeを追加。
+- 棚卸しLocationを先にscanし、その後PhysicalTag / Repairを最大100件まで連続scan。
+- 明示的な「棚卸し結果を確認」でread-only照合を実行。
+- Prisma Repeatable Read snapshot内でactive StorageLocationAssignmentと照合。
+- 結果分類: MATCH / OTHER_LOCATION / UNASSIGNED / MISSING。
+- 0件scanでも対象Locationのactive Repair全件をMISSINGとして確認可能。
+- audit中の追加scanをblockし、mode / Location変更時のrequest ID + generation guardでstale responseを破棄。
+- scan / auditだけではStorageLocationAssignmentを変更しない。
+- Repair.status / approvalStatus / RepairPlanningStateを変更しない。
+- recommended zone判定・不一致自動解消は対象外。
+- 独立レビューでtest-only TypeScript typing issueを1件検出し、Codex修正後に再検証。
+- Prisma validate / TypeScript / `git diff --check` / production build PASS。
+- StorageLocation / ScanSession regression: 26/26 PASS。
+- Production smoke: `/`=200、`/login`=200、`/storage-locations`未認証=307、`POST /api/storage-locations/audit`未認証=401。
+- 詳細: `docs/ai-tasks/198d-storage-location-audit.md`
+
 ## Supabase security hardening — 2026-10-02
 
 Status: production complete
@@ -145,21 +169,23 @@ Status: production complete
 
 Stage AのTask182–184とTask188–195Eはproduction完了。Task185–187はdocs-only完了。Task195Eの納期・安全buffer feedbackのdata readinessは `docs/ai-tasks/195e-deadline-feedback-readiness.md` を参照する。
 
-## Stage B — 次の候補: Task198D
+## Stage B — 次の候補: Task198E
 
 Status: awaiting user approval
 
-Task198D候補は、Task198Cで投入・可視化したStorageLocationを使った現在地確認 / 棚卸しscanに限定する。
+Task198E候補は、Task198Dで分離した「業務状態からの推奨保管zone / 不一致警告」に限定する。
 
 候補境界:
 
-- LOCATION_AUDIT / 棚卸しscan mode
-- PhysicalTag / Repair scanとStorageLocationAssignment現在地の照合
-- 現物とDB現在地の不一致を明示
-- scanだけで自動移動しない
+- Repair.status / approvalStatus / RepairPlanningState / parts readiness等の正本を整理
+- 業務状態からrecommended zone / allowed zone / 要確認を導出するdomain resolver
+- 現在StorageLocationとのread-only比較
+- 業務状態上の不一致を明示
+- 自動移動しない
 - Repair.statusを自動変更しない
-- 不一致解消は人間の確認操作を残す
+- 推奨根拠を人間が確認できる形で表示
 
-Repair.status / approvalStatus / RepairPlanningState等から推奨zoneを導くロジックはTask198Dへ混ぜず、Task198E候補として分離する。
+Task198Dの「現物とDB現在地の照合」と混ぜない。
+Shipmentや配送状態まで含めるかはTask198E実装前調査で境界確認する。
 
-Task198D以外の次Taskを連続開始しない。
+Task198E以外の次Taskを連続開始しない。
