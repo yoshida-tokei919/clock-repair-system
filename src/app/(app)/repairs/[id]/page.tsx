@@ -5,6 +5,8 @@ import { RepairSchedulePanel } from "@/components/repairs/RepairSchedulePanel";
 import { RepairWorkTimerPanel } from "@/components/repairs/RepairWorkTimerPanel";
 import { RepairPlanningPanel } from "@/components/repairs/RepairPlanningPanel";
 import { PhysicalTagPanel } from "@/components/repairs/PhysicalTagPanel";
+import { recommendZoneForRepair } from "@/lib/storage-zone-repair";
+import { compareStorageZone, STORAGE_COMPARISON_LABELS } from "@/lib/storage-zone-recommendation";
 
 export const dynamic = "force-dynamic";
 
@@ -74,8 +76,10 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
                 }
             },
             orderRequests: {
-                select: { id: true, partsMasterId: true, quantity: true, status: true }
+                select: { id: true, repairId: true, partsMasterId: true, quantity: true, status: true, expectedArrivalDate: true, receivedAt: true }
             },
+            planningState: { select: { blocked: true, blockReason: true } },
+            partAllocations: { select: { partsMasterId: true, quantity: true, state: true } },
             photos: true,
             logs: {
                 orderBy: { changedAt: 'asc' },
@@ -113,12 +117,22 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
     const activeLocationAssignment = await prisma.storageLocationAssignment.findFirst({
         where: { repairId: repair.id, releasedAt: null },
         select: {
+            storageLocationId: true,
             assignedAt: true,
             storageLocation: {
                 select: { name: true, shortCode: true, locationType: true },
             },
         },
     });
+    const locationNodes = await prisma.storageLocation.findMany({
+        select: { id: true, name: true, locationType: true, parentId: true, isActive: true },
+    });
+    const zoneRecommendation = recommendZoneForRepair(repair);
+    const zoneComparison = compareStorageZone(
+        zoneRecommendation,
+        activeLocationAssignment?.storageLocationId ?? null,
+        new Map(locationNodes.map(location => [location.id, location])),
+    );
 
     const publicCase = await prisma.publicCase.findUnique({
         where: {
@@ -235,6 +249,14 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
                         <p>割当日時: {activeLocationAssignment.assignedAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</p>
                     </div>
                 ) : <p className="mt-2 text-sm text-gray-700">保管場所未登録</p>}
+                <div className="mt-3 space-y-1 border-t pt-3 text-sm text-gray-700">
+                    <p>所属ゾーン: {zoneComparison.currentZone ?? (activeLocationAssignment ? "不明（階層・ゾーン要確認）" : "なし")}</p>
+                    <p>推奨ゾーン: {zoneRecommendation.recommendedZone ?? "なし"}</p>
+                    <p>許容ゾーン: {zoneRecommendation.allowedZones.join("、") || "なし"}</p>
+                    <p>判定: <span className={zoneComparison.comparison === "MISMATCH" ? "font-semibold text-red-700" : ""}>{STORAGE_COMPARISON_LABELS[zoneComparison.comparison]}</span></p>
+                    <p>根拠: {zoneRecommendation.reason}</p>
+                    {zoneRecommendation.attention.length > 0 && <p className="text-amber-800">要確認: {zoneRecommendation.attention.join(" ")}</p>}
+                </div>
             </section>
             <RepairWorkTimerPanel repairId={repair.id} laborLines={laborRepairLineItems.map(item => ({
                 id: item.id,
