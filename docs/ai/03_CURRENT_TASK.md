@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `165530378a6713c188a33585142b2b1a96420529`
-- Commit subject: `feat: add shipment server foundation`
-- Deploy source: GitHub `main` → Railway, exact commit `165530378a6713c188a33585142b2b1a96420529`
-- Railway deployment: `59a1a9c3-d9be-454b-9f34-49f31355890f`
+- Production application commit: `4fdcb074dfa6fb8a29074bcb3aa6dd40496720b0`
+- Commit subject: `feat: connect shipment scan selection`
+- Deploy source: GitHub `main` → Railway, exact commit `4fdcb074dfa6fb8a29074bcb3aa6dd40496720b0`
+- Railway deployment: `a692dd3a-9c06-45fb-98b9-0cb4dda80e0f`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task199b-20261002`
+- Production tag: `production-task199c-20261002`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 345ms
+- Runtime: Next.js 15.5.27, Ready in 263ms
 - Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Task199B complete. Task199C is awaiting user approval.
+Production: Task199C complete. Task200 is awaiting user approval.
 
 ## Stage B 現在地
 
@@ -241,18 +241,36 @@ Status: production complete
 
 ### Task199C — ScanSession SHIPMENT_SELECT connection
 
+Status: production complete
+
+- Application commit: `4fdcb074dfa6fb8a29074bcb3aa6dd40496720b0`
+- Railway deployment: `a692dd3a-9c06-45fb-98b9-0cb4dda80e0f` — SUCCESS
+- Production tag: `production-task199c-20261002`
+- schema / migration / production DB mutationなし。
+- SHIPMENT_SELECTはscanのみではShipmentを作成せず、selected Repairsを人間が確認して `このN件で発送を作成` を押した場合のみTask199BへPOST。
+- 最大100 Repair。同一顧客のclient-side guardに加えてserver-sideでRepair / customer / return-address snapshotを再検証。
+- 作成中はscan / mode変更 / 選択変更 / 二重confirmをblock。
+- transport failureまたは成功responseからShipment IDを確定できない場合は結果不明として同じ選択の再送をblock。
+- Repair.status / StorageLocation / PhysicalTag / DeliveryNoteは変更しない。
+- 独立レビューで結果不明時の重複Shipment作成リスクを検出し、typed uncertain error + client-side resend lockへ修正。
+- TypeScript / focused tests 23/23 / `git diff --check` / production build（56/56）PASS。
+- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、`POST /api/shipments`未認証=401。Railway HTTP logsのupstreamErrorsなし。
+- 詳細: `docs/ai-tasks/199c-scan-session-shipment-connection.md`
+
+### Task200 — 発送スケジュール
+
 Status: awaiting user approval
 
-次候補はTask199C。
+次候補はTask200。
 
 少なくとも以下を扱う。
 
-- ScanSession `SHIPMENT_SELECT` のselected Repairsを確認画面へ接続
-- scanだけではShipmentを作成しない
-- 人間の明示確認後にTask199Bのserver contractへPOST
-- server-sideでRepair / customer / return-address snapshotを再検証
-- 別顧客 / 宛先不一致はblock
-- Repair.status / StorageLocationの自動変更はまだ行わない
-- Task200の発送スケジュールUIは先取りしない
+- `plannedShipDate` を基準に今日 / 明日 / 今週 / 来週 / 遅延を一覧化
+- 作業完了 / ランニングテスト完了 / 納品書発行状態 / 配達希望日時 / 送り状発行状態を表示
+- 集荷 / 窓口持込、B2B / B2C、配送会社を発送予定の判断材料として扱う
+- 同一顧客の近接発送予定は候補提示のみとし、自動統合しない
+- PhysicalTag連続scanによる梱包内容照合
+- 発送前の再利用PhysicalTag release確認
+- Task201以降の配送会社固有CSV / 追跡状態同期 / LINE連携は先取りしない
 
-Task199Cはuser approvalなしに開始しない。
+Task200はuser approvalなしに開始しない。
