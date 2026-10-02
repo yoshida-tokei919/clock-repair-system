@@ -7,17 +7,18 @@
 
 ## Production
 
-- Production application commit: `d5c6007b3405730104204973b98abff4e5a5dbdd`
-- Commit subject: `feat: add storage zone recommendations`
-- Deploy source: GitHub `main` → Railway, exact commit `d5c6007b3405730104204973b98abff4e5a5dbdd`
-- Railway deployment: `d4209f14-c39c-4720-bceb-be2903475466`
+- Production application commit: `2a2a4fe491675e6c67de87b784262226782d0fee`
+- Commit subject: `feat: add shipment schema foundation`
+- Deploy source: GitHub `main` → Railway, exact commit `2a2a4fe491675e6c67de87b784262226782d0fee`
+- Railway deployment: `83f71fb9-0a51-4a87-bc64-1066fa7bba89`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task198e-20261002`
+- Production tag: `production-task199a-20261002`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 300ms
-- Supabase migration: none; schema / migration / production DB mutationなし
+- Runtime: Next.js 15.5.27, Ready in 618ms
+- Supabase migration: `20261002074103 add_shipment_foundation`
+- Pre-production backup: `C:\\Users\\yoshi\\clock-repair-backups\\task199a-20261002-163314`
 
-Production: Task198E complete; Task198A–D remain complete.
+Production: Task199A complete. Task199B is awaiting user approval.
 
 ## Stage B 現在地
 
@@ -193,25 +194,44 @@ Status: production complete
 
 Stage AのTask182–184とTask188–195Eはproduction完了。Task185–187はdocs-only完了。Task195Eの納期・安全buffer feedbackのdata readinessは `docs/ai-tasks/195e-deadline-feedback-readiness.md` を参照する。
 
-## Stage B — 次の候補: Task199
+## Stage C 現在地 — Task199 Shipment基盤
+
+### Task199A — Shipment schema foundation
+
+Status: production complete
+
+- Application commit: `2a2a4fe491675e6c67de87b784262226782d0fee`
+- Railway deployment: `83f71fb9-0a51-4a87-bc64-1066fa7bba89` — SUCCESS
+- Production tag: `production-task199a-20261002`
+- Supabase migration: `20261002074103 add_shipment_foundation`
+- Shipment / ShipmentRepairと3 enumを追加。
+- Repair ↔ Shipmentを明示join modelで多対多化。
+- 1 Shipment = 1個口、1 Shipmentに複数Repair、1 Repairに複数Shipmentを許容。
+- plannedShipDate / actualShippedAt / trackingNumber / carrier-independent destination snapshot等をShipmentへ配置。
+- Repair.status / DeliveryNote / StorageLocation / PhysicalTagとは独立。
+- 日本郵便 / ヤマト固有schemaは追加せず、carrierCode / serviceCodeを共通fieldとして保持。
+- server-only: RLS enabled、policyなし、anon/authenticated/service_roleへtable/sequence権限なし、GRANTなし。
+- 独立レビューでmigration順序とgenerated tsconfig.tsbuildinfo混入を検出し、production前に修正。
+- Prisma validate / TypeScript / `git diff --check` / production build PASS。
+- Production read-backでtable / enum / FK / index / RLS / privileges一致を確認。
+- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、`/storage-locations`未認証=307。
+- 詳細: `docs/ai-tasks/199a-shipment-schema-foundation.md`
+
+### Task199B — Shipment server-side create/read/update foundation
 
 Status: awaiting user approval
 
-Task198 StorageLocation・現物保管場所管理はTask198A–Eまでproduction完了。
+次候補はTask199B。
 
-次候補はroadmapどおりTask199 Shipment基盤。
+少なくとも以下を扱う。
 
-Task199実装前調査では少なくとも以下を確認する。
+- Shipment create / read / updateのserver-side domain
+- ScanSession等から渡されるselected Repairのserver-side再取得
+- same-customer validation
+- destination snapshot確定
+- Repairごとのreturn address snapshot不一致時のfail-closed
+- 明示的なhuman confirmation
+- Repair.status / StorageLocationの自動変更はまだ行わない
+- carrier固有adapter / CSV / LINEはTask201以降へ残す
 
-- ShipmentをRepair.statusから独立した正本として扱う境界
-- 1 Shipmentに複数Repairをまとめる関係
-- 1 Repairが複数Shipmentへ分割される将来要件
-- 同一顧客の複数Repairは候補提示に留め、人間がまとめ発送を確定する
-- plannedShipDateと実発送イベントの責務分離
-- PhysicalTag / ScanSession `SHIPMENT_SELECT` との接続
-- 納品書とShipmentの責務分離
-- ゆうプリR / ヤマト等の配送会社固有項目をShipment正本へ混ぜない
-- Task202以降の「日本郵便の引受」を実発送イベントとする方針との整合
-- schema / migration / RLS / GRANTが必要な場合は高リスクTaskとして実装・独立レビュー・production承認を分離する
-
-Task199以外の次Taskを連続開始しない。
+Task199Bはuser approvalなしに開始しない。
