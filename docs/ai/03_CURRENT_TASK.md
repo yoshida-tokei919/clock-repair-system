@@ -1,23 +1,23 @@
 # CURRENT TASK
 
-## 現在のcheckpoint — 2026-10-02
+## 現在のcheckpoint — 2026-10-03
 
 このファイルは、現在の実装Taskとproductionの現在地だけを管理する。
 過去Taskの詳細は `docs/ai-tasks/` と各runbookを参照する。
 
 ## Production
 
-- Production application commit: `b368e5c9886ab44a7c0edc2e436d1022e5bf413a`
-- Commit subject: `feat: add shipment readiness context`
-- Deploy source: GitHub `main` → Railway, exact commit `b368e5c9886ab44a7c0edc2e436d1022e5bf413a`
-- Railway deployment: `96ac3283-8014-4bab-821c-133b1382eb4f`
+- Production application commit: `24565e8c5501507f2033dd12280ee80dd1911b91`
+- Commit subject: `feat: add shipment packing verification`
+- Deploy source: GitHub `main` → Railway, exact commit `24565e8c5501507f2033dd12280ee80dd1911b91`
+- Railway deployment: `8a7729dc-2ed9-4845-80b3-7c11ad97e969`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task200b-20261002`
+- Production tag: `production-task200c-20261003`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 399ms
+- Runtime: Next.js 15.5.27, Ready in 327ms
 - Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Task200B complete. Task200C is awaiting user approval.
+Production: Task200C complete. Task200D remains pending. Task201 implementation + independent review are complete on `task/201A`; main integration / production are pending.
 
 ## Stage B 現在地
 
@@ -289,4 +289,22 @@ Status: production complete
 - 独立レビューで同一顧客候補Shipment内のRepair番号表示不足を検出し、修正後blocking findingなし。
 - Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307。Railway HTTP logsの`upstreamErrors`なし。
 - 詳細: `docs/ai-tasks/200b-shipment-readiness-context.md`
-- Task200C/Dは未着手。次候補はTask200C。user approvalなしに開始しない。
+
+### Task200C — PhysicalTag連続scanによるShipment梱包照合
+
+Status: production complete
+
+- Application commit: `24565e8c5501507f2033dd12280ee80dd1911b91`
+- Railway deployment: `8a7729dc-2ed9-4845-80b3-7c11ad97e969` — SUCCESS
+- Production tag: `production-task200c-20261003`
+- schema / migration / production DB mutationなし。
+- ScanSessionへ `SHIPMENT_PACKING` modeを追加。既存ShipmentをGETでread-only取得し、ShipmentRepairの期待集合とPhysicalTag連続scan結果を照合。
+- Shipment外Repair、重複scan、未登録 / 廃止 / 未割当タグを明示し、全件一致かつ不一致0件の場合のみ最終確認可能。
+- confirm時にShipmentを再GETし、Repair集合 / status / direction / actualShippedAt変更を再確認。generation + request IDでstale responseを破棄。
+- scan / confirmのみではShipment / Repair / PhysicalTag / StorageLocationをmutationしない。PhysicalTag releaseはTask200Dへ分離。
+- focused + ScanSession regression 18/18 PASS、TypeScript / `git diff --check` PASS。Windows localの`npm run build`はPrisma DLL file lockのEPERMで停止したが、`next build` 56/56 PASS、Railway production buildはPrisma generateを含め完全PASS。
+- 独立レビュー: blocking findingなし。Shipment eligibilityはTask200AのOUTBOUND / actualShippedAt=null / status!=CANCELLED条件と整合確認済み。
+- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
+- 詳細: `docs/ai-tasks/200c-shipment-packing-verification.md`
+
+Task200Dは未着手。Task201は`task/201A`で実装・独立レビュー済み、main統合 / production pending。
