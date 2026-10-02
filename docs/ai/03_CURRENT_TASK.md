@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `af0555a3847275d4e17961d392f79cabb8f8109d`
-- Commit subject: `feat: add storage location audit scan`
-- Deploy source: GitHub `main` → Railway, exact commit `af0555a3847275d4e17961d392f79cabb8f8109d`
-- Railway deployment: `2a99e732-a6db-4fad-93bc-f6cb5873e9d3`
+- Production application commit: `d5c6007b3405730104204973b98abff4e5a5dbdd`
+- Commit subject: `feat: add storage zone recommendations`
+- Deploy source: GitHub `main` → Railway, exact commit `d5c6007b3405730104204973b98abff4e5a5dbdd`
+- Railway deployment: `d4209f14-c39c-4720-bceb-be2903475466`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task198d-20261002`
+- Production tag: `production-task198e-20261002`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 270ms
+- Runtime: Next.js 15.5.27, Ready in 300ms
 - Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Task198D complete; prior Next.js 15 security migration, Supabase security hardening, and Task198C remain complete.
+Production: Task198E complete; Task198A–D remain complete.
 
 ## Stage B 現在地
 
@@ -145,6 +145,30 @@ Status: production complete
 - Production smoke: `/`=200、`/login`=200、`/storage-locations`未認証=307、`POST /api/storage-locations/audit`未認証=401。
 - 詳細: `docs/ai-tasks/198d-storage-location-audit.md`
 
+### Task198E — Storage zone recommendation / mismatch visibility
+
+Status: production complete
+
+- Application commit: `d5c6007b3405730104204973b98abff4e5a5dbdd`
+- Railway deployment: `d4209f14-c39c-4720-bceb-be2903475466` — SUCCESS
+- Production tag: `production-task198e-20261002`
+- schema / migration / production DB mutationなし。
+- Repair.status / approvalStatus / RepairPlanningState / canonical parts readinessからrecommended zone / allowed zones / 根拠 / attentionをread-onlyで導出。
+- `resolveRepairPartsReadiness()`を再利用し、部品準備判定を複製しない。
+- 見積中は「見積り待ち」を推奨し「見積り調査中」も許容。
+- 作業完了は「ランニングテスト中」を推奨し「発送・引渡し待ち」も許容。
+- 作業中は専用zoneがないため条件により未割当を許容。
+- StorageLocationがSHELF / BOX / TRAYでもparentを辿ってcanonical ZONEを判定。
+- cycle / missing parent / inactive node / canonical外ZONEはfail-safeでMISMATCH。
+- Repair詳細と `/storage-locations` に推奨 / 許容 / 判定 / 根拠 / attentionを表示。
+- StorageLocationAssignment自動移動、Repair.status変更、Shipment先取りなし。
+- 独立レビュー: blocking findingなし。
+- Prisma validate / TypeScript / `git diff --check` / production build PASS。
+- related StorageLocation / ScanSession / parts readiness tests: 43/43 PASS。
+- Railway build: static pages 56/56。
+- Production smoke: `/`=200、`/login`=200、`/storage-locations`未認証=307、`/repairs/1`未認証=307。
+- 詳細: `docs/ai-tasks/198e-storage-zone-recommendations.md`
+
 ## Supabase security hardening — 2026-10-02
 
 Status: production complete
@@ -169,23 +193,25 @@ Status: production complete
 
 Stage AのTask182–184とTask188–195Eはproduction完了。Task185–187はdocs-only完了。Task195Eの納期・安全buffer feedbackのdata readinessは `docs/ai-tasks/195e-deadline-feedback-readiness.md` を参照する。
 
-## Stage B — 次の候補: Task198E
+## Stage B — 次の候補: Task199
 
 Status: awaiting user approval
 
-Task198E候補は、Task198Dで分離した「業務状態からの推奨保管zone / 不一致警告」に限定する。
+Task198 StorageLocation・現物保管場所管理はTask198A–Eまでproduction完了。
 
-候補境界:
+次候補はroadmapどおりTask199 Shipment基盤。
 
-- Repair.status / approvalStatus / RepairPlanningState / parts readiness等の正本を整理
-- 業務状態からrecommended zone / allowed zone / 要確認を導出するdomain resolver
-- 現在StorageLocationとのread-only比較
-- 業務状態上の不一致を明示
-- 自動移動しない
-- Repair.statusを自動変更しない
-- 推奨根拠を人間が確認できる形で表示
+Task199実装前調査では少なくとも以下を確認する。
 
-Task198Dの「現物とDB現在地の照合」と混ぜない。
-Shipmentや配送状態まで含めるかはTask198E実装前調査で境界確認する。
+- ShipmentをRepair.statusから独立した正本として扱う境界
+- 1 Shipmentに複数Repairをまとめる関係
+- 1 Repairが複数Shipmentへ分割される将来要件
+- 同一顧客の複数Repairは候補提示に留め、人間がまとめ発送を確定する
+- plannedShipDateと実発送イベントの責務分離
+- PhysicalTag / ScanSession `SHIPMENT_SELECT` との接続
+- 納品書とShipmentの責務分離
+- ゆうプリR / ヤマト等の配送会社固有項目をShipment正本へ混ぜない
+- Task202以降の「日本郵便の引受」を実発送イベントとする方針との整合
+- schema / migration / RLS / GRANTが必要な場合は高リスクTaskとして実装・独立レビュー・production承認を分離する
 
-Task198E以外の次Taskを連続開始しない。
+Task199以外の次Taskを連続開始しない。
