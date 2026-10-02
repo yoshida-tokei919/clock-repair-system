@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `24565e8c5501507f2033dd12280ee80dd1911b91`
-- Commit subject: `feat: add shipment packing verification`
-- Deploy source: GitHub `main` → Railway, exact commit `24565e8c5501507f2033dd12280ee80dd1911b91`
-- Railway deployment: `8a7729dc-2ed9-4845-80b3-7c11ad97e969`
+- Production application commit: `72c80913f2adf4bbec70af0f064ef341af7f31e5`
+- Commit subject: `feat: add yu-pri v3 shipment export`
+- Deploy source: GitHub `main` → Railway, exact commit `72c80913f2adf4bbec70af0f064ef341af7f31e5`
+- Railway deployment: `42baa5f7-3b3b-4462-bbc5-88772065e3ff`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task200c-20261003`
+- Production tag: `production-task201-20261003`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 327ms
+- Runtime: Next.js 15.5.27, Ready in 336ms
 - Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Task200C complete. Task200D remains pending. Task201 implementation + independent review are complete on `task/201A`; main integration / production are pending.
+Production: Task201 complete. Task200D remains pending. No next Task has been started.
 
 ## Stage B 現在地
 
@@ -307,4 +307,25 @@ Status: production complete
 - Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
 - 詳細: `docs/ai-tasks/200c-shipment-packing-verification.md`
 
-Task200Dは未着手。Task201は`task/201A`で実装・独立レビュー済み、main統合 / production pending。
+Task200Dは未着手。
+
+### Task201 — ゆうプリR 標準フォーマットV3 CSV出力adapter
+
+Status: production complete
+
+- Application commit: `72c80913f2adf4bbec70af0f064ef341af7f31e5`
+- Railway deployment: `42baa5f7-3b3b-4462-bbc5-88772065e3ff` — SUCCESS
+- Production tag: `production-task201-20261003`
+- schema / migration / production DB mutationなし。
+- authenticated Admin専用 `GET /api/shipments/[id]/yupuri-v3` を追加し、Shipment destination snapshotからゆうプリR標準フォーマットV3 CSVをread-only生成。
+- CSVは100列、headerなし、CP932 / Shift_JIS、BOMなし、CRLF。管理番号は `SHP-{Shipment.id}` でTask202から機械照合可能。
+- 配送先はCustomer current addressへfallbackせずShipment snapshotのみ使用。配達希望日と公式時間帯codeをmappingし、未対応値やCP932非対応文字はfail closed。
+- OUTBOUNDかつ発送前のShipmentだけexport可能。CSV出力でShipment / Repair / tracking / status等をmutationしない。
+- PoCに合わせ内容品は「腕時計」、荷物サイズcodeは現時点で `060` 固定。60サイズ以外を扱う前にShipment側の荷物サイズ正本が必要。
+- `iconv-lite`をdirect dependencyとして追加。Task202の結果CSV取込、追跡番号保存、配送状態同期は対象外。
+- focused tests 9/9 PASS、TypeScript / `git diff --check` / `npm run build` PASS。rebase後も同結果を再確認、static pages 56/56。
+- 独立レビュー: blocking findingなし。実取込成功済みPoCと100列mapping / encoding / 配達時間帯codeを照合済み。
+- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401、`GET /api/shipments/1/yupuri-v3`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
+- 詳細: `docs/ai-tasks/201-yu-pri-v3-export.md`
+
+Task200Dは未着手。次Taskはuser approvalなしに開始しない。
