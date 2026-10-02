@@ -1,6 +1,6 @@
 # Task202A — ゆうプリR発送履歴CSVの読取プレビュー
 
-Status: local implementation committed; independent review pending. Production: pending.
+Status: production complete. Independent review complete; blocking findingなし.
 
 ## Primary evidence and contract
 
@@ -48,3 +48,15 @@ Status: local implementation committed; independent review pending. Production: 
 - 実際の郵便局引受後と配達完了後の発送履歴CSVを一次資料として取得し、code pairと非空日付書式を確認する。
 - trackingNumberおよびShipment/Repairの状態保存は、その証拠に基づく別Taskで設計・レビューする。
 - 書込時の冪等性、並行更新、監査、再取込、1Repair複数Shipment、通知条件を別途定義する。
+
+## Production completion — 2026-10-03
+
+- Application commit: `332862857df3748c35626dfe31cea2d0d56e476e`
+- Railway deployment: `e589361d-1935-4b2d-a894-bee5b7882215` — SUCCESS (`sin`)
+- Production tag: `production-task202a-20261003`
+- Runtime: Next.js 15.5.27, Ready in 679ms
+- schema / migration / production DB mutationなし。
+- latest mainへrebase後、focused 9/9、Task201 + Shipment regression 29/29、TypeScript、`git diff --check`、`npm run build`（56/56）を再実行してPASS。
+- Production smoke: `/`=200、`/login`=200、`/shipments`=307、`/repairs`=307、Shipment GET=401、ゆうプリR V3 GET=401、history preview POST=401（いずれも未認証時の期待値）。
+- Railway HTTP logsでsmoke requestの`upstreamErrors`はすべて空。
+- Task202Aはread-only previewまで。tracking保存、Shipment / Repair状態更新、実引受・配達完了codeの確定は後続Taskへ分離する。

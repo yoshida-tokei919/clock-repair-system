@@ -7,17 +7,17 @@
 
 ## Production
 
-- Production application commit: `df4753cc50e84ab8f692924fb78e4408359531c6`
-- Commit subject: `feat: add shipment physical tag release`
-- Deploy source: GitHub `main` → Railway, exact commit `df4753cc50e84ab8f692924fb78e4408359531c6`
-- Railway deployment: `174eaa26-0374-41c6-aa48-94a06ac9b2f7`
+- Production application commit: `332862857df3748c35626dfe31cea2d0d56e476e`
+- Commit subject: `feat: add yu-pri history import preview`
+- Deploy source: GitHub `main` → Railway, exact commit `332862857df3748c35626dfe31cea2d0d56e476e`
+- Railway deployment: `e589361d-1935-4b2d-a894-bee5b7882215`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task200d-20261003`
+- Production tag: `production-task202a-20261003`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 389ms
+- Runtime: Next.js 15.5.27, Ready in 679ms
 - Supabase migration: none; schema / migration / production DB mutationなし
 
-Production: Task200D complete. Task202A is implemented and independently reviewed on `task/202A`; main integration / production are pending.
+Production: Task202A complete. No next software Task has been started; hardware PoC is the next checkpoint.
 
 ## Stage B 現在地
 
@@ -344,4 +344,20 @@ Status: production complete
 - Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401、`GET /api/shipments/1/yupuri-v3`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
 - 詳細: `docs/ai-tasks/201-yu-pri-v3-export.md`
 
-Task202Aは`task/202A`で実装・独立レビュー済み。main統合 / production pending。Task202A production完了後は次Taskへ進まず、BC-NL3000U-W + Brother QL-800 / DK-2205の実機PoCを先に実施する。
+### Task202A — ゆうプリR発送履歴CSV read-only preview
+
+Status: production complete
+
+- Application commit: `332862857df3748c35626dfe31cea2d0d56e476e`
+- Railway deployment: `e589361d-1935-4b2d-a894-bee5b7882215` — SUCCESS
+- Production tag: `production-task202a-20261003`
+- schema / migration / production DB mutationなし。
+- authenticated Admin専用 `POST /api/shipments/yupuri-history/preview` を追加し、CP932 / BOMなし / CRLF / headerあり6列のゆうプリR発送履歴CSVをread-only解析する。
+- お客様側管理番号は `SHP-{Shipment.id}` のみ機械照合し、PoCの `POC003` は意図どおりrow error。tracking候補、日付候補、status codeはpreviewのみで保存しない。
+- 現時点で意味を確定している `10/0A = 引受予定` 以外は推定せずraw値とwarningを返す。重複・tracking競合・malformed CSVはfail closed。上限は256 KiB / 500行。
+- Shipment / Repair / trackingNumber / actualShippedAt / deliveredAt / statusは更新しない。
+- rebase後validation: focused 9/9 PASS、Task201 + Shipment regression 29/29 PASS、TypeScript / `git diff --check` / `npm run build` PASS、static pages 56/56。独立レビューblocking findingなし。
+- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、Shipment GET未認証=401、ゆうプリR V3 GET未認証=401、history preview POST未認証=401。Railway HTTP logsの`upstreamErrors`なし。
+- 詳細: `docs/ai-tasks/202a-yupuri-history-import-preview.md`
+
+Task202A production complete. 次のsoftware Taskは未着手。次checkpointはBC-NL3000U-W + Brother QL-800 / DK-2205の実機PoC。
