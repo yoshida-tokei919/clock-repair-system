@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  addSelection, combineScanResults, enqueueQueuedScan, MAX_LOCATION_AUDIT_REPAIRS, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS,
-  nextQueuedScan, scanCandidates, scanPhase, SCAN_DEBOUNCE_MS, shouldDebounceScan, timerDecision, type SelectedRepair,
+  addSelection, combineScanResults, enqueueQueuedScan, MAX_LOCATION_AUDIT_REPAIRS, MAX_LOCATION_MOVE_REPAIRS, MAX_QUEUED_SCANS, MAX_SHIPMENT_REPAIRS,
+  nextQueuedScan, scanCandidates, scanPhase, SCAN_DEBOUNCE_MS, shipmentConfirmationBlockAfterSelectionChange,
+  shouldDebounceScan, timerDecision, type SelectedRepair,
 } from "./scan-session-domain";
 
 const repair: SelectedRepair = {
@@ -47,6 +48,31 @@ test("selection guards duplicates and mixed customers only for delivery and ship
     assert.deepEqual(addSelection(mode, [repair], repair), { outcome: "DUPLICATE", selected: [repair] });
     assert.equal(addSelection(mode, [], other).outcome, "ADDED");
   }
+});
+
+test("shipment selection stops at 100 without changing duplicate, customer or other-mode behavior", () => {
+  assert.equal(MAX_SHIPMENT_REPAIRS, 100);
+  const full = Array.from({ length: MAX_SHIPMENT_REPAIRS }, (_, index) =>
+    ({ ...repair, repairId: index + 100, physicalTagId: index + 100 }));
+  const sameCustomer = { ...repair, repairId: 999, physicalTagId: 999 };
+  const otherCustomer = { ...sameCustomer, customerId: 8 };
+  assert.equal(addSelection("SHIPMENT_SELECT", full.slice(0, -1), full.at(-1)!).outcome, "ADDED");
+  assert.deepEqual(addSelection("SHIPMENT_SELECT", full, sameCustomer), { outcome: "LIMIT_REACHED", selected: full });
+  assert.deepEqual(addSelection("SHIPMENT_SELECT", full, full[0]), { outcome: "DUPLICATE", selected: full });
+  assert.deepEqual(addSelection("SHIPMENT_SELECT", [repair], otherCustomer),
+    { outcome: "MIXED_CUSTOMER", selected: [repair] });
+  assert.equal(addSelection("SHIPMENT_SELECT", [repair], sameCustomer).outcome, "ADDED");
+  assert.equal(addSelection("DELIVERY_NOTE", full, sameCustomer).outcome, "ADDED");
+  assert.equal(addSelection("BATCH_SELECT", full, otherCustomer).outcome, "ADDED");
+});
+
+test("uncertain shipment selection remains blocked until its repairs actually change", () => {
+  const second = { ...repair, repairId: 13, physicalTagId: 5 };
+  assert.equal(shipmentConfirmationBlockAfterSelectionChange(true, [repair], [repair]), true);
+  assert.equal(shipmentConfirmationBlockAfterSelectionChange(true, [repair], [{ ...repair }]), true);
+  assert.equal(shipmentConfirmationBlockAfterSelectionChange(true, [repair], [repair, second]), false);
+  assert.equal(shipmentConfirmationBlockAfterSelectionChange(true, [repair, second], [repair]), false);
+  assert.equal(shipmentConfirmationBlockAfterSelectionChange(true, [repair], []), false);
 });
 
 test("timer decision requires confirmation except when same repair is already active", () => {

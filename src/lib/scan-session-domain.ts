@@ -84,12 +84,20 @@ export function combineScanResults(results: ScanResult[]): ScanResult {
 
 export const MAX_LOCATION_MOVE_REPAIRS = 100;
 export const MAX_LOCATION_AUDIT_REPAIRS = 100;
+export const MAX_SHIPMENT_REPAIRS = 100;
+export function shipmentConfirmationBlockAfterSelectionChange(
+  blocked: boolean, previous: SelectedRepair[], next: SelectedRepair[],
+): boolean {
+  return blocked && previous.length === next.length &&
+    previous.every((repair, index) => repair.repairId === next[index].repairId);
+}
 export type SelectionOutcome = "ADDED" | "DUPLICATE" | "MIXED_CUSTOMER" | "LIMIT_REACHED";
 export function addSelection(mode: ScanMode, selected: SelectedRepair[], repair: SelectedRepair):
   { outcome: SelectionOutcome; selected: SelectedRepair[] } {
   if (selected.some(item => item.repairId === repair.repairId)) return { outcome: "DUPLICATE", selected };
   if (((mode === "LOCATION_MOVE" && selected.length >= MAX_LOCATION_MOVE_REPAIRS) ||
-      (mode === "LOCATION_AUDIT" && selected.length >= MAX_LOCATION_AUDIT_REPAIRS))) return { outcome: "LIMIT_REACHED", selected };
+      (mode === "LOCATION_AUDIT" && selected.length >= MAX_LOCATION_AUDIT_REPAIRS) ||
+      (mode === "SHIPMENT_SELECT" && selected.length >= MAX_SHIPMENT_REPAIRS))) return { outcome: "LIMIT_REACHED", selected };
   if ((mode === "DELIVERY_NOTE" || mode === "SHIPMENT_SELECT") &&
       selected.length > 0 && selected[0].customerId !== repair.customerId) {
     return { outcome: "MIXED_CUSTOMER", selected };

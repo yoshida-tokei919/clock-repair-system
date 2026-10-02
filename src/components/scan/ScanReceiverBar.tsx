@@ -18,7 +18,8 @@ const MODE_LABELS: Record<ScanMode, string> = {
 
 export function ScanReceiverBar() {
   const { mode, selected, candidate, feedback, scanning, queuedCount, destination, moving, auditResult, auditing,
-    setMode, scan, remove, clear, confirmTimer, confirmLocationMove, confirmLocationAudit,
+    creatingShipment, shipmentConfirmationBlocked, setMode, scan, remove, clear, confirmTimer,
+    confirmLocationMove, confirmLocationAudit, confirmShipment,
     resetLocationDestination } = useScanSession();
   const timer = useWorkTimer();
   const [manual, setManual] = useState("");
@@ -38,16 +39,17 @@ export function ScanReceiverBar() {
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="scan-mode" className="font-medium text-zinc-800">読取モード</label>
           <select id="scan-mode" value={mode} onChange={event => setMode(event.target.value as ScanMode)}
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5">
+            disabled={creatingShipment} className="rounded border border-zinc-300 bg-white px-2 py-1.5 disabled:opacity-50">
             {SCAN_MODES.map(value => <option key={value} value={value}>{MODE_LABELS[value]}</option>)}
           </select>
           <form onSubmit={submit} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <label htmlFor="scan-manual" className="sr-only">タグの読み取り値を手入力</label>
             <input id="scan-manual" value={manual} onChange={event => setManual(event.target.value)}
+              disabled={creatingShipment}
               autoComplete="off" placeholder={(mode === "LOCATION_MOVE" || mode === "LOCATION_AUDIT") && !destination ?
                 "Locationタグ / LOCコード" : "PhysicalTag / PTコード"}
               className="min-w-48 flex-1 rounded border border-zinc-300 bg-white px-2 py-1.5" />
-            <button type="submit" disabled={auditing} className="rounded bg-blue-700 px-3 py-1.5 font-medium text-white disabled:opacity-50">
+            <button type="submit" disabled={auditing || creatingShipment} className="rounded bg-blue-700 px-3 py-1.5 font-medium text-white disabled:opacity-50">
               照合
             </button>
           </form>
@@ -108,7 +110,7 @@ export function ScanReceiverBar() {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-medium">選択中: {selected.length}件</span>
-              {selected.length > 0 && <button type="button" onClick={clear} disabled={auditing}
+              {selected.length > 0 && <button type="button" onClick={clear} disabled={auditing || creatingShipment}
                 className="text-blue-700 underline disabled:opacity-50">すべて解除</button>}
               <span className="text-zinc-600">モード切替時に選択はクリアされます。</span>
             </div>
@@ -116,10 +118,19 @@ export function ScanReceiverBar() {
               {selected.map(item => <li key={item.repairId} className="rounded border border-zinc-300 bg-white px-2 py-1">
                 {item.inquiryNumber} / {item.shortCode}{" "}
                 <button type="button" onClick={() => remove(item.repairId)}
-                  disabled={auditing} aria-label={`${item.inquiryNumber} を選択から外す`}
+                  disabled={auditing || creatingShipment} aria-label={`${item.inquiryNumber} を選択から外す`}
                   className="text-blue-700 underline disabled:opacity-50">解除</button>
               </li>)}
             </ul>}
+            {mode === "SHIPMENT_SELECT" && <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p className="text-zinc-700">読み取りだけでは発送は作成されません。上の対象を確認し、ボタンで確定してください。</p>
+              {shipmentConfirmationBlocked && <p className="text-red-700">作成結果が不明です。この選択は再送できません。発送を確認してください。</p>}
+              <button type="button" onClick={() => void confirmShipment()}
+                disabled={selected.length === 0 || creatingShipment || shipmentConfirmationBlocked || scanning || queuedCount > 0}
+                className="rounded bg-blue-700 px-3 py-1 text-white disabled:opacity-50">
+                {creatingShipment ? "作成中..." : `この${selected.length}件で発送を作成`}
+              </button>
+            </div>}
           </div>
         )}
       </div>
