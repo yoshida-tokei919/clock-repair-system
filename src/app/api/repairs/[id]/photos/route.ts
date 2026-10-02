@@ -13,10 +13,10 @@ import { deleteRepairPhotoObject, isR2RepairPhotoKey } from "@/lib/r2-repair-pho
 // Fetch existing photos for a repair
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const repairId = parseInt(params.id);
+        const repairId = parseInt((await params).id);
         if (isNaN(repairId)) {
             return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
         }
@@ -37,10 +37,10 @@ export async function GET(
 // Register a photo record (Mock or Real URL)
 export async function POST(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const repairId = Number(params.id);
+        const repairId = Number((await params).id);
         if (isNaN(repairId)) {
             return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
         }
@@ -84,10 +84,10 @@ export async function POST(
 // Update one saved photo's classification and sharing permissions.
 export async function PATCH(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const repairId = Number(params.id);
+        const repairId = Number((await params).id);
         if (!Number.isInteger(repairId) || repairId <= 0) {
             return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
         }
@@ -128,9 +128,9 @@ export async function PATCH(
     }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const repairId = Number(params.id);
+        const repairId = Number((await params).id);
         const body = await req.json();
         const photoId = Number(body.photoId);
         if (!Number.isInteger(repairId) || repairId <= 0 || !Number.isInteger(photoId) || photoId <= 0) {

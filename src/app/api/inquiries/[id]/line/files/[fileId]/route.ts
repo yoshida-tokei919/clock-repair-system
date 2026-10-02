@@ -10,12 +10,12 @@ function positiveSafeId(value: string) {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-export async function GET(_: Request, { params }: { params: { id: string; fileId: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string; fileId: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const inquiryId = positiveSafeId(params.id);
-  const fileId = positiveSafeId(params.fileId);
+  const inquiryId = positiveSafeId((await params).id);
+  const fileId = positiveSafeId((await params).fileId);
   if (!inquiryId || !fileId) return NextResponse.json({ error: "Invalid file" }, { status: 400 });
 
   try {

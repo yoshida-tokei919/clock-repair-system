@@ -34,9 +34,9 @@ function requireCustomerType(value?: string | null): "business" | "individual" {
     return customerType;
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const id = parseInt(params.id);
+        const id = parseInt((await params).id);
         const body = await req.json();
 
         // Repair updates can include estimate and parts-master synchronization.

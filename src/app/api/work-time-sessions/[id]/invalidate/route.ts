@@ -5,11 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { parsePathId, parseReasonInput, WorkTimeInputError } from "@/lib/work-time-session-domain";
 import { invalidateWorkTimeSession } from "@/lib/work-time-sessions";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await getServerSession(authOptions);
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const id = parsePathId(params.id);
+    const id = parsePathId((await params).id);
     const reason = parseReasonInput(await request.json());
     const session = await invalidateWorkTimeSession(prisma, id, reason);
     if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });

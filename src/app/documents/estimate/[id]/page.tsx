@@ -16,8 +16,8 @@ function formatPdfGeneratedAt(date: Date) {
     }).format(date);
 }
 
-export default async function EstimateDocumentPage({ params }: { params: { id: string } }) {
-    const id = parseInt(params.id);
+export default async function EstimateDocumentPage({ params }: { params: Promise<{ id: string }> }) {
+    const id = parseInt((await params).id);
     if (isNaN(id)) return notFound();
 
     const estimateDoc = await prisma.estimateDocument.findUnique({

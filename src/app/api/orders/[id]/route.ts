@@ -18,8 +18,8 @@ import {
   type RepairPartsOrderStatus,
 } from "@/lib/repair-parts-status";
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
-  const orderId = Number(params.id);
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const orderId = Number((await params).id);
   if (!Number.isSafeInteger(orderId) || orderId <= 0) {
     return NextResponse.json({ error: "Invalid order" }, { status: 400 });
   }

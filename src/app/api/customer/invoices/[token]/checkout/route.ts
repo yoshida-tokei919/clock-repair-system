@@ -32,8 +32,8 @@ async function expirePendingPayment(paymentId: number, attemptId: number) {
   ]);
 }
 
-export async function POST(request: Request, { params }: { params: { token: string } }) {
-  const token = params.token?.trim();
+export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }) {
+  const token = (await params).token?.trim();
   if (!token) return errorResponse("請求情報が見つかりません。", 404);
 
   const invoice = await prisma.invoice.findUnique({

@@ -4,14 +4,15 @@ import React, { useEffect, useState } from 'react';
 import { WarrantyDocument } from '@/components/pdf/WarrantyDocument';
 import { usePDF, Document, Page, Text } from '@react-pdf/renderer';
 
-export default function WarrantyDocumentPage({ params }: { params: { id: string } }) {
+export default function WarrantyDocumentPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = React.use(params);
     const [docData, setDocData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function fetchData() {
             try {
-                const res = await fetch(`/api/warranties/${params.id}`);
+                const res = await fetch(`/api/warranties/${resolvedParams.id}`);
                 const data = await res.json();
                 setDocData(data);
             } catch (err) {
@@ -21,7 +22,7 @@ export default function WarrantyDocumentPage({ params }: { params: { id: string 
             }
         }
         fetchData();
-    }, [params.id]);
+    }, [resolvedParams.id]);
 
     const [isReady, setIsReady] = useState(false);
     const [instance, updateInstance] = usePDF({

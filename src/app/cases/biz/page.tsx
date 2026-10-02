@@ -214,16 +214,16 @@ function B2BPublicCaseCard({ publicCase }: { publicCase: B2BPublicCaseForBizPage
 export default async function BizCasePage({
   searchParams,
 }: {
-  searchParams?: BizSearchParams;
+  searchParams?: Promise<BizSearchParams>;
 }) {
-  const session = cookies().get("b2b_session");
+  const session = (await cookies()).get("b2b_session");
   const isAuthenticated = session?.value === "authenticated";
 
   if (!isAuthenticated) {
     redirect("/cases/biz/login");
   }
 
-  const query = getSearchQuery(searchParams);
+  const query = getSearchQuery(await searchParams);
   const publicCases = await getB2BPublicCasesForBizPage(query);
 
   return (

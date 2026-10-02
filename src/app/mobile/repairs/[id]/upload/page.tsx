@@ -8,8 +8,9 @@ import imageCompression from "browser-image-compression";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 
-export default function MobileUploadPage({ params }: { params: { id: string } }) {
-    const repairId = params.id;
+export default function MobileUploadPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = React.use(params);
+    const repairId = resolvedParams.id;
     const [isUploading, setIsUploading] = useState(false);
     const [uploadedCount, setUploadedCount] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);

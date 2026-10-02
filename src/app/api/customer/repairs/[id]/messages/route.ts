@@ -5,9 +5,9 @@ import { findRepairIdByIdOrToken } from "../_workflow";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const repairId = await findRepairIdByIdOrToken(params.id);
+  const repairId = await findRepairIdByIdOrToken((await params).id);
 
   const body = await request.json().catch(() => null);
   const messageBody = typeof body?.body === "string" ? body.body.trim() : "";

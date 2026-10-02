@@ -97,7 +97,7 @@ type CurrentPdfFileRow = {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions);
 
@@ -105,7 +105,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const documentId = Number(params.id);
+  const documentId = Number((await params).id);
 
   if (!Number.isInteger(documentId)) {
     return NextResponse.json(

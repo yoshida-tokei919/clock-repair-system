@@ -6,14 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { parseRepairScheduleInput } from "@/lib/repair-schedule";
 import { RepairScheduleNotFoundError, ScheduleSummaryConflictError, updateRepairSchedule } from "@/lib/repair-schedule-update";
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const repairId = Number(params.id);
-    if (!/^\d+$/.test(params.id) || !Number.isSafeInteger(repairId) || repairId <= 0) {
+    const repairId = Number((await params).id);
+    if (!/^\d+$/.test((await params).id) || !Number.isSafeInteger(repairId) || repairId <= 0) {
         return NextResponse.json({ error: "Invalid repair ID" }, { status: 400 });
     }
 

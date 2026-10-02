@@ -109,10 +109,10 @@ export default async function CustomerInvoicePage({
   params,
   searchParams,
 }: {
-  params: { token: string };
-  searchParams?: { checkout?: string };
+  params: Promise<{ token: string }>;
+  searchParams?: Promise<{ checkout?: string }>;
 }) {
-  const token = params.token?.trim();
+  const token = (await params).token?.trim();
   if (!token) return notFound();
 
   const [tokenRow] = await prisma.$queryRaw<InvoiceTokenRow[]>`
@@ -149,7 +149,7 @@ export default async function CustomerInvoicePage({
   const canPayOnline = invoice.customer.type === "individual"
     && invoice.status === "issued"
     && paymentSummary.outstandingBalance > 0;
-  const checkoutState = searchParams?.checkout;
+  const checkoutState = (await searchParams)?.checkout;
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">

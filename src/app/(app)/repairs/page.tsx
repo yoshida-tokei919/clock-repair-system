@@ -13,10 +13,11 @@ export const dynamic = "force-dynamic";
 export default async function RepairsPage({
     searchParams,
 }: {
-    searchParams: { q?: string; status?: string };
+    searchParams: Promise<{ q?: string; status?: string }>;
 }) {
-    const query = searchParams.q || "";
-    const status = searchParams.status || "all";
+    const { q, status: statusParam } = await searchParams;
+    const query = q || "";
+    const status = statusParam || "all";
 
     // Build Filters
     const where: any = {};

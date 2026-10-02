@@ -7,11 +7,11 @@ import {
 } from "@/lib/repair-intake";
 import { getRepairIntakeShippingAddress } from "@/lib/repair-intake-shipping";
 
-type Context = { params: { token: string } };
+type Context = { params: Promise<{ token: string }> };
 
 export async function GET(_: Request, { params }: Context) {
   try {
-    const state = await getRepairIntakeInviteState(params.token);
+    const state = await getRepairIntakeInviteState((await params).token);
     return NextResponse.json(state.completed ? { ...state, shippingAddress: getRepairIntakeShippingAddress() } : state);
   } catch (error) {
     const response = repairIntakeErrorResponse(error);
@@ -24,7 +24,7 @@ export async function GET(_: Request, { params }: Context) {
 export async function POST(request: Request, { params }: Context) {
   try {
     const payload = await request.json();
-    const result = await submitRepairIntake(params.token, payload);
+    const result = await submitRepairIntake((await params).token, payload);
     return NextResponse.json({ ...result, count: result.repairs.length, shippingAddress: getRepairIntakeShippingAddress() }, { status: 201 });
   } catch (error) {
     const response = repairIntakeErrorResponse(error);

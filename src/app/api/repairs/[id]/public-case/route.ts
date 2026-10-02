@@ -20,9 +20,9 @@ function partSourceArea(partType: string | null): "internal" | "external" | null
 
 export async function POST(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const repairId = Number(params.id);
+  const repairId = Number((await params).id);
   if (!Number.isInteger(repairId) || repairId <= 0) {
     return NextResponse.json({ error: "修理IDが不正です。" }, { status: 400 });
   }

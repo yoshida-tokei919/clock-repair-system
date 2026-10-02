@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect } from "react";
 import dynamicImport from "next/dynamic";
-import { usePDF } from "@react-pdf/renderer";
 import { Button } from "@/components/ui/button"; // Assumed existing
 import { Card } from "@/components/ui/card";
 import { Printer, Download, FileText } from "lucide-react";
@@ -23,7 +22,7 @@ const MOCK_SALES_DATA: SalesDocumentProps['data'] = {
 
 // --- PDF Viewer (Client Only) ---
 const PDFViewer = dynamicImport(
-    () => import("@react-pdf/renderer").then((mod) => mod.PDFViewer),
+    () => import("@/components/pdf/ReportPDFViewer").then((mod) => mod.ReportPDFViewer),
     { ssr: false, loading: () => <div className="h-full flex items-center justify-center bg-gray-100">Loading PDF Engine...</div> }
 );
 

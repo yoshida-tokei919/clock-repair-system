@@ -13,10 +13,10 @@ function repairIdParam(id: string): number | null {
   return /^\d+$/.test(id) && Number.isSafeInteger(value) && value > 0 && value <= 2147483647 ? value : null;
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await getServerSession(authOptions))?.user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const repairId = repairIdParam(params.id);
+  const repairId = repairIdParam((await params).id);
   if (repairId === null) return NextResponse.json({ error: "Invalid repair ID" }, { status: 400 });
   try {
     const repair = await prisma.repair.findUnique({
@@ -45,10 +45,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await getServerSession(authOptions))?.user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const repairId = repairIdParam(params.id);
+  const repairId = repairIdParam((await params).id);
   if (repairId === null) return NextResponse.json({ error: "Invalid repair ID" }, { status: 400 });
   let action;
   try {

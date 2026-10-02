@@ -84,9 +84,9 @@ async function sendStaffReplyNotification(input: {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const repairId = Number(params.id);
+  const repairId = Number((await params).id);
   if (!Number.isInteger(repairId)) {
     return NextResponse.json({ error: "修理IDが不正です。" }, { status: 400 });
   }

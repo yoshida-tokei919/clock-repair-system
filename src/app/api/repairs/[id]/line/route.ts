@@ -13,10 +13,10 @@ function repairId(value: string) {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const id = repairId(params.id);
+  const id = repairId((await params).id);
   if (!id) return NextResponse.json({ error: "Invalid Repair ID" }, { status: 400 });
   try {
     return NextResponse.json({ ok: true, ...await getRepairLineChat(prisma, id) });
@@ -27,10 +27,10 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   }
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const id = repairId(params.id);
+  const id = repairId((await params).id);
   if (!id) return NextResponse.json({ error: "Invalid Repair ID" }, { status: 400 });
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "LINE返信内容が不正です。" }, { status: 400 }); }

@@ -7,7 +7,7 @@ const REJECT_STATUS = "保留";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const body = await request.json().catch(() => null);
   const reason = typeof body?.body === "string" ? body.body.trim() : "";
@@ -15,7 +15,7 @@ export async function POST(
     return NextResponse.json({ error: "差戻し理由を入力してください。" }, { status: 400 });
   }
 
-  const repairId = await findRepairIdByIdOrToken(params.id);
+  const repairId = await findRepairIdByIdOrToken((await params).id);
   if (!repairId) {
     return NextResponse.json({ error: "修理案件が見つかりません。" }, { status: 404 });
   }

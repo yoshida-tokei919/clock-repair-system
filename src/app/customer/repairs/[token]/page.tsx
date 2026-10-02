@@ -16,7 +16,7 @@ import { CustomerB2CApprovalPanel } from "./CustomerB2CApprovalPanel";
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 };
 
 const repairInclude = {
@@ -208,7 +208,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string
 }
 
 export default async function CustomerRepairPage({ params }: PageProps) {
-  const token = params.token?.trim();
+  const token = (await params).token?.trim();
   if (!token) return notFound();
 
   const [documentTokenRow] = await prisma.$queryRaw<{ id: number }[]>`

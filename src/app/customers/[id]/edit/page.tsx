@@ -11,9 +11,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "@/components/ui/use-toast";
 
-export default function CustomerEditPage({ params }: { params: { id: string } }) {
+export default function CustomerEditPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = React.use(params);
   const router = useRouter();
-  const id = parseInt(params.id);
+  const id = parseInt(resolvedParams.id);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [data, setData] = useState<any>(null);

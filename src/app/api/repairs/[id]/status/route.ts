@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { getRepairStatusTransition } from "@/lib/repair-status-transition";
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
-  const repairId = Number(params.id);
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const repairId = Number((await params).id);
   const { status } = await req.json();
 
   if (!Number.isInteger(repairId) || typeof status !== "string") {

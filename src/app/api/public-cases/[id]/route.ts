@@ -61,8 +61,8 @@ function workItemInputs(value: unknown): WorkItemInput[] | null {
   return inputs;
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const publicCaseId = Number(params.id);
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const publicCaseId = Number((await params).id);
   if (!Number.isInteger(publicCaseId) || publicCaseId <= 0) {
     return NextResponse.json({ error: "PublicCase IDが不正です。" }, { status: 400 });
   }

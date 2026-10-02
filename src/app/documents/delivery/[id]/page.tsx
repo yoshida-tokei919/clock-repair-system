@@ -5,8 +5,8 @@ import { formatPartDisplay } from "@/lib/formatPartDisplay";
 
 export const dynamic = "force-dynamic";
 
-export default async function DeliveryDocumentPage({ params }: { params: { id: string } }) {
-    const id = parseInt(params.id);
+export default async function DeliveryDocumentPage({ params }: { params: Promise<{ id: string }> }) {
+    const id = parseInt((await params).id);
     if (isNaN(id)) return notFound();
 
     const note = await prisma.deliveryNote.findUnique({

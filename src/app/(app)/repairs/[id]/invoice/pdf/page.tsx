@@ -8,7 +8,8 @@ import { usePDF } from '@react-pdf/renderer';
 import { getRepairDataForPDF } from '@/lib/repairs';
 import { Document, Page, Text } from '@react-pdf/renderer';
 
-export default function InvoicePreviewPage({ params }: { params: { id: string } }) {
+export default function InvoicePreviewPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = React.use(params);
     const [pdfData, setPdfData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
@@ -16,7 +17,7 @@ export default function InvoicePreviewPage({ params }: { params: { id: string } 
     useEffect(() => {
         async function fetchData() {
             try {
-                const data = await getRepairDataForPDF(parseInt(params.id));
+                const data = await getRepairDataForPDF(parseInt(resolvedParams.id));
                 setPdfData(data);
             } catch (err) {
                 console.error("Failed to fetch repair data:", err);
@@ -25,7 +26,7 @@ export default function InvoicePreviewPage({ params }: { params: { id: string } 
             }
         }
         fetchData();
-    }, [params.id]);
+    }, [resolvedParams.id]);
 
     // Manual Trigger State
     const [isReady, setIsReady] = useState(false);

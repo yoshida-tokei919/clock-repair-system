@@ -111,16 +111,16 @@ function DetailImage({ publicCase }: { publicCase: B2BPublicCaseForBizPage }) {
 export default async function BizPublicCaseDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const session = cookies().get("b2b_session");
+  const session = (await cookies()).get("b2b_session");
   const isAuthenticated = session?.value === "authenticated";
 
   if (!isAuthenticated) {
     redirect("/cases/biz/login");
   }
 
-  const publicCase = await getB2BPublicCaseDetail(params.id);
+  const publicCase = await getB2BPublicCaseDetail((await params).id);
   if (!publicCase) {
     notFound();
   }

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-    const id = parseInt(params.id);
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const id = parseInt((await params).id);
     if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
     const warranty = await prisma.warranty.findUnique({

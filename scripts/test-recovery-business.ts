@@ -102,7 +102,7 @@ async function main() {
             targetPartNameId: structuredRows[i].targetPartNameId,
         }));
         for (let pass = 0; pass < 2; pass++) {
-            const updated = await updateRepair(request({ status: '修理中', estimate: { items: reloaded } }), { params: { id: '77' } });
+            const updated = await updateRepair(request({ status: '修理中', estimate: { items: reloaded } }), { params: Promise.resolve({ id: '77' }) });
             assert.equal(updated.status, 200, JSON.stringify(await updated.json()));
             assert.deepEqual(estimateRows.map(estimateItemSnapshots), snapshotsBefore);
             assert.equal(structuredRows[0].repairWorkCategoryId, 10);
@@ -110,7 +110,7 @@ async function main() {
         }
         // Structured snapshots win, even when EstimateItem text differs.
         structuredRows[0].itemNameSnapshot = '構造化明細が正本';
-        let draft = await createDraft(request({}), { params: { id: '77' } });
+        let draft = await createDraft(request({}), { params: Promise.resolve({ id: '77' }) });
         assert.equal(draft.status, 200);
         assert.equal(publicCaseData.workItems.create.length, 2);
         assert.equal(publicCaseData.workItems.create[0].sourceText, '構造化明細が正本');
@@ -120,7 +120,7 @@ async function main() {
         assert.equal(publicCaseData.showPriceB2c, false);
         assert.equal(publicCaseData.b2cPublishStatus, 'HIDDEN');
         existingCase = { id: 500 };
-        draft = await createDraft(request({}), { params: { id: '77' } });
+        draft = await createDraft(request({}), { params: Promise.resolve({ id: '77' }) });
         assert.equal((await draft.json()).created, false);
         existingCase = null;
         structuredRows = [];
@@ -132,14 +132,14 @@ async function main() {
             [null, null, null, null],
         ] as const) {
             repair.movementCaliber = movement; repair.baseMovementCaliber = base; repair.watch.caliber = watch;
-            draft = await createDraft(request({}), { params: { id: '77' } });
+            draft = await createDraft(request({}), { params: Promise.resolve({ id: '77' }) });
             assert.equal(draft.status, 200);
             assert.equal(publicCaseData.caliber, expected);
             assert.equal(publicCaseData.workItems.create[0].attributes.estimateItemId, 100);
             assert.equal(publicCaseData.partItems.create[0].displayName, '未登録部品');
             assert.equal(publicCaseData.partItems.create[0].metadata.gradeNameSnapshot, '中古');
         }
-        assert.equal((await createDraft(request({}), { params: { id: 'bad' } })).status, 400);
+        assert.equal((await createDraft(request({}), { params: Promise.resolve({ id: 'bad' }) })).status, 400);
         for (const ref of [' AB-12 ', 'AB.12', 'AB/12', 'ab12']) {
             assert.equal(__partsMasterInternals.normalizeRefToken(ref), ref.trim());
             assert.equal(growth.normalizePartRefForCompare(ref), ref.trim());

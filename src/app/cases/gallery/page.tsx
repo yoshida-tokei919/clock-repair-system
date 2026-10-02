@@ -129,10 +129,11 @@ function PublicCaseGalleryCard({ publicCase }: { publicCase: B2CPublicCaseForGal
 export default async function GalleryPage({
   searchParams,
 }: {
-  searchParams?: GallerySearchParams;
+  searchParams?: Promise<GallerySearchParams>;
 }) {
-  const query = getSearchQuery(searchParams);
-  const brand = getBrandFilter(searchParams);
+  const resolvedSearchParams = await searchParams;
+  const query = getSearchQuery(resolvedSearchParams);
+  const brand = getBrandFilter(resolvedSearchParams);
   const [publicCases, brandOptions] = await Promise.all([
     getB2CPublicCasesForGallery(query, brand),
     getB2CBrandOptionsForGallery(),

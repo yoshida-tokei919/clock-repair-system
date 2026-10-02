@@ -5,10 +5,10 @@ import { findOrCreateBrand } from "@/lib/master-normalize";
 // PUT /api/masters/pricing/[id]
 export async function PUT(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = parseInt(params.id);
+        const id = parseInt((await params).id);
         const body = await request.json();
         const { brandName, modelName, caliberName, workName, minPrice, maxPrice, customerType, notes } = body;
 
@@ -55,10 +55,10 @@ export async function PUT(
 // DELETE /api/masters/pricing/[id]
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = parseInt(params.id);
+        const id = parseInt((await params).id);
         if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
         await prisma.pricingRule.delete({ where: { id } });

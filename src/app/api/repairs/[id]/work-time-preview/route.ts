@@ -6,11 +6,11 @@ import { getRepairWorkTimePreview } from "@/lib/repair-work-time-preview";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await getServerSession(authOptions))?.user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const repairId = Number(params.id);
-  if (!/^\d+$/.test(params.id) || !Number.isSafeInteger(repairId) || repairId <= 0)
+  const repairId = Number((await params).id);
+  if (!/^\d+$/.test((await params).id) || !Number.isSafeInteger(repairId) || repairId <= 0)
     return NextResponse.json({ error: "Invalid repair ID" }, { status: 400 });
   try {
     const preview = await getRepairWorkTimePreview(prisma, repairId);

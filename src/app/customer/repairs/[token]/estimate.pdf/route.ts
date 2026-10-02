@@ -20,8 +20,8 @@ function pdfNotGenerated() {
   return new Response("PDF not generated", { status: 404 });
 }
 
-export async function GET(_request: Request, { params }: { params: { token: string } }) {
-  const token = params.token?.trim();
+export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
+  const token = (await params).token?.trim();
   if (!token) {
     return new Response("Not found", { status: 404 });
   }

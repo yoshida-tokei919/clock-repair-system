@@ -102,7 +102,7 @@ ${sharedUrl}
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions);
 
@@ -110,7 +110,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const invoiceId = Number(params.id);
+  const invoiceId = Number((await params).id);
 
   if (!Number.isInteger(invoiceId)) {
     return NextResponse.json({ ok: false, error: "Invalid invoice id" }, { status: 400 });

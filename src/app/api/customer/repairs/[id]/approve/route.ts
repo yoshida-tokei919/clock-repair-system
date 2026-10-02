@@ -7,9 +7,9 @@ import { findRepairIdByIdOrToken } from "../_workflow";
 
 export async function POST(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const repairId = await findRepairIdByIdOrToken(params.id);
+  const repairId = await findRepairIdByIdOrToken((await params).id);
   if (!repairId) {
     return NextResponse.json({ error: "修理案件が見つかりません。" }, { status: 404 });
   }

@@ -12,10 +12,10 @@ function idFromParams(params: { id: string }) {
   return id;
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await getServerSession(authOptions))?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const id = idFromParams(params);
+    const id = idFromParams(await params);
     const input = parseStandardInput(await request.json());
     await validateStandardMasters(prisma, input);
     await assertUniqueStandard(prisma, input, id);
@@ -23,10 +23,10 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   } catch (error) { const result = settingsResponseError(error); return NextResponse.json({ error: result.message }, { status: result.status }); }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await getServerSession(authOptions))?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const id = idFromParams(params);
+    const id = idFromParams(await params);
     await prisma.repairWorkTimeStandard.delete({ where: { id } });
     return NextResponse.json({ deletedId: id });
   } catch (error) { const result = settingsResponseError(error); return NextResponse.json({ error: result.message }, { status: result.status }); }

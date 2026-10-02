@@ -8,8 +8,8 @@ import { PhysicalTagPanel } from "@/components/repairs/PhysicalTagPanel";
 
 export const dynamic = "force-dynamic";
 
-export default async function RepairDetailPage({ params }: { params: { id: string } }) {
-    const repairId = parseInt(params.id);
+export default async function RepairDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const repairId = parseInt((await params).id);
     if (isNaN(repairId)) return notFound();
 
     const repair = await prisma.repair.findUnique({

@@ -2,6 +2,6 @@ import { RepairIntakeForm } from "./RepairIntakeForm";
 
 export const dynamic = "force-dynamic";
 
-export default function CustomerRepairIntakePage({ params }: { params: { token: string } }) {
-  return <RepairIntakeForm token={params.token} />;
+export default async function CustomerRepairIntakePage({ params }: { params: Promise<{ token: string }> }) {
+  return <RepairIntakeForm token={(await params).token} />;
 }

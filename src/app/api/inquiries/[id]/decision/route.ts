@@ -7,10 +7,10 @@ import { reconcileInquiryClosure, reconcileInquiryRepairIntakeInvites } from "@/
 import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
 import { prisma } from "@/lib/prisma";
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const inquiryId = Number(params.id);
+  const inquiryId = Number((await params).id);
   const body = await request.json().catch(() => null);
   const watchId = Number(body?.watchId);
   const decision = body?.decision;

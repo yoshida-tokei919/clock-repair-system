@@ -10,10 +10,10 @@ function inquiryIdFromParams(value: string) {
 
 const customerSelect = { id: true, name: true, companyName: true, type: true, prefix: true, phone: true, lineId: true } as const;
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const inquiryId = inquiryIdFromParams(params.id);
+  const inquiryId = inquiryIdFromParams((await params).id);
   if (!inquiryId) return NextResponse.json({ error: "Invalid inquiry ID" }, { status: 400 });
   const inquiry = await prisma.inquiry.findUnique({
     where: { id: inquiryId },

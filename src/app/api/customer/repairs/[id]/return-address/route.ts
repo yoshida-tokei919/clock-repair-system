@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { parseReturnAddress, pendingReturnAddressUpdateWhere, returnAddressData, returnAddressResponse } from "@/lib/return-address";
 import { findRepairIdByIdOrToken } from "../_workflow";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const repairId = await findRepairIdByIdOrToken(params.id);
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const repairId = await findRepairIdByIdOrToken((await params).id);
   if (!repairId) return NextResponse.json({ error: "修理案件が見つかりません。" }, { status: 404 });
 
   let address;

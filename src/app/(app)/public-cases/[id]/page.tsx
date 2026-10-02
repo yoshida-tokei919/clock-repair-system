@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function PublicCaseEditorPage({ params }: { params: { id: string } }) {
-  const id = Number(params.id);
+export default async function PublicCaseEditorPage({ params }: { params: Promise<{ id: string }> }) {
+  const id = Number((await params).id);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
   const publicCase = await prisma.publicCase.findFirst({

@@ -4,8 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRepairPhotoSignedReadUrl, isR2PublicCasePhotoKey } from "@/lib/r2-repair-photos";
 
-export async function GET(_: Request, { params }: { params: { imageId: string } }) {
-  const imageId = Number(params.imageId);
+export async function GET(_: Request, { params }: { params: Promise<{ imageId: string }> }) {
+  const imageId = Number((await params).imageId);
   if (!Number.isInteger(imageId) || imageId <= 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const image = await prisma.publicCaseImage.findUnique({
     where: { id: imageId },

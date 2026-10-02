@@ -39,12 +39,12 @@ function registrationInput(body: unknown) {
   return { watchId: positiveId(input.watchId, "時計ID"), kind, value, parentId: input.parentId == null ? null : positiveId(input.parentId, "親master") };
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const inquiryId = positiveId(params.id, "Inquiry ID");
+    const inquiryId = positiveId((await params).id, "Inquiry ID");
     const input = registrationInput(await request.json());
     const result = await prisma.$transaction(async (tx) => {
       const watch = await tx.inquiryWatch.findFirst({

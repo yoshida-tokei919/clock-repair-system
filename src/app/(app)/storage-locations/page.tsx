@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default async function StorageLocationsPage({
   searchParams,
 }: {
-  searchParams: { location?: string };
+  searchParams: Promise<{ location?: string }>;
 }) {
   const locations = await prisma.storageLocation.findMany({
     where: { isActive: true },
@@ -20,8 +20,9 @@ export default async function StorageLocationsPage({
     },
   });
 
-  const selectedId = /^\d+$/.test(searchParams.location ?? "")
-    ? Number(searchParams.location)
+  const { location: locationParam } = await searchParams;
+  const selectedId = /^\d+$/.test(locationParam ?? "")
+    ? Number(locationParam)
     : null;
   const selected = locations.find((location) => location.id === selectedId);
   const assignments = selected

@@ -94,9 +94,9 @@ function getRelatedWorkDisplayName(publicCase: B2CRelatedPublicCase): string {
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const publicCase = await getB2CPublicCaseDetail(params.id);
+  const publicCase = await getB2CPublicCaseDetail((await params).id);
   if (!publicCase) {
     return {};
   }
@@ -135,7 +135,7 @@ export async function generateMetadata({
       .join(" | "),
     description,
     alternates: {
-      canonical: `/cases/gallery/${params.id}`,
+      canonical: `/cases/gallery/${(await params).id}`,
     },
   };
 }
@@ -166,9 +166,9 @@ function DetailImage({ publicCase }: { publicCase: B2CPublicCaseDetail }) {
 export default async function PublicCaseDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const publicCase = await getB2CPublicCaseDetail(params.id);
+  const publicCase = await getB2CPublicCaseDetail((await params).id);
   if (!publicCase) {
     notFound();
   }
