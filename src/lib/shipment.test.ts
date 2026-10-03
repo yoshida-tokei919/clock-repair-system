@@ -7,7 +7,9 @@ const address = {
   returnRecipientName: "山田 太郎", returnPostalCode: "1000001", returnPrefecture: "東京都",
   returnCity: "千代田区", returnStreet: "千代田1-1", returnBuilding: null, returnPhone: "0312345678",
 };
-const repair = (id: number, extra = {}) => ({ id, customerId: 4, customer: { type: "individual" }, ...address, ...extra });
+const repair = (id: number, extra = {}) => ({
+  id, customerId: 4, customer: { type: "individual" }, ...address, shipmentRepairs: [], ...extra,
+});
 
 function fakeDb(rows = [repair(1), repair(2)]) {
   const writes: unknown[] = [];
@@ -84,6 +86,71 @@ test("create saves one OUTBOUND DRAFT parcel and both joins in one transaction",
   assert.deepEqual(created.data.repairs.create, [
     { repair: { connect: { id: 1 } } }, { repair: { connect: { id: 2 } } },
   ]);
+});
+
+test("single-Repair Shipment inherits a stored customer delivery preference", async () => {
+  const preference = {
+    requestedDeliveryDate: new Date("2026-10-06T00:00:00.000Z"),
+    requestedDeliveryTimeSlot: "午前中",
+  };
+  const instance = fakeDb([repair(1, { deliveryPreference: preference })]);
+  await createShipment(instance.client, parseShipmentCreate({ repairIds: [1], confirmed: true }), new Date("2026-10-03T01:00:00Z"));
+  const created = instance.writes[0] as { data: Record<string, any> };
+  assert.equal(created.data.requestedDeliveryDate, preference.requestedDeliveryDate);
+  assert.equal(created.data.requestedDeliveryTimeSlot, "午前中");
+});
+
+test("single-Repair Shipment does not inherit an expired stored delivery date", async () => {
+  const preference = {
+    requestedDeliveryDate: new Date("2026-10-02T00:00:00.000Z"),
+    requestedDeliveryTimeSlot: "午前中",
+  };
+  const instance = fakeDb([repair(1, { deliveryPreference: preference })]);
+  await createShipment(instance.client, parseShipmentCreate({ repairIds: [1], confirmed: true }), new Date("2026-10-03T01:00:00Z"));
+  const created = instance.writes[0] as { data: Record<string, any> };
+  assert.equal(created.data.requestedDeliveryDate, null);
+  assert.equal(created.data.requestedDeliveryTimeSlot, null);
+});
+
+test("single-Repair Shipment does not inherit a preference when another active outbound parcel already exists", async () => {
+  const preference = {
+    requestedDeliveryDate: new Date("2026-10-06T00:00:00.000Z"),
+    requestedDeliveryTimeSlot: "午前中",
+  };
+  const instance = fakeDb([repair(1, {
+    deliveryPreference: preference,
+    shipmentRepairs: [{ shipment: { direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null } }],
+  })]);
+  await createShipment(instance.client, parseShipmentCreate({ repairIds: [1], confirmed: true }));
+  const created = instance.writes[0] as { data: Record<string, any> };
+  assert.equal(created.data.requestedDeliveryDate, null);
+  assert.equal(created.data.requestedDeliveryTimeSlot, null);
+});
+
+test("cancelled or already-shipped historical parcels do not block a later single-Repair preference", async () => {
+  const preference = { requestedDeliveryDate: null, requestedDeliveryTimeSlot: "午前中" };
+  for (const shipment of [
+    { direction: "OUTBOUND", status: "CANCELLED", actualShippedAt: null },
+    { direction: "OUTBOUND", status: "SHIPPED", actualShippedAt: new Date("2026-10-01T00:00:00Z") },
+    { direction: "INBOUND", status: "DRAFT", actualShippedAt: null },
+  ]) {
+    const instance = fakeDb([repair(1, { deliveryPreference: preference, shipmentRepairs: [{ shipment }] })]);
+    await createShipment(instance.client, parseShipmentCreate({ repairIds: [1], confirmed: true }));
+    const created = instance.writes[0] as { data: Record<string, any> };
+    assert.equal(created.data.requestedDeliveryTimeSlot, "午前中");
+  }
+});
+
+test("multi-Repair Shipment never auto-applies Repair-specific delivery preferences", async () => {
+  const preference = { requestedDeliveryDate: null, requestedDeliveryTimeSlot: "午前中" };
+  const instance = fakeDb([
+    repair(1, { deliveryPreference: preference }),
+    repair(2, { deliveryPreference: preference }),
+  ]);
+  await createShipment(instance.client, parseShipmentCreate({ repairIds: [1, 2], confirmed: true }));
+  const created = instance.writes[0] as { data: Record<string, any> };
+  assert.equal(created.data.requestedDeliveryDate, null);
+  assert.equal(created.data.requestedDeliveryTimeSlot, null);
 });
 
 test("read includes relations; update only permits planning fields on DRAFT", async () => {

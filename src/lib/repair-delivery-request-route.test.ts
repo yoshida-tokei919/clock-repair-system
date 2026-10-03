@@ -24,6 +24,7 @@ const modules = {
     "export class RepairDeliveryRequestNotFoundError extends Error {};",
     "export const getRepairDeliveryShipments = async (_db, id) => { globalThis.__deliveryReads++; if (id === 404) throw new RepairDeliveryRequestNotFoundError('Repair not found'); return [{ id: 9 }]; };",
   ].join("\n"),
+  "@/lib/repair-delivery-preference": "export const getRepairDeliveryPreferenceForAdmin = async () => ({ applicationStatus: 'UNANSWERED', preference: null });",
   "@/lib/yupuri-v3": "export const YUPURI_DELIVERY_TIME_OPTIONS = [{ value: '指定なし', label: '指定なし' }];",
 };
 
@@ -43,7 +44,11 @@ test("delivery shipment candidate read returns options and maps missing Repair t
   state.__deliverySession = { user: { email: "admin@example.com" } }; state.__deliveryAdmin = true; state.__deliveryReads = 0;
   const ok = await target.GET({}, { params: Promise.resolve({ id: "8" }) });
   assert.equal(ok.status, 200);
-  assert.deepEqual(ok.body, { shipments: [{ id: 9 }], timeOptions: [{ value: "指定なし", label: "指定なし" }] });
+  assert.deepEqual(ok.body, {
+    shipments: [{ id: 9 }],
+    customerResponse: { applicationStatus: "UNANSWERED", preference: null },
+    timeOptions: [{ value: "指定なし", label: "指定なし" }],
+  });
   assert.equal((await target.GET({}, { params: Promise.resolve({ id: "404" }) })).status, 404);
   assert.equal(state.__deliveryReads, 2);
 });

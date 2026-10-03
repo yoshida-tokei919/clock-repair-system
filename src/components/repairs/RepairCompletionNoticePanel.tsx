@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  canPrepareRepairCompletionNotice, completionNoticeStatusLabels,
-  COMPLETION_NOTICE_TEXT_LIMIT, defaultRepairCompletionNoticeText,
+  buildRepairCompletionNoticeText, canPrepareRepairCompletionNotice, completionNoticeStatusLabels,
+  COMPLETION_NOTICE_INTRO_LIMIT, COMPLETION_NOTICE_TEXT_LIMIT, defaultRepairCompletionNoticeText,
   type CompletionNoticeState, type CompletionNoticeStatus,
 } from "@/lib/repair-completion-notice-message";
 
@@ -21,6 +21,8 @@ export function RepairCompletionNoticePanel({ repairId }: { repairId: number }) 
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState(defaultRepairCompletionNoticeText);
   const [reviewedText, setReviewedText] = useState<string | null>(null);
+  const [reviewedDraft, setReviewedDraft] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [hold, setHold] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,9 +46,31 @@ export function RepairCompletionNoticePanel({ repairId }: { repairId: number }) 
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  async function prepareReview() {
+    if (preparing || loading || hold || !canPrepareRepairCompletionNotice(state, draft)) return;
+    setPreparing(true);
+    setError(null);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/repairs/${repairId}/delivery-preference-link`, { method: "POST" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.ok !== true || typeof data.url !== "string") {
+        throw new Error(data?.error || "配達希望回答URLを準備できませんでした。");
+      }
+      const finalText = buildRepairCompletionNoticeText(draft, data.url);
+      if (finalText.length > COMPLETION_NOTICE_TEXT_LIMIT) throw new Error("送信文面が長すぎます。冒頭文を短くしてください。");
+      setReviewedDraft(draft);
+      setReviewedText(finalText);
+    } catch (cause) {
+      setReviewedDraft(null);
+      setReviewedText(null);
+      setError(cause instanceof Error ? cause.message : "送信内容を準備できませんでした。");
+    } finally { setPreparing(false); }
+  }
+
   async function submit() {
-    if (postInFlight.current || loading || hold || reviewedText === null ||
-        reviewedText !== draft || !canPrepareRepairCompletionNotice(state, reviewedText)) return;
+    if (postInFlight.current || loading || hold || reviewedText === null || reviewedDraft === null ||
+        reviewedDraft !== draft || !canPrepareRepairCompletionNotice(state, reviewedDraft)) return;
     postInFlight.current = true;
     setSubmitting(true);
     setHold(true);
@@ -55,10 +79,11 @@ export function RepairCompletionNoticePanel({ repairId }: { repairId: number }) 
     try {
       const response = await fetch(`/api/repairs/${repairId}/completion-notice`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmed: true, text: reviewedText }),
+        body: JSON.stringify({ confirmed: true, introText: reviewedDraft, reviewedText }),
       });
       const data = await response.json().catch(() => null);
       setReviewedText(null);
+      setReviewedDraft(null);
       if (response.status === 409) {
         await refresh(true);
         setError(data?.error || "状態が変わりました。最新の状態を確認し、必要なら内容を再確認してください。");
@@ -69,6 +94,7 @@ export function RepairCompletionNoticePanel({ repairId }: { repairId: number }) 
       setFeedback("作業完了連絡を送信待ちに追加しました。実際の送信確認はまだ完了していません。");
     } catch (cause) {
       setReviewedText(null);
+      setReviewedDraft(null);
       setError(cause instanceof Error ? cause.message : "結果を確認できませんでした。状態を更新して確認してください。");
     } finally {
       postInFlight.current = false;
@@ -76,7 +102,7 @@ export function RepairCompletionNoticePanel({ repairId }: { repairId: number }) 
     }
   }
 
-  const canPrepare = !loading && !hold && canPrepareRepairCompletionNotice(state, draft);
+  const canPrepare = !loading && !hold && !preparing && canPrepareRepairCompletionNotice(state, draft);
 
   return <section className="space-y-3 rounded border p-4" aria-label="作業完了のLINE連絡">
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -97,20 +123,21 @@ export function RepairCompletionNoticePanel({ repairId }: { repairId: number }) 
       state && !state.eligible ?
         <p className="text-sm text-amber-800">この修理は現在、作業完了のLINE連絡の対象ではありません。</p> :
         state && <div className="space-y-2">
-          <label htmlFor={`completion-notice-${repairId}`} className="text-sm font-medium">お客様へ送る文面を確認・編集</label>
-          <Textarea id={`completion-notice-${repairId}`} value={draft} maxLength={COMPLETION_NOTICE_TEXT_LIMIT}
-            onChange={(event) => { setDraft(event.target.value); setReviewedText(null); }}
-            disabled={submitting || hold} className="min-h-28" />
-          <p className="text-right text-xs text-zinc-600">{draft.length} / {COMPLETION_NOTICE_TEXT_LIMIT}</p>
+          <label htmlFor={`completion-notice-${repairId}`} className="text-sm font-medium">お客様へ送る冒頭文を確認・編集</label>
+          <Textarea id={`completion-notice-${repairId}`} value={draft} maxLength={COMPLETION_NOTICE_INTRO_LIMIT}
+            onChange={(event) => { setDraft(event.target.value); setReviewedText(null); setReviewedDraft(null); }}
+            disabled={preparing || submitting || hold} className="min-h-24" />
+          <p className="text-xs text-zinc-600">配達希望の回答URLと「希望がない場合も『希望なし』を選択してください」という案内は、送信文面へ自動で追加されます。</p>
+          <p className="text-right text-xs text-zinc-600">{draft.length} / {COMPLETION_NOTICE_INTRO_LIMIT}</p>
           {hold ? <p className="text-sm text-amber-800">送信結果を確認してください。状態が確認できるまで再操作はできません。</p> :
             reviewedText === null ?
-              <div className="flex justify-end"><Button type="button" disabled={!canPrepare} onClick={() => setReviewedText(draft)}>送信内容を確認</Button></div> :
+              <div className="flex justify-end"><Button type="button" disabled={!canPrepare} onClick={() => void prepareReview()}>{preparing ? "準備中…" : "送信内容を確認"}</Button></div> :
               <div className="space-y-2 rounded border border-blue-200 bg-blue-50 p-3 text-sm">
                 <p className="font-medium">この内容でLINE送信待ちに追加します</p>
                 <p className="whitespace-pre-wrap break-words">{reviewedText}</p>
                 <p className="text-xs text-zinc-600">追加後も実際の送信確認まで送信待ちとして扱います。</p>
                 <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" disabled={submitting} onClick={() => setReviewedText(null)}>編集に戻る</Button>
+                  <Button type="button" variant="outline" disabled={submitting} onClick={() => { setReviewedText(null); setReviewedDraft(null); }}>編集に戻る</Button>
                   <Button type="button" disabled={submitting || !canPrepare} onClick={() => void submit()}>{submitting ? "追加中…" : "この内容で送信待ちに追加"}</Button>
                 </div>
               </div>}

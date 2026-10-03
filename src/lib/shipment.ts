@@ -48,6 +48,14 @@ function dateOnly(value: unknown): Date | null {
   return date;
 }
 
+function japanDateString(now: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 function optionalText(value: unknown): string | null {
   if (value === null) return null;
   if (typeof value !== "string" || !value.trim() || value.trim().length > 100)
@@ -96,7 +104,7 @@ export function shipmentFailure(error: unknown): { status: number; message: stri
   return { status: 500, message: "発送の処理に失敗しました。" };
 }
 
-export async function createShipment(db: PrismaClient, input: { repairIds: number[]; confirmed: true }) {
+export async function createShipment(db: PrismaClient, input: { repairIds: number[]; confirmed: true }, now = new Date()) {
   // Guard the domain entry point too: callers other than the HTTP route must confirm.
   const { repairIds } = parseShipmentCreate(input);
   return db.$transaction(async tx => {
@@ -104,7 +112,11 @@ export async function createShipment(db: PrismaClient, input: { repairIds: numbe
       where: { id: { in: repairIds } },
       select: { id: true, customerId: true,
         returnRecipientName: true, returnPostalCode: true, returnPrefecture: true, returnCity: true,
-        returnStreet: true, returnBuilding: true, returnPhone: true },
+        returnStreet: true, returnBuilding: true, returnPhone: true,
+        deliveryPreference: { select: { requestedDeliveryDate: true, requestedDeliveryTimeSlot: true } },
+        shipmentRepairs: { select: { shipment: { select: {
+          direction: true, status: true, actualShippedAt: true,
+        } } } } },
     });
     if (repairs.length !== repairIds.length) throw new ShipmentError(404, "修理案件が見つかりません。");
     const customerId = repairs[0].customerId;
@@ -119,9 +131,21 @@ export async function createShipment(db: PrismaClient, input: { repairIds: numbe
     const destination = destinations[0];
     if (destinations.some(address => JSON.stringify(address) !== JSON.stringify(destination)))
       throw new ShipmentError(409, "修理案件の返送先が一致しません。");
+    const hasExistingActiveOutboundShipment = repairs.length === 1 && repairs[0].shipmentRepairs.some(({ shipment }) =>
+      shipment.direction === "OUTBOUND" && shipment.status !== "CANCELLED" && shipment.actualShippedAt === null,
+    );
+    const storedDeliveryPreference = repairs.length === 1 && !hasExistingActiveOutboundShipment
+      ? repairs[0].deliveryPreference
+      : null;
+    const storedDeliveryDate = storedDeliveryPreference?.requestedDeliveryDate;
+    const deliveryPreference = storedDeliveryDate && storedDeliveryDate.toISOString().slice(0, 10) < japanDateString(now)
+      ? null
+      : storedDeliveryPreference;
     return tx.shipment.create({
       data: {
         customerId, direction: "OUTBOUND", status: "DRAFT",
+        requestedDeliveryDate: deliveryPreference?.requestedDeliveryDate ?? null,
+        requestedDeliveryTimeSlot: deliveryPreference?.requestedDeliveryTimeSlot ?? null,
         destinationRecipientName: destination.recipientName,
         destinationPostalCode: destination.postalCode,
         destinationPrefecture: destination.prefecture,

@@ -7,11 +7,35 @@ import {
   type RepairDeliveryShipment,
 } from "@/lib/repair-delivery-request";
 
+type CustomerResponse = {
+  applicationStatus: "UNANSWERED" | "APPLIED" | "PENDING_NO_SHIPMENT" | "PENDING_MULTIPLE_SHIPMENTS" | "PENDING_MULTI_REPAIR_SHIPMENT" | "PENDING_MISMATCH" | "LOCKED";
+  preference: {
+    requestedDeliveryDate: string | null;
+    requestedDeliveryTimeSlot: string;
+    respondedAt: string;
+  } | null;
+};
 type Payload = {
   shipments: RepairDeliveryShipment[];
+  customerResponse: CustomerResponse;
   timeOptions: { value: string; label: string }[];
 };
 type Draft = { shipmentId: number; date: string; timeSlot: string };
+
+const customerResponseStatusLabels: Record<CustomerResponse["applicationStatus"], string> = {
+  UNANSWERED: "未回答",
+  APPLIED: "Shipmentへ反映済み",
+  PENDING_NO_SHIPMENT: "Shipment作成待ち",
+  PENDING_MULTIPLE_SHIPMENTS: "複数Shipmentのため要確認",
+  PENDING_MULTI_REPAIR_SHIPMENT: "複数Repair同梱のため要確認",
+  PENDING_MISMATCH: "Shipmentとの内容差異あり",
+  LOCKED: "発送準備進行済み",
+};
+
+const displayResponseTime = (value: string) => new Intl.DateTimeFormat("ja-JP", {
+  year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
+  timeZone: "Asia/Tokyo",
+}).format(new Date(value));
 
 export function RepairDeliveryRequestPanel({ repairId }: { repairId: number }) {
   const [payload, setPayload] = useState<Payload | null>(null);
@@ -94,11 +118,21 @@ export function RepairDeliveryRequestPanel({ repairId }: { repairId: number }) {
       <h3 className="font-semibold">配達希望日時の記録</h3>
       <Button type="button" size="sm" variant="outline" onClick={() => void refresh()} disabled={loading || saving}>発送候補を更新</Button>
     </div>
-    <p className="text-sm text-zinc-600">LINEの返答を確認し、対象の発送へ手動で記録してください。</p>
+    <p className="text-sm text-zinc-600">お客様のセルフ回答とShipmentへの反映状態を確認できます。必要な場合はDRAFT Shipmentへ手動で記録できます。</p>
     {loading && <p className="text-sm text-zinc-600">発送候補を確認しています…</p>}
     {error && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {feedback && <p className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{feedback}</p>}
-    {payload?.shipments.length === 0 && <p className="text-sm text-amber-800">未発送の対象Shipmentがありません。配達希望は仮保存しません。LINE返信がある場合は既存のInquiryMessage履歴を正本として、Shipment作成後に構造化してください。</p>}
+    {payload && <div className={`rounded border p-3 text-sm ${payload.customerResponse.preference && payload.customerResponse.applicationStatus !== "APPLIED" ? "border-amber-200 bg-amber-50" : "border-zinc-200 bg-zinc-50"}`}>
+      <p className="font-medium">お客様の配達希望回答: {customerResponseStatusLabels[payload.customerResponse.applicationStatus]}</p>
+      {payload.customerResponse.preference ? <>
+        <p>回答日時: {displayResponseTime(payload.customerResponse.preference.respondedAt)}</p>
+        <p>希望日: {payload.customerResponse.preference.requestedDeliveryDate ?? "指定なし"}</p>
+        <p>時間帯: {payload.customerResponse.preference.requestedDeliveryTimeSlot}</p>
+      </> : <p>配達希望ページからの回答はまだありません。</p>}
+      {payload.customerResponse.preference && payload.customerResponse.applicationStatus !== "APPLIED" &&
+        <p className="mt-1 text-amber-800">回答は保存されていますが、Shipmentへ自動反映されていません。発送候補と内容を確認してください。</p>}
+    </div>}
+    {payload?.shipments.length === 0 && <p className="text-sm text-amber-800">未発送の対象Shipmentがありません。お客様の回答がある場合はRepair側に保持され、単一RepairのShipment作成時に自動反映されます。複数Repair同梱は自動反映せず要確認です。</p>}
     {payload && payload.shipments.length > 1 && <label className="block space-y-1 text-sm">
       <span className="font-medium">記録する発送を選択</span>
       <select className="w-full rounded border p-2" value={selectedId ?? ""} onChange={event => selectShipment(event.target.value ? Number(event.target.value) : null)} disabled={saving}>

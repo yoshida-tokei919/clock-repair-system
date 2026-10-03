@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
+import { buildCustomerShareUrl } from "@/lib/customer-share-url";
 import { LineManagerSendOutboxError } from "@/lib/line-manager-send-outbox";
 import {
   createRepairCompletionNotice,
@@ -9,6 +10,14 @@ import {
   RepairCompletionNoticeNotFoundError,
   RepairCompletionNoticeUnavailableError,
 } from "@/lib/repair-completion-notice";
+import {
+  buildRepairCompletionNoticeText,
+  parseRepairCompletionNoticeSubmission,
+} from "@/lib/repair-completion-notice-message";
+import {
+  getRepairPublicToken,
+  RepairPublicTokenNotFoundError,
+} from "@/lib/repair-public-token";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +37,9 @@ function repairId(value: string) {
 
 function failure(error: unknown) {
   if (error instanceof RepairCompletionNoticeInputError) return NextResponse.json({ error: error.message }, { status: 400 });
-  if (error instanceof RepairCompletionNoticeNotFoundError) return NextResponse.json({ error: error.message }, { status: 404 });
+  if (error instanceof RepairCompletionNoticeNotFoundError || error instanceof RepairPublicTokenNotFoundError) {
+    return NextResponse.json({ error: error.message }, { status: 404 });
+  }
   if (error instanceof RepairCompletionNoticeUnavailableError || error instanceof LineManagerSendOutboxError) {
     return NextResponse.json({ error: error.message }, { status: 409 });
   }
@@ -55,7 +66,23 @@ export async function POST(request: Request, { params }: Context) {
   let body: unknown;
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
+  let submission: { introText: string; reviewedText: string };
+  try { submission = parseRepairCompletionNoticeSubmission(body); }
+  catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "入力が不正です。" }, { status: 400 });
+  }
   try {
-    return NextResponse.json({ ok: true, notice: await createRepairCompletionNotice(prisma, id, body) });
+    const current = await getRepairCompletionNotice(prisma, id);
+    if (!current.eligible || !current.hasVerifiedLineDestination) {
+      throw new RepairCompletionNoticeUnavailableError("Repair is not eligible for a LINE completion notice");
+    }
+    const token = await getRepairPublicToken(prisma, id);
+    if (!token) throw new RepairCompletionNoticeUnavailableError("配達希望回答URLを準備し直してください。");
+    const deliveryUrl = buildCustomerShareUrl(`/customer/delivery/${token}`, request.url);
+    const text = buildRepairCompletionNoticeText(submission.introText, deliveryUrl);
+    if (text !== submission.reviewedText) {
+      throw new RepairCompletionNoticeUnavailableError("送信内容が確認時から変わりました。もう一度送信内容を確認してください。");
+    }
+    return NextResponse.json({ ok: true, notice: await createRepairCompletionNotice(prisma, id, { confirmed: true, text }) });
   } catch (error) { return failure(error); }
 }
