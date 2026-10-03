@@ -7,17 +7,23 @@
 
 ## Production
 
-- Production application commit: `332862857df3748c35626dfe31cea2d0d56e476e`
-- Commit subject: `feat: add yu-pri history import preview`
-- Deploy source: GitHub `main` → Railway, exact commit `332862857df3748c35626dfe31cea2d0d56e476e`
-- Railway deployment: `e589361d-1935-4b2d-a894-bee5b7882215`
+- Production source snapshot: `1d19e1d27b17d8d3543e17fe36352ae979fad91c`
+- Included application commits:
+  - Task196E: `13fd1b0` — `feat: update physical tag label for dk2205`
+  - Task203A: `c6c9971` — `feat: add repair completion notice foundation`
+  - Task201B: `1d19e1d` — investigation-only docs checkpoint
+- Deploy source: GitHub `main` → Railway, exact commit `1d19e1d27b17d8d3543e17fe36352ae979fad91c`
+- Railway deployment: `01bb8bca-82ca-4888-8d6e-e2590d2adb1b`
 - Deployment status: `SUCCESS`
-- Production tag: `production-task202a-20261003`
+- Production tags: `production-task196e-20261003`, `production-task203a-20261003`
 - Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 679ms
-- Supabase migration: none; schema / migration / production DB mutationなし
+- Runtime: Next.js 15.5.27, Ready in 475ms
+- Railway production build: compile / type check PASS、static pages 56/56
+- Supabase migration: none; schema / migration / RLS / GRANT / production DB mutationなし
+- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、`/shipments`未認証=307、Task203A completion-notice GET未認証=401。Railway HTTP logsの`upstreamErrors`なし。
+- 実LINE送信なし。Task203AはAPPROVED outbox intent作成基盤までで、UI / Shipment配達希望日時更新 / sender worker変更は未実装。
 
-Production: Task202A complete. No next software Task has been started; hardware PoC is the next checkpoint.
+Production: Task196E / Task203A production complete. Task201B investigation complete; B2 Cloud CSV実装は一次資料のformat evidence待ち。
 
 ## Stage B 現在地
 
@@ -360,4 +366,48 @@ Status: production complete
 - Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、Shipment GET未認証=401、ゆうプリR V3 GET未認証=401、history preview POST未認証=401。Railway HTTP logsの`upstreamErrors`なし。
 - 詳細: `docs/ai-tasks/202a-yupuri-history-import-preview.md`
 
-Task202A production complete. 次のsoftware Taskは未着手。次checkpointはBC-NL3000U-W + Brother QL-800 / DK-2205の実機PoC。
+## 今回の並列production checkpoint
+
+### Task201B — ヤマトB2クラウド CSV出力adapter 調査
+
+Status: investigation complete / implementation pending
+
+- Investigation commit: `1d19e1d27b17d8d3543e17fe36352ae979fad91c`
+- Task199の共通Shipment契約を維持し、ヤマト固有列・code・validationをadapter境界へ閉じ込める方針を確認。
+- B2 Cloud取込CSVの一次資料・実ファイル evidenceが不足しているため、列定義やcodeを推測して実装していない。
+- schema / migration / production DB mutationなし。runtime behavior変更なし。
+- 詳細: `docs/ai-tasks/201b-yamato-b2-adapter-investigation.md`
+
+### Task196E — Brother QL-800 / DK-2205 62×75mm PhysicalTag修理袋ラベル
+
+Status: production complete
+
+- Application commit: `13fd1b0`
+- Production source snapshot: `1d19e1d27b17d8d3543e17fe36352ae979fad91c`
+- Railway deployment: `01bb8bca-82ca-4888-8d6e-e2590d2adb1b` — SUCCESS
+- Production tag: `production-task196e-20261003`
+- DK-2205 62mm連続紙を75mmでauto-cutする前提へ更新。QRは28mm、payloadは引き続きopaque `qrToken`のみ。
+- 受付番号 / 取引先管理番号 / 顧客・取引先 / エンドユーザー / ブランド / モデル / Ref. / シリアル / Cal. / 受付日 / shortCodeをB2C/B2B条件に応じて表示。
+- 長いB2B文字列でも62×75mmの1ページを維持する明示truncation + fixed layoutを実装し、実PDF renderで1 Page / expected MediaBoxを回帰確認。
+- 独立Codex review: blocking findingなし。schema / lifecycle変更なし。
+- Railway production build: compile / type check PASS、static pages 56/56。
+- production上の最終ラベル実機印刷は未実施。ソフトウェアproduction反映とは分離して確認する。
+- 詳細: `docs/ai-tasks/196e-dk2205-physical-tag-label.md`
+
+### Task203A — LINE作業完了連絡 backend foundation
+
+Status: production complete
+
+- Application commit: `c6c9971`
+- Production source snapshot: `1d19e1d27b17d8d3543e17fe36352ae979fad91c`
+- Railway deployment: `01bb8bca-82ca-4888-8d6e-e2590d2adb1b` — SUCCESS
+- Production tag: `production-task203a-20261003`
+- authenticated Adminの明示GET/POSTだけを追加し、RepairStatus変更だけでは自動送信しない。
+- B2C / `作業完了` / originating Inquiry promotion / verified LineManagerChatをserver-sideで再検証し、`Customer.lineId`へfallbackしない。
+- POSTは既存 `LineManagerSendOutbox` のAPPROVED intentを作るだけで、LINEへ直接送信しない。idempotency keyは `repair-completion-notice:{repairId}` 固定。
+- stale eligibility raceとdeadlock riskを独立reviewで検出後、Customer → Repairのlock順、linkage再確認、eligibility再読込、同transaction内outbox作成へ修正。
+- branch validation: Task203A + route + outbox regression 23/23 PASS、TypeScript / build / diff check PASS。最終独立Codex reviewでHigh / Medium / Low findingなし。
+- production smoke: completion-notice GET未認証=401。実LINE送信なし、Shipment / Repair status mutationなし。
+- 詳細: `docs/ai-tasks/203a-line-completion-notice-backend.md`
+
+Current checkpoint: Task196E / Task203A production complete. Task201B investigation complete. Task202B / Task204は実際の日本郵便引受・配達完了CSV evidence待ち。
