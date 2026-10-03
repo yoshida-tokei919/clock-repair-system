@@ -36,6 +36,16 @@ const timeCodes: Readonly<Record<string, string>> = {
   "19\uff5e21\u6642": "57",
 };
 
+export const YUPURI_DELIVERY_TIME_OPTIONS = [
+  { value: "指定なし", label: "指定なし" },
+  { value: "午前中", label: "午前中" },
+  { value: "12時～14時", label: "12時～14時" },
+  { value: "14時～16時", label: "14時～16時" },
+  { value: "16時～18時", label: "16時～18時" },
+  { value: "18時～20時", label: "18時～20時" },
+  { value: "19時～21時", label: "19時～21時" },
+] as const;
+
 function required(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim() || /[\0\r\n]/.test(value)) throw new YupuriV3Error(`${field} is required`);
   return value.trim();

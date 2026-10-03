@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { RepairCompletionNoticePanel } from "./RepairCompletionNoticePanel";
+import { RepairDeliveryRequestPanel } from "./RepairDeliveryRequestPanel";
 
 type Classification = { scope: "WATCHES" | "COMMON" | "UNASSIGNED"; source: "AI" | "MANUAL"; confidence: string | null; confirmedAt: string | null; watchIds: number[] } | null;
 type Message = { id: number; direction: "INBOUND" | "OUTBOUND"; messageType: "TEXT" | "IMAGE" | "FILE" | "OTHER"; body: string | null; receivedAt: string | null; sentAt: string | null; createdAt: string; status: string; classification: Classification; relatedRepairIds: number[]; relatedToCurrentRepair: boolean; files: { id: number; mimeType: string | null; width: number | null; height: number | null; uploadStatus: string }[] };
@@ -72,6 +73,7 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
     {error && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {notice && <p className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
     <RepairCompletionNoticePanel repairId={repairId} />
+    <RepairDeliveryRequestPanel repairId={repairId} />
     {loading && !payload && <p className="text-sm text-zinc-500">LINE履歴を読み込んでいます…</p>}
     {payload && !payload.available && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">このRepairに紐付く元のInquiryがないため、LINEのやり取りを表示できません。</p>}
     {payload?.available && <>
