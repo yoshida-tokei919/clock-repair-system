@@ -59,7 +59,7 @@ export async function createVerifiedLineManagerChat(
 
 /** Creates an approved, immutable destination snapshot. sendId is generated exactly once here. */
 export async function createApprovedLineManagerSendOutbox(
-  db: LineManagerSendOutboxDb,
+  db: Pick<LineManagerSendOutboxDb, "inquiry" | "lineManagerChat" | "lineManagerSendOutbox" | "repair">,
   input: { inquiryId: number; lineManagerChatId: number; text: string; idempotencyKey: string; sourceRepairId?: number; approvedAt?: Date },
 ) {
   if (input.sourceRepairId !== undefined && (!Number.isSafeInteger(input.sourceRepairId) || input.sourceRepairId <= 0)) throw new LineManagerSendOutboxError("Invalid source Repair ID");
