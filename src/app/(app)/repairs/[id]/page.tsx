@@ -227,10 +227,17 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
             <PhysicalTagPanel
                 repairId={repair.id}
                 inquiryNumber={repair.inquiryNumber}
-                customerName={repair.customer.companyName || repair.customer.name}
+                customerType={repair.customer.type === "business" ? "business" : "individual"}
+                customerName={repair.customer.name}
+                companyName={repair.customer.companyName}
+                endUserName={repair.endUserName}
+                partnerRef={repair.partnerRef}
                 brand={repair.watch.brand.nameJp || repair.watch.brand.name}
                 model={repair.watch.model?.nameJp || repair.watch.modelNameInput || ""}
                 reference={repair.watch.reference?.name || ""}
+                serialNumber={repair.watch.serialNumber}
+                movementCaliber={repair.movementCaliber?.name ?? null}
+                watchCaliber={repair.watch.caliber?.name ?? null}
                 receptionDate={repair.receptionDate?.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) ?? null}
                 initialTag={activeTagAssignment ? {
                     physicalTagId: activeTagAssignment.physicalTag.id,
