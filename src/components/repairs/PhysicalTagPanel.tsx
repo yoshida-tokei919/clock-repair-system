@@ -13,10 +13,17 @@ type Tag = { physicalTagId: number; shortCode: string; qrToken: string; nfcUid: 
 type Props = {
   repairId: number;
   inquiryNumber: string;
+  customerType: "individual" | "business";
   customerName: string;
+  companyName: string | null;
+  endUserName: string | null;
+  partnerRef: string | null;
   brand: string;
   model: string;
   reference: string;
+  serialNumber: string | null;
+  movementCaliber: string | null;
+  watchCaliber: string | null;
   receptionDate: string | null;
   initialTag: Tag | null;
 };
@@ -63,11 +70,15 @@ export function PhysicalTagPanel(props: Props) {
     try {
       const label = physicalTagLabel({
         shortCode: tag.shortCode, qrToken: tag.qrToken,
-        inquiryNumber: props.inquiryNumber, customerName: props.customerName,
+        inquiryNumber: props.inquiryNumber, customerType: props.customerType,
+        customerName: props.customerName, companyName: props.companyName,
+        endUserName: props.endUserName, partnerRef: props.partnerRef,
         brand: props.brand, model: props.model, reference: props.reference,
+        serialNumber: props.serialNumber,
+        movementCaliber: props.movementCaliber, watchCaliber: props.watchCaliber,
         receptionDate: props.receptionDate,
       });
-      const qrCodeDataUrl = await QRCode.toDataURL(label.qrPayload, { width: 240, margin: 1 });
+      const qrCodeDataUrl = await QRCode.toDataURL(label.qrPayload, { width: 480, margin: 4 });
       const blob = await pdf(<TagDocument label={label} qrCodeDataUrl={qrCodeDataUrl} />).toBlob();
       setPreviewUrl(URL.createObjectURL(blob));
     } catch {
@@ -107,7 +118,7 @@ export function PhysicalTagPanel(props: Props) {
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>管理タグ ラベルプレビュー</DialogTitle></DialogHeader>
-          <p className="text-xs text-zinc-500">62 × 29 mm PDF。印刷時に用紙サイズを確認してください。</p>
+          <p className="text-xs text-zinc-500">Brother QL-800 / DK-2205 連続テープ用 62 × 75 mm PDF。印刷時は等倍・余白なしで用紙サイズを確認してください。</p>
           {previewLoading && <p>PDFを生成中...</p>}
           {error && !previewLoading && <p role="alert" className="text-sm text-red-600">{error}</p>}
           {previewUrl && !previewLoading && <>

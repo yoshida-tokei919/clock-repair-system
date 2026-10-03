@@ -119,11 +119,31 @@ test("missing Repair, active assignment, and create failure leave no new tag", a
 
 test("label QR payload is exactly the token, independent of printed Repair and customer text", () => {
   const label = physicalTagLabel({ shortCode: "PT-000123", qrToken: "opaque_token_123",
-    inquiryNumber: "T-999", customerName: "Customer PII", brand: "Brand", model: "Model",
-    reference: "Ref", receptionDate: "2026-10-01" });
+    inquiryNumber: "T-999", customerType: "individual", customerName: "Customer PII",
+    companyName: "Wrong company", endUserName: "Wrong end user", partnerRef: "Wrong partner ref",
+    brand: "Brand", model: "Model", reference: "Ref", serialNumber: "SN123",
+    movementCaliber: " Cal. 123 ", watchCaliber: "Cal. 456", receptionDate: "2026-10-01" });
   assert.equal(label.qrPayload, "opaque_token_123");
   assert.equal(label.inquiryNumber, "T-999");
   assert.equal(label.customerName, "Customer PII");
+  assert.equal(label.endUserName, null);
+  assert.equal(label.partnerRef, null);
+  assert.equal(label.caliber, "Cal. 123");
+  assert.equal(label.serialNumber, "SN123");
   assert.ok(!label.qrPayload.includes("T-999"));
   assert.ok(!label.qrPayload.includes("Customer PII"));
+  assert.ok(!label.qrPayload.includes("SN123"));
+});
+
+test("business label uses partner and end-user fields with Watch caliber fallback", () => {
+  const label = physicalTagLabel({ shortCode: "PT-000124", qrToken: "opaque_token_124",
+    inquiryNumber: "B-100", customerType: "business", customerName: "担当者名",
+    companyName: "  取引先会社  ", endUserName: "  所有者  ", partnerRef: "  先方-001  ",
+    brand: "Brand", model: "Model", reference: "Ref", serialNumber: null,
+    movementCaliber: null, watchCaliber: " Watch Cal ", receptionDate: null });
+  assert.equal(label.customerName, "取引先会社");
+  assert.equal(label.endUserName, "所有者");
+  assert.equal(label.partnerRef, "先方-001");
+  assert.equal(label.caliber, "Watch Cal");
+  assert.equal(label.qrPayload, "opaque_token_124");
 });
