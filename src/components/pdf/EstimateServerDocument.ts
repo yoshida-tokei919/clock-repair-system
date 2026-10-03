@@ -60,7 +60,7 @@ export function createEstimateServerDocumentElement(
   const styles = StyleSheet.create({
     page: {
       padding: 30,
-      fontFamily: "Noto Sans JP",
+      fontFamily: "Estimate Server Noto Sans JP",
       fontSize: 10,
       color: "#333",
     },

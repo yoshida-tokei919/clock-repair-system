@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import path from "path";
 
-import {
-  createEstimateServerDocumentElement,
-  EstimateServerDocumentProps,
-} from "@/components/pdf/EstimateServerDocument";
+import { type EstimateServerDocumentProps } from "@/components/pdf/EstimateServerDocument";
 import { authOptions } from "@/lib/auth";
 import {
   buildEstimatePdfStorageKey,
@@ -14,6 +10,7 @@ import {
   uploadEstimatePdf,
 } from "@/lib/estimate-pdf-storage";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
+import { renderEstimatePdfBuffer } from "@/lib/estimate-pdf-render";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -33,32 +30,6 @@ function getPdfCustomerName(customer: {
 
 function getEstimatePdfFileName(estimateNumber: string) {
   return `estimate_${estimateNumber.replace(/[^\w.-]+/g, "_")}.pdf`;
-}
-
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  return Buffer.concat(chunks);
-}
-
-async function renderEstimatePdfBuffer(data: EstimateServerDocumentProps["data"]) {
-  const nodeRequire = eval("require") as NodeRequire;
-  const ReactRuntime = nodeRequire("react");
-  const renderer = nodeRequire("@react-pdf/renderer");
-  const { Font, renderToStream } = renderer;
-
-  Font.register({
-    family: "Noto Sans JP",
-    src: path.join(process.cwd(), "public", "fonts", "NotoSansJP-Regular.otf"),
-  });
-
-  const documentElement = createEstimateServerDocumentElement(ReactRuntime, renderer, data);
-  const stream = (await renderToStream(documentElement)) as NodeJS.ReadableStream;
-  return streamToBuffer(stream);
 }
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
