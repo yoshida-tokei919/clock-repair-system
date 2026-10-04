@@ -188,7 +188,7 @@ export async function confirmLineManagerSendOutbox(
     const updated = await tx.lineManagerSendOutbox.updateMany({ where: { id: outbox.id, status: "POST_UNCONFIRMED", reconciliationToken: input.reconciliationToken }, data: { status: "CONFIRMED", confirmedManagerMessageId: input.actualMessageId, confirmedInquiryMessageId: message.id, confirmedAt: nowOr(input.now), reconciliationToken: null, reconciliationLeaseExpiresAt: null, lastError: null } });
     if (updated.count !== 1) throw new LineManagerSendOutboxError("Reconciliation claim changed before confirmation");
     return tx.lineManagerSendOutbox.findUnique({ where: { id: outbox.id } });
-  });
+  }, { timeout: 20_000 });
 }
 
 export const LINE_MANAGER_SEND_OUTBOX_LIMITS = { CLAIM_LEASE_MS, RECONCILIATION_LEASE_MS };

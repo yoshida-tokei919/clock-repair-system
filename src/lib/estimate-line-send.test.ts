@@ -180,7 +180,10 @@ function confirmationFixture(idempotencyKey?: string) {
     },
   };
   return {
-    db: { $transaction: async (fn: (client: any) => Promise<unknown>) => fn(tx) } as any,
+    db: { $transaction: async (fn: (client: any) => Promise<unknown>, options: unknown) => {
+      assert.deepEqual(options, { timeout: 20_000 });
+      return fn(tx);
+    } } as any,
     rows, timestamp,
     set status(value: string) { status = value; },
     set customerId(value: number) { customerId = value; },
