@@ -59,5 +59,6 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 - 初回見本: `previews/01_intake-print-preview.md` — LINE問い合わせ → AI受付レビュー → 受付リンク → Repair「送付待ち」
 - 続き見本: `previews/02_receive-tag-storage-preview.md` — 現物到着 → 受付 → PhysicalTag → QL-800ラベル → StorageLocation
 - 見積・承認見本: `previews/03_estimate-approval-parts-preview.md` — 見積入力 → LINE共有 → 顧客承認 → 部品発注
+- タイマー・Scheduler見本: `previews/04_timer-scheduler-preview.md` — WorkTimeSession → Scheduler設定 → WorkCalendar → Scheduler v2 → 今日の作業
 - 生成PDFは確認用出力であり、Git上の正本にはしない。
 - 画面例には実顧客データを使わず、実アプリUIまたは現行UI構造へ合成データを表示して撮影する。

@@ -40,12 +40,23 @@
 - `inquiry-list.png` — Inquiry一覧
 - `slack-inquiry-notification-sample.png` — ダミーSlack通知
 
+### 取得済み — タイマー・Scheduler
+
+- `work-timer-bar.png` — 共通業務タイマーバー。active作業、経過時間、停止、共通業務クイック開始を合成表示
+- `repair-work-timer.png` — Repair詳細の作業タイマー。見積開始とLABOR明細ごとの修理開始を合成表示
+- `scheduler-settings.png` — Scheduler設定の共通設定と修理一般標準時間を、現行項目に沿った合成データで表示
+- `repair-work-time-preview.png` — Repair詳細の作業時間previewと「推定時間を採用」導線を合成表示
+- `work-calendar.png` — 通常8時間と0h / 4h等の例外日を含むWorkCalendar合成画面
+- `scheduler-v2-preview.png` — Scheduler v2の分割予定案、時間feedback、部品・中断、apply導線を合成表示
+- `today-work.png` — 今日の容量、実行可能作業、部品待ちとRepairタイマー開始導線を合成表示
+
+実顧客データ、実WorkTimeSession、実ScheduleSegment、production DBは使用していない。
+
 ### 今後取得する — 見積・作業
 
 - `repair-detail.png`
 - `estimate-document-create.png`
 - `estimate-parts-search.png`
-- `today-work.png`
 - `today-work-and-scan.png`
 
 ### 今後取得する — PhysicalTag・保管場所
@@ -100,5 +111,6 @@
 - `../previews/01_intake-print-preview.md` — 問い合わせ・受付前半
 - `../previews/02_receive-tag-storage-preview.md` — 現物受付・PhysicalTag・StorageLocation
 - `../previews/03_estimate-approval-parts-preview.md` — 見積・承認・部品
+- `../previews/04_timer-scheduler-preview.md` — WorkTimeSession・Scheduler設定・Scheduler v2・今日の作業
 
 生成PDFはMarkdown原本ではなく確認用出力として扱い、Gitの正本にはしない。
