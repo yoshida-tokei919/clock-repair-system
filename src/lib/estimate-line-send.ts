@@ -110,7 +110,7 @@ export async function queueEstimateLineSend(
     const publicToken = await ensurePublicToken(tx, "EstimateDocument", documentId);
     for (const repair of document.repairs) await ensurePublicToken(tx, "Repair", repair.id);
     const estimateUrl = buildCustomerShareUrl(`/customer/repairs/${publicToken}`, requestUrl);
-    const text = `お見積りを共有いたします。\n\n下記URLより、対象案件・お見積内容をご確認ください。\n${estimateUrl}\n\nご確認後、画面上の「承認」または「差戻し」よりご回答ください。`;
+    const text = `お見積りができましたので、下記ページよりご確認をお願いいたします。\n\n${estimateUrl}\n\nこの内容で進める場合は、画面上から承認をお願いいたします。\nご不明な点や修正のご希望がございましたら、このLINEからご連絡ください。`;
     const idempotencyKey = estimateLineKey(documentId, document.customerId, document.repairs);
     const existing = await tx.lineManagerSendOutbox.findFirst({
       where: { idempotencyKey: { startsWith: estimateLineKeyPrefix(documentId) } },
