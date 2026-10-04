@@ -9,7 +9,19 @@ Inquiry / InquiryMessage / 画像保存
         ↓
 AI暫定分析 → 人が受付レビュー
         ↓
-時計受領・Watch / Repairへ案件化
+受付希望の時計を確定
+        ↓
+顧客用受付リンクを発行・LINE案内
+        ↓
+顧客が住所・返送先等を入力して送信
+        ↓
+Watch / Repair作成（送付待ち）
+        ↓
+顧客が時計を発送 → 工房へ現物到着
+        ↓
+Repairを「受付」へ変更
+        ↓
+PhysicalTag発行・保管場所登録
         ↓
 見積作成
         ↓
@@ -40,7 +52,17 @@ Repair納品完了
 
 後半の「日本郵便引受 → LINE発送通知 → 配達完了 → Repair納品済み」はTask202/204の完成状況に合わせて更新する。
 
-## 2.2 データの中心はRepair
+## 2.2 「送付待ち」と「受付」の違い
+
+B2C Inquiry起点では、Repairは時計現物が届く前に作成される。
+
+顧客が受付リンクを送信した時点で、正式なCustomer / Watch / Repairを作成し、Repair statusを `送付待ち` とする。この段階の `receptionDate` は未設定である。
+
+時計現物が工房へ到着した後、Repairを `受付` へ変更する。
+
+この2段階により、「受付情報は登録済みだが未着」と「工房が現物を受領済み」を区別する。
+
+## 2.3 データの中心はRepair
 
 Repairは修理案件の中心であり、次の情報を接続する。
 
@@ -55,7 +77,7 @@ Repairは修理案件の中心であり、次の情報を接続する。
 
 ただし、各情報をRepairの1テーブルへ詰め込むのではなく、役割別のデータとして分離している。
 
-## 2.3 主要システム構成
+## 2.4 主要システム構成
 
 ```text
 [顧客 LINE]
@@ -67,13 +89,12 @@ Repairは修理案件の中心であり、次の情報を接続する。
      ▼
 [Supabase / PostgreSQL]
      ▲
-     │ internal API / automation
+     │ internal API
      │
-[ローカル n8n 等の自動化]
+[Windowsローカル n8n 2.19.5]
      │
-     ├──────────────→ [Slack]
-     │
-     └─ LINE送信系とは役割を分離
+     ├─ LINE Inbox Processor
+     └──────────────→ [Slack]
 
 [管理画面]
      │ 明示送信操作
@@ -87,28 +108,43 @@ Repairは修理案件の中心であり、次の情報を接続する。
 [LINE Manager履歴照合]
      ▼
 CONFIRMED → OUTBOUND InquiryMessage
+
+[カタリ / inquiry-ai-bridge.ps1]
+     │ 明示実行
+     ▼
+[Inquiry AI暫定分析]
 ```
 
 LINE通常トーク送信ではMessaging API Pushを正本にせず、OutboxとManager履歴照合を使う。
-## 2.4 n8nの位置付け
+
+## 2.5 n8nの位置付け
 
 n8nはローカル自動化基盤として利用する。アプリの正本データはSupabase側に置き、n8n自身を案件データの正本にはしない。
 
-内部APIでは `N8N_INTERNAL_TOKEN` を利用する領域があるが、token値はマニュアル・ログ・Slack・画面キャプチャへ載せない。
+2026-10-04確認時点ではDockerではなく、Windowsローカルのn8n 2.19.5を使用している。Windowsタスクスケジューラ `YoshidaClockRepair-n8n` がログオン時に `C:\Users\yoshi\n8n-service\start-n8n.ps1` を起動する。
 
-このマニュアルでは、実際に稼働しているローカルn8nコンテナを確認したうえで、次を図解する。
+active workflowは現在2本である。
 
-- workflow一覧と役割
-- 起動条件 / polling間隔
-- 呼び出す内部API
-- Slack通知との接続
-- 成功時・失敗時の分岐
-- retryの有無
-- アプリ側のどの状態を正本とするか
+1. `LINE Inquiry Inbox Processor` — 1分ごとにLINE Webhook Inboxの後処理APIを呼ぶ。
+2. `Slack Notification Outbox Processor` — 1分ごとにSlack通知Outboxをclaimし、Slack投稿後にsent / failedをアプリへ返す。
 
-ノード名やworkflow IDは推測で書かず、実コンテナ確認後に確定する。
+AI暫定分析とLINE Manager通常トーク送信はn8nの役割ではない。
 
-## 2.5 LINE送信の安全ロジック
+内部APIでは `N8N_INTERNAL_TOKEN` を利用するが、token値はマニュアル・ログ・Slack・画面キャプチャへ載せない。
+
+詳細は第29章「n8n連携」で説明する。
+
+## 2.6 AI処理の位置付け
+
+現在のInquiry AI分析は、n8nによる完全自動処理ではない。
+
+新規Inquiryを確認した後、カタリが `scripts/inquiry-ai-bridge.ps1` を使用して保存済みLINE全文と画像を取得し、暫定分析を作成する。
+
+AI分析にはinputFingerprintを使用し、分析中に新しいメッセージや画像が増えた場合は古い分析の保存を409で拒否する。
+
+AI候補は正式値ではなく、人がInquiryレビュー画面で確認・確定する。
+
+## 2.7 LINE送信の安全ロジック
 
 ```text
 管理画面で送信内容を確認
@@ -135,7 +171,7 @@ OUTBOUND InquiryMessageを作成
 
 `APPROVED` は送信待ちであり送信成功ではない。`CONFIRMED` を実送信確認済みの状態として扱う。
 
-## 2.6 外部サービスとの境界
+## 2.8 外部サービスとの境界
 
 - Supabase: PostgreSQLの正本データ
 - Railway: Next.jsアプリのproduction実行環境
@@ -143,10 +179,22 @@ OUTBOUND InquiryMessageを作成
 - Slack: 通知用。問い合わせ本文の正本ではない
 - LINE Official Account / LINE Manager: 顧客との会話
 - lineoa: 現行LINE Manager通常トーク送信系で使用するローカルライブラリ
-- n8n: ローカル自動化・連携処理
+- n8n: Windowsローカルの定期処理・Slack連携
+- inquiry-ai-bridge / カタリ: Inquiry AI暫定分析の明示実行
 - ゆうプリR: 日本郵便送り状作成と発送履歴連携
 - Brother QL-800: PhysicalTag修理袋ラベル印刷
 
-## 2.7 印刷版の図解方針
+## 2.9 印刷版の図解方針
 
 最終PDFでは上記text図をそのまま使用せず、カラーのフロー図へ置き換える。図の原本は `assets/diagrams/` へ置き、詳細版と簡易版で再利用する。
+
+全体図では、少なくとも次を色分けする。
+
+- 顧客操作
+- 管理者操作
+- Railway / Next.js
+- Supabase
+- Windowsローカル処理
+- 外部サービス
+- 自動処理
+- 人の確認が必要な境界
