@@ -2,6 +2,7 @@ import { randomInt, randomUUID } from "crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { reconcileInquiryMessageRepairLinks } from "./inquiry-message-repair-links";
 import { lockLineUserInquiryTransaction } from "./inquiry-transaction-lock";
+import { transitionConfirmedEstimateRepairs } from "./estimate-line-confirmation";
 
 export type LineManagerSendOutboxDb = Pick<
   PrismaClient,
@@ -183,6 +184,7 @@ export async function confirmLineManagerSendOutbox(
         await reconcileInquiryMessageRepairLinks(tx, prior.id);
       }
     }
+    await transitionConfirmedEstimateRepairs(tx, outbox, nowOr(input.now));
     const updated = await tx.lineManagerSendOutbox.updateMany({ where: { id: outbox.id, status: "POST_UNCONFIRMED", reconciliationToken: input.reconciliationToken }, data: { status: "CONFIRMED", confirmedManagerMessageId: input.actualMessageId, confirmedInquiryMessageId: message.id, confirmedAt: nowOr(input.now), reconciliationToken: null, reconciliationLeaseExpiresAt: null, lastError: null } });
     if (updated.count !== 1) throw new LineManagerSendOutboxError("Reconciliation claim changed before confirmation");
     return tx.lineManagerSendOutbox.findUnique({ where: { id: outbox.id } });

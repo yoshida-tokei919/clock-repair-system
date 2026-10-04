@@ -34,7 +34,7 @@ export function EstimatePDFClient({ data, documentId, customerType, repairOption
         alert(result.error || "LINE送信に失敗しました。");
         return;
       }
-      alert("LINEで見積書URLを送信しました。");
+      alert("見積書URLをLINEの送信待ちに登録しました。");
     } catch (error) {
       console.error(error);
       alert("LINE送信に失敗しました。");

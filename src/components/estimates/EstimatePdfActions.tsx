@@ -38,7 +38,7 @@ export function EstimatePdfActions({ estimateDocumentId, hasPdf }: EstimatePdfAc
 
   async function sendLine() {
     const confirmed = window.confirm(
-      "この見積書共有URLをLINEで送信します。\nPDF添付は行いません。\n送信してよろしいですか？"
+      "この見積書共有URLをLINEの送信待ちに登録します。\nPDF添付は行いません。\n登録してよろしいですか？"
     );
 
     if (!confirmed) return;
@@ -56,7 +56,7 @@ export function EstimatePdfActions({ estimateDocumentId, hasPdf }: EstimatePdfAc
         throw new Error(result?.error || "LINE送信に失敗しました。");
       }
 
-      setMessage("送信しました。");
+      setMessage("LINEの送信待ちに登録しました。");
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "LINE送信に失敗しました。");
