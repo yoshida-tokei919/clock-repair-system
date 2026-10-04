@@ -8,8 +8,21 @@ import {
   createVerifiedLineManagerChat,
   fenceLineManagerPostAttempt,
   markLineManagerPreSendFailed,
+  lineManagerSendCandidateWhere,
+  LINE_MANAGER_SEND_OUTBOX_LIMITS,
   safeClaimLineManagerSendOutbox,
 } from "./line-manager-send-outbox";
+
+function guardedDb(outbox: any, unresolved = false): any {
+  const tx = {
+    $executeRaw: async (strings: TemplateStringsArray) => {
+      assert.equal(strings.join(""), "SELECT pg_advisory_xact_lock(203, 5)");
+      return 1;
+    },
+    lineManagerSendOutbox: { ...outbox, findFirst: async () => unresolved ? { id: 99 } : null },
+  };
+  return { lineManagerSendOutbox: tx.lineManagerSendOutbox, $transaction: async (fn: any) => fn(tx) };
+}
 
 test("mapping rejects non-inbound, another LINE user, and mismatched evidence ids", async () => {
   for (const evidence of [
@@ -77,30 +90,50 @@ test("mapping and outbox upserts converge concurrent equal requests and fail clo
 
 test("concurrent send claims permit exactly one worker", async () => {
   let token: string | undefined; let claimed = false;
-  const db: any = { lineManagerSendOutbox: { updateMany: async (a: any) => { if (claimed) return { count: 0 }; claimed = true; token = a.data.claimToken; return { count: 1 }; }, findUnique: async () => ({ id: 1, claimToken: token }) } };
+  const db = guardedDb({ updateMany: async (a: any) => { if (claimed) return { count: 0 }; claimed = true; token = a.data.claimToken; return { count: 1 }; }, findUnique: async () => ({ id: 1, claimToken: token }) });
   const result = await Promise.all([safeClaimLineManagerSendOutbox(db, { id: 1 }), safeClaimLineManagerSendOutbox(db, { id: 1 })]);
   assert.equal(result.filter(Boolean).length, 1);
 });
 
 test("stale CLAIMED is reclaimable, but POST_UNCONFIRMED is never a send-claim candidate", async () => {
-  const updates: any[] = []; const db: any = { lineManagerSendOutbox: { updateMany: async (a: any) => { updates.push(a); return { count: 0 }; } } };
+  const updates: any[] = []; const db = guardedDb({ updateMany: async (a: any) => { updates.push(a); return { count: 0 }; } });
   await safeClaimLineManagerSendOutbox(db, { id: 1, now: new Date("2026-09-23T00:00:00Z") });
   const where = updates[0].where;
-  assert.equal(where.OR[1].status, "CLAIMED"); assert.equal(where.OR.some((x: any) => x.status === "POST_UNCONFIRMED"), false);
+  assert.equal(where.OR.at(-1).status, "CLAIMED"); assert.equal(where.OR.some((x: any) => x.status === "POST_UNCONFIRMED"), false);
 });
 
 test("PRE_SEND_FAILED is retryable and stale claim tokens cannot fail or fence a newer claim", async () => {
-  const updates: any[] = []; const db: any = { lineManagerSendOutbox: { updateMany: async (a: any) => { updates.push(a); return { count: 0 }; } } };
+  const updates: any[] = []; const db = guardedDb({ updateMany: async (a: any) => { updates.push(a); return { count: 0 }; } });
   await safeClaimLineManagerSendOutbox(db, { id: 1 });
-  assert.deepEqual(updates[0].where.OR[0], { status: { in: ["APPROVED", "PRE_SEND_FAILED"] } });
+  assert.deepEqual(updates[0].where.OR[0], { status: "APPROVED", sendAttemptCount: { lt: 5 } });
   assert.equal(await markLineManagerPreSendFailed(db, { id: 1, claimToken: "old", error: "no" }), false);
   assert.equal(await fenceLineManagerPostAttempt(db, { id: 1, claimToken: "old" }), false);
   assert.equal(updates[2].where.status, "CLAIMED"); assert.equal(updates[2].where.claimToken, "old");
 });
 
 test("fence transitions only the current CLAIMED worker to POST_UNCONFIRMED, never back to send retry", async () => {
-  const db: any = { lineManagerSendOutbox: { updateMany: async (a: any) => { assert.equal(a.where.status, "CLAIMED"); assert.equal(a.data.status, "POST_UNCONFIRMED"); return { count: 1 }; } } };
+  const db = guardedDb({ updateMany: async (a: any) => { assert.equal(a.where.status, "CLAIMED"); assert.equal(a.data.status, "POST_UNCONFIRMED"); return { count: 1 }; } });
   assert.equal(await fenceLineManagerPostAttempt(db, { id: 1, claimToken: "current" }), true);
+});
+
+test("unresolved POST_UNCONFIRMED blocks direct claim and fence before mutation", async () => {
+  let updates = 0;
+  const db = guardedDb({ updateMany: async () => { updates++; return { count: 1 }; } }, true);
+  assert.equal(await safeClaimLineManagerSendOutbox(db, { id: 1 }), null);
+  assert.equal(await fenceLineManagerPostAttempt(db, { id: 1, claimToken: "token" }), false);
+  assert.equal(updates, 0);
+});
+
+test("retry backoff is durable and send attempts stop at five", () => {
+  const now = new Date("2026-09-23T00:10:00Z");
+  const clauses = lineManagerSendCandidateWhere(now).OR as any[];
+  assert.deepEqual(LINE_MANAGER_SEND_OUTBOX_LIMITS.RETRY_BACKOFF_MS, [30_000, 60_000, 120_000, 300_000]);
+  for (let count = 1; count <= 4; count++) {
+    assert.equal(clauses[count].sendAttemptCount, count);
+    assert.equal(clauses[count].lastAttemptAt.lte.getTime(), now.getTime() - LINE_MANAGER_SEND_OUTBOX_LIMITS.RETRY_BACKOFF_MS[count - 1]);
+  }
+  assert.equal(clauses.some((clause) => clause.status === "PRE_SEND_FAILED" && clause.sendAttemptCount === 5), false);
+  assert.deepEqual(clauses.at(-1).sendAttemptCount, { lt: 5 });
 });
 
 test("reconciliation claims only POST_UNCONFIRMED and competing workers cannot both claim", async () => {

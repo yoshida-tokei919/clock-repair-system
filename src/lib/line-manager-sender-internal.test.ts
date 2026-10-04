@@ -21,9 +21,15 @@ const row = {
   postAttemptedAt: null, reconciliationLeaseExpiresAt: null, lastHistoryCheckedAt: null,
 };
 
+async function executeGuardLock(strings: TemplateStringsArray) {
+  assert.equal(strings.join(""), "SELECT pg_advisory_xact_lock(203, 5)");
+  return 1;
+}
+
 test("sender claim scans eligible candidates, claims one safely, and returns only worker data", async () => {
   const seen: any[] = []; let token: string | undefined;
-  const db: any = { lineManagerSendOutbox: {
+  const db: any = { $transaction: async (fn: any) => fn({ $executeRaw: executeGuardLock, lineManagerSendOutbox: db.lineManagerSendOutbox }), lineManagerSendOutbox: {
+    findFirst: async () => null,
     findMany: async (args: any) => { seen.push(args); return [{ id: 5 }]; },
     updateMany: async (args: any) => { token = args.data.claimToken; return { count: 1 }; },
     findUnique: async () => ({ ...row, claimToken: token }),
@@ -33,12 +39,13 @@ test("sender claim scans eligible candidates, claims one safely, and returns onl
   assert.equal(item!.status, "CLAIMED"); assert.equal(item!.managerChatId, "chat");
   const where = seen[0].where;
   assert.equal(where.OR.some((item: any) => item.status === "POST_UNCONFIRMED"), false);
-  assert.deepEqual(where.OR[0], { status: { in: ["APPROVED", "PRE_SEND_FAILED"] } });
+  assert.deepEqual(where.OR[0], { status: "APPROVED", sendAttemptCount: { lt: 5 } });
 });
 
 test("competing sender scans have one safe-claim winner", async () => {
   let claimed = false; let token: string | undefined;
-  const db: any = { lineManagerSendOutbox: {
+  const db: any = { $transaction: async (fn: any) => fn({ $executeRaw: executeGuardLock, lineManagerSendOutbox: db.lineManagerSendOutbox }), lineManagerSendOutbox: {
+    findFirst: async () => null,
     findMany: async () => [{ id: 5 }],
     updateMany: async (args: any) => { if (claimed) return { count: 0 }; claimed = true; token = args.data.claimToken; return { count: 1 }; },
     findUnique: async () => ({ ...row, claimToken: token }),
@@ -49,7 +56,8 @@ test("competing sender scans have one safe-claim winner", async () => {
 
 test("a successful pre-send failure returns work to the safe claim path", async () => {
   let status = "APPROVED"; let token: string | null = null;
-  const db: any = { lineManagerSendOutbox: {
+  const db: any = { $transaction: async (fn: any) => fn({ $executeRaw: executeGuardLock, lineManagerSendOutbox: db.lineManagerSendOutbox }), lineManagerSendOutbox: {
+    findFirst: async () => null,
     updateMany: async (args: any) => {
       if (args.data.status === "CLAIMED" && (status === "APPROVED" || status === "PRE_SEND_FAILED")) {
         status = "CLAIMED"; token = args.data.claimToken; return { count: 1 };

@@ -107,6 +107,10 @@ class SenderTests(unittest.TestCase):
     def test_dry_run_never_claims_fences_or_posts(self):
         api,adapter=FakeApi(),FakeAdapter(); self.assertIn("no claim",process_send_once(api,adapter,allow_send=False,evidence_root=self.root)); self.assertEqual(api.calls,[]); self.assertEqual(adapter.posts,[])
     def test_pre_send_acknowledgement_failure_is_reported(self): self.assertEqual(self.send(FakeApi(pre=False),FakeAdapter(history_error=RuntimeError("down"))),"pre-send failure acknowledgement rejected")
+    def test_pre_send_exception_details_never_reach_internal_api(self):
+        api = FakeApi()
+        self.send(api, FakeAdapter(history_error=RuntimeError("cookie=value; secret; manager-id")))
+        self.assertEqual(api.calls[-1], ("pre", "pre-send history/evidence failed"))
     def test_no_post_without_fence(self):
         api,adapter=FakeApi(fence=False),FakeAdapter(); self.send(api,adapter); self.assertEqual(adapter.posts,[])
     def test_fence_error_does_not_post(self):

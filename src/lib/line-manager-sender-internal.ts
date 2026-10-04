@@ -5,6 +5,7 @@ import {
   confirmLineManagerSendOutbox,
   fenceLineManagerPostAttempt,
   LineManagerSendOutboxError,
+  lineManagerSendCandidateWhere,
   markLineManagerPreSendFailed,
   safeClaimLineManagerSendOutbox,
   type LineManagerSendOutboxDb,
@@ -69,10 +70,6 @@ export function parseLineManagerConfirmation(value: unknown) {
   };
 }
 
-function senderCandidateWhere(now: Date): Prisma.LineManagerSendOutboxWhereInput {
-  return { OR: [{ status: { in: ["APPROVED", "PRE_SEND_FAILED"] } }, { status: "CLAIMED", claimLeaseExpiresAt: { lt: now } }] };
-}
-
 function reconciliationCandidateWhere(now: Date): Prisma.LineManagerSendOutboxWhereInput {
   return { status: "POST_UNCONFIRMED", OR: [{ reconciliationToken: null }, { reconciliationLeaseExpiresAt: { lt: now } }] };
 }
@@ -98,7 +95,7 @@ function reconciliationItem(row: NonNullable<OutboxRow>, reconciliationToken: st
 
 export async function claimLineManagerSenderWork(db: LineManagerSendOutboxDb, now = new Date()) {
   const candidates = await db.lineManagerSendOutbox.findMany({
-    where: senderCandidateWhere(now), orderBy: { id: "asc" }, take: CANDIDATE_SCAN_LIMIT, select: { id: true },
+    where: lineManagerSendCandidateWhere(now), orderBy: { id: "asc" }, take: CANDIDATE_SCAN_LIMIT, select: { id: true },
   });
   for (const candidate of candidates) {
     const claimed = await safeClaimLineManagerSendOutbox(db, { id: candidate.id, now });

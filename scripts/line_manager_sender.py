@@ -195,8 +195,8 @@ def process_send_once(api: InternalApi, adapter: LineManagerAdapter, *, allow_se
     try:
         history = adapter.get_raw_history(item.manager_bot_id, item.manager_chat_id); watermark, latest_id = pre_send_watermark(history)
         evidence = SendEvidence(item.id, item.send_id, item.manager_bot_id, item.manager_chat_id, watermark, latest_id, _now(now), None); persist_evidence(evidence, root=evidence_root)
-    except Exception as error:
-        return "pre-send history/evidence failed" if api.pre_send_failed(item, safe_error(error)) else "pre-send failure acknowledgement rejected"
+    except Exception:
+        return "pre-send history/evidence failed" if api.pre_send_failed(item, "pre-send history/evidence failed") else "pre-send failure acknowledgement rejected"
     try:
         if not api.fence(item): return "fence rejected; no Manager POST"
     except Exception:

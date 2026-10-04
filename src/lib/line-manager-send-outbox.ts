@@ -14,6 +14,8 @@ export class LineManagerSendOutboxError extends Error {}
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 const RECONCILIATION_LEASE_MS = 5 * 60 * 1000;
 const MAX_ERROR_LENGTH = 1000;
+const MAX_SEND_ATTEMPTS = 5;
+const RETRY_BACKOFF_MS = [30_000, 60_000, 120_000, 300_000] as const;
 
 function nowOr(input?: Date) { return input ?? new Date(); }
 function expiredBefore(now: Date) { return { lt: now }; }
@@ -89,12 +91,32 @@ export async function createApprovedLineManagerSendOutbox(
   return outbox;
 }
 
+export function lineManagerSendCandidateWhere(now: Date): Prisma.LineManagerSendOutboxWhereInput {
+  return { OR: [
+    { status: "APPROVED", sendAttemptCount: { lt: MAX_SEND_ATTEMPTS } },
+    ...RETRY_BACKOFF_MS.map((delay, index) => ({ status: "PRE_SEND_FAILED" as const, sendAttemptCount: index + 1, lastAttemptAt: { lte: new Date(now.getTime() - delay) } })),
+    { status: "CLAIMED", sendAttemptCount: { lt: MAX_SEND_ATTEMPTS }, claimLeaseExpiresAt: expiredBefore(now) },
+  ] };
+}
+
+/** Serialize all send fences and claims, then fail closed while any POST outcome is unresolved. */
+async function withNoUnresolvedPost<T>(db: LineManagerSendOutboxDb, action: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T | null> {
+  return db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(203, 5)`;
+    const unresolved = await tx.lineManagerSendOutbox.findFirst({ where: { status: "POST_UNCONFIRMED" }, select: { id: true } });
+    if (unresolved) return null;
+    return action(tx);
+  });
+}
+
 export async function safeClaimLineManagerSendOutbox(db: LineManagerSendOutboxDb, input: { id: number; now?: Date; leaseMs?: number }) {
   const now = nowOr(input.now); const token = randomUUID(); const expires = new Date(now.getTime() + (input.leaseMs ?? CLAIM_LEASE_MS));
-  const result = await db.lineManagerSendOutbox.updateMany({ where: { id: input.id, OR: [{ status: { in: ["APPROVED", "PRE_SEND_FAILED"] } }, { status: "CLAIMED", claimLeaseExpiresAt: expiredBefore(now) }] }, data: { status: "CLAIMED", claimToken: token, claimLeaseExpiresAt: expires, claimedAt: now, sendAttemptCount: { increment: 1 }, lastAttemptAt: now, lastError: null } });
-  if (result.count !== 1) return null;
-  const row = await db.lineManagerSendOutbox.findUnique({ where: { id: input.id } });
-  return row?.claimToken === token ? { outbox: row, claimToken: token } : null;
+  return withNoUnresolvedPost(db, async (tx) => {
+    const result = await tx.lineManagerSendOutbox.updateMany({ where: { id: input.id, ...lineManagerSendCandidateWhere(now) }, data: { status: "CLAIMED", claimToken: token, claimLeaseExpiresAt: expires, claimedAt: now, sendAttemptCount: { increment: 1 }, lastAttemptAt: now, lastError: null } });
+    if (result.count !== 1) return null;
+    const row = await tx.lineManagerSendOutbox.findUnique({ where: { id: input.id } });
+    return row?.claimToken === token ? { outbox: row, claimToken: token } : null;
+  });
 }
 
 export async function markLineManagerPreSendFailed(db: LineManagerSendOutboxDb, input: { id: number; claimToken: string; error: unknown }) {
@@ -104,8 +126,8 @@ export async function markLineManagerPreSendFailed(db: LineManagerSendOutboxDb, 
 
 /** Mandatory durable fence: a sender may POST only after this returns true. */
 export async function fenceLineManagerPostAttempt(db: LineManagerSendOutboxDb, input: { id: number; claimToken: string; now?: Date }) {
-  const result = await db.lineManagerSendOutbox.updateMany({ where: { id: input.id, status: "CLAIMED", claimToken: input.claimToken }, data: { status: "POST_UNCONFIRMED", postAttemptedAt: nowOr(input.now), claimToken: null, claimLeaseExpiresAt: null, lastError: null } });
-  return result.count === 1;
+  const result = await withNoUnresolvedPost(db, async (tx) => tx.lineManagerSendOutbox.updateMany({ where: { id: input.id, status: "CLAIMED", claimToken: input.claimToken, sendAttemptCount: { lte: MAX_SEND_ATTEMPTS } }, data: { status: "POST_UNCONFIRMED", postAttemptedAt: nowOr(input.now), claimToken: null, claimLeaseExpiresAt: null, lastError: null } }));
+  return result?.count === 1;
 }
 
 export async function cancelLineManagerSendOutbox(db: LineManagerSendOutboxDb, input: { id: number; now?: Date }) {
@@ -191,4 +213,4 @@ export async function confirmLineManagerSendOutbox(
   }, { timeout: 20_000 });
 }
 
-export const LINE_MANAGER_SEND_OUTBOX_LIMITS = { CLAIM_LEASE_MS, RECONCILIATION_LEASE_MS };
+export const LINE_MANAGER_SEND_OUTBOX_LIMITS = { CLAIM_LEASE_MS, RECONCILIATION_LEASE_MS, MAX_SEND_ATTEMPTS, RETRY_BACKOFF_MS };
