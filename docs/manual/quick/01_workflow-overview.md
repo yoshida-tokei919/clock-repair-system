@@ -14,7 +14,7 @@ Inquiryレビュー画面でLINE履歴とAIの暫定分析を確認する。
 
 ブランド、モデル、Ref.、ケースRef、Cal.、故障内容、希望作業、不足情報等を確認する。AI候補はそのまま正式値にせず、人が確認する。
 
-`[画面画像予定: inquiry-review-overview.png]`
+![Inquiry review](../assets/screenshots/inquiry-review-full.png)
 
 ## 3. 時計情報を確定し、受付判断を行う
 
@@ -28,7 +28,7 @@ Inquiryレビュー画面でLINE履歴とAIの暫定分析を確認する。
 
 受付リンクには、確認済みの対象時計が紐づいている。
 
-`[画面画像予定: inquiry-intake-invite-dialog.png]`
+![Intake link](../assets/screenshots/inquiry-intake-dialog.png)
 
 ## 5. 顧客入力後の「送付待ち」を確認する
 

@@ -111,7 +111,7 @@ LINE返信欄へ入力した内容は、そのまま顧客向け送信内容に�
 
 ## 6.10 スクリーンショット構成
 
-`[画面画像予定: inquiry-review-line-section.png]`
+![LINE conversation](../assets/screenshots/inquiry-review-line.png)
 
 印刷版では次の状態を1枚の画面で示す。
 

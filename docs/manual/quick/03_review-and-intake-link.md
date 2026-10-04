@@ -10,7 +10,7 @@ AI候補を確認して時計情報を確定し、受付する時計だけを顧
 
 AI候補は参考情報であり、そのまま正式値ではない。
 
-`[画面画像予定: inquiry-review-watch-candidates.png]`
+![AI candidates](../assets/screenshots/inquiry-review-watch.png)
 
 ## 2. 時計情報を確定する
 
@@ -40,7 +40,7 @@ AI候補は参考情報であり、そのまま正式値ではない。
 3. LINE送信用案内文をコピーする。
 4. 顧客へのLINE返信として送信待ちに追加する。
 
-`[画面画像予定: inquiry-intake-invite-dialog.png]`
+![Intake link](../assets/screenshots/inquiry-intake-dialog.png)
 
 ## 5. 受付内容を後から変更した場合
 

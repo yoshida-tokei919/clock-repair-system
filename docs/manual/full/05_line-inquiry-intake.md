@@ -126,7 +126,7 @@ Inbox処理に失敗した場合、`LineWebhookInbox` はFAILEDとなり、後�
 
 `[画面画像予定: inquiry-list.png]`
 
-`[画面画像予定: inquiry-review-line-section.png]`
+![LINE conversation](../assets/screenshots/inquiry-review-line.png)
 
 ### 印刷版の注釈予定
 

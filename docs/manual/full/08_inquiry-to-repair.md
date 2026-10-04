@@ -51,7 +51,7 @@ Inquiryレビュー画面の「B2C 受付判断」で、時計ごとに受付可
 
 リンクは推測困難なrandom tokenを使用し、連番のRepair ID等を公開URLへ直接使用しない。
 
-`[画面画像予定: inquiry-intake-invite-dialog.png]`
+![Intake link](../assets/screenshots/inquiry-intake-dialog.png)
 
 印刷版では次を示す。
 

@@ -107,7 +107,7 @@ Aの分析をsave
 - B2C受付判断
 - 時計ごとの確認状態
 
-`[画面画像予定: inquiry-review-overview.png]`
+![Inquiry review](../assets/screenshots/inquiry-review-full.png)
 
 ## 7.7 時計ごとの確認
 
@@ -165,8 +165,8 @@ AI文字列をそのままmasterとして自動登録しない。
 
 詳細版では最低3枚を使用する。
 
-1. `inquiry-review-overview.png` — 画面全体
-2. `inquiry-review-watch-candidates.png` — AI候補・根拠・確定操作
-3. `inquiry-review-master-selection.png` — master選択・明示新規登録
+1. `inquiry-review-full.png` — 画面全体
+2. `inquiry-review-watch.png` — AI候補・根拠・確定操作
+3. `inquiry-review-line.png` — LINE履歴、分類、送信状態
 
 画像には「AI候補」と「正式値」の境界が分かる色付き注釈を入れる。

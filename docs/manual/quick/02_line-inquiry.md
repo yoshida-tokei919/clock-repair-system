@@ -14,7 +14,7 @@
 
 `[画面画像予定: inquiry-list.png]`
 
-`[画面画像予定: inquiry-review-line-section.png]`
+![LINE conversation](../assets/screenshots/inquiry-review-line.png)
 
 ## 画面で確認するところ
 
