@@ -123,9 +123,9 @@ Repair一覧のstatus選択では、現在 `送付待ち` の案件は次の遷�
 
 この操作で「顧客が入力した」「発送した」と「工房が現物を受領した」を区別する。
 
-`[画面画像予定: repairs-waiting-shipment.png]`
+`![Repair shipment waiting](../assets/screenshots/repairs-waiting-shipment.png)`
 
-`[画面画像予定: repair-status-received.png]`
+`![Repair received](../assets/screenshots/repair-status-received.png)`
 
 ## 8.10 現物受領後に行うこと
 

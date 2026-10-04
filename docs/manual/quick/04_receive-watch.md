@@ -12,7 +12,7 @@
 
 この状態は「受付情報は登録済みだが、時計現物はまだ工房へ届いていない」という意味である。
 
-`[画面画像予定: repairs-waiting-shipment.png]`
+`![Repair shipment waiting](../assets/screenshots/repairs-waiting-shipment.png)`
 
 ## 2. 現物が届くまで
 
@@ -30,7 +30,7 @@ Repairが「送付待ち」の間は、現物を受領済みとして扱わな�
 
 「送付待ち」から選べる通常の次statusは「受付」である。
 
-`[画面画像予定: repair-status-received.png]`
+`![Repair received](../assets/screenshots/repair-status-received.png)`
 
 ## 4. 受付後
 

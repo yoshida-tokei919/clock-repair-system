@@ -56,6 +56,7 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 `previews/` は、Markdown原本と共通スクリーンショットからA4カラーPDFを組む際のページ構成・文字量・画像サイズを確認するためのレイアウト原本を置く。
 
 - 初回見本: `previews/01_intake-print-preview.md`
+- 続き見本: `previews/02_receive-tag-storage-preview.md` — 現物到着 → 受付 → PhysicalTag → QL-800ラベル → StorageLocation
 - 対象: LINE問い合わせ → AI受付レビュー → 受付リンク → Repair「送付待ち」
 - 生成PDFは確認用出力であり、Git上の正本にはしない。
 - 画面例には実顧客データを使わず、実アプリUIへ合成データを表示して撮影する。

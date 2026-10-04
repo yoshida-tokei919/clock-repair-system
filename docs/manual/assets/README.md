@@ -15,11 +15,19 @@
 
 上記4枚は、実アプリの `InquiryReviewScreen` を使用し、表示データだけをマニュアル用の合成データへ差し替えて撮影した。実顧客の個人情報、実LINE識別子、認証情報、実受付tokenは使用していない。
 
+### 取得済み — 現物受付・PhysicalTag・保管場所
+
+- `physical-tag-panel.png` — Repair詳細のPhysicalTag / 管理タグ。実コンポーネントへマニュアル用合成データを渡して撮影
+- `physical-tag-label-preview.png` — 62×75mm修理袋ラベルのレイアウト見本。実装済み印字項目・QR payload方針に合わせた合成プレビュー
+- `storage-location-panel.png` — Repair詳細「現在の保管場所」と推奨 / 許容ゾーン表示。現行pageの表示構造へ合成データを適用
+- `repairs-waiting-shipment.png` — `送付待ち` Repairと、現物到着後に選べる次status `受付` を示す合成画面
+- `repair-status-received.png` — 現物受領後の `受付` 状態と次業務への案内
+
+実顧客データ、実QR token、実NFC UIDは使用していない。
+
 ### 今後取得する — 問い合わせ・受付
 
 - `inquiry-list.png` — Inquiry一覧
-- `repairs-waiting-shipment.png` — 「送付待ち」Repair
-- `repair-status-received.png` — 現物到着後の「受付」変更
 - `slack-inquiry-notification-sample.png` — ダミーSlack通知
 
 ### 見積・作業
@@ -32,7 +40,6 @@
 
 ### PhysicalTag・保管場所
 
-- `physical-tag-panel.png`
 - `scan-session.png`
 - `storage-locations.png`
 
