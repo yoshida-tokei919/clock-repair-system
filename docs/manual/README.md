@@ -51,12 +51,13 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 初期確認時のrepository HEAD: `2e28c8f586c0ccc783893ba901578953bab90d9c`
 
 今後は機能のproduction反映状況に合わせて継続更新する。
+
 ## 印刷プレビュー
 
 `previews/` は、Markdown原本と共通スクリーンショットからA4カラーPDFを組む際のページ構成・文字量・画像サイズを確認するためのレイアウト原本を置く。
 
-- 初回見本: `previews/01_intake-print-preview.md`
+- 初回見本: `previews/01_intake-print-preview.md` — LINE問い合わせ → AI受付レビュー → 受付リンク → Repair「送付待ち」
 - 続き見本: `previews/02_receive-tag-storage-preview.md` — 現物到着 → 受付 → PhysicalTag → QL-800ラベル → StorageLocation
-- 対象: LINE問い合わせ → AI受付レビュー → 受付リンク → Repair「送付待ち」
+- 見積・承認見本: `previews/03_estimate-approval-parts-preview.md` — 見積入力 → LINE共有 → 顧客承認 → 部品発注
 - 生成PDFは確認用出力であり、Git上の正本にはしない。
-- 画面例には実顧客データを使わず、実アプリUIへ合成データを表示して撮影する。
+- 画面例には実顧客データを使わず、実アプリUIまたは現行UI構造へ合成データを表示して撮影する。
