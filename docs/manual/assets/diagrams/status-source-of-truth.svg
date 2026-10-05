@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">業務事実ごとに分かれた正本</title>
+  <desc id="desc">Repairを中心に、Inquiry、Timer、PhysicalTag割当、保管場所割当、Shipment、LINE送信Outbox、Paymentを独立した業務事実として示す。線は関係と参照であり、同一statusを意味しない。</desc>
+  <defs>
+    <style>
+      .bg{fill:#fff}.core{fill:#eaf4fb;stroke:#24638d;stroke-width:3}.fact{fill:#e9f6ee;stroke:#28724f;stroke-width:2.5}.pending{fill:#fff4e7;stroke:#aa6924;stroke-width:2.5}.note{fill:#f5f6f8;stroke:#aab4bf;stroke-width:2}.link{fill:none;stroke:#8195a5;stroke-width:2.5;stroke-dasharray:6 6}.txt{font-family:"Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#173047;font-size:20px}.head{font-size:29px;font-weight:700}.label{font-size:21px;font-weight:700}.small{font-size:16px}.muted{fill:#526678}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="760"/>
+  <text class="txt head" x="44" y="45">業務事実ごとに正本を確認する</text>
+  <text class="txt small muted" x="44" y="73">点線は関係・参照。statusの同期や自動更新を表さない。</text>
+  <path class="link" d="M600 352 L600 212 M489 382 L320 169 M489 407 L320 346 M489 435 L320 542 M711 382 L881 169 M711 407 L881 346 M711 435 L881 542 M600 463 L600 632"/>
+  <rect class="core" x="475" y="330" width="250" height="133" rx="18"/>
+  <text class="txt label" x="500" y="372">Repair</text><text class="txt" x="500" y="407">業務工程 status</text><text class="txt small muted" x="500" y="435">案件の進行を記録</text>
+  <rect class="fact" x="58" y="103" width="300" height="132" rx="14"/>
+  <text class="txt label" x="78" y="140">InquiryMessage / InquiryFile</text><text class="txt small" x="78" y="172">保存済み原文・画像の記録</text><text class="txt small muted" x="78" y="203">Inquiry=業務単位／Slack通知とは別</text>
+  <rect class="fact" x="58" y="279" width="300" height="132" rx="14"/>
+  <text class="txt label" x="78" y="316">WorkTimeSession</text><text class="txt small" x="78" y="348">開始・停止・計測時間</text><text class="txt small muted" x="78" y="379">Repair statusでは停止しない</text>
+  <rect class="fact" x="58" y="475" width="300" height="132" rx="14"/>
+  <text class="txt label" x="78" y="512">PhysicalTagAssignment</text><text class="txt small" x="78" y="544">activeなタグ割当</text><text class="txt small muted" x="78" y="575">タグ本体ACTIVEとは別</text>
+  <rect class="fact" x="842" y="103" width="300" height="132" rx="14"/>
+  <text class="txt label" x="862" y="140">StorageLocationAssignment</text><text class="txt small" x="862" y="172">現物の現在地</text><text class="txt small muted" x="862" y="203">推奨zoneは移動記録でない</text>
+  <rect class="fact" x="842" y="279" width="300" height="132" rx="14"/>
+  <text class="txt label" x="862" y="316">Shipment</text><text class="txt small" x="862" y="348">1個口・宛先snapshot</text><text class="txt small muted" x="862" y="379">実発送・追跡は別の確認</text>
+  <rect class="pending" x="842" y="475" width="300" height="132" rx="14"/>
+  <text class="txt label" x="862" y="512">LINE Outbox</text><text class="txt small" x="862" y="544">intent → 履歴照合</text><text class="txt small muted" x="862" y="575">CONFIRMEDで送信確認</text>
+  <rect class="fact" x="450" y="620" width="300" height="102" rx="14"/>
+  <text class="txt label" x="473" y="656">Payment</text><text class="txt small" x="473" y="688">照合後のSUCCEEDEDで入金確定</text>
+</svg>

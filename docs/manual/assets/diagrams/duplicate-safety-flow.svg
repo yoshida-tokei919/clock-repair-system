@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="690" viewBox="0 0 1200 690" role="img" aria-labelledby="title desc">
+  <title id="title">重複防止の層と結果不明時の確認</title>
+  <desc id="desc">RequestまたはEventからdedupe、transactionとlock、人による確認を経て外部副作用へ進む。結果が確認できれば確定し、結果不明なら再送せず照合する。</desc>
+  <defs>
+    <style>
+      .bg{fill:#fff}.blue{fill:#eaf4fb;stroke:#24638d;stroke-width:2.5}.green{fill:#e9f6ee;stroke:#28724f;stroke-width:2.5}.orange{fill:#fff4e7;stroke:#aa6924;stroke-width:2.5}.gray{fill:#f5f6f8;stroke:#8e9ba7;stroke-width:2.5}.txt{font-family:"Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#173047;font-size:20px}.head{font-size:29px;font-weight:700}.label{font-size:21px;font-weight:700}.small{font-size:16px}.muted{fill:#526678}.arrow{stroke:#37779e;stroke-width:3;fill:none;marker-end:url(#tip)}.warnarrow{stroke:#aa6924;stroke-width:3;fill:none;marker-end:url(#warnTip)}
+    </style>
+    <marker id="tip" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#37779e"/></marker>
+    <marker id="warnTip" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#aa6924"/></marker>
+  </defs>
+  <rect class="bg" width="1200" height="690"/>
+  <text class="txt head" x="42" y="46">二重処理を防ぐ複数の層</text>
+  <text class="txt small muted" x="42" y="75">各経路で適用する層は異なる。DB制約だけで外部結果は確定しない。</text>
+  <rect class="blue" x="40" y="125" width="190" height="132" rx="14"/><text class="txt label" x="60" y="162">Request / Event</text><text class="txt small" x="60" y="194">Webhook・操作・scan</text><text class="txt small" x="60" y="222">再到着を想定</text>
+  <rect class="green" x="272" y="125" width="200" height="132" rx="14"/><text class="txt label" x="292" y="162">dedupe / key</text><text class="txt small" x="292" y="194">event ID・message ID</text><text class="txt small" x="292" y="222">intent key・sendId</text>
+  <rect class="green" x="514" y="125" width="200" height="132" rx="14"/><text class="txt label" x="534" y="162">transaction / lock</text><text class="txt small" x="534" y="194">再検証・unique制約</text><text class="txt small" x="534" y="222">atomicな更新</text>
+  <rect class="orange" x="756" y="125" width="200" height="132" rx="14"/><text class="txt label" x="776" y="162">明示確認 / fence</text><text class="txt small" x="776" y="194">read-only preview</text><text class="txt small" x="776" y="222">送信前の永続記録</text>
+  <rect class="blue" x="998" y="125" width="160" height="132" rx="14"/><text class="txt label" x="1018" y="162">外部副作用</text><text class="txt small" x="1018" y="194">LINE POST</text><text class="txt small" x="1018" y="222">Stripe等</text>
+  <path class="arrow" d="M230 190 H263 M472 190 H505 M714 190 H747 M956 190 H989"/>
+  <path class="arrow" d="M1078 257 V330 H861 V353"/>
+  <rect class="green" x="690" y="355" width="340" height="118" rx="14"/><text class="txt label" x="714" y="392">照合できた → 正本を確定</text><text class="txt small" x="714" y="425">Manager履歴 / paid Webhook等</text><text class="txt small muted" x="714" y="451">各業務事実の条件を満たして確定</text>
+  <path class="warnarrow" d="M1078 257 V543 H871"/>
+  <rect class="orange" x="380" y="509" width="480" height="126" rx="16"/><text class="txt label" x="410" y="551">結果不明 = 再送せず確認</text><text class="txt small" x="410" y="585">Shipment作成・タグrelease・LINE POSTの状態を再取得</text><text class="txt small" x="410" y="611">証拠不足・曖昧な履歴は要確認のまま止める</text>
+  <rect class="gray" x="40" y="352" width="570" height="120" rx="14"/><text class="txt label" x="62" y="389">retryできる失敗は処理ごとに限定</text><text class="txt small" x="62" y="422">例: LINE Inboxの上限未満、senderのfence前失敗</text><text class="txt small muted" x="62" y="449">fence後・外部結果不明は同じ扱いにしない</text>
+</svg>

@@ -128,6 +128,8 @@
 - [SupabaseとR2のデータ保存境界](diagrams/supabase-r2-data-boundary.svg) — 第31・32章
 - [Railway deployとDB migration](diagrams/railway-deploy-flow.svg) — 第33章
 - [外部サービスの接続境界](diagrams/external-services-boundary.svg) — 第34章
+- [業務事実ごとの正本](diagrams/status-source-of-truth.svg) — 第35章
+- [二重処理防止の層](diagrams/duplicate-safety-flow.svg) — 第36章
 
 ## 印刷プレビュー
 
@@ -140,5 +142,6 @@
 - [07 LINE内部構造](../previews/07_line-internals-preview.md)
 - [08 データ保存・実行環境](../previews/08_data-runtime-preview.md)
 - [09 外部配送・決済等の接続](../previews/09_external-services-preview.md)
+- [10 ステータス・正本・二重処理防止](../previews/10_status-safety-preview.md)
 
 生成PDFはMarkdown原本ではなく確認用出力として扱い、Gitの正本にはしない。

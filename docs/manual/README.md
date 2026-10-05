@@ -71,6 +71,10 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 - 詳細版: [34 外部配送・決済等の接続](full/34_external-integrations.md)
 
+## 第VII部 ステータス・正本・二重処理防止
+
+- 詳細版: [35 ステータスと正本データの考え方](full/35_status-source-of-truth.md) → [36 二重送信・二重作成を防ぐ仕組み](full/36_duplicate-safety.md)
+
 ## 印刷プレビュー
 
 `previews/` は、Markdown原本と共通スクリーンショットからA4カラーPDFを組む際のページ構成・文字量・画像サイズを確認するためのレイアウト原本を置く。
@@ -84,5 +88,6 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 - LINE内部構造見本: [previews/07_line-internals-preview.md](previews/07_line-internals-preview.md)
 - データ保存・実行環境見本: [previews/08_data-runtime-preview.md](previews/08_data-runtime-preview.md)
 - 外部配送・決済等の接続見本: [previews/09_external-services-preview.md](previews/09_external-services-preview.md)
+- ステータス・正本・二重処理防止見本: [previews/10_status-safety-preview.md](previews/10_status-safety-preview.md)
 - 生成PDFは確認用出力であり、Git上の正本にはしない。
 - 画面例には実顧客データを使わず、実アプリUIまたは現行UI構造へ合成データを表示して撮影する。
