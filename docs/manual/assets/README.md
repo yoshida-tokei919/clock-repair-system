@@ -123,6 +123,9 @@
 
 最終PDFではカラー図へ書き出し、Markdownから同じ画像を参照する。
 
+- [LINE Webhook / Inboxフロー](diagrams/line-webhook-inbox-flow.svg) — 第27章
+- [LINE Manager senderフロー](diagrams/line-manager-sender-flow.svg) — 第28章
+
 ## 印刷プレビュー
 
 - `../previews/01_intake-print-preview.md` — 問い合わせ・受付前半
@@ -131,5 +134,6 @@
 - `../previews/04_timer-scheduler-preview.md` — WorkTimeSession・Scheduler設定・Scheduler v2・今日の作業
 - `../previews/05_repair-work-completion-preview.md` — ScanSession・修理作業・作業完了・ランニングテスト・LINE完了連絡
 - `../previews/06_shipping-yupuri-preview.md` — 配達希望回答・Shipment・梱包照合・PhysicalTag release・ゆうプリR
+- [07 LINE内部構造](../previews/07_line-internals-preview.md)
 
 生成PDFはMarkdown原本ではなく確認用出力として扱い、Gitの正本にはしない。

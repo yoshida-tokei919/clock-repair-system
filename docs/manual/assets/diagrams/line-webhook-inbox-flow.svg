@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 1130" role="img" aria-labelledby="title desc">
+  <title id="title">LINE WebhookからInquiry保存まで</title>
+  <desc id="desc">LINE PlatformのWebhookを署名検証後にInboxへ保存し、n8nの起動でprocessorがInquiry、Message、FileとSlack通知Outboxを保存する流れ。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#456078"/></marker>
+    <style>
+      text{font-family:"Noto Sans JP","Yu Gothic",sans-serif;fill:#183047} .head{font-size:27px;font-weight:700}.label{font-size:20px;font-weight:700}.sub{font-size:15px}.small{font-size:14px}.line{stroke:#456078;stroke-width:3;fill:none;marker-end:url(#arrow)} .op{fill:#e9f5ff;stroke:#387eb2;stroke-width:2}.auto{fill:#e8f7ed;stroke:#3e9162;stroke-width:2}.store{fill:#f0edfc;stroke:#7765ad;stroke-width:2}.warn{fill:#fff3dc;stroke:#bd8230;stroke-width:2}
+    </style>
+  </defs>
+  <rect width="840" height="1130" fill="#fff"/>
+  <text x="42" y="55" class="head">LINE Webhook → Inquiry保存</text>
+  <rect x="42" y="75" width="756" height="48" rx="9" fill="#f5f7fa"/>
+  <rect x="60" y="89" width="18" height="18" class="op"/><text x="85" y="104" class="small">外部 / 入口</text>
+  <rect x="232" y="89" width="18" height="18" class="auto"/><text x="257" y="104" class="small">自動処理</text>
+  <rect x="408" y="89" width="18" height="18" class="store"/><text x="433" y="104" class="small">保存データ</text>
+  <rect x="585" y="89" width="18" height="18" class="warn"/><text x="610" y="104" class="small">注意・人の確認</text>
+  <rect x="130" y="150" width="580" height="70" rx="13" class="op"/>
+  <text x="420" y="180" text-anchor="middle" class="label">LINE Platform</text><text x="420" y="204" text-anchor="middle" class="sub">Webhookイベント</text>
+  <path d="M420 221 V251" class="line"/>
+  <rect x="130" y="255" width="580" height="96" rx="13" class="auto"/>
+  <text x="420" y="288" text-anchor="middle" class="label">/api/line/webhook</text>
+  <text x="420" y="316" text-anchor="middle" class="sub">raw body + x-line-signature を検証</text>
+  <text x="420" y="338" text-anchor="middle" class="small">不正署名・不正payloadは保存しない</text>
+  <path d="M420 352 V382" class="line"/>
+  <rect x="130" y="385" width="580" height="80" rx="13" class="store"/>
+  <text x="420" y="418" text-anchor="middle" class="label">LineWebhookInbox</text>
+  <text x="420" y="445" text-anchor="middle" class="sub">RECEIVED / webhookEventIdで重複保存防止</text>
+  <path d="M420 466 V496" class="line"/>
+  <rect x="130" y="499" width="580" height="76" rx="13" class="auto"/>
+  <text x="420" y="530" text-anchor="middle" class="label">n8n：1分ごとに内部APIを起動</text>
+  <text x="420" y="555" text-anchor="middle" class="sub">LINE送信や業務ロジックは行わない</text>
+  <path d="M420 576 V606" class="line"/>
+  <rect x="130" y="609" width="580" height="95" rx="13" class="auto"/>
+  <text x="420" y="642" text-anchor="middle" class="label">Inbox processor</text>
+  <text x="420" y="669" text-anchor="middle" class="sub">最大20件claim / stale 10分 / 最大5回</text>
+  <text x="420" y="691" text-anchor="middle" class="small">externalMessageIdでMessageをdedupe</text>
+  <path d="M420 705 V735" class="line"/>
+  <rect x="130" y="738" width="580" height="93" rx="13" class="store"/>
+  <text x="420" y="771" text-anchor="middle" class="label">Inquiry / InquiryMessage / InquiryFile</text>
+  <text x="420" y="798" text-anchor="middle" class="sub">画像はR2保存済みを確認してからPROCESSED</text>
+  <text x="420" y="820" text-anchor="middle" class="small">保存済みの会話・ファイルが正本</text>
+  <path d="M420 832 V862" class="line"/>
+  <rect x="130" y="865" width="580" height="76" rx="13" class="store"/>
+  <text x="420" y="898" text-anchor="middle" class="label">SlackNotificationOutbox</text>
+  <text x="420" y="925" text-anchor="middle" class="sub">通知は別workflowで投稿。Slackは正本ではない</text>
+  <rect x="130" y="972" width="580" height="86" rx="13" class="warn"/>
+  <text x="420" y="1004" text-anchor="middle" class="label">失敗・競合時</text>
+  <text x="420" y="1031" text-anchor="middle" class="sub">複数active Inquiry → NEEDS_REVIEW</text>
+  <text x="420" y="1052" text-anchor="middle" class="small">5回失敗 → INBOX_PROCESSING_FAILED通知</text>
+</svg>

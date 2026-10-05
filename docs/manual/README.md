@@ -59,6 +59,10 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 これらの章は現行実装と未実装範囲を明示する。発送・追跡・配達完了の自動処理はまだ完成していないため、実装済みの発送準備と未実装の自動連携を分けて記載する。
 
+## LINE内部構造の章
+
+- 詳細版: [27 LINE WebhookとInquiry保存](full/27_line-webhook.md) → [28 LINE Manager Outbox / local sender / lineoa / 履歴照合](full/28_line-manager-sender.md)
+
 ## 印刷プレビュー
 
 `previews/` は、Markdown原本と共通スクリーンショットからA4カラーPDFを組む際のページ構成・文字量・画像サイズを確認するためのレイアウト原本を置く。
@@ -69,5 +73,6 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 - タイマー・Scheduler見本: `previews/04_timer-scheduler-preview.md` — WorkTimeSession → Scheduler設定 → WorkCalendar → Scheduler v2 → 今日の作業
 - 修理作業・完了連絡見本: `previews/05_repair-work-completion-preview.md` — PhysicalTag scan → 実修理 → 作業完了 → ランニングテスト → LINE完了連絡
 - 配達希望・発送見本: `previews/06_shipping-yupuri-preview.md` — 配達希望回答 → Shipment → 梱包照合 → PhysicalTag release → ゆうプリR
+- LINE内部構造見本: [previews/07_line-internals-preview.md](previews/07_line-internals-preview.md)
 - 生成PDFは確認用出力であり、Git上の正本にはしない。
 - 画面例には実顧客データを使わず、実アプリUIまたは現行UI構造へ合成データを表示して撮影する。
