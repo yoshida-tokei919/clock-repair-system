@@ -39,7 +39,7 @@
 23. PhysicalTag連続scanによる梱包照合
 24. 発送前PhysicalTag release
 25. ゆうプリR CSV出力・発送履歴取込
-26. 発送・追跡・配達完了
+26. [発送・追跡・配達完了 — 現行運用と制限](26_shipping-tracking-delivery.md)
 
 ## 第VI部 外部連携と内部ロジック
 

@@ -58,7 +58,7 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 ## 発送・配達希望の章
 
-- 詳細版: [21 配達希望](full/21_delivery-preference.md) → [22 Shipment](full/22_shipment.md) → [23 梱包照合](full/23_shipment-packing.md) → [24 タグ解放](full/24_physical-tag-release.md) → [25 ゆうプリR](full/25_yupuri.md)
+- 詳細版: [21 配達希望](full/21_delivery-preference.md) → [22 Shipment](full/22_shipment.md) → [23 梱包照合](full/23_shipment-packing.md) → [24 タグ解放](full/24_physical-tag-release.md) → [25 ゆうプリR](full/25_yupuri.md) → [26 発送・追跡・配達完了（現行運用と制限）](full/26_shipping-tracking-delivery.md)
 - 簡易版: [18 配達希望](quick/18_delivery-preference.md) → [19 Shipment](quick/19_shipment.md) → [20 梱包](quick/20_packing.md) → [21 タグ解放](quick/21_tag-release.md) → [22 ゆうプリR](quick/22_yupuri.md)
 
 これらの章は現行実装と未実装範囲を明示する。発送・追跡・配達完了の自動処理はまだ完成していないため、実装済みの発送準備と未実装の自動連携を分けて記載する。
