@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">外部サービスと時計修理業務アプリの接続境界</title>
+  <desc id="desc">中央のNext.jsとSupabaseを正本とし、ゆうプリRはCSV、StripeはCheckoutと署名付きWebhook、銀行振込は人による手動確認。ヤマトB2、PayPay、KOMOJUは現行経路に接続しない。LINE、n8n、Slackは実装済み経路として詳細章を参照する。</desc>
+  <defs>
+    <style>
+      .bg{fill:#ffffff}.core{fill:#eaf4fb;stroke:#24638d;stroke-width:3}.db{fill:#e9f6ee;stroke:#28724f;stroke-width:2.5}
+      .live{fill:#f5faff;stroke:#4b7799;stroke-width:2.5}.manual{fill:#fff4e7;stroke:#aa6924;stroke-width:2.5}
+      .blocked{fill:#f5f5f5;stroke:#858e98;stroke-width:2.5;stroke-dasharray:8 6}.light{fill:#f7f8fb;stroke:#bdc6d0;stroke-width:2}
+      .txt{font-family:"Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#173047;font-size:21px}.head{font-size:27px;font-weight:700}
+      .small{font-size:17px}.tiny{font-size:15px}.muted{fill:#526678}.warn{fill:#8a4b12}.line{stroke:#2e6e9b;stroke-width:3;fill:none}
+      .orange{stroke:#b87527;stroke-width:3;fill:none}.dashed{stroke:#8a939e;stroke-width:2.5;stroke-dasharray:7 6;fill:none}
+    </style>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#2e6e9b"/></marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#b87527"/></marker>
+  </defs>
+  <rect class="bg" width="1200" height="760"/>
+  <text class="txt head" x="48" y="40">外部サービスとの接続境界</text>
+  <text class="txt small muted" x="876" y="38">実線：現行経路　点線：未接続</text>
+
+  <rect class="live" x="40" y="66" width="300" height="135" rx="14"/>
+  <text class="txt head" x="61" y="101">日本郵便／ゆうプリR</text>
+  <text class="txt small" x="61" y="131">V3取込CSV出力</text>
+  <text class="txt small" x="61" y="158">発送履歴CSV読取preview</text>
+  <text class="txt small muted" x="61" y="185">直接の配送会社APIなし</text>
+
+  <rect class="blocked" x="860" y="66" width="300" height="135" rx="14"/>
+  <text class="txt head" x="880" y="101">ヤマトB2クラウド</text>
+  <text class="txt small" x="880" y="133">97項目の形式を調査済み</text>
+  <text class="txt small muted" x="880" y="162">CSV出力は未実装</text>
+  <text class="txt tiny muted" x="880" y="185">契約値・実サンプル待ち</text>
+
+  <rect class="core" x="353" y="224" width="494" height="334" rx="20"/>
+  <text class="txt head" x="380" y="263">Next.js アプリ境界</text>
+  <text class="txt small" x="380" y="296">Admin認証／顧客請求書／各API</text>
+  <text class="txt small" x="380" y="326">Shipment → CSV生成・履歴preview</text>
+  <text class="txt small" x="380" y="356">Checkout Session作成／Webhook検証</text>
+  <text class="txt small" x="380" y="386">管理者の手動入金登録</text>
+  <rect class="db" x="380" y="417" width="440" height="111" rx="12"/>
+  <text class="txt head" x="402" y="450">Supabase PostgreSQL</text>
+  <text class="txt small" x="402" y="479">Shipment・Invoice・Payment</text>
+  <text class="txt small" x="402" y="506">PaymentAllocation・PaymentAttempt</text>
+
+  <rect class="live" x="888" y="258" width="272" height="130" rx="14"/>
+  <text class="txt head" x="908" y="295">Stripe</text>
+  <text class="txt small" x="908" y="325">カードCheckout／API</text>
+  <text class="txt small" x="908" y="354">署名付きWebhook</text>
+  <rect class="manual" x="888" y="433" width="272" height="111" rx="14"/>
+  <text class="txt head" x="908" y="467">銀行振込</text>
+  <text class="txt small" x="908" y="494">人が着金確認 → Admin登録</text>
+  <text class="txt small muted" x="908" y="520">銀行API／取引feedなし</text>
+
+  <rect class="light" x="40" y="267" width="255" height="72" rx="12"/>
+  <text class="txt" x="60" y="296">LINE</text>
+  <text class="txt small muted" x="60" y="322">Webhook／別のlocal sender</text>
+  <rect class="light" x="40" y="363" width="255" height="72" rx="12"/>
+  <text class="txt" x="60" y="392">n8n</text>
+  <text class="txt small muted" x="60" y="418">定期起動・orchestration</text>
+  <rect class="light" x="40" y="459" width="255" height="72" rx="12"/>
+  <text class="txt" x="60" y="488">Slack</text>
+  <text class="txt small muted" x="60" y="514">通知、問い合わせ正本ではない</text>
+
+  <path class="line" d="M353 278 H322 V201 H190" marker-end="url(#arrowBlue)"/>
+  <text class="txt tiny" x="335" y="219" transform="rotate(-90 335 219)">CSV出力</text>
+  <path class="line" d="M200 201 V222 H341 V306 H353" marker-end="url(#arrowBlue)"/>
+  <text class="txt tiny" x="201" y="242">履歴preview</text>
+  <path class="dashed" d="M847 245 H875 V201 H1005"/>
+  <text class="txt tiny muted" x="873" y="219">実装なし</text>
+  <path class="line" d="M847 303 H888" marker-end="url(#arrowBlue)"/>
+  <text class="txt tiny" x="853" y="290">HTTPS</text>
+  <path class="line" d="M888 352 H847" marker-end="url(#arrowBlue)"/>
+  <text class="txt tiny" x="848" y="378">署名Webhook</text>
+  <path class="orange" d="M888 484 H847" marker-end="url(#arrowOrange)"/>
+  <text class="txt tiny warn" x="850" y="469">手動確認</text>
+  <path class="line" d="M295 303 H353 M295 399 H353 M295 495 H353"/>
+  <text class="txt tiny muted" x="42" y="564">LINE／n8n／Slackの詳細は第27～30章参照</text>
+
+  <rect class="blocked" x="387" y="612" width="426" height="78" rx="14"/>
+  <text class="txt head" x="408" y="644">PayPay／KOMOJU</text>
+  <text class="txt small muted" x="408" y="672">現行の実行可能な決済経路に含まれない</text>
+  <path class="dashed" d="M600 558 V612"/>
+  <text class="txt tiny muted" x="623" y="591">未接続</text>
+  <text class="txt tiny muted" x="41" y="727">CSV出力・preview・送信intent・画面遷移だけでは、配送や決済の確定にならない。</text>
+</svg>

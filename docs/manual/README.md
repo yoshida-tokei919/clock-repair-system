@@ -67,6 +67,10 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 - 詳細版: [31 Supabase / Prisma](full/31_supabase-prisma.md) → [32 Cloudflare R2](full/32_cloudflare-r2.md) → [33 Railway](full/33_railway.md)
 
+## 外部サービスの接続境界
+
+- 詳細版: [34 外部配送・決済等の接続](full/34_external-integrations.md)
+
 ## 印刷プレビュー
 
 `previews/` は、Markdown原本と共通スクリーンショットからA4カラーPDFを組む際のページ構成・文字量・画像サイズを確認するためのレイアウト原本を置く。
@@ -79,5 +83,6 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 - 配達希望・発送見本: `previews/06_shipping-yupuri-preview.md` — 配達希望回答 → Shipment → 梱包照合 → PhysicalTag release → ゆうプリR
 - LINE内部構造見本: [previews/07_line-internals-preview.md](previews/07_line-internals-preview.md)
 - データ保存・実行環境見本: [previews/08_data-runtime-preview.md](previews/08_data-runtime-preview.md)
+- 外部配送・決済等の接続見本: [previews/09_external-services-preview.md](previews/09_external-services-preview.md)
 - 生成PDFは確認用出力であり、Git上の正本にはしない。
 - 画面例には実顧客データを使わず、実アプリUIまたは現行UI構造へ合成データを表示して撮影する。

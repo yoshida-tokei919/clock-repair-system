@@ -127,6 +127,7 @@
 - [LINE Manager senderフロー](diagrams/line-manager-sender-flow.svg) — 第28章
 - [SupabaseとR2のデータ保存境界](diagrams/supabase-r2-data-boundary.svg) — 第31・32章
 - [Railway deployとDB migration](diagrams/railway-deploy-flow.svg) — 第33章
+- [外部サービスの接続境界](diagrams/external-services-boundary.svg) — 第34章
 
 ## 印刷プレビュー
 
@@ -138,5 +139,6 @@
 - `../previews/06_shipping-yupuri-preview.md` — 配達希望回答・Shipment・梱包照合・PhysicalTag release・ゆうプリR
 - [07 LINE内部構造](../previews/07_line-internals-preview.md)
 - [08 データ保存・実行環境](../previews/08_data-runtime-preview.md)
+- [09 外部配送・決済等の接続](../previews/09_external-services-preview.md)
 
 生成PDFはMarkdown原本ではなく確認用出力として扱い、Gitの正本にはしない。
