@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <style>
+      .bg{fill:#fff}.local{fill:#fff3e4;stroke:#bd7b2d;stroke-width:3}.app{fill:#e8f2fb;stroke:#4e83aa;stroke-width:3}.db{fill:#e9f7ee;stroke:#57936b;stroke-width:3}.ext{fill:#eef2f6;stroke:#73808c;stroke-width:3}.t{font-family:"Yu Gothic",Meiryo,sans-serif;fill:#173047;font-size:28px}.h{font-size:38px;font-weight:700}.b{font-size:21px;font-weight:700}.s{font-size:23px}.line{stroke:#526678;stroke-width:4;fill:none}
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0 0 L12 6 L0 12 Z" fill="#526678"/></marker>
+  </defs>
+  <rect class="bg" width="1600" height="900"/>
+  <text class="t h" x="60" y="65">n8n実行環境と責任範囲</text>
+  <rect class="local" x="80" y="125" width="290" height="105" rx="16"/>
+  <text class="t b" x="110" y="168">Windows Task Scheduler</text><text class="t s" x="110" y="205">ログオン時に起動</text>
+  <rect class="local" x="455" y="125" width="270" height="105" rx="16"/>
+  <text class="t b" x="490" y="168">start-n8n.ps1</text><text class="t s" x="490" y="205">tokenを子processへ渡す</text>
+  <rect class="local" x="810" y="125" width="270" height="105" rx="16"/>
+  <text class="t b" x="858" y="168">n8n 2.19.5</text><text class="t s" x="850" y="205">1分ごとのorchestration</text>
+  <path class="line" d="M370 178 H455" marker-end="url(#arrow)"/><path class="line" d="M725 178 H810" marker-end="url(#arrow)"/>
+
+  <rect class="local" x="155" y="350" width="360" height="115" rx="16"/>
+  <text class="t b" x="190" y="395">LINE Inquiry Inbox Processor</text><text class="t s" x="190" y="435">内部APIを起動するだけ</text>
+  <rect class="app" x="625" y="350" width="330" height="115" rx="16"/>
+  <text class="t b" x="680" y="395">Next.js processor</text><text class="t s" x="675" y="435">Inquiry保存・画像処理・retry</text>
+  <rect class="db" x="1080" y="350" width="345" height="115" rx="16"/>
+  <text class="t b" x="1120" y="395">Supabase PostgreSQL</text><text class="t s" x="1130" y="435">Inbox / Inquiry / Outbox</text>
+  <path class="line" d="M945 230 V300 H335 V350" marker-end="url(#arrow)"/><path class="line" d="M515 408 H625" marker-end="url(#arrow)"/><path class="line" d="M955 408 H1080" marker-end="url(#arrow)"/>
+
+  <rect class="local" x="155" y="610" width="410" height="115" rx="16"/>
+  <text class="t b" x="190" y="655">Slack Notification Outbox Processor</text><text class="t s" x="190" y="695">claim → 投稿 → sent/failed ack</text>
+  <rect class="ext" x="700" y="610" width="260" height="115" rx="16"/>
+  <text class="t b" x="790" y="655">Slack</text><text class="t s" x="750" y="695">通知先・正本ではない</text>
+  <rect class="app" x="1090" y="610" width="335" height="115" rx="16"/>
+  <text class="t b" x="1130" y="655">Next.js ack API</text><text class="t s" x="1138" y="695">Outboxへ結果を返す</text>
+  <path class="line" d="M945 230 V550 H360 V610" marker-end="url(#arrow)"/><path class="line" d="M565 668 H700" marker-end="url(#arrow)"/><path class="line" d="M960 668 H1090" marker-end="url(#arrow)"/><path class="line" d="M1255 610 V530 H1255 V465" marker-end="url(#arrow)"/>
+
+  <text class="t s" x="80" y="825">n8nは起動・通知の調整役。LINE通常トーク送信本体や業務データの正本にはしない。</text>
+</svg>

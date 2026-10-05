@@ -124,7 +124,6 @@ Inbox処理に失敗した場合、`LineWebhookInbox` はFAILEDとなり、後�
 3. 対象Inquiryの「時計情報の確認」画面を開く。
 4. LINE本文・画像・AI分析を確認する。
 
-`[画面画像予定: inquiry-list.png]`
 
 ![LINE conversation](../assets/screenshots/inquiry-review-line.png)
 

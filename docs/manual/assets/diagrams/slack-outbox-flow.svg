@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="720" viewBox="0 0 1600 720">
+  <defs>
+    <style>
+      .bg{fill:#fff}.db{fill:#e9f7ee;stroke:#57936b;stroke-width:3}.local{fill:#fff3e4;stroke:#bd7b2d;stroke-width:3}.ext{fill:#eef2f6;stroke:#73808c;stroke-width:3}.app{fill:#e8f2fb;stroke:#4e83aa;stroke-width:3}.t{font-family:"Yu Gothic",Meiryo,sans-serif;fill:#173047;font-size:28px}.h{font-size:38px;font-weight:700}.b{font-size:21px;font-weight:700}.s{font-size:23px}.line{stroke:#526678;stroke-width:4;fill:none}
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0 0 L12 6 L0 12 Z" fill="#526678"/></marker>
+  </defs>
+  <rect class="bg" width="1600" height="720"/>
+  <text class="t h" x="60" y="65">Slack通知Outboxの流れ</text>
+  <rect class="db" x="70" y="240" width="330" height="120" rx="16"/>
+  <text class="t b" x="105" y="288">SlackNotificationOutbox</text><text class="t s" x="130" y="330">通知本文と送信状態を保存</text>
+  <rect class="local" x="500" y="240" width="290" height="120" rx="16"/>
+  <text class="t b" x="555" y="288">n8n claim</text><text class="t s" x="540" y="330">送信対象を1件ずつ取得</text>
+  <rect class="ext" x="890" y="240" width="250" height="120" rx="16"/>
+  <text class="t b" x="975" y="288">Slack</text><text class="t s" x="930" y="330">指定channelへ投稿</text>
+  <rect class="app" x="1240" y="240" width="290" height="120" rx="16"/>
+  <text class="t b" x="1280" y="288">sent / failed ack</text><text class="t s" x="1280" y="330">結果をアプリへ返す</text>
+  <path class="line" d="M400 300 H500" marker-end="url(#arrow)"/><path class="line" d="M790 300 H890" marker-end="url(#arrow)"/><path class="line" d="M1140 300 H1240" marker-end="url(#arrow)"/>
+  <path class="line" d="M1385 360 V500 H235 V360" marker-end="url(#arrow)"/>
+  <text class="t s" x="520" y="560">投稿結果はOutboxへ戻す。Slack表示そのものを問い合わせ本文の正本にしない。</text>
+</svg>

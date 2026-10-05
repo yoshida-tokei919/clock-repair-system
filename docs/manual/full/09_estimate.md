@@ -32,7 +32,7 @@ Repair詳細の「見積・修理明細」で、顧客へ提示する作業と�
 
 内装・外装の作業マスタと部品マスタは役割が異なるため、同じものとして扱わない。
 
-`[画面画像予定: estimate-entry.png]`
+![Estimate entry](../assets/screenshots/estimate-entry.png)
 
 ## 9.3 明細行で確認する項目
 
@@ -145,7 +145,7 @@ Repair詳細の「お客様連絡」には、見積内容に添えて顧客へ�
 
 同一顧客の複数Repairを1つの見積書へまとめることもできる。
 
-`[画面画像予定: estimate-document-create.png]`
+?????????????9.10??Estimate document actions???????
 
 ## 9.10 EstimateDocumentとPDFは別
 
