@@ -50,7 +50,7 @@ reconciliationは`POST_UNCONFIRMED`をclaimし、ローカル証拠とManager履
 
 ## 28.6 実環境の稼働確認と障害時の順序
 
-2026-10-05確認時点でWindows Scheduled Task `ClockRepair-LineManagerSender`は**Running / Enabled**。actionは`powershell.exe -File "C:\Users\yoshi\line-manager-sender-service\start-line-manager-sender.ps1" -AllowSend`、WorkingDirectoryは`C:\Users\yoshi\line-manager-sender-service\runtime`。`runtime\VERSION.txt`は上記Task203E版、ログの場所は`C:\Users\yoshi\line-manager-sender-service\logs`。launcherはUser環境変数の内部API認証tokenをchildへ渡す。値は表示しない。同日時点でstdoutにPOST試行から次cycleで履歴確認に至る正常完了を1件確認し、stderrは空だった。これはその時点の稼働確認であり、現在の全送信の成功保証ではない。
+Task203Eのコードがproductionへdeployされていることと、Windows Scheduled Taskが現在正常稼働していることは別に確認する。2026-10-05のマニュアル監査では`ClockRepair-LineManagerSender`が**登録済み・Enabled**で、actionは`powershell.exe -File "C:\Users\yoshi\line-manager-sender-service\start-line-manager-sender.ps1" -AllowSend`、WorkingDirectoryは`C:\Users\yoshi\line-manager-sender-service\runtime`だった。一方、監査時点のTask stateは`Ready`、直近実行結果は`1`であり、deploy済みという事実だけからlocal senderの現在稼働や送信成功を断定しない。`runtime\VERSION.txt`、`C:\Users\yoshi\line-manager-sender-service\logs`、Scheduled Taskのstate / LastTaskResult、Outbox状態をその都度確認する。launcherはUser環境変数の内部API認証tokenをchildへ渡すが、値は表示しない。
 
 停止・滞留を疑うときは次の順に確認する。
 
