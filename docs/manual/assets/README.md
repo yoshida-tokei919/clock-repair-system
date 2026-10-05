@@ -62,6 +62,15 @@
 
 実顧客、実LINE送信先、実public token、実WorkTimeSession、production DBは使用していない。LINE送信・status更新・DB mutationも実行していない。
 
+### 取得済み — 配達希望・Shipment・梱包
+
+- `delivery-preference-customer.png` — 実DeliveryPreferenceFormへ合成データを表示し、日付+時間帯の回答確認まで進めた画面
+- `delivery-preference-admin.png` — 実RepairDeliveryRequestPanelへ合成回答とDRAFT Shipmentを表示し、`Shipmentへ反映済み` を確認できる画面
+- `shipments-schedule.png` — 実ShipmentsClientへ合成Shipmentを表示した発送予定一覧
+- `shipment-select.png` — 実ScanSessionの `発送対象` でPhysicalTag 1件を選択し、明示的なShipment作成ボタンを表示した画面
+- `shipment-packing-release.png` — 実ScanSessionの `梱包照合` で梱包一致後、PhysicalTag release previewと明示解放ボタンまで表示した画面
+
+実顧客、実Shipment、実PhysicalTag token、実public token、production DBは使用していない。Shipment作成、配達希望保存、PhysicalTag release等のmutationも実行していない。
 
 ### 今後取得する — 見積・作業
 
@@ -76,9 +85,7 @@
 
 ### 今後取得する — 発送・納品
 
-- `shipments.png`
-- `delivery-preference.png`
-- `yupuri-export.png`
+- `yupuri-export.png` — 共通UIが追加された場合に取得。現状はAPI出力のため偽画面を作らない
 
 ## スクリーンショット方針
 
@@ -123,5 +130,6 @@
 - `../previews/03_estimate-approval-parts-preview.md` — 見積・承認・部品
 - `../previews/04_timer-scheduler-preview.md` — WorkTimeSession・Scheduler設定・Scheduler v2・今日の作業
 - `../previews/05_repair-work-completion-preview.md` — ScanSession・修理作業・作業完了・ランニングテスト・LINE完了連絡
+- `../previews/06_shipping-yupuri-preview.md` — 配達希望回答・Shipment・梱包照合・PhysicalTag release・ゆうプリR
 
 生成PDFはMarkdown原本ではなく確認用出力として扱い、Gitの正本にはしない。

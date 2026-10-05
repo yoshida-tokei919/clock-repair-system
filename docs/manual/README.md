@@ -52,6 +52,13 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 今後は機能のproduction反映状況に合わせて継続更新する。
 
+## 発送・配達希望の章
+
+- 詳細版: [21 配達希望](full/21_delivery-preference.md) → [22 Shipment](full/22_shipment.md) → [23 梱包照合](full/23_shipment-packing.md) → [24 タグ解放](full/24_physical-tag-release.md) → [25 ゆうプリR](full/25_yupuri.md)
+- 簡易版: [18 配達希望](quick/18_delivery-preference.md) → [19 Shipment](quick/19_shipment.md) → [20 梱包](quick/20_packing.md) → [21 タグ解放](quick/21_tag-release.md) → [22 ゆうプリR](quick/22_yupuri.md)
+
+これらの章は現行実装と未実装範囲を明示する。発送・追跡・配達完了の自動処理はまだ完成していないため、実装済みの発送準備と未実装の自動連携を分けて記載する。
+
 ## 印刷プレビュー
 
 `previews/` は、Markdown原本と共通スクリーンショットからA4カラーPDFを組む際のページ構成・文字量・画像サイズを確認するためのレイアウト原本を置く。
@@ -61,5 +68,6 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 - 見積・承認見本: `previews/03_estimate-approval-parts-preview.md` — 見積入力 → LINE共有 → 顧客承認 → 部品発注
 - タイマー・Scheduler見本: `previews/04_timer-scheduler-preview.md` — WorkTimeSession → Scheduler設定 → WorkCalendar → Scheduler v2 → 今日の作業
 - 修理作業・完了連絡見本: `previews/05_repair-work-completion-preview.md` — PhysicalTag scan → 実修理 → 作業完了 → ランニングテスト → LINE完了連絡
+- 配達希望・発送見本: `previews/06_shipping-yupuri-preview.md` — 配達希望回答 → Shipment → 梱包照合 → PhysicalTag release → ゆうプリR
 - 生成PDFは確認用出力であり、Git上の正本にはしない。
 - 画面例には実顧客データを使わず、実アプリUIまたは現行UI構造へ合成データを表示して撮影する。
