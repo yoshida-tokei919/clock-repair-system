@@ -63,6 +63,10 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 - 詳細版: [27 LINE WebhookとInquiry保存](full/27_line-webhook.md) → [28 LINE Manager Outbox / local sender / lineoa / 履歴照合](full/28_line-manager-sender.md)
 
+## データ保存・実行環境の章
+
+- 詳細版: [31 Supabase / Prisma](full/31_supabase-prisma.md) → [32 Cloudflare R2](full/32_cloudflare-r2.md) → [33 Railway](full/33_railway.md)
+
 ## 印刷プレビュー
 
 `previews/` は、Markdown原本と共通スクリーンショットからA4カラーPDFを組む際のページ構成・文字量・画像サイズを確認するためのレイアウト原本を置く。
@@ -74,5 +78,6 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 - 修理作業・完了連絡見本: `previews/05_repair-work-completion-preview.md` — PhysicalTag scan → 実修理 → 作業完了 → ランニングテスト → LINE完了連絡
 - 配達希望・発送見本: `previews/06_shipping-yupuri-preview.md` — 配達希望回答 → Shipment → 梱包照合 → PhysicalTag release → ゆうプリR
 - LINE内部構造見本: [previews/07_line-internals-preview.md](previews/07_line-internals-preview.md)
+- データ保存・実行環境見本: [previews/08_data-runtime-preview.md](previews/08_data-runtime-preview.md)
 - 生成PDFは確認用出力であり、Git上の正本にはしない。
 - 画面例には実顧客データを使わず、実アプリUIまたは現行UI構造へ合成データを表示して撮影する。

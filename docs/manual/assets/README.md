@@ -125,6 +125,8 @@
 
 - [LINE Webhook / Inboxフロー](diagrams/line-webhook-inbox-flow.svg) — 第27章
 - [LINE Manager senderフロー](diagrams/line-manager-sender-flow.svg) — 第28章
+- [SupabaseとR2のデータ保存境界](diagrams/supabase-r2-data-boundary.svg) — 第31・32章
+- [Railway deployとDB migration](diagrams/railway-deploy-flow.svg) — 第33章
 
 ## 印刷プレビュー
 
@@ -135,5 +137,6 @@
 - `../previews/05_repair-work-completion-preview.md` — ScanSession・修理作業・作業完了・ランニングテスト・LINE完了連絡
 - `../previews/06_shipping-yupuri-preview.md` — 配達希望回答・Shipment・梱包照合・PhysicalTag release・ゆうプリR
 - [07 LINE内部構造](../previews/07_line-internals-preview.md)
+- [08 データ保存・実行環境](../previews/08_data-runtime-preview.md)
 
 生成PDFはMarkdown原本ではなく確認用出力として扱い、Gitの正本にはしない。

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="660" viewBox="0 0 1100 660" role="img" aria-labelledby="title desc">
+  <title id="title">Railway deployとproduction DB migrationの独立した流れ</title>
+  <desc id="desc">GitHub mainからRailway Railpack、npm install、npm run build、npm run start、productionへの流れと、backup、review、明示migration、read-backの別レーンを示す。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#475569"/></marker>
+    <style>
+      .bg{fill:#f8fafc}.title{font:700 27px sans-serif;fill:#0f172a}.lane{font:700 18px sans-serif;fill:#334155}
+      .label{font:700 17px sans-serif;fill:#0f172a}.body{font:14px sans-serif;fill:#334155}.small{font:13px sans-serif;fill:#475569}
+      .box{fill:#e0f2fe;stroke:#0284c7;stroke-width:2}.prod{fill:#dbeafe;stroke:#2563eb;stroke-width:2}
+      .migration{fill:#dcfce7;stroke:#16a34a;stroke-width:2}.storage{fill:#ffedd5;stroke:#ea580c;stroke-width:2}
+      .line{stroke:#475569;stroke-width:2.4;fill:none;marker-end:url(#arrow)}.laneBg{fill:#eff6ff}.migrationBg{fill:#f0fdf4}
+    </style>
+  </defs>
+  <rect class="bg" width="1100" height="660"/>
+  <text class="title" x="35" y="48">deployとDB migrationは別工程</text>
+  <rect class="laneBg" x="28" y="78" width="1044" height="260" rx="14"/>
+  <text class="lane" x="45" y="109">アプリのbuild / deploy</text>
+  <rect class="box" x="45" y="140" width="145" height="72" rx="10"/><text class="label" x="117" y="169" text-anchor="middle">GitHub</text><text class="body" x="117" y="192" text-anchor="middle">main</text>
+  <path class="line" d="M190 176 L215 176"/>
+  <rect class="box" x="220" y="140" width="145" height="72" rx="10"/><text class="label" x="292" y="169" text-anchor="middle">Railway</text><text class="body" x="292" y="192" text-anchor="middle">Railpack</text>
+  <path class="line" d="M365 176 L390 176"/>
+  <rect class="box" x="395" y="140" width="145" height="72" rx="10"/><text class="label" x="467" y="181" text-anchor="middle">npm install</text>
+  <path class="line" d="M540 176 L565 176"/>
+  <rect class="box" x="570" y="140" width="165" height="72" rx="10"/><text class="label" x="652" y="169" text-anchor="middle">npm run build</text><text class="body" x="652" y="192" text-anchor="middle">prisma generate</text>
+  <path class="line" d="M735 176 L760 176"/>
+  <rect class="box" x="765" y="140" width="140" height="72" rx="10"/><text class="label" x="835" y="181" text-anchor="middle">next build</text>
+  <path class="line" d="M905 176 L930 176"/>
+  <rect class="prod" x="935" y="140" width="120" height="72" rx="10"/><text class="label" x="995" y="169" text-anchor="middle">start</text><text class="body" x="995" y="192" text-anchor="middle">production</text>
+  <text class="body" x="45" y="257">起動コマンド: npm run start（next start）</text>
+  <text class="body" x="45" y="285">prisma generateはClient生成。Railway build / startにprisma migrate deployは含まれない。</text>
+  <rect class="migrationBg" x="28" y="357" width="1044" height="135" rx="14"/>
+  <text class="lane" x="45" y="386">production DB migration — 明示管理</text>
+  <rect class="migration" x="45" y="409" width="210" height="61" rx="10"/><text class="label" x="150" y="446" text-anchor="middle">backup + review</text>
+  <path class="line" d="M255 440 L325 440"/>
+  <rect class="migration" x="330" y="409" width="370" height="61" rx="10"/><text class="label" x="515" y="446" text-anchor="middle">explicit production migration</text>
+  <path class="line" d="M700 440 L770 440"/>
+  <rect class="migration" x="775" y="409" width="280" height="61" rx="10"/><text class="label" x="915" y="446" text-anchor="middle">read-back / 権限確認</text>
+  <rect class="storage" x="45" y="525" width="1010" height="85" rx="12"/>
+  <text class="label" x="550" y="557" text-anchor="middle">永続データは外部に保存</text>
+  <text class="body" x="550" y="585" text-anchor="middle">業務DB: Supabase PostgreSQL　　PDF: Supabase Storage　　画像: Cloudflare R2</text>
+  <text class="small" x="45" y="634">2026-10-05確認時点: Railway volumeなし。rollback / redeployはDB migrationを自動で巻き戻さない。</text>
+</svg>
