@@ -83,6 +83,10 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 - 詳細版: [37 エラー時の切り分け](full/37_troubleshooting.md) → [38 バックアップ・migration・deploy](full/38_backup-migration-deploy.md)
 
+## マニュアルの更新
+
+- 詳細版: [39 マニュアル更新手順](full/39_manual-update.md)
+
 ## 印刷プレビュー
 
 `previews/` は、Markdown原本と共通スクリーンショットからA4カラーPDFを組む際のページ構成・文字量・画像サイズを確認するためのレイアウト原本を置く。
