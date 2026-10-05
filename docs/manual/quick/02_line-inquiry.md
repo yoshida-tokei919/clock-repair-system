@@ -1,4 +1,4 @@
-# 簡易版 1 — LINE問い合わせを確認する
+# 簡易版 2 — LINE問い合わせを確認する
 
 ## 目的
 
@@ -12,7 +12,6 @@
 4. 「LINEやり取り」で顧客の本文と画像を確認する。
 5. 送信待ちの返信がある場合は、まだ送信済みとは判断しない。
 
-`[画面画像予定: inquiry-list.png]`
 
 ![LINE conversation](../assets/screenshots/inquiry-review-line.png)
 

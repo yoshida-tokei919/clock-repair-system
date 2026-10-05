@@ -1,4 +1,4 @@
-# 簡易版 受付から納品までの全体像
+# 簡易版 1 — 受付から納品までの全体像
 
 このページでは、1件のB2C修理をLINE問い合わせから返送・納品完了まで進める基本順序を示す。
 
@@ -6,7 +6,6 @@
 
 Slackの通知またはInquiry一覧から新しい問い合わせを開き、保存済みの顧客メッセージ・画像を確認する。
 
-`[画面画像予定: inquiry-list.png]`
 
 ## 2. 受付レビュー
 
@@ -42,7 +41,7 @@ Inquiryレビュー画面でLINE履歴とAIの暫定分析を確認する。
 
 ここが工房での正式な現物受領操作になる。
 
-`[画面画像予定: repairs-waiting-shipment.png]`
+![送付待ち案件](../assets/screenshots/repairs-waiting-shipment.png)
 
 ## 7. PhysicalTagを発行する
 
@@ -50,7 +49,7 @@ Inquiryレビュー画面でLINE履歴とAIの暫定分析を確認する。
 
 QR / NFC / shortCodeを使って時計現物とRepairを対応付ける。
 
-`[画面画像予定: physical-tag-panel.png]`
+![PhysicalTag管理](../assets/screenshots/physical-tag-panel.png)
 
 ## 8. 保管場所を登録する
 
@@ -72,7 +71,9 @@ QR / NFC / shortCodeを使って時計現物とRepairを対応付ける。
 
 PhysicalTagをscanして対象Repairを確認し、必要な作業タイマーを開始する。scanだけで重要状態を自動確定しない。
 
-`[画面画像予定: today-work-and-scan.png]`
+![今日の作業](../assets/screenshots/today-work.png)
+
+![PhysicalTag scan](../assets/screenshots/scan-session-timer.png)
 
 ## 13. 修理・ランニングテスト
 
@@ -86,7 +87,7 @@ Repairが作業完了になった後、管理者が送信内容を確認し、�
 
 顧客がLINE内の案内から配達希望回答ページを開き、希望なし / 日付 / 時間帯 / 日付+時間帯を回答する。
 
-`[画面画像予定: delivery-preference.png]`
+![配達希望回答](../assets/screenshots/delivery-preference-admin.png)
 
 ## 16. Shipmentを準備
 
@@ -106,7 +107,9 @@ ShipmentからゆうプリR標準フォーマットV3 CSVを出力し、ゆう�
 
 ## 20. 発送・配達完了を確認
 
-日本郵便の引受・追跡・配達完了との自動連携はTask202/204の完成状況に合わせて、この手順を最終確定する。
+現行アプリは、ゆうプリR向けCSV出力と発送履歴CSVのread-only previewまで対応している。送り状の発行・印刷、荷物の実引渡し、追跡、配達完了はゆうプリR / 日本郵便側で実際の結果を確認する。
+
+発送履歴previewは追跡番号・実発送日時・配達完了日時・Shipment / Repair statusを書き戻さない。`10/0A = 引受予定`も実引受の証拠ではない。Task202B / Task204の実引受判定、追跡番号保存、LINE発送通知、配達完了からRepair納品済みへの自動連携は未完成のため、アプリに自動記録されたものとして扱わない。
 
 ---
 

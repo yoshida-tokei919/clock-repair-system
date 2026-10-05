@@ -1,4 +1,4 @@
-# 簡易版 4 — PhysicalTag発行と修理袋ラベル
+# 簡易版 5 — PhysicalTag発行と修理袋ラベル
 
 ## 目的
 
