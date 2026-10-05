@@ -38,6 +38,55 @@ export type HistoryRow = {
 };
 export type HistoryShipment = { id: number; trackingNumber: string | null };
 
+// Japan Post Yu-Pri R, 入出力インターフェース仕様書 (2025-08-07), section 10.
+// These are the table's descriptions, not Shipment state transitions.
+type StatusGroup = readonly [aggregate: string, description: string, details: readonly string[]];
+const describedStatusGroups: readonly StatusGroup[] = [
+  ["10", "引受予定", ["01", "02", "0A", "0B", "0H"]],
+  ["11", "引受", ["01", "02", "06", "07", "0C", "0F", "0G"]],
+  ["12", "通過", ["14"]],
+  ["12", "最寄局送付", ["15"]],
+  ["12", "ＣＶＳ等引渡", ["16"]],
+  ["12", "はこぽす等入庫", ["17"]],
+  ["13", "発送", ["19", "23", "25"]],
+  ["14", "車船輸送", ["83", "84", "85", "86", "87", "88"]],
+  ["30", "到着", ["00"]],
+  ["50", "持出中", ["01", "02"]],
+  ["51", "不在持戻", ["30", "31", "32"]],
+  ["51", "最寄局保管", ["33"]],
+  ["52", "配達完了", ["01", "31", "32", "35"]],
+  ["52", "返還完了", ["34"]],
+  ["53", "窓口渡し", ["37"]],
+  ["53", "配達完了", ["38"]],
+  ["60", "局内保管", ["48", "50"]],
+  ["60", "私書箱保管", ["49"]],
+  ["60", "保管中", ["77"]],
+  ["60", "保管", ["99"]],
+  ["61", "転送", ["51", "52", "53", "54", "55"]],
+  ["61", "他局転送", ["79"]],
+  ["62", "返還", ["44", "56", "57", "58", "59", "60", "61", "62", "63", "64", "76", "79"]],
+  ["62", "処分", ["65"]],
+  ["62", "返還不能", ["66"]],
+  ["63", "配達希望", ["67", "68", "72", "78", "79", "80"]],
+  ["63", "保管延長", ["70"]],
+  ["64", "休日保管", ["73"]],
+  ["64", "保管", ["74", "75", "79"]],
+  ["65", "調査中", ["44", "56", "58", "59", "60", "61", "64", "76", "79", "80"]],
+];
+const statusKey = (aggregate: string, detail: string) => `${aggregate}/${detail}`;
+const officialDescriptions = new Map(describedStatusGroups.flatMap(([aggregate, description, details]) =>
+  details.map(detail => [statusKey(aggregate, detail), description] as const)));
+
+// A dash in the official table is a listed pair without a description.
+const officiallyUndescribedPairs = new Set([
+  "11/0D", "11/0E",
+  "12/10", "12/11", "12/12", "12/13",
+  "13/20", "13/21", "13/22", "13/24", "13/26", "13/27",
+  "20/03", "20/18", "40/00", "52/36",
+  "60/81", "60/82", "63/69", "63/71",
+  "90/39", "90/40", "90/41", "90/42", "90/43", "90/44", "90/45", "90/46", "90/47", "90/79",
+]);
+
 function csvRows(input: string): CsvRow[] {
   const rows: CsvRow[] = [];
   let fields: string[] = [];
@@ -123,8 +172,11 @@ export function parseYupuriHistory(bytes: Buffer): HistoryRow[] {
     const resolvedShipmentId = Number.isSafeInteger(id) && id <= 2147483647 ? id : null;
     if (resolvedShipmentId === null) errors.push("Invalid SHP management number");
     if (!trackingNumberCandidate.trim()) errors.push("Tracking number is required");
-    const confirmedDescriptionOrNull = aggregateStatusCode === "10" && detailStatusCode === "0A" ? "引受予定" : null;
-    if (confirmedDescriptionOrNull === null) warnings.push("Unverified delivery status codes");
+    const key = statusKey(aggregateStatusCode, detailStatusCode);
+    const confirmedDescriptionOrNull = officialDescriptions.get(key) ?? null;
+    if (confirmedDescriptionOrNull === null) warnings.push(officiallyUndescribedPairs.has(key)
+      ? "Official delivery status table lists this pair without a description"
+      : "Unverified delivery status codes");
     return { rowNumber, managementNumber, resolvedShipmentId, shipmentFound: false,
       trackingNumberCandidate, acceptanceRelatedValue, deliveryCompletionCandidate,
       aggregateStatusCode, detailStatusCode, confirmedDescriptionOrNull, warnings, errors,
@@ -159,6 +211,7 @@ export function resolveYupuriHistory(rows: HistoryRow[], shipments: readonly His
     if (new Set(group.map(row => row.trackingNumberCandidate)).size > 1)
       for (const row of group) row.errors.push("Conflicting tracking numbers for the same Shipment");
   }
-  for (const row of result) row.importableLater = row.errors.length === 0 && row.confirmedDescriptionOrNull !== null;
+  for (const row of result) row.importableLater = row.errors.length === 0 && row.shipmentFound &&
+    row.confirmedDescriptionOrNull !== null;
   return result;
 }

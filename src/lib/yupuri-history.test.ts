@@ -79,6 +79,36 @@ test("duplicate management, duplicate Shipment, differing candidates and existin
   }
 });
 
+test("official Japan Post descriptions remain read-only preview candidates", () => {
+  for (const [aggregate, detail, description] of [
+    ["10", "01", "引受予定"], ["10", "0A", "引受予定"],
+    ["11", "01", "引受"], ["12", "14", "通過"], ["13", "19", "発送"],
+    ["14", "83", "車船輸送"], ["30", "00", "到着"], ["50", "01", "持出中"],
+    ["51", "33", "最寄局保管"], ["52", "01", "配達完了"],
+    ["52", "34", "返還完了"], ["53", "38", "配達完了"],
+    ["60", "48", "局内保管"], ["61", "51", "転送"],
+    ["62", "65", "処分"], ["63", "70", "保管延長"],
+    ["64", "73", "休日保管"], ["65", "56", "調査中"],
+  ]) {
+    const result = preview(`${header}\n${row("SHP-42", "123", aggregate, detail)}\n`)[0];
+    assert.equal(result.confirmedDescriptionOrNull, description, `${aggregate}/${detail}`);
+    assert.deepEqual(result.warnings, []);
+    assert.equal(result.importableLater, true);
+  }
+});
+
+test("official dash pair has no description and is distinct from an unknown pair", () => {
+  const dash = preview(`${header}\n${row("SHP-42", "123", "11", "0D")}\n`)[0];
+  assert.equal(dash.confirmedDescriptionOrNull, null);
+  assert.ok(dash.warnings.includes("Official delivery status table lists this pair without a description"));
+  assert.equal(dash.importableLater, false);
+
+  const unknown = preview(`${header}\n${row("SHP-42", "123", "ZZ", "ZZ")}\n`)[0];
+  assert.equal(unknown.confirmedDescriptionOrNull, null);
+  assert.ok(unknown.warnings.includes("Unverified delivery status codes"));
+  assert.equal(unknown.importableLater, false);
+});
+
 test("unknown aggregate/detail pair keeps raw codes and cannot imply a delivery state", () => {
   for (const [aggregate, detail] of [["10", "ZZ"], ["ZZ", "0A"], ["20", "20"]]) {
     const result = preview(`${header}\n${row("SHP-42", "123", aggregate, detail)}\n`)[0];
