@@ -6,6 +6,10 @@ type BpacPrinter = {
   IsPrinterOnline(name: string): Promise<boolean>;
 };
 
+type BpacObject = {
+  set Text(value: string);
+};
+
 type BpacDocument = {
   Open(filePath: string): Promise<boolean>;
   Close(): Promise<boolean>;
@@ -14,8 +18,7 @@ type BpacDocument = {
   GetMediaName(): Promise<string>;
   readonly Width: Promise<number>;
   readonly Length: Promise<number>;
-  GetTextIndex(name: string): Promise<number | undefined>;
-  SetText(index: number, text: string): Promise<boolean>;
+  GetObject(name: string): Promise<BpacObject | undefined>;
   GetBarcodeIndex(name: string): Promise<number | undefined>;
   SetBarcodeData(index: number, text: string): Promise<boolean>;
   StartPrint(documentName: string, option: number): Promise<boolean>;
@@ -96,20 +99,17 @@ function requireIndex(index: number | undefined, objectName: string): number {
 
 async function setTemplateData(document: BpacDocument, label: PhysicalTagLabel): Promise<void> {
   const text = physicalTagBpacText(label);
-  const inquiryIndex = requireIndex(await document.GetTextIndex("objInquiry"), "objInquiry");
-  const shortCodeIndex = requireIndex(await document.GetTextIndex("objShortCode"), "objShortCode");
-  const infoIndex = requireIndex(await document.GetTextIndex("objInfo"), "objInfo");
+  const inquiryObject = await document.GetObject("objInquiry");
+  if (!inquiryObject) throw new Error("印刷テンプレートにobjInquiryがありません。");
+  const shortCodeObject = await document.GetObject("objShortCode");
+  if (!shortCodeObject) throw new Error("印刷テンプレートにobjShortCodeがありません。");
+  const infoObject = await document.GetObject("objInfo");
+  if (!infoObject) throw new Error("印刷テンプレートにobjInfoがありません。");
   const qrIndex = requireIndex(await document.GetBarcodeIndex("objQr"), "objQr");
 
-  if (!(await document.SetText(inquiryIndex, text.inquiry))) {
-    throw new Error("受付番号を印刷テンプレートへ設定できませんでした。");
-  }
-  if (!(await document.SetText(shortCodeIndex, text.shortCode))) {
-    throw new Error("管理タグ番号を印刷テンプレートへ設定できませんでした。");
-  }
-  if (!(await document.SetText(infoIndex, text.info))) {
-    throw new Error("案件情報を印刷テンプレートへ設定できませんでした。");
-  }
+  inquiryObject.Text = text.inquiry;
+  shortCodeObject.Text = text.shortCode;
+  infoObject.Text = text.info;
   if (!(await document.SetBarcodeData(qrIndex, label.qrPayload))) {
     throw new Error("QRコードを印刷テンプレートへ設定できませんでした。");
   }

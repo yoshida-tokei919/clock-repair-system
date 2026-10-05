@@ -4,6 +4,11 @@ export class IPrinter {
   IsPrinterOnline(name: string): Promise<boolean>;
 }
 
+export class IObject {
+  get Text(): Promise<string>;
+  set Text(value: string);
+}
+
 export class IDocument {
   static Open(filePath: string): Promise<boolean>;
   static Close(): Promise<boolean>;
@@ -12,8 +17,7 @@ export class IDocument {
   static GetMediaName(): Promise<string>;
   static readonly Width: Promise<number>;
   static readonly Length: Promise<number>;
-  static GetTextIndex(name: string): Promise<number | undefined>;
-  static SetText(index: number, text: string): Promise<boolean>;
+  static GetObject(name: string): Promise<IObject | undefined>;
   static GetBarcodeIndex(name: string): Promise<number | undefined>;
   static SetBarcodeData(index: number, text: string): Promise<boolean>;
   static StartPrint(documentName: string, option: number): Promise<boolean>;

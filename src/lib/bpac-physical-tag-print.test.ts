@@ -36,11 +36,12 @@ type MockOptions = {
   length?: number;
   printOut?: boolean;
   endPrint?: boolean;
+  missingObject?: "objInquiry" | "objShortCode" | "objInfo";
 };
 
 function mockRuntime(options: MockOptions = {}) {
   const calls: Array<{ method: string; args: unknown[] }> = [];
-  const textValues = new Map<number, string>();
+  const textValues = new Map<string, string>();
   let qrValue = "";
   const printer = {
     async GetInstalledPrinters() {
@@ -85,14 +86,16 @@ function mockRuntime(options: MockOptions = {}) {
       calls.push({ method: "Length", args: [] });
       return Promise.resolve(options.length ?? 4252);
     },
-    async GetTextIndex(name: string) {
-      calls.push({ method: "GetTextIndex", args: [name] });
-      return ({ objInquiry: 0, objShortCode: 1, objInfo: 2 } as Record<string, number>)[name];
-    },
-    async SetText(index: number, value: string) {
-      calls.push({ method: "SetText", args: [index, value] });
-      textValues.set(index, value);
-      return true;
+    async GetObject(name: string) {
+      calls.push({ method: "GetObject", args: [name] });
+      if (options.missingObject === name) return undefined;
+      if (!["objInquiry", "objShortCode", "objInfo"].includes(name)) return undefined;
+      return {
+        set Text(value: string) {
+          calls.push({ method: "Object.Text", args: [name, value] });
+          textValues.set(name, value);
+        },
+      };
     },
     async GetBarcodeIndex(name: string) {
       calls.push({ method: "GetBarcodeIndex", args: [name] });
@@ -137,11 +140,26 @@ test("direct print fixes Brother QL-800, prints one auto-cut copy, and writes ex
   assert.deepEqual(mock.calls.find(call => call.method === "SetPrinter")?.args, [BPAC_PRINTER_NAME, false]);
   assert.deepEqual(mock.calls.find(call => call.method === "StartPrint")?.args, ["PhysicalTag PT-000123", BPAC_AUTO_CUT]);
   assert.deepEqual(mock.calls.find(call => call.method === "PrintOut")?.args, [1, 0]);
+  const text = physicalTagBpacText(label);
+  assert.equal(mock.textValues.get("objInquiry"), text.inquiry);
+  assert.equal(mock.textValues.get("objShortCode"), text.shortCode);
+  assert.equal(mock.textValues.get("objInfo"), text.info);
+  assert.equal(mock.calls.some(call => call.method === "GetTextIndex"), false);
   assert.equal(mock.qrValue, label.qrPayload);
   assert.equal(mock.calls.filter(call => call.method === "EndPrint").length, 1);
   assert.equal(mock.calls.filter(call => call.method === "Close").length, 1);
   assert.equal(mock.calls.some(call => call.args.includes("NEC MultiWriter 5750C")), false);
   assert.match(String(mock.calls.find(call => call.method === "Open")?.args[0]), /^https:\/\/repair\.example\.test\/bpac\/physical-tag-62x75\.lbx$/);
+});
+
+test("missing named text object fails closed before printing", async () => {
+  const mock = mockRuntime({ missingObject: "objInquiry" });
+  await assert.rejects(
+    () => printPhysicalTagLabel(label, deps(mock.runtime)),
+    /objInquiry/,
+  );
+  assert.equal(mock.calls.some(call => call.method === "StartPrint"), false);
+  assert.equal(mock.calls.filter(call => call.method === "Close").length, 1);
 });
 
 test("missing b-PAC extension fails before opening or printing", async () => {
