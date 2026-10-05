@@ -4,7 +4,7 @@ Production: not applicable（docs-only / PDF出力検証）
 
 ## 対象
 
-最終PDFの本文ソースは `4953dc28434a3986a1739863022b9a9808d6ca1e` 時点の `docs/manual/full/` と `docs/manual/quick/`。
+最終PDFの本文ソースは `2ea038cc801ed8ebfd8e897f01eb86e2f9597117` 時点の `docs/manual/full/` と `docs/manual/quick/`。
 
 - 詳細版PDF: `C:\Users\yoshi\clock-repair-manual-preview\final\時計修理業務アプリ_取扱説明書_詳細版_A4カラー.pdf`
 - 簡易版PDF: `C:\Users\yoshi\clock-repair-manual-preview\final\時計修理業務アプリ_取扱説明書_簡易版_A4カラー.pdf`
@@ -20,14 +20,16 @@ PDFはGit上の正本ではなく、Markdown原本と共通画像から生成し
 - `画面画像予定` / `図予定`: 0件
 - 連続した `????` 文字列: 0件
 - Unicode replacement character `U+FFFD`: 0件
-- Task202B / Task204の実引受判定、追跡番号保存、LINE発送通知、配達完了連携は未実装として記載し、完成済み操作として扱っていない
+- Task202Bの公式配送status code pair説明表示はproduction完了済みとして反映
+- Task204の実引受に基づく発送更新、追跡番号保存、LINE発送通知、配達完了からRepair納品済みへの自動連携は未実装として記載し、完成済み操作として扱っていない
+- Task196Fのb-PAC直接印刷をprimary導線、PDFを「プレビュー」のsecondary導線として反映
 
 ## PDF生成結果
 
 | 冊子 | ページ数 | サイズ | SHA-256 |
 | --- | ---: | ---: | --- |
-| 詳細版 | 115ページ | 3,359,571 bytes | `A1C63EE0D36F8090ADAE22F60EAB505A8341B562EFBAAB510C603A806B0A1212` |
-| 簡易版 | 38ページ | 1,418,076 bytes | `930F0ACC93375A8B74E2DE2E40768FAF101E5784ED0F27433387B415D6305E14` |
+| 詳細版 | 115ページ | 3,368,561 bytes | `937FC886A876F2A2665E81E5DF8728A8EE66113271E533F2BEE61FE692F79D09` |
+| 簡易版 | 38ページ | 1,425,344 bytes | `3E63D37AE247E0C2CB158CFDFC336EA66011EBEA3D51B65B3B196E6027190E4F` |
 
 両冊子ともA4縦・カラーで生成し、本文ページに冊子名ヘッダー、工房名フッター、`現在ページ / 総ページ`を付与した。
 
@@ -60,6 +62,8 @@ PyMuPDFで両PDF全153ページを再読込・レンダリングして確認し�
 
 独立Codexレビューで、詳細版第8章と簡易版第4章の「送付待ち」「受付」スクリーンショット4か所がバッククォートで囲まれ、画像ではなくコード表記になっていることを検出した。`4953dc2`でMarkdown画像へ修正し、PDFを再生成した。詳細版28ページ、簡易版11ページで両画像が実際に埋め込まれていることを個別画像で確認し、その後に全153ページの機械検証・縮小一覧目視を再実行した。
 
+その後、push前に`origin/main`へ追加済みだったTask196F / Task202Bを取り込み、`2ea038c`でマニュアルを現行実装へ同期した。PhysicalTag共用画面画像は現行UIの「ラベル印刷」「プレビュー」に合わせた合成画像へ更新した。PDF再生成後、詳細版69〜70ページ、第25章82ページ、第26章83〜84ページ、簡易版13ページ・38ページを個別確認し、b-PAC直接印刷・read-only status説明・Task204未実装境界が正常に表示されていることを確認した。さらに全153ページの縮小一覧を再確認し、レイアウト異常は見つからなかった。
+
 ## 作業ツリー保護
 
 `C:\Users\yoshi\clock-repair-system\scripts\__pycache__\` はTask外の未追跡差分として保持し、stage / commitしていない。
@@ -70,4 +74,4 @@ PDF生成・検証用script、レンダリング画像、依存パッケージ�
 
 ## 最終独立レビュー
 
-修正後のHEAD `5713992` を対象にCodexで最終独立read-only再レビューを実施した。章構成・リンク・4画像・Task202B / Task204の未実装境界・外部サービス責務・秘密情報・PDF監査記録を再確認し、最終結果は `No substantive findings.` だった。
+Task196F / Task202B同期後の最終独立read-only再レビューは、このPDF監査記録の更新commit後に実施する。
