@@ -69,7 +69,23 @@
 - PhysicalTag lifecycle変更なし。
 - LINE / Shipment変更なし。
 
-Production: pending. 実装・local validation後、独立レビュー、commit、production反映判断を別工程で行う。
+Production: complete.
+
+## Production completion — 2026-10-05
+
+- Initial application commit: `c89c0a57b01af81890bf9d83c5e341a6489c3031` — `feat: add direct physical tag label printing`
+- Production hotfix commit: `1b2a385a651611ce96975b37048a0de878d93a0b` — `fix: bind b-PAC text objects by name`
+- Final production source: GitHub `main` at `1b2a385a651611ce96975b37048a0de878d93a0b`
+- Initial Railway deployment: `cba6cd3b-25c4-4435-8ffa-da0290798f63` — SUCCESS
+- Hotfix Railway deployment: `453f9c30-7d91-4b1e-b765-a2f527cfe7cf` — SUCCESS
+- Railway production build: compile / type check PASS、static pages 56/56。hotfix runtimeはNext.js 15.5.27、Ready in 251ms。
+- Initial production smokeで `.lbx` 内に `objInquiry` が実在するにもかかわらず、text objectを `GetTextIndex("objInquiry")` で名前検索したため `-1` となる不具合を検出。
+- Brother公式方式の `GetObject("objInquiry").Text = ...` へtext 3項目だけを最小修正。QRのbarcode index経路、QL-800固定、62mm / 75mm preflight、auto-cut、fail-closedは維持。
+- Hotfix validation: focused tests 19/19 PASS、TypeScript PASS、`git diff --check` PASS、production build 56/56 PASS。実機b-PAC COMで `objInquiry` / `objShortCode` / `objInfo` のText書込みと `objQr` barcode index=0を印刷なしで確認。
+- Hotfix独立read-only Codex review: final findings 0件。
+- Production実機smoke: Repair `C-003` / PhysicalTag `PT-000002` で直接印刷を実行し、QL-800から1枚のみ出力、75mm auto-cut、C-003 / PT-000002 / 案件情報の印字、QR読取の4条件をユーザー確認済み。
+- 再印刷でPhysicalTag再発行なし。既存 `PT-000002` をそのまま使用。
+- schema / migration / RLS / GRANT / production DB mutationなし。
 
 ## Independent review
 
