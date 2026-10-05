@@ -1,6 +1,6 @@
 # Task202B — ゆうプリR発送履歴の公式配達ステータス表示
 
-Status: implemented locally; production pending.
+Status: production complete.
 
 ## Primary source
 
@@ -26,4 +26,16 @@ Status: implemented locally; production pending.
 - TypeScript `--noEmit --incremental false`: PASS（Prisma Client生成後）。
 - `git diff --check`: PASS。
 - `npm run build`: PASS、static pages 56/56。
-- Production: pending。push / deploy / DB変更 / LINE送信なし。
+- Local validation時点ではProduction pending。DB変更 / LINE送信なし。
+## Production completion — 2026-10-05
+
+- Application commit: `cb7f6260ec7a1a3410344a02ff19be5b3b23ad8b` — `feat: map official yu-pri delivery statuses`。
+- Deploy source: GitHub `main` → Railway。
+- Railway deployment: `11e5aef5-fee0-4892-bebd-e50ce40dcc8f` — SUCCESS、region `sin`。
+- Railway build: Prisma Client生成、Next.js compile / type check PASS、static pages 56/56。
+- Runtime: Next.js 15.5.27、Ready in 677ms。
+- Production tag: `production-task202b-20261005`。
+- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`POST /api/shipments/yupuri-history/preview`未認証=401。
+- Railway HTTP logs: 上記smoke requestの`upstreamErrors`はすべて空。
+- schema / migration / RLS / GRANT / production DB mutationなし。LINE送信なし。
+- 実際の非空14バイト日時値は引き続き未確認。Task202Bでは日時parse・Shipment/Repair状態更新を行わない。
