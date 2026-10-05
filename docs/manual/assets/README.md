@@ -21,7 +21,7 @@
 
 ### 取得済み — 現物受付・PhysicalTag・保管場所
 
-- `physical-tag-panel.png` — Repair詳細のPhysicalTag / 管理タグ。実コンポーネントへマニュアル用合成データを渡して撮影
+- `physical-tag-panel.png` — Repair詳細のPhysicalTag / 管理タグ。現行UIの項目・配置・文言を元に合成データで再現（「ラベル印刷」「プレビュー」）
 - `physical-tag-label-preview.png` — 62×75mm修理袋ラベルのレイアウト見本。実装済み印字項目・QR payload方針に合わせた合成プレビュー
 - `storage-location-panel.png` — Repair詳細「現在の保管場所」と推奨 / 許容ゾーン表示。現行pageの表示構造へ合成データを適用
 - `repairs-waiting-shipment.png` — `送付待ち` Repairと、現物到着後に選べる次status `受付` を示す合成画面

@@ -45,7 +45,7 @@ Inquiryレビュー画面でLINE履歴とAIの暫定分析を確認する。
 
 ## 7. PhysicalTagを発行する
 
-修理袋用PhysicalTagをRepairへ割り当て、Brother QL-800でラベルを印刷する。
+修理袋用PhysicalTagをRepairへ割り当て、Repair詳細の「ラベル印刷」からBrother QL-800へ直接印刷する。PDFは「プレビュー」から開ける。
 
 QR / NFC / shortCodeを使って時計現物とRepairを対応付ける。
 
@@ -109,4 +109,4 @@ ShipmentからゆうプリR標準フォーマットV3 CSVを出力し、ゆう�
 
 現行アプリは、ゆうプリR向けCSV出力と発送履歴CSVのread-only previewまで対応している。送り状の発行・印刷、荷物の実引渡し、追跡、配達完了はゆうプリR / 日本郵便側で実際の結果を確認する。
 
-発送履歴previewは追跡番号・実発送日時・配達完了日時・Shipment / Repair statusを書き戻さない。`10/0A = 引受予定`も実引受の証拠ではない。Task202B / Task204の実引受判定、追跡番号保存、LINE発送通知、配達完了からRepair納品済みへの自動連携は未完成のため、アプリに自動記録されたものとして扱わない。
+Task202Bで発送履歴previewに公式配送status code pairの説明が表示される。`10/0A = 引受予定`は実引受の証拠ではない。previewは追跡番号・実発送日時・配達完了日時・Shipment / Repair statusを書き戻さない。Task204の実引受に基づく発送更新、追跡番号保存、LINE発送通知、配達完了からRepair納品済みへの自動連携は未実装のため、アプリに自動記録されたものとして扱わない。

@@ -8,7 +8,7 @@
 
 | サービス | 接続方式 | アプリ側の正本 | 状態変更・確認の責任者 | 現在の状態 |
 | --- | --- | --- | --- | --- |
-| 日本郵便／ゆうプリR | Shipmentから取込用CSVを出力、発送履歴CSVを読取プレビュー。配送会社APIとの直接接続なし | Shipmentの宛先snapshot。履歴側はCSVのraw値と照合候補 | 送り状と現物の引渡しは担当者が外部で確認。プレビューはDBを更新しない | **実装済み：CSV出力・読取プレビューのみ**。引受・追跡・配達の書戻しは未実装 |
+| 日本郵便／ゆうプリR | Shipmentから取込用CSVを出力、発送履歴CSVを読取プレビュー。配送会社APIとの直接接続なし | Shipmentの宛先snapshot。履歴側はCSVのraw値・照合候補・公式code pair説明 | 送り状と現物の引渡しは担当者が外部で確認。プレビューはDBを更新しない | **実装済み：CSV出力・公式説明付き読取プレビュー**。引受・追跡・配達の書戻しは未実装 |
 | ヤマトB2クラウド | CSV adapterを調査中。現行アプリにB2出力UI・API・CSV生成はない | 配送会社非依存のShipment。B2固有の確定値は未設定 | 契約固有値と受理済み実ファイルの確認が先決 | **調査完了／実装保留** |
 | Stripe | 顧客のカードCheckout用にHTTPSでSessionを作成し、署名付きWebhookを受信 | Invoice、Payment、PaymentAllocation、PaymentAttempt | Stripeの決済結果をWebhookで検証し、アプリが決済レコードを確定 | **実装済み：B2C請求書のカードCheckout** |
 | 銀行振込 | 振込そのものはアプリ外。管理者の手動入金登録API | Invoiceと`MANUAL`／`BANK_TRANSFER`のPayment | 入金を確認した管理者が明示登録。銀行APIや取引明細feedは使わない | **実装済み：手動確認・登録** |
@@ -29,9 +29,9 @@
 
 荷物サイズコードは現時点で`060`固定である。実荷物が60サイズ以外なら、この値をそのまま使えると判断しない。未対応の配達希望値やCP932で表現できない文字は推測変換せずエラーにする。
 
-Admin認証が必要な`POST /api/shipments/yupuri-history/preview`は、ゆうプリR発送履歴CSVを解析して照合候補とエラーを返す。対象はCP932・BOMなし・CRLF・headerあり6列のファイルで、`SHP-{Shipment.id}`により候補を照合する。追跡番号・日付・status codeは候補またはraw値にとどめ、**追跡番号、Shipment／Repair status、実発送日時、配達完了日時を保存しない**。重複や追跡番号競合、形式不正も自動解決しない。
+Admin認証が必要な`POST /api/shipments/yupuri-history/preview`は、ゆうプリR発送履歴CSVを解析して照合候補とエラーを返す。対象はCP932・BOMなし・CRLF・headerあり6列のファイルで、`SHP-{Shipment.id}`により候補を照合する。Task202Bで公式配送status code pairの説明表示を追加した。追跡番号・日付は候補またはraw値にとどめ、**追跡番号、Shipment／Repair status、実発送日時、配達完了日時を保存しない**。重複や追跡番号競合、形式不正も自動解決しない。
 
-現時点で意味が確認されたstatusの組は`10/0A = 引受予定`のみであり、**実際の郵便局引受を証明しない**。実引受・配達完了のコードと日付形式は実際のゆうプリR履歴証拠を待つ。Task202B／Task204の追跡保存、配送状態更新、LINE発送通知を、CSV出力やpreviewの結果から先取りしない。業務上の詳細は[第25章](25_yupuri.md)を参照する。
+`10/0A = 引受予定`を含む公式表のcode pairに説明を表示するが、**説明は実際の郵便局引受やShipment状態更新を証明しない**。公式表の「-」は説明なし、表にない組は未確認として警告する。14バイトの日付値はparseせず、非空の実CSVによる形式確認を待つ。`importableLater`も将来取込候補であり書込承認ではない。Task204の追跡保存、配送状態更新、LINE発送通知をCSV出力やpreviewの結果から先取りしない。業務上の詳細は[第25章](25_yupuri.md)を参照する。
 
 ## 34.3 ヤマトB2クラウドの調査境界
 

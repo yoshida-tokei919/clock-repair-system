@@ -73,7 +73,6 @@ CSV出力はread-onlyで、Shipment status、trackingNumber、実発送日時等
 
 ## 7. 発送履歴は現在read-only preview
 
-発送履歴CSVのpreview APIは、追跡番号候補・日付候補・status codeを照合するだけで保存しない。
-現在意味を確認済みなのは `10/0A = 引受予定` のみで、実際の郵便局引受や配達完了を意味しない。
+発送履歴CSVのpreview APIは、追跡番号候補・raw日付値・status codeを照合し、Task202Bで公式code pairの説明を表示する。値は保存しない。`10/0A = 引受予定`は実際の郵便局引受を意味しない。`importableLater`は将来取込候補で、状態更新承認ではない。14バイトの日付値のparse・保存も未実装である。
 
 **現在の限界:** 追跡番号保存、実引受検知、LINE発送通知、配達完了 → Repair納品完了の自動連携はまだ完成していない。

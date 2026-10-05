@@ -32,7 +32,7 @@ LINE Webhookの成功応答は`LineWebhookInbox`への受信保存を表す。�
 
 ### Shipmentと外部配送
 
-Shipmentは1個口の記録で、Repairとは別に作成する。作成・梱包一致・タグrelease・ゆうプリR向けCSV出力のいずれも、それだけで実発送にならない。現行のゆうプリR発送履歴APIは**read-only preview**で、tracking候補、日付候補、raw status codeを保存しない。意味を確認済みの`10/0A`も「引受予定」であり実引受ではない。実引受・配達完了のcode確定と、追跡番号・発送状態の書戻しは未実装である。詳細は[第22章](22_shipment.md)、[第23章](23_shipment-packing.md)、[第25章](25_yupuri.md)。
+Shipmentは1個口の記録で、Repairとは別に作成する。作成・梱包一致・タグrelease・ゆうプリR向けCSV出力のいずれも、それだけで実発送にならない。現行のゆうプリR発送履歴APIは**read-only preview**で、tracking候補、raw日付値・status codeを保存しない。Task202Bで公式配送status codeの組の説明を表示できるが、説明はShipment状態の確定ではない。`10/0A`も「引受予定」であり実引受ではない。14バイトの日付値のparseと、追跡番号・発送／配達状態の書戻しは未実装である。詳細は[第22章](22_shipment.md)、[第23章](23_shipment-packing.md)、[第25章](25_yupuri.md)。
 
 ### 送信と決済
 

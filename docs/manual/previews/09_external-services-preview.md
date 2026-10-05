@@ -31,8 +31,8 @@
 | --- | --- |
 | `GET /api/shipments/[id]/yupuri-v3` | Admin認証、OUTBOUND・発送前のShipmentから読取専用出力。共通画面に出力ボタンはない |
 | V3 CSV | 100列、headerなし、CP932／Shift_JIS、BOMなし、CRLF。管理番号`SHP-{Shipment.id}` |
-| `POST /api/shipments/yupuri-history/preview` | Admin認証、履歴のraw値・照合候補・エラーを表示するだけ |
-| 状態の確定 | `10/0A = 引受予定`だけ意味を確認済み。実引受、追跡保存、配達更新は未実装 |
+| `POST /api/shipments/yupuri-history/preview` | Admin認証、履歴のraw値・照合候補・エラーと公式配送status code pairの説明を表示するだけ |
+| 状態の確定 | `10/0A = 引受予定`は実引受ではない。`importableLater`も書込承認ではなく、実引受に基づく発送更新、追跡保存、配達更新は未実装 |
 
 **下段の区切り枠:** ヤマトB2クラウドは**調査完了／実装保留**。公式の固定順97項目を確認したが、契約ごとの請求先情報、依頼主情報、サービス設定と、受理済みテンプレート／実サンプルが不足する。現行アプリにB2 CSV出力UI・APIはない。実契約コードを印刷しない。
 

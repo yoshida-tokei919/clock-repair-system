@@ -29,7 +29,7 @@
 
 記載前に対象の画面・API・処理と[ステータスの正本](35_status-source-of-truth.md)を確認し、Task記録・現在のproduction source commit・deployment・smoke結果と照合する。local実装、commit、production反映、外部連携の実動作は別段階である。確認できた段階だけを「できること」として記し、未実装・未検証・結果不明はそのまま明示する。[第38章](38_backup-migration-deploy.md)のproduction記録も参照する。
 
-特に**Task202B/204の追跡番号保存、実引受・配達完了の判定、発送・配達自動連携**は、実装とproductionでの動作が確認できるまで完成済みとして書かない。現行のゆうプリR発送履歴取込はread-only previewであり、候補値をShipmentへ保存しない。[第25章](25_yupuri.md)と[第35章](35_status-source-of-truth.md)を照合する。ロードマップの予定と現行操作を同じ手順に混ぜず、予定が必要なら「未実装」と分けて書く。
+Task202Bの公式配送status code説明表示はproduction完了済みとして扱う。一方、Task204の実引受に基づく発送更新、追跡番号保存、LINE発送通知、配達完了からRepair納品済みへの自動連携と、raw日付値のparse・timestamp保存は未実装である。現行のゆうプリR発送履歴はread-only previewであり、候補値をShipmentへ保存しない。[第25章](25_yupuri.md)と[第35章](35_status-source-of-truth.md)を照合する。ロードマップの予定と現行操作を同じ手順に混ぜず、予定が必要なら「未実装」と分けて書く。
 
 ## 39.4 画面画像を安全に更新する
 

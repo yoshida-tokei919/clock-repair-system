@@ -54,7 +54,7 @@ PhysicalTag連続scanで梱包照合
 [後続実装] 配達完了を確定 → Repair納品済み連携
 ```
 
-現行でアプリが確定できるのは、ゆうプリR向けCSV出力と発送履歴CSVのread-only previewまでである。履歴previewは追跡番号・実発送日時・配達完了日時・Shipment / Repair statusを書き戻さない。上図の`[後続実装]`部分はTask202B / Task204の範囲であり、現在使える操作として扱わない。
+現行のゆうプリR連携は、V3 CSV出力と発送履歴CSVのread-only previewまでである。Task202Bでpreviewに公式配送status codeの組の説明表示が加わったが、追跡番号・実発送日時・配達完了日時・Shipment / Repair statusは書き戻さない。上図の`[後続実装]`部分はTask204等の範囲であり、現在使える操作として扱わない。
 
 ## 2.2 「送付待ち」と「受付」の違い
 
