@@ -52,6 +52,10 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 今後は機能のproduction反映状況に合わせて継続更新する。
 
+## 第I部 システム概要・共通操作
+
+- 詳細版: [1 アプリでできること](full/01_capabilities.md) → [2 システム全体像](full/02_system-overview.md) → [3 システム構成とデータの流れ](full/03_system-architecture.md) → [4 ログイン・画面構成・共通操作](full/04_login-common-ui.md)
+
 ## 発送・配達希望の章
 
 - 詳細版: [21 配達希望](full/21_delivery-preference.md) → [22 Shipment](full/22_shipment.md) → [23 梱包照合](full/23_shipment-packing.md) → [24 タグ解放](full/24_physical-tag-release.md) → [25 ゆうプリR](full/25_yupuri.md)
@@ -94,5 +98,6 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 - 外部配送・決済等の接続見本: [previews/09_external-services-preview.md](previews/09_external-services-preview.md)
 - ステータス・正本・二重処理防止見本: [previews/10_status-safety-preview.md](previews/10_status-safety-preview.md)
 - 障害切り分け・production変更見本: [previews/11_troubleshooting-deploy-preview.md](previews/11_troubleshooting-deploy-preview.md)
+- システム構成・ログイン・共通操作見本: [previews/12_system-basics-preview.md](previews/12_system-basics-preview.md)
 - 生成PDFは確認用出力であり、Git上の正本にはしない。
 - 画面例には実顧客データを使わず、実アプリUIまたは現行UI構造へ合成データを表示して撮影する。

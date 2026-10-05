@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1160" viewBox="0 0 1600 1160">
+  <defs>
+    <style>
+      .bg{fill:#ffffff}.band{fill:#f7f9fc;stroke:#d7e0ea;stroke-width:2}.core{fill:#e8f2fb;stroke:#4e83aa;stroke-width:2}.db{fill:#e9f7ee;stroke:#57936b;stroke-width:2}.external{fill:#eef2f6;stroke:#73808c;stroke-width:2}.local{fill:#fff3e4;stroke:#bd7b2d;stroke-width:2}.pending{fill:#f5f5f5;stroke:#858e98;stroke-width:2;stroke-dasharray:8 6}
+      .txt{font-family:"Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#173047;font-size:22px}.head{font-size:31px;font-weight:700}.label{font-size:25px;font-weight:700}.small{font-size:19px}.tiny{font-size:17px}.muted{fill:#526678}.warn{fill:#8a4b12}
+      .line{stroke:#2e6e9b;stroke-width:3;fill:none}.orange{stroke:#b87527;stroke-width:3;fill:none}.gray{stroke:#858e98;stroke-width:2.5;fill:none;stroke-dasharray:8 6}
+    </style>
+    <marker id="blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#2e6e9b"/></marker>
+    <marker id="amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#b87527"/></marker>
+  </defs>
+  <rect class="bg" width="1600" height="1160"/>
+  <text class="txt head" x="45" y="44">システム構成とデータの流れ</text>
+  <text class="txt small muted" x="1082" y="42">青＝アプリ／外部　緑＝正本　橙＝Windows local</text>
+
+  <rect class="band" x="32" y="72" width="1536" height="328" rx="18"/>
+  <text class="txt label" x="56" y="108">管理画面・顧客画面 → 業務データとファイル</text>
+  <rect class="external" x="55" y="144" width="256" height="96" rx="12"/>
+  <text class="txt label" x="77" y="181">browser</text><text class="txt small" x="77" y="213">管理者／顧客</text>
+  <rect class="core" x="372" y="137" width="306" height="110" rx="14"/>
+  <text class="txt label" x="396" y="177">Railway / Next.js</text><text class="txt small" x="396" y="211">認証・API・業務処理</text>
+  <rect class="core" x="738" y="144" width="164" height="96" rx="12"/>
+  <text class="txt label" x="759" y="183">Prisma</text><text class="txt small" x="759" y="215">server側</text>
+  <rect class="db" x="962" y="136" width="300" height="112" rx="14"/>
+  <text class="txt label" x="985" y="175">Supabase PostgreSQL</text><text class="txt small" x="985" y="207">業務レコード・Inbox / Outbox</text>
+  <path class="line" d="M311 192 H372 M678 192 H738 M902 192 H962" marker-end="url(#blue)"/>
+  <rect class="db" x="954" y="279" width="292" height="86" rx="12"/>
+  <text class="txt label" x="977" y="317">Supabase Storage</text><text class="txt small" x="977" y="347">documents：PDF body</text>
+  <rect class="external" x="1282" y="279" width="254" height="86" rx="12"/>
+  <text class="txt label" x="1305" y="317">Cloudflare R2</text><text class="txt small" x="1305" y="347">Inquiry画像 / RepairPhoto</text>
+  <path class="line" d="M678 222 V322 H954" marker-end="url(#blue)"/>
+  <path class="line" d="M678 235 V262 H1409 V279" marker-end="url(#blue)"/>
+  <text class="txt tiny muted" x="374" y="369">Railway filesystemは業務データの正本ではない。</text>
+
+  <rect class="band" x="32" y="421" width="1536" height="427" rx="18"/>
+  <text class="txt label" x="56" y="457">LINE受信・通知／LINE送信は別経路</text>
+
+  <rect class="external" x="55" y="478" width="190" height="72" rx="12"/>
+  <text class="txt label" x="77" y="507">LINE</text><text class="txt tiny" x="77" y="534">顧客 inbound</text>
+  <rect class="core" x="285" y="478" width="250" height="72" rx="12"/>
+  <text class="txt label" x="306" y="507">Railway Webhook</text><text class="txt tiny" x="306" y="534">署名検証・受信保存</text>
+  <rect class="db" x="575" y="478" width="280" height="72" rx="12"/>
+  <text class="txt label" x="596" y="507">LineWebhookInbox</text><text class="txt tiny" x="596" y="534">PostgreSQLの受信正本</text>
+  <path class="line" d="M245 514 H285 M535 514 H575" marker-end="url(#blue)"/>
+
+  <rect class="local" x="55" y="568" width="245" height="70" rx="12"/>
+  <text class="txt label" x="76" y="596">Windows local n8n</text><text class="txt tiny" x="76" y="623">processorを定期起動</text>
+  <rect class="core" x="335" y="568" width="245" height="70" rx="12"/>
+  <text class="txt label" x="356" y="596">Next.js processor</text><text class="txt tiny" x="356" y="623">Inboxを取得して後処理</text>
+  <rect class="core" x="615" y="568" width="365" height="70" rx="12"/>
+  <text class="txt label" x="636" y="596">Inquiry / R2 / 通知Outbox</text><text class="txt tiny" x="636" y="623">保存とSlackNotificationOutbox作成</text>
+  <rect class="local" x="1015" y="568" width="285" height="70" rx="12"/>
+  <text class="txt label" x="1036" y="596">n8n Slack workflow</text><text class="txt tiny" x="1036" y="623">通知Outbox取得・投稿・ack</text>
+  <rect class="external" x="1335" y="568" width="200" height="70" rx="12"/>
+  <text class="txt label" x="1356" y="596">Slack</text><text class="txt tiny" x="1356" y="623">通知先</text>
+  <path class="line" d="M300 603 H335 M580 603 H615 M980 603 H1015 M1300 603 H1335" marker-end="url(#blue)"/>
+  <path class="line" d="M715 550 V558 H457 V568" marker-end="url(#blue)"/>
+  <text class="txt tiny muted" x="875" y="541">受信保存と後処理・Slack投稿は別段階。</text>
+
+  <rect class="core" x="55" y="658" width="265" height="116" rx="12"/>
+  <text class="txt label" x="76" y="696">管理画面の明示操作</text><text class="txt small" x="76" y="728">LineManagerSendOutbox</text><text class="txt tiny" x="76" y="753">APPROVED＝送信待ち</text>
+  <rect class="local" x="362" y="658" width="270" height="116" rx="12"/>
+  <text class="txt label" x="384" y="696">Windows local sender</text><text class="txt small" x="384" y="728">n8nとは別のworker</text>
+  <rect class="external" x="675" y="658" width="274" height="116" rx="12"/>
+  <text class="txt label" x="696" y="696">lineoa / LINE Manager</text><text class="txt small" x="696" y="728">通常トーク送信試行</text>
+  <rect class="local" x="991" y="658" width="256" height="116" rx="12"/>
+  <text class="txt label" x="1012" y="696">Manager履歴照合</text><text class="txt small" x="1012" y="728">送信結果を検証</text>
+  <rect class="db" x="1289" y="658" width="247" height="116" rx="12"/>
+  <text class="txt label" x="1310" y="696">CONFIRMED</text><text class="txt small" x="1310" y="728">OUTBOUND</text><text class="txt small" x="1310" y="752">InquiryMessage</text>
+  <path class="orange" d="M320 716 H362 M632 716 H675 M949 716 H991 M1247 716 H1289" marker-end="url(#amber)"/>
+  <text class="txt tiny warn" x="56" y="814">送信試行だけでは確定しない。POST_UNCONFIRMEDは履歴照合を優先し、盲目的に再送しない。</text>
+
+  <rect class="band" x="32" y="868" width="1536" height="248" rx="18"/>
+  <text class="txt label" x="56" y="905">その他の接続・現行範囲</text>
+  <rect class="local" x="55" y="934" width="352" height="139" rx="12"/>
+  <text class="txt label" x="77" y="971">Inquiry AI：明示bridge</text>
+  <text class="txt small" x="77" y="1003">カタリ → 暫定分析 → 人の確認</text>
+  <text class="txt tiny" x="77" y="1034">n8n全自動の正式登録ではない</text>
+  <rect class="external" x="451" y="934" width="344" height="139" rx="12"/>
+  <text class="txt label" x="473" y="971">Stripe</text>
+  <text class="txt small" x="473" y="1003">Checkout Session</text>
+  <text class="txt small" x="473" y="1034">署名Webhook → Payment照合</text>
+  <rect class="external" x="839" y="934" width="353" height="139" rx="12"/>
+  <text class="txt label" x="861" y="971">日本郵便／ゆうプリR</text>
+  <text class="txt small" x="861" y="1003">V3 CSV出力</text>
+  <text class="txt small" x="861" y="1034">履歴CSV read-only preview</text>
+  <rect class="pending" x="1236" y="934" width="300" height="139" rx="12"/>
+  <text class="txt label" x="1257" y="971">後続実装</text>
+  <text class="txt small" x="1257" y="1003">実引受・追跡・配達の</text>
+  <text class="txt small" x="1257" y="1034">自動状態同期</text>
+  <text class="txt tiny muted" x="56" y="1102">実線＝現行経路。下段の破線枠は未実装。secret・cookie・接続文字列の実値は図示しない。</text>
+</svg>

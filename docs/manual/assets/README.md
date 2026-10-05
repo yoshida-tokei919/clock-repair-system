@@ -6,6 +6,10 @@
 
 画面スクリーンショットの正本。
 
+### 取得済み — システム基本画面
+
+- `login-page.png` — production公開 `/login` の現行ログイン画面。`admin@example.com` はplaceholderであり実アカウントではない
+
 ### 取得済み — 問い合わせ・受付
 
 - `inquiry-review-full.png` — Inquiryレビュー画面の全体。LINE履歴、B2C受付判断、時計情報確認までを含む
@@ -123,6 +127,8 @@
 
 最終PDFではカラー図へ書き出し、Markdownから同じ画像を参照する。
 
+- [システム構成とデータの流れ](diagrams/system-architecture.svg) — 第3章
+- [管理画面の共通レイアウト](diagrams/admin-common-ui.svg) — 第4章
 - [LINE Webhook / Inboxフロー](diagrams/line-webhook-inbox-flow.svg) — 第27章
 - [LINE Manager senderフロー](diagrams/line-manager-sender-flow.svg) — 第28章
 - [SupabaseとR2のデータ保存境界](diagrams/supabase-r2-data-boundary.svg) — 第31・32章
@@ -146,5 +152,6 @@
 - [09 外部配送・決済等の接続](../previews/09_external-services-preview.md)
 - [10 ステータス・正本・二重処理防止](../previews/10_status-safety-preview.md)
 - [11 障害切り分け・production変更](../previews/11_troubleshooting-deploy-preview.md)
+- [12 システム構成・ログイン・共通操作](../previews/12_system-basics-preview.md)
 
 生成PDFはMarkdown原本ではなく確認用出力として扱い、Gitの正本にはしない。

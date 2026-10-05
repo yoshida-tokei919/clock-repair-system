@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">認証後の管理画面共通レイアウト</title>
+  <desc id="desc">上からstickyな横スクロールナビ、共通業務タイマー、読取モードとPhysicalTagまたはLocation照合欄、各ページ本文を配置。青いナビが現在地。scanだけで重要な変更は確定せず、画面の確認ボタンを使う。</desc>
+  <defs>
+    <style>
+      .bg{fill:#fff}.shell{fill:#f7f8fb;stroke:#bdc6d0;stroke-width:2.5}.nav{fill:#1f2937}.active{fill:#2563eb}.timer{fill:#fff;stroke:#bdc6d0;stroke-width:2}.scan{fill:#f9fafb;stroke:#bdc6d0;stroke-width:2}.page{fill:#eaf4fb;stroke:#24638d;stroke-width:2.5}.note{fill:#fff4e7;stroke:#aa6924;stroke-width:2}
+      .txt{font-family:"Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#173047;font-size:21px}.head{font-size:30px;font-weight:700}.label{font-size:24px;font-weight:700}.small{font-size:18px}.tiny{font-size:16px}.white{fill:#fff}.muted{fill:#526678}.line{stroke:#2e6e9b;stroke-width:3;fill:none}
+    </style>
+    <marker id="blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#2e6e9b"/></marker>
+  </defs>
+  <rect class="bg" width="1200" height="700"/>
+  <text class="txt head" x="42" y="44">管理画面の共通レイアウト</text>
+  <rect class="shell" x="41" y="72" width="1118" height="552" rx="17"/>
+  <rect class="nav" x="43" y="74" width="1114" height="101" rx="13"/>
+  <text class="txt label white" x="66" y="111">① 上部ナビ（sticky）</text>
+  <text class="txt small white" x="66" y="147">ダッシュボード　修理一覧　保管場所　発送予定　今日の作業　…　→ 横スクロール</text>
+  <rect class="active" x="258" y="116" width="118" height="42" rx="7"/>
+  <text class="txt small white" x="269" y="144">修理一覧</text>
+  <text class="txt tiny white" x="852" y="110">青＝現在のページ</text>
+
+  <rect class="timer" x="61" y="193" width="1078" height="113" rx="11"/>
+  <text class="txt label" x="82" y="227">② WorkTimerBar（sticky）</text>
+  <text class="txt small" x="82" y="258">稼働中の作業・経過時間・停止　／　受付・顧客連絡・発送・事務・その他を開始</text>
+  <rect class="scan" x="61" y="324" width="1078" height="119" rx="11"/>
+  <text class="txt label" x="82" y="359">③ ScanReceiverBar</text>
+  <text class="txt small" x="82" y="391">読取モード選択 → PhysicalTag / PTコード、またはLocationタグ / LOCコードを照合</text>
+  <text class="txt small muted" x="82" y="420">梱包照合・保管場所移動などは対象を確認してから明示確定</text>
+  <rect class="page" x="61" y="461" width="1078" height="143" rx="11"/>
+  <text class="txt label" x="82" y="500">④ 各ページの本文</text>
+  <text class="txt small" x="82" y="533">一覧／詳細／フォーム／preview／結果表示</text>
+  <rect class="note" x="760" y="518" width="350" height="60" rx="9"/>
+  <text class="txt tiny" x="781" y="545">保存・確定・previewは意味が異なる</text>
+  <text class="txt tiny" x="781" y="568">結果不明なら連打せず状態を確認</text>
+  <text class="txt small muted" x="43" y="665">画面の上から下へ操作。scanは照合・選択が基本で、重要な変更には人の確認を残す。</text>
+</svg>
