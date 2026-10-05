@@ -52,6 +52,17 @@
 
 実顧客データ、実WorkTimeSession、実ScheduleSegment、production DBは使用していない。
 
+### 取得済み — ScanSession・作業完了・ランニングテスト
+
+- `scan-session-timer.png` — 実ScanSessionのTIMERモードへ合成PhysicalTagを解決し、Repair候補と明示開始ボタンを表示
+- `repair-status-work-complete.png` — 現行StatusUpdateFormで `作業中 → 作業完了` を選んだ合成画面
+- `running-test-location.png` — `作業完了`・blockedなしの合成Repairで、推奨zone `ランニングテスト中` と現行の完了イベント未実装を明示した画面
+- `completion-notice-review.png` — 実RepairCompletionNoticePanelで配達希望URLを含む最終LINE文面を確認する画面。tokenは `xxxxxxxx`
+- `completion-notice-confirmed.png` — 実RepairCompletionNoticePanelの `CONFIRMED / 送信済み` 表示
+
+実顧客、実LINE送信先、実public token、実WorkTimeSession、production DBは使用していない。LINE送信・status更新・DB mutationも実行していない。
+
+
 ### 今後取得する — 見積・作業
 
 - `repair-detail.png`
@@ -61,7 +72,6 @@
 
 ### 今後取得する — PhysicalTag・保管場所
 
-- `scan-session.png`
 - `storage-locations.png`
 
 ### 今後取得する — 発送・納品
@@ -112,5 +122,6 @@
 - `../previews/02_receive-tag-storage-preview.md` — 現物受付・PhysicalTag・StorageLocation
 - `../previews/03_estimate-approval-parts-preview.md` — 見積・承認・部品
 - `../previews/04_timer-scheduler-preview.md` — WorkTimeSession・Scheduler設定・Scheduler v2・今日の作業
+- `../previews/05_repair-work-completion-preview.md` — ScanSession・修理作業・作業完了・ランニングテスト・LINE完了連絡
 
 生成PDFはMarkdown原本ではなく確認用出力として扱い、Gitの正本にはしない。
