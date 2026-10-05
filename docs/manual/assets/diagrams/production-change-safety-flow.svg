@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="790" viewBox="0 0 1200 790" role="img" aria-labelledby="title desc">
+  <title id="title">production変更の安全フローと独立したDB migration</title>
+  <desc id="desc">local実装と確認、commit、リスクとmigrationと環境差分の確認、backupと独立reviewと承認を経て、DB migrationとRailway deployが別レーンで進む。read-backとsmoke後にproduction記録とtagを残す。</desc>
+  <defs>
+    <style>
+      .bg{fill:#fff}.head{font:700 28px "Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#173047}.label{font:700 18px "Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#173047}.body{font:15px "Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#334f63}.small{font:14px "Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#526678}.blue{fill:#eaf4fb;stroke:#24638d;stroke-width:2.4}.green{fill:#e9f6ee;stroke:#28724f;stroke-width:2.4}.orange{fill:#fff4e7;stroke:#aa6924;stroke-width:2.4}.gray{fill:#f5f6f8;stroke:#8e9ba7;stroke-width:2.4}.laneBlue{fill:#f3f9fd}.laneGreen{fill:#f2faf5}.arrow{stroke:#37779e;stroke-width:3;fill:none;marker-end:url(#tip)}.dbArrow{stroke:#28724f;stroke-width:3;fill:none;marker-end:url(#dbTip)}.dash{stroke:#8e9ba7;stroke-width:2;stroke-dasharray:7 6;fill:none}
+    </style>
+    <marker id="tip" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#37779e"/></marker>
+    <marker id="dbTip" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#28724f"/></marker>
+  </defs>
+  <rect class="bg" width="1200" height="790"/>
+  <text class="head" x="38" y="46">production変更: deployとDB migrationを別に確認</text>
+  <text class="small" x="38" y="75">高リスク変更は独立reviewと本番操作前のユーザー明示承認を通す。</text>
+
+  <rect class="blue" x="34" y="105" width="245" height="95" rx="13"/><text class="label" x="55" y="143">local implementation / test</text><text class="body" x="55" y="173">型・test・build・差分確認</text>
+  <path class="arrow" d="M281 152 H310"/>
+  <rect class="blue" x="316" y="105" width="184" height="95" rx="13"/><text class="label" x="337" y="143">1 Task = 1 commit</text><text class="body" x="337" y="173">Task外差分を混ぜない</text>
+  <path class="arrow" d="M502 152 H531"/>
+  <rect class="orange" x="537" y="105" width="269" height="95" rx="13"/><text class="label" x="558" y="143">risk / migration / env</text><text class="body" x="558" y="173">対象DB・互換性・権限</text>
+  <path class="arrow" d="M808 152 H837"/>
+  <rect class="orange" x="843" y="105" width="322" height="95" rx="13"/><text class="label" x="864" y="143">backup / review / approval</text><text class="body" x="864" y="173">変更前・独立確認・明示承認</text>
+
+  <rect class="laneGreen" x="34" y="236" width="1132" height="167" rx="14"/>
+  <text class="label" x="52" y="268">DB migration lane — 必要なTaskで明示実施</text>
+  <rect class="green" x="52" y="292" width="310" height="84" rx="11"/><text class="label" x="71" y="326">repo内migration SQL</text><text class="body" x="71" y="353">対象・差分・適用順を確認</text>
+  <path class="dbArrow" d="M364 334 H438"/>
+  <rect class="green" x="444" y="292" width="310" height="84" rx="11"/><text class="label" x="463" y="326">明示的にmigration適用</text><text class="body" x="463" y="353">deployから自動実行しない</text>
+  <path class="dbArrow" d="M756 334 H830"/>
+  <rect class="green" x="836" y="292" width="310" height="84" rx="11"/><text class="label" x="855" y="326">構造・RLS / GRANT read-back</text><text class="body" x="855" y="353">必要ならSecurity Advisor</text>
+  <path class="dash" d="M1004 201 V235"/>
+
+  <rect class="laneBlue" x="34" y="430" width="1132" height="163" rx="14"/>
+  <text class="label" x="52" y="462">Railway deploy lane — GitHub mainからアプリをdeploy</text>
+  <rect class="blue" x="52" y="485" width="310" height="82" rx="11"/><text class="label" x="71" y="519">GitHub main</text><text class="body" x="71" y="545">production source commit</text>
+  <path class="arrow" d="M364 526 H438"/>
+  <rect class="blue" x="444" y="485" width="310" height="82" rx="11"/><text class="label" x="463" y="519">Railway build / start</text><text class="body" x="463" y="545">prisma generate + next build</text>
+  <path class="arrow" d="M756 526 H830"/>
+  <rect class="blue" x="836" y="485" width="310" height="82" rx="11"/><text class="label" x="855" y="519">runtime / smoke</text><text class="body" x="855" y="545">公開route・認証境界・対象API</text>
+  <path class="dash" d="M992 403 V429"/>
+
+  <path class="arrow" d="M992 594 V621"/>
+  <rect class="gray" x="510" y="627" width="656" height="102" rx="13"/><text class="label" x="533" y="663">production record / tag</text><text class="body" x="533" y="690">commit・deployment・backup・migration・read-back・smokeを記録</text>
+  <text class="small" x="38" y="759">prisma generateはClient生成。Railway rollback / redeployは適用済みDB migrationを自動で戻さない。</text>
+</svg>

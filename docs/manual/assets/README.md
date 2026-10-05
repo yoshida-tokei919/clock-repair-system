@@ -130,6 +130,8 @@
 - [外部サービスの接続境界](diagrams/external-services-boundary.svg) — 第34章
 - [業務事実ごとの正本](diagrams/status-source-of-truth.svg) — 第35章
 - [二重処理防止の層](diagrams/duplicate-safety-flow.svg) — 第36章
+- [障害の層と確認の順序](diagrams/troubleshooting-boundary.svg) — 第37章
+- [production変更の安全フロー](diagrams/production-change-safety-flow.svg) — 第38章
 
 ## 印刷プレビュー
 
@@ -143,5 +145,6 @@
 - [08 データ保存・実行環境](../previews/08_data-runtime-preview.md)
 - [09 外部配送・決済等の接続](../previews/09_external-services-preview.md)
 - [10 ステータス・正本・二重処理防止](../previews/10_status-safety-preview.md)
+- [11 障害切り分け・production変更](../previews/11_troubleshooting-deploy-preview.md)
 
 生成PDFはMarkdown原本ではなく確認用出力として扱い、Gitの正本にはしない。

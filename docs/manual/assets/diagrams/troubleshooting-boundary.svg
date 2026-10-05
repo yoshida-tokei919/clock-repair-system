@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">障害の層と正本の確認順序</title>
+  <desc id="desc">browserからRailway、DBとStorageとR2、Windows local worker、外部サービスへ続く責任境界。症状の層を固定し、正本を確認して上下流を分離する。</desc>
+  <defs>
+    <style>
+      .bg{fill:#fff}.head{font:700 29px "Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#173047}.label{font:700 20px "Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#173047}.body{font:16px "Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#334f63}.small{font:15px "Noto Sans JP","Yu Gothic",Meiryo,sans-serif;fill:#526678}.blue{fill:#eaf4fb;stroke:#24638d;stroke-width:2.5}.green{fill:#e9f6ee;stroke:#28724f;stroke-width:2.5}.orange{fill:#fff4e7;stroke:#aa6924;stroke-width:2.5}.gray{fill:#f5f6f8;stroke:#8e9ba7;stroke-width:2.5}.arrow{stroke:#37779e;stroke-width:3;fill:none;marker-end:url(#tip)}.sep{stroke:#a7b5c0;stroke-width:2;stroke-dasharray:6 6}
+    </style>
+    <marker id="tip" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#37779e"/></marker>
+  </defs>
+  <rect class="bg" width="1200" height="720"/>
+  <text class="head" x="42" y="51">エラー時は責任境界ごとに確認</text>
+  <text class="small" x="42" y="81">表示・実行・保存・送信は別の事実。矢印は調査の進行であり、障害箇所の断定ではない。</text>
+
+  <rect class="blue" x="34" y="126" width="184" height="173" rx="14"/>
+  <text class="label" x="53" y="165">browser / UI</text><text class="body" x="53" y="203">表示・認証状態</text><text class="body" x="53" y="232">操作とHTTP応答</text><text class="small" x="53" y="269">307 / 401</text>
+  <path class="arrow" d="M220 211 H247"/>
+  <rect class="blue" x="252" y="126" width="192" height="173" rx="14"/>
+  <text class="label" x="270" y="165">Railway / Next.js</text><text class="body" x="270" y="203">build・runtime</text><text class="body" x="270" y="232">API・server処理</text><text class="small" x="270" y="269">5xx / 設定・接続</text>
+  <path class="arrow" d="M446 211 H473"/>
+  <rect class="green" x="478" y="126" width="235" height="173" rx="14"/>
+  <text class="label" x="496" y="165">保存先を分ける</text><text class="body" x="496" y="202">PostgreSQL: 業務DB</text><text class="body" x="496" y="231">Storage: PDF</text><text class="body" x="496" y="260">R2: 画像</text>
+  <path class="arrow" d="M715 211 H742"/>
+  <rect class="orange" x="747" y="126" width="190" height="173" rx="14"/>
+  <text class="label" x="765" y="165">Windows local</text><text class="body" x="765" y="203">n8n: 処理・通知</text><text class="body" x="765" y="232">LINE sender: 送信</text><text class="small" x="765" y="269">Railwayとは別</text>
+  <path class="arrow" d="M939 211 H966"/>
+  <rect class="gray" x="971" y="126" width="197" height="173" rx="14"/>
+  <text class="label" x="989" y="165">外部サービス</text><text class="body" x="989" y="203">LINE Manager</text><text class="body" x="989" y="230">Stripe・ゆうプリR</text><text class="body" x="989" y="257">Slack</text>
+  <path class="sep" d="M235 113 V318 M461 113 V318 M730 113 V318 M954 113 V318"/>
+
+  <text class="label" x="42" y="369">調査の順序</text>
+  <rect class="blue" x="42" y="396" width="315" height="103" rx="13"/>
+  <text class="label" x="63" y="434">1. 症状の層を固定</text><text class="small" x="63" y="468">時刻・範囲・応答・直前の変更</text>
+  <path class="arrow" d="M359 448 H408"/>
+  <rect class="green" x="414" y="396" width="326" height="103" rx="13"/>
+  <text class="label" x="435" y="434">2. 業務事実の正本を確認</text><text class="small" x="435" y="468">DB記録・object・外部の確定証拠</text>
+  <path class="arrow" d="M742 448 H791"/>
+  <rect class="orange" x="797" y="396" width="371" height="103" rx="13"/>
+  <text class="label" x="818" y="434">3. 上流 / 下流を分離</text><text class="small" x="818" y="468">結果不明は再実行せず照合</text>
+
+  <rect class="gray" x="42" y="541" width="1126" height="119" rx="13"/>
+  <text class="label" x="65" y="580">典型例: Slack未着 ≠ Inquiry未保存 / LINE intent ≠ 送信済み</text>
+  <text class="body" x="65" y="617">Railway build成功 ≠ runtime正常 ≠ DB migration適用済み</text>
+  <text class="small" x="42" y="692">調査記録にsecret・token・cookie・顧客PIIを載せない。</text>
+</svg>
