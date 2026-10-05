@@ -1,6 +1,6 @@
 # Task202C — ゆうプリR発送履歴 → Shipment同期候補プレビューUI
 
-Status: local implementation. Production: pending.
+Status: production complete.
 
 ## Boundary
 
@@ -31,3 +31,16 @@ Status: local implementation. Production: pending.
 - Focused parser/route tests: 14/14 PASS（direct transpile）。
 - Related Shipment regression attempt: 39 tests discovered / 37 PASS。2件の `shipment-route` test はWindows環境の `spawn EPERM` によりassertion実行前に停止しており、assertion failureではない。
 - TypeScript `--noEmit`、`git diff --check`、`npm run build`: PASS。
+
+## Production completion — 2026-10-05
+
+- Application commit: `30f34824bca389a5eb85e5e404aa82753a538a5f` — `feat: add yu-pri shipment sync preview`。
+- Deploy source: GitHub `main` → Railway、exact commit `30f34824bca389a5eb85e5e404aa82753a538a5f`。
+- Railway deployment: `8a0f13a1-bb55-458c-b23a-68b0d483ed47` — SUCCESS、region `sin`。
+- Railway production build: Prisma Client生成、Next.js 15.5.27 compile / type check PASS、static pages 56/56。
+- Independent Codex review: clear actionable regression / production blockerなし。
+- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`POST /api/shipments/yupuri-history/preview`未認証=401。
+- Railway HTTP logs: 上記smoke requestの`upstreamErrors`はすべて空。runtimeはNext.js 15.5.27、`Ready in 311ms`。
+- Production health: 1 replica online、warning 0、critical 0、recent failure 0。
+- Production tag: `production-task202c-20261005`。
+- schema / migration / RLS / GRANT / production DB mutationなし。Shipment / Repair mutationなし。LINE送信なし。
