@@ -32,11 +32,23 @@ export type HistoryRow = {
   aggregateStatusCode: string;
   detailStatusCode: string;
   confirmedDescriptionOrNull: string | null;
+  currentShipment: HistoryShipmentPreview | null;
+  statusCandidate: ShipmentStatusCandidate | null;
+  statusChange: "NO_CHANGE" | "CANDIDATE" | "NONE";
+  trackingChange: "NO_CHANGE" | "CANDIDATE" | "CONFLICT" | "NONE";
   warnings: string[];
   errors: string[];
   importableLater: boolean;
 };
-export type HistoryShipment = { id: number; trackingNumber: string | null };
+export type ShipmentStatusCandidate = "AWAITING_ACCEPTANCE" | "SHIPPED" | "IN_TRANSIT" |
+  "OUT_FOR_DELIVERY" | "DELIVERED" | "EXCEPTION";
+export type HistoryShipment = {
+  id: number; direction: "INBOUND" | "OUTBOUND"; status: string; trackingNumber: string | null;
+  actualShippedAt: Date | null; deliveredAt: Date | null;
+};
+export type HistoryShipmentPreview = Omit<HistoryShipment, "actualShippedAt" | "deliveredAt"> & {
+  actualShippedAt: string | null; deliveredAt: string | null;
+};
 
 // Japan Post Yu-Pri R, 入出力インターフェース仕様書 (2025-08-07), section 10.
 // These are the table's descriptions, not Shipment state transitions.
@@ -76,6 +88,20 @@ const describedStatusGroups: readonly StatusGroup[] = [
 const statusKey = (aggregate: string, detail: string) => `${aggregate}/${detail}`;
 const officialDescriptions = new Map(describedStatusGroups.flatMap(([aggregate, description, details]) =>
   details.map(detail => [statusKey(aggregate, detail), description] as const)));
+
+// Preview proposal only. An official description does not establish update eligibility.
+const normalizedStatusByDescription: Readonly<Record<string, ShipmentStatusCandidate>> = {
+  "引受予定": "AWAITING_ACCEPTANCE", "引受": "SHIPPED",
+  "通過": "IN_TRANSIT", "最寄局送付": "IN_TRANSIT", "ＣＶＳ等引渡": "IN_TRANSIT",
+  "はこぽす等入庫": "IN_TRANSIT", "発送": "IN_TRANSIT", "車船輸送": "IN_TRANSIT", "到着": "IN_TRANSIT",
+  "持出中": "OUT_FOR_DELIVERY", "配達完了": "DELIVERED",
+  "不在持戻": "EXCEPTION", "最寄局保管": "EXCEPTION", "返還完了": "EXCEPTION",
+  "局内保管": "EXCEPTION", "私書箱保管": "EXCEPTION", "配達希望": "EXCEPTION",
+  "保管中": "EXCEPTION", "保管": "EXCEPTION", "転送": "EXCEPTION",
+  "他局転送": "EXCEPTION", "返還": "EXCEPTION", "処分": "EXCEPTION",
+  "返還不能": "EXCEPTION", "保管延長": "EXCEPTION", "休日保管": "EXCEPTION",
+  "調査中": "EXCEPTION",
+};
 
 // A dash in the official table is a listed pair without a description.
 const officiallyUndescribedPairs = new Set([
@@ -177,9 +203,14 @@ export function parseYupuriHistory(bytes: Buffer): HistoryRow[] {
     if (confirmedDescriptionOrNull === null) warnings.push(officiallyUndescribedPairs.has(key)
       ? "Official delivery status table lists this pair without a description"
       : "Unverified delivery status codes");
+    const statusCandidate = confirmedDescriptionOrNull === null ? null :
+      normalizedStatusByDescription[confirmedDescriptionOrNull] ?? null;
+    if (confirmedDescriptionOrNull !== null && statusCandidate === null)
+      warnings.push("Official description has no normalized Shipment status candidate");
     return { rowNumber, managementNumber, resolvedShipmentId, shipmentFound: false,
       trackingNumberCandidate, acceptanceRelatedValue, deliveryCompletionCandidate,
-      aggregateStatusCode, detailStatusCode, confirmedDescriptionOrNull, warnings, errors,
+      aggregateStatusCode, detailStatusCode, confirmedDescriptionOrNull, currentShipment: null,
+      statusCandidate, statusChange: "NONE", trackingChange: "NONE", warnings, errors,
       importableLater: false };
   });
 }
@@ -200,8 +231,23 @@ export function resolveYupuriHistory(rows: HistoryRow[], shipments: readonly His
       const shipment = byId.get(row.resolvedShipmentId);
       row.shipmentFound = !!shipment;
       if (!shipment) row.errors.push("Shipment not found");
-      else if (shipment.trackingNumber && shipment.trackingNumber !== row.trackingNumberCandidate)
-        row.errors.push("Existing Shipment tracking number conflicts with candidate");
+      else {
+        row.currentShipment = {
+          id: shipment.id, direction: shipment.direction, status: shipment.status,
+          trackingNumber: shipment.trackingNumber,
+          actualShippedAt: shipment.actualShippedAt?.toISOString() ?? null,
+          deliveredAt: shipment.deliveredAt?.toISOString() ?? null,
+        };
+        row.statusChange = row.statusCandidate === null ? "NONE" :
+          shipment.status === row.statusCandidate ? "NO_CHANGE" : "CANDIDATE";
+        row.trackingChange = !row.trackingNumberCandidate.trim() ? "NONE" :
+          shipment.trackingNumber === row.trackingNumberCandidate ? "NO_CHANGE" :
+          shipment.trackingNumber ? "CONFLICT" : "CANDIDATE";
+        if (row.trackingChange === "CONFLICT")
+          row.errors.push("Existing Shipment tracking number conflicts with candidate");
+        if (shipment.direction !== "OUTBOUND") row.errors.push("INBOUND Shipment is not a supported synchronization target");
+        if (shipment.status === "CANCELLED") row.errors.push("CANCELLED Shipment is not a supported synchronization target");
+      }
     }
   }
   for (const group of byManagement.values()) if (group.length > 1)
@@ -212,6 +258,6 @@ export function resolveYupuriHistory(rows: HistoryRow[], shipments: readonly His
       for (const row of group) row.errors.push("Conflicting tracking numbers for the same Shipment");
   }
   for (const row of result) row.importableLater = row.errors.length === 0 && row.shipmentFound &&
-    row.confirmedDescriptionOrNull !== null;
+    row.statusCandidate !== null;
   return result;
 }

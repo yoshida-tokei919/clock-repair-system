@@ -17,7 +17,7 @@ const state = globalThis as typeof globalThis & {
 async function route() {
   const readOnly = (target: Record<string, unknown>) => new Proxy(target, {
     get(object, property) {
-      if (typeof property === "string" && /^(create|update|upsert|delete|\$transaction)/.test(property)) {
+      if (typeof property === "string" && /^(create|update|upsert|delete|createMany|updateMany|deleteMany|\$transaction|\$executeRaw|\$queryRaw)/.test(property)) {
         state.__yhMutations++;
         throw new Error("DB mutation attempted");
       }
@@ -30,14 +30,17 @@ async function route() {
       ({ body, status: options?.status ?? 200, headers: options?.headers }) } },
     "@/lib/auth": { authOptions: {} },
     "@/lib/prisma": { prisma: readOnly({
-      admin: readOnly({ findUnique: async () => {
+      admin: readOnly({ findUnique: async (query: { where: { email: string }; select: { id: boolean } }) => {
+        assert.deepEqual(query, { where: { email: "admin@example.com" }, select: { id: true } });
         state.__yhAdminReads++; return state.__yhAdmin ? { id: 1 } : null;
       } }),
       shipment: readOnly({ findMany: async (query: { where: { id: { in: number[] } }; select: Record<string, boolean> }) => {
         state.__yhShipmentReads++;
         assert.deepEqual(query.where, { id: { in: [42] } });
-        assert.deepEqual(query.select, { id: true, trackingNumber: true });
-        return [{ id: 42, trackingNumber: null }];
+        assert.deepEqual(query.select, { id: true, direction: true, status: true, trackingNumber: true,
+          actualShippedAt: true, deliveredAt: true });
+        return [{ id: 42, direction: "OUTBOUND", status: "DRAFT", trackingNumber: null,
+          actualShippedAt: new Date("2026-01-01T00:00:00.000Z"), deliveredAt: null }];
       } }),
     }) },
     "@/lib/yupuri-history": { parseYupuriHistory, resolveYupuriHistory, YUPURI_HISTORY_MAX_BYTES: 256 * 1024,
@@ -95,6 +98,11 @@ test("preview requires session and matching Admin, then only reads Shipments", a
   assert.equal(response.status, 200);
   assert.equal(response.headers?.["Cache-Control"], "no-store");
   assert.equal(response.body.rows?.[0].shipmentFound, true);
+  assert.deepEqual(response.body.rows?.[0].currentShipment, {
+    id: 42, direction: "OUTBOUND", status: "DRAFT", trackingNumber: null,
+    actualShippedAt: "2026-01-01T00:00:00.000Z", deliveredAt: null,
+  });
+  assert.equal(response.body.rows?.[0].statusCandidate, "AWAITING_ACCEPTANCE");
   assert.equal(response.body.rows?.[0].importableLater, true);
   assert.equal(state.__yhShipmentReads, 1);
   assert.equal(state.__yhMutations, 0);

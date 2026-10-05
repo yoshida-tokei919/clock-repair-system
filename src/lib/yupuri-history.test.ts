@@ -10,7 +10,11 @@ const header = YUPURI_HISTORY_HEADER.map(value => `"${value}"`).join(",");
 const row = (key = "SHP-42", tracking = "193715301010", aggregate = "10", detail = "0A") =>
   [key, tracking, "", "", aggregate, detail].map(value => `"${value}"`).join(",");
 const cp932 = (text: string) => iconv.encode(text, "cp932");
-const preview = (text: string, shipments = [{ id: 42, trackingNumber: null as string | null }]) =>
+const shipment = (overrides: Partial<Parameters<typeof resolveYupuriHistory>[1][number]> = {}) => ({
+  id: 42, direction: "OUTBOUND" as const, status: "DRAFT", trackingNumber: null as string | null,
+  actualShippedAt: null as Date | null, deliveredAt: null as Date | null, ...overrides,
+});
+const preview = (text: string, shipments = [shipment()]) =>
   resolveYupuriHistory(parseYupuriHistory(cp932(text)), shipments);
 
 test("CP932 header, 10/0A, raw dates, CRLF and LF", () => {
@@ -52,9 +56,11 @@ test("missing columns, short row, extra column and blank tracking are row errors
   assert.ok(rows[0].errors.some(error => error.includes("6 columns")));
   assert.ok(rows[0].errors.some(error => error.includes("Tracking number")));
   assert.ok(rows[1].errors.some(error => error.includes("Tracking number")));
+  assert.equal(rows[1].trackingChange, "NONE");
   assert.ok(rows[2].errors.some(error => error.includes("6 columns")));
   assert.equal(rows[3].trackingNumberCandidate, "  ");
   assert.ok(rows[3].errors.some(error => error.includes("Tracking number")));
+  assert.equal(rows[3].trackingChange, "NONE");
   assert.ok(rows.every(value => !value.importableLater));
 });
 
@@ -69,7 +75,7 @@ test("canonical SHP ID and safe Int range are required; missing Shipment is expl
 
 test("duplicate management, duplicate Shipment, differing candidates and existing tracking conflict", () => {
   const rows = preview(`${header}\n${row("SHP-42", "AAA")}\n${row("SHP-42", "BBB")}\n`,
-    [{ id: 42, trackingNumber: "OLD" }]);
+    [shipment({ trackingNumber: "OLD" })]);
   for (const item of rows) {
     assert.ok(item.errors.includes("Duplicate management number"));
     assert.ok(item.errors.includes("Duplicate resolved Shipment"));
@@ -97,14 +103,71 @@ test("official Japan Post descriptions remain read-only preview candidates", () 
   }
 });
 
+test("official descriptions map only to explicit Shipment status candidates", () => {
+  for (const [aggregate, detail, candidate] of [
+    ["10", "0A", "AWAITING_ACCEPTANCE"], ["11", "01", "SHIPPED"],
+    ["12", "14", "IN_TRANSIT"], ["12", "15", "IN_TRANSIT"], ["12", "16", "IN_TRANSIT"],
+    ["12", "17", "IN_TRANSIT"], ["13", "19", "IN_TRANSIT"], ["14", "83", "IN_TRANSIT"],
+    ["30", "00", "IN_TRANSIT"], ["50", "01", "OUT_FOR_DELIVERY"],
+    ["52", "01", "DELIVERED"], ["51", "30", "EXCEPTION"],
+    ["51", "33", "EXCEPTION"], ["52", "34", "EXCEPTION"],
+    ["60", "48", "EXCEPTION"], ["60", "49", "EXCEPTION"], ["60", "77", "EXCEPTION"],
+    ["60", "99", "EXCEPTION"], ["61", "51", "EXCEPTION"], ["61", "79", "EXCEPTION"],
+    ["62", "44", "EXCEPTION"], ["62", "65", "EXCEPTION"], ["62", "66", "EXCEPTION"],
+    ["63", "67", "EXCEPTION"], ["63", "68", "EXCEPTION"], ["63", "72", "EXCEPTION"],
+    ["63", "78", "EXCEPTION"], ["63", "79", "EXCEPTION"], ["63", "80", "EXCEPTION"],
+    ["63", "70", "EXCEPTION"], ["64", "73", "EXCEPTION"], ["65", "56", "EXCEPTION"],
+  ]) {
+    const result = preview(`${header}\n${row("SHP-42", "123", aggregate, detail)}\n`)[0];
+    assert.equal(result.statusCandidate, candidate, `${aggregate}/${detail}`);
+    assert.equal(result.statusChange, "CANDIDATE");
+  }
+  const counterHandoff = preview(`${header}\n${row("SHP-42", "123", "53", "37")}\n`)[0];
+  assert.equal(counterHandoff.confirmedDescriptionOrNull, "窓口渡し");
+  assert.equal(counterHandoff.statusCandidate, null);
+  assert.equal(counterHandoff.statusChange, "NONE");
+  assert.equal(counterHandoff.importableLater, false);
+  assert.ok(counterHandoff.warnings.includes("Official description has no normalized Shipment status candidate"));
+});
+
+test("same status and tracking are no-op; raw date fields and current dates remain distinct", () => {
+  const acceptance = "20260102030405";
+  const completion = "20260203040506";
+  const rows = preview(`${header}\n"SHP-42","123","${acceptance}","${completion}","10","0A"\n`,
+    [shipment({ status: "AWAITING_ACCEPTANCE", trackingNumber: "123",
+      actualShippedAt: new Date("2026-01-01T00:00:00.000Z"), deliveredAt: null })]);
+  assert.equal(rows[0].statusChange, "NO_CHANGE");
+  assert.equal(rows[0].trackingChange, "NO_CHANGE");
+  assert.equal(rows[0].acceptanceRelatedValue, acceptance);
+  assert.equal(rows[0].deliveryCompletionCandidate, completion);
+  assert.equal(rows[0].currentShipment?.actualShippedAt, "2026-01-01T00:00:00.000Z");
+  assert.equal(rows[0].currentShipment?.deliveredAt, null);
+  assert.deepEqual(rows[0].errors, []);
+});
+
+test("tracking conflict, INBOUND and CANCELLED block preview candidates", () => {
+  for (const [current, blocker] of [
+    [shipment({ trackingNumber: "OLD" }), "Existing Shipment tracking number conflicts with candidate"],
+    [shipment({ direction: "INBOUND" }), "INBOUND Shipment is not a supported synchronization target"],
+    [shipment({ status: "CANCELLED" }), "CANCELLED Shipment is not a supported synchronization target"],
+  ] as const) {
+    const result = preview(`${header}\n${row("SHP-42", "123")}\n`, [current])[0];
+    assert.ok(result.errors.includes(blocker));
+    assert.equal(result.importableLater, false);
+    assert.equal(result.statusCandidate, "AWAITING_ACCEPTANCE");
+  }
+});
+
 test("official dash pair has no description and is distinct from an unknown pair", () => {
   const dash = preview(`${header}\n${row("SHP-42", "123", "11", "0D")}\n`)[0];
   assert.equal(dash.confirmedDescriptionOrNull, null);
+  assert.equal(dash.statusCandidate, null);
   assert.ok(dash.warnings.includes("Official delivery status table lists this pair without a description"));
   assert.equal(dash.importableLater, false);
 
   const unknown = preview(`${header}\n${row("SHP-42", "123", "ZZ", "ZZ")}\n`)[0];
   assert.equal(unknown.confirmedDescriptionOrNull, null);
+  assert.equal(unknown.statusCandidate, null);
   assert.ok(unknown.warnings.includes("Unverified delivery status codes"));
   assert.equal(unknown.importableLater, false);
 });

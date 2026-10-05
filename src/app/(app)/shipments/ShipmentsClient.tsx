@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ShipmentDirection, ShipmentHandoffMethod, ShipmentStatus, StorageLocationType } from "@prisma/client";
 import { activePhysicalTag, activeStorageLocation, sameCustomerShipmentContext, SCHEDULE_GROUPS, shipmentRepairSummary, shipmentScheduleGroup } from "@/lib/shipment-schedule";
+import YupuriHistoryPreview from "./YupuriHistoryPreview";
 
 export type ScheduleShipment = {
   id: number;
@@ -102,6 +103,7 @@ export default function ShipmentsClient({ rows, today }: { rows: ScheduleShipmen
         <p className="text-sm text-gray-600">ランニングテスト完了の正本イベントは未実装です。現在のデータでは完了を判定できません。</p>
         <p className="text-sm text-gray-600">同一顧客の他個口はまとめ発送を検討するための参考情報です。統合可否は判定していません。</p>
       </div>
+      <YupuriHistoryPreview />
       {error && <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       {SCHEDULE_GROUPS.map(group => {
         const groupRows = rows.filter(row => shipmentScheduleGroup(row.plannedShipDate, today, row.status, row.actualShippedAt) === group.key);

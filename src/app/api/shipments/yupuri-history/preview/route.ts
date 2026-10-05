@@ -29,7 +29,8 @@ export async function POST(request: Request) {
     const ids = [...new Set(rows.flatMap(row => row.resolvedShipmentId === null ? [] : [row.resolvedShipmentId]))];
     const shipments = ids.length ? await prisma.shipment.findMany({
       where: { id: { in: ids } },
-      select: { id: true, trackingNumber: true },
+      select: { id: true, direction: true, status: true, trackingNumber: true,
+        actualShippedAt: true, deliveredAt: true },
     }) : [];
     return NextResponse.json({ rows: resolveYupuriHistory(rows, shipments) }, {
       headers: { "Cache-Control": "no-store" },
