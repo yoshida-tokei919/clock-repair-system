@@ -126,12 +126,3 @@ Inbox処理に失敗した場合、`LineWebhookInbox` はFAILEDとなり、後�
 
 
 ![LINE conversation](../assets/screenshots/inquiry-review-line.png)
-
-### 印刷版の注釈予定
-
-- ① Inquiry番号
-- ② LINEやり取り
-- ③ 受信画像
-- ④ 送信待ち / 送信済み表示
-- ⑤ お客様へのLINE返信欄
-- ⑥ 時計情報確認エリア

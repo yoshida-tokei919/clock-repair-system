@@ -53,7 +53,7 @@ Inquiryレビュー画面の「B2C 受付判断」で、時計ごとに受付可
 
 ![Intake link](../assets/screenshots/inquiry-intake-dialog.png)
 
-印刷版では次を示す。
+この画面では次を確認する。
 
 1. 「お客様用受付リンクを発行」
 2. 発行されたURL

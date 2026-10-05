@@ -188,17 +188,10 @@ OUTBOUND InquiryMessageを作成
 - ゆうプリR: 日本郵便送り状作成と発送履歴連携
 - Brother QL-800: PhysicalTag修理袋ラベル印刷
 
-## 2.9 印刷版の図解方針
+## 2.9 全体図
 
-最終PDFでは上記text図をそのまま使用せず、カラーのフロー図へ置き換える。図の原本は `assets/diagrams/` へ置き、詳細版と簡易版で再利用する。
+システム全体の役割分担は次の図で確認する。
 
-全体図では、少なくとも次を色分けする。
+![システム全体構成](../assets/diagrams/system-architecture.svg)
 
-- 顧客操作
-- 管理者操作
-- Railway / Next.js
-- Supabase
-- Windowsローカル処理
-- 外部サービス
-- 自動処理
-- 人の確認が必要な境界
+受付・LINE・AI・発送準備・外部サービスの責任境界は第3章「システム構成とデータの流れ」で詳しく説明する。

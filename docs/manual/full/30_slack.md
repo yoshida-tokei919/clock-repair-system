@@ -140,22 +140,8 @@ LINE Inbox処理は再試行できるが、同じ項目が最大試行回数へ�
 
 「Slack通知が来ない」ことと「LINE問い合わせ自体を受信していない」ことを同じ障害として扱わない。
 
-## 30.10 印刷版の画面・図
-
-Slack???????????????????????????????????????????????
-
-実顧客の個人情報を使用せず、マニュアル用のダミー通知を使用する。
+## 30.10 Slack通知Outboxの流れ
 
 ![Slack outbox flow](../assets/diagrams/slack-outbox-flow.svg)
 
-```text
-Supabase Outbox
-      ↓
-n8n claim
-      ↓
-Slack
-      ↓
-sent / failed ack
-      ↓
-Supabase Outbox status
-```
+通知本文と送信状態はSlack画面そのものを正本にせず、アプリ側の`SlackNotificationOutbox`と保存済みInquiryを基準に確認する。
