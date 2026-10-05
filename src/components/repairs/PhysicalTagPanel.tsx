@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { pdf } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { TagDocument } from "@/components/pdf/TagDocument";
 import { physicalTagLabel } from "@/lib/physical-tag-label";
+import { printPhysicalTagLabel } from "@/lib/bpac-physical-tag-print";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -33,7 +34,10 @@ export function PhysicalTagPanel(props: Props) {
   const [tag, setTag] = useState<Tag | null>(props.initialTag);
   const [nfcUid, setNfcUid] = useState("");
   const [issuing, setIssuing] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const printingRef = useRef(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -41,9 +45,23 @@ export function PhysicalTagPanel(props: Props) {
   useEffect(() => { setTag(props.initialTag); }, [props.initialTag]);
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
+  function buildLabel(activeTag: Tag) {
+    return physicalTagLabel({
+      shortCode: activeTag.shortCode, qrToken: activeTag.qrToken,
+      inquiryNumber: props.inquiryNumber, customerType: props.customerType,
+      customerName: props.customerName, companyName: props.companyName,
+      endUserName: props.endUserName, partnerRef: props.partnerRef,
+      brand: props.brand, model: props.model, reference: props.reference,
+      serialNumber: props.serialNumber,
+      movementCaliber: props.movementCaliber, watchCaliber: props.watchCaliber,
+      receptionDate: props.receptionDate,
+    });
+  }
+
   async function issue() {
     setIssuing(true);
     setError("");
+    setNotice("");
     try {
       const response = await fetch("/api/physical-tags/issue", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -61,6 +79,23 @@ export function PhysicalTagPanel(props: Props) {
     }
   }
 
+  async function directPrint() {
+    if (!tag || printingRef.current) return;
+    printingRef.current = true;
+    setPrinting(true);
+    setError("");
+    setNotice("");
+    try {
+      await printPhysicalTagLabel(buildLabel(tag));
+      setNotice(`${tag.shortCode} をBrother QL-800へ1枚印刷しました。`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "管理タグラベルを印刷できませんでした。");
+    } finally {
+      printingRef.current = false;
+      setPrinting(false);
+    }
+  }
+
   async function openPreview() {
     if (!tag) return;
     setPreviewOpen(true);
@@ -68,16 +103,7 @@ export function PhysicalTagPanel(props: Props) {
     setError("");
     setPreviewUrl(null);
     try {
-      const label = physicalTagLabel({
-        shortCode: tag.shortCode, qrToken: tag.qrToken,
-        inquiryNumber: props.inquiryNumber, customerType: props.customerType,
-        customerName: props.customerName, companyName: props.companyName,
-        endUserName: props.endUserName, partnerRef: props.partnerRef,
-        brand: props.brand, model: props.model, reference: props.reference,
-        serialNumber: props.serialNumber,
-        movementCaliber: props.movementCaliber, watchCaliber: props.watchCaliber,
-        receptionDate: props.receptionDate,
-      });
+      const label = buildLabel(tag);
       const qrCodeDataUrl = await QRCode.toDataURL(label.qrPayload, { width: 480, margin: 4 });
       const blob = await pdf(<TagDocument label={label} qrCodeDataUrl={qrCodeDataUrl} />).toBlob();
       setPreviewUrl(URL.createObjectURL(blob));
@@ -96,8 +122,11 @@ export function PhysicalTagPanel(props: Props) {
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="font-mono font-semibold">{tag.shortCode}</span>
             {tag.nfcUid && <span className="text-zinc-600">NFC UID: {tag.nfcUid}</span>}
-            <Button type="button" variant="outline" size="sm" onClick={() => void openPreview()}>
-              ラベルをプレビュー・印刷
+            <Button type="button" size="sm" disabled={printing} onClick={() => void directPrint()}>
+              {printing ? "印刷中..." : "ラベル印刷"}
+            </Button>
+            <Button type="button" variant="outline" size="sm" disabled={printing} onClick={() => void openPreview()}>
+              プレビュー
             </Button>
           </div>
         ) : (
@@ -113,6 +142,7 @@ export function PhysicalTagPanel(props: Props) {
             <p className="w-full text-xs text-zinc-500">R65リーダーのUID出力形式は未確認です。UIDは後から確認できます。</p>
           </div>
         )}
+        {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       </div>
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
