@@ -1,6 +1,6 @@
 # Task205C — B2B一括受付の検索・自由入力マスター
 
-Production: pending
+Production: complete
 
 ## Scope
 
@@ -24,4 +24,13 @@ Production: pending
 
 ## Production
 
-Production: pending. Commit、push、deploy、migration、production DB変更なし。
+- Status: complete.
+- Application commit: `3cdb8e1bb1cd72ce039f0d625dbcbf188c509b76` (`feat: improve B2B intake master entry`).
+- Railway deployment: `a1e2ddd3-26c5-43d9-82e7-398f1bc371e7` — SUCCESS.
+- Production tag: `production-task205c-20261006`.
+- Local validation: focused tests 21/21 PASS（batch 11/11、drilldown 8/8、master normalize 2/2）、TypeScript PASS、`git diff --check` PASS、Next.js production build PASS（static pages 57/57）。
+- Railway production build: Prisma generate / Next.js compile / lint・type check / static pages 57/57 / build trace collection PASS.
+- Production runtime: Next.js 15.5.27、`Ready in 257ms`、deployment status SUCCESS.
+- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、`/repairs/b2b-intake`未認証=307。productionデータを増やさないためB2B一括受付POSTの実mutation smokeは未実施。
+- schema / migration / RLS / GRANT / production DB変更なし。
+- Final read-only review: blocking findingなし。実装担当Codexとは分離して最終差分を確認済み。
