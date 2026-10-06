@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { getB2bBrandMasters, getB2bModelMasters } from "@/actions/b2b-intake-master-actions";
 import { changeBrand, changeModel, changeRef, filterIntakeChoices, intakeComboboxKeyDecision, matchingModel, modelCacheKey, optionsForRow, shouldPreventB2bBatchEnter, type ModelChoice, type RefChoice, type CaliberChoice, type SearchChoice } from "@/lib/b2b-intake-drilldown";
+import { B2bBatchTagPrinting } from "./B2bBatchTagPrinting";
 
 // Keep the operator-facing cap in sync with the server validation.
 const B2B_BATCH_LIMIT = 30;
@@ -216,9 +217,9 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
           <Link className="text-blue-700 underline" href={`/repairs/${repair.id}`}>{repair.inquiryNumber} — 案件を開く</Link>
         </li>)}
       </ul>
-      <button type="button" className="mt-4 rounded-md border bg-white px-4 py-2 text-sm" onClick={() => {
+      <B2bBatchTagPrinting result={result} onReset={() => {
         setResult(null); setPartnerId(""); setRows([newRow()]); setError("");
-      }}>別のバッチを受付</button>
+      }} />
     </section> : <form ref={formRef} onSubmit={(event) => event.preventDefault()}
       onKeyDownCapture={(event) => {
         if (shouldPreventB2bBatchEnter(event.key, (event.target as HTMLElement).tagName,
