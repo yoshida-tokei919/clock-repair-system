@@ -1,6 +1,6 @@
 # Task205A — B2B一括受付
 
-Production: pending
+Production: complete
 
 ## Scope
 
@@ -37,4 +37,14 @@ Production: pending
 
 - B2C受付・guard変更、取引先新規登録、専用バッチschema、見積・価格・修理明細。
 - Shipment、PhysicalTag、StorageLocation、LINE、帳票・PDF、顧客通知への書き込み。
-- commit、deploy、production DB変更。本Taskのproduction反映は別工程。
+- production DB変更。schema / migrationは本Taskでは行わない。
+## Production
+
+- Application commit: `00536cf291472474e7283bf7c1c0f60de1514cee` (`feat: add B2B batch intake`)
+- Railway deployment: `88329053-165a-4a7c-93cf-429ebeccbf68` — SUCCESS
+- Production tag: `production-task205a-20261006`
+- Railway production build: Prisma generate / Next.js compile / type check / static pages 57/57 / build trace collection PASS。
+- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、`/repairs/b2b-intake`未認証=307、`POST /api/repairs/b2b-intake`未認証=401。
+- Railway HTTP logs: smoke対象にupstreamErrorsなし。deploy後のn8n internal endpointsも200。
+- schema / migration / production DB変更なし。LINE / Shipment / PhysicalTag / StorageLocationへのmutationなし。
+- Independent review: blocking findingなし。
