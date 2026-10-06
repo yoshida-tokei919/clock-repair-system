@@ -135,6 +135,10 @@ export default function CustomerListPage() {
                 </div>
               )}
 
+              <Link href={`/customers/${c.id}/communications`} className="mt-4 block text-sm font-medium text-blue-700 hover:underline">
+                やり取りを見る →
+              </Link>
+
               <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Link href={`/customers/${c.id}/edit`}>
                   <Button variant="outline" size="icon" className="h-8 w-8 text-zinc-600">

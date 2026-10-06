@@ -55,6 +55,9 @@ export default function CustomerEditPage({ params }: { params: Promise<{ id: str
           <ArrowLeft className="w-4 h-4 mr-1" /> 戻る
         </Button>
         <h1 className="text-xl font-bold text-zinc-900">顧客情報編集</h1>
+        <Link href={`/customers/${id}/communications`} className="ml-auto text-sm text-blue-700 hover:underline">
+          やり取りを見る →
+        </Link>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
