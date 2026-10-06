@@ -1,6 +1,6 @@
 ﻿# Task205D — B2B一括受付後のPhysicalTag準備・直接印刷
 
-Production: pending
+Production: complete
 
 ## Scope
 
@@ -20,11 +20,21 @@ Production: pending
 ## Validation
 
 - Task205D focused tests: 5/5 PASS。入力上限・重複、欠損/B2C/別顧客の拒否、active再利用、不足分のみ発行、順序、正本ラベルとQR privacy、割当競合時の再取得、印刷停止と未試行分再開を確認。
-- 既存回帰: b-PAC直接印刷 14/14 PASS、PhysicalTag単発発行 5/5 PASS、発行route認証 1/1 PASS。
+- PhysicalTag / b-PAC回帰: b-PAC 14/14、単件PhysicalTag発行 5/5、発行route認証 1/1 PASS。
 - `node node_modules/typescript/bin/tsc --noEmit --incremental false`: PASS。
 - `git diff --check`: PASS。
-- `node node_modules/next/dist/bin/next build`: PASS（static pages 57/57）。
-- Brother QL-800実機の一括印刷は未確認。単件直接印刷経路はTask196Fの既存実装を再利用。
-- Codex実装後にカタリが独立read-onlyレビューと上記検証を実施し、blocking findingなし。
+- `node node_modules/next/dist/bin/next build`: PASS。コンパイル、型チェック、静的ページ57/57、build trace収集完了。
+- Brother QL-800実機の複数枚連続印刷は未確認。単件直接印刷経路はTask196Fの既存実装を再利用。
+- 独立レビュー: blocking findingなし。実装担当Codexとは分離して最終差分・回帰・production buildを確認済み。
 
-Production deploy / push: pending.
+## Production
+
+- Status: complete.
+- Application commit: `aac9c53bcb16e6f70e72fdb3cc0a164a087ee43a` (`feat: add B2B batch physical tag printing`).
+- Railway deployment: `9df2a41b-5032-4796-9039-875ebbc8da04` — SUCCESS.
+- Production tag: `production-task205d-20261006`.
+- Railway production build: Prisma generate / Next.js compile / lint・type check / static pages 57/57 / build trace collection PASS.
+- Production runtime: Next.js 15.5.27、`Ready in 360ms`、deployment status SUCCESS.
+- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、`/repairs/b2b-intake`未認証=307、`POST /api/physical-tags/b2b-batch-prepare`未認証=401。productionデータを増やす実mutation smokeは未実施。
+- schema / migration / RLS / GRANT / production DB変更なし。
+- Brother QL-800実機の複数枚連続印刷はproduction上でも未確認。次回の実受付または安全なテストバッチで確認する。
