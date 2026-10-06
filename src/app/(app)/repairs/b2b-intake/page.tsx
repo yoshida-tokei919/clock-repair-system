@@ -12,7 +12,7 @@ export default async function B2bBatchIntakePage() {
     where: { email: session.user.email }, select: { id: true },
   })) redirect("/login");
 
-  const [partners, brands] = await Promise.all([
+  const [partners, brands, movementMakers, movementCalibers] = await Promise.all([
     prisma.customer.findMany({
       where: { type: "business", isPartner: true },
       select: { id: true, name: true, companyName: true, prefix: true },
@@ -20,8 +20,16 @@ export default async function B2bBatchIntakePage() {
     }),
     prisma.brand.findMany({
       where: { isWatchBrand: true, brandKind: { not: "TYPE" } },
-      select: { id: true, name: true, nameJp: true }, orderBy: { nameJp: "asc" },
+      select: { id: true, name: true, nameJp: true, nameEn: true, kana: true,
+        aliases: { select: { alias: true } } }, orderBy: { nameJp: "asc" },
     }),
+    prisma.brand.findMany({
+      where: { isMovementMaker: true, brandKind: { not: "TYPE" } },
+      select: { id: true, name: true, nameJp: true, nameEn: true, kana: true,
+        aliases: { select: { alias: true } } }, orderBy: { nameJp: "asc" },
+    }),
+    prisma.caliber.findMany({ select: { id: true, name: true, nameJp: true, nameEn: true, brandId: true },
+      orderBy: { name: "asc" } }),
   ]);
-  return <B2bBatchIntakeForm partners={partners} brands={brands} />;
+  return <B2bBatchIntakeForm partners={partners} brands={brands} movementMakers={movementMakers} movementCalibers={movementCalibers} />;
 }

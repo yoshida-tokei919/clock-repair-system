@@ -146,7 +146,7 @@ export async function findOrCreateModel(db: PrismaLike, brandId: number, rawName
     return db.model.create({ data: { brandId, name, nameJp: name } });
 }
 
-export async function findOrCreateWatchReference(db: PrismaLike, modelId: number, rawName: string) {
+export async function findOrCreateWatchReference(db: PrismaLike, modelId: number, rawName: string, caliberId?: number | null) {
     const name = rawName.trim();
     const normalized = normalizeMasterName(name);
     if (!normalized) throw new Error("Refを入力してください。");
@@ -156,5 +156,5 @@ export async function findOrCreateWatchReference(db: PrismaLike, modelId: number
     });
     const existing = references.find((reference) => normalizeMasterName(reference.name) === normalized);
     if (existing) return existing;
-    return db.watchReference.create({ data: { modelId, name } });
+    return db.watchReference.create({ data: { modelId, name, ...(caliberId ? { caliberId } : {}) } });
 }
