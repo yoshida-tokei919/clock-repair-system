@@ -1,8 +1,8 @@
 import type { Shipment } from "@prisma/client";
 import * as iconv from "iconv-lite";
 
-// The final 2026-09-24 Print R V3 PoC is a 100-column, headerless row.
-// Positions in this module are one-based to match that file.
+// External Standard Format V3 input uses a 99-field, headerless row.
+// Positions here are one-based and match the Yu-Pri R converter's external map.
 export type YupuriShipment = Pick<Shipment,
   "id" | "direction" | "status" | "actualShippedAt" | "plannedShipDate" | "requestedDeliveryDate" | "requestedDeliveryTimeSlot" |
   "destinationRecipientName" | "destinationPostalCode" | "destinationPrefecture" |
@@ -97,34 +97,36 @@ export function yupuriV3Fields(shipment: YupuriShipment): string[] {
       shipment.actualShippedAt !== null)
     throw new YupuriV3Error("This shipment cannot be exported", 409);
 
-  const fields = Array<string>(100).fill("");
+  const fields = Array<string>(99).fill("");
   const put = (position: number, value: string) => { fields[position - 1] = value; };
   put(1, `SHP-${shipment.id}`);
-  for (const position of [3, 9, 10, 11, 12, 20, 23, 26, 27, 28, 39, 43, 44, 45, 46, 47, 51, 54, 55, 69, 70, 86, 88])
+  for (const position of [6, 7, 8, 9, 18, 21, 24, 25, 26, 34, 37, 41, 42, 43, 44, 45, 49, 52, 53, 67, 68, 72, 85, 87])
     put(position, "0");
-  put(6, dateOnly(shipment.plannedShipDate, "Planned ship date", true));
-  put(13, "1100780");
-  put(15, postal(shipment.destinationPostalCode, "Destination postal code"));
-  put(16, [
+  put(4, dateOnly(shipment.plannedShipDate, "Planned ship date", true));
+  put(12, postal(shipment.destinationPostalCode, "Destination postal code"));
+  put(13, [
     required(shipment.destinationPrefecture, "Destination prefecture"),
     required(shipment.destinationCity, "Destination city"),
     required(shipment.destinationStreet, "Destination street"),
     optional(shipment.destinationBuilding, "Destination building"),
   ].join(""));
-  put(18, required(shipment.destinationRecipientName, "Destination recipient"));
-  put(21, phone(shipment.destinationPhone, "Destination phone"));
-  put(30, postal(sender.postalCode, "Sender postal code"));
-  put(31, required(sender.address, "Sender address"));
-  put(34, required(sender.name, "Sender name"));
-  put(37, phone(sender.phone, "Sender phone"));
-  put(48, "060");
-  put(52, dateOnly(shipment.requestedDeliveryDate, "Requested delivery date", false));
-  put(53, yupuriTimeCode(shipment.requestedDeliveryTimeSlot));
-  put(56, "1");
-  put(57, watch);
-  put(84, watch);
-  put(85, "1");
-  put(87, "10");
+  put(16, required(shipment.destinationRecipientName, "Destination recipient"));
+  put(19, phone(shipment.destinationPhone, "Destination phone"));
+  put(28, postal(sender.postalCode, "Sender postal code"));
+  put(29, required(sender.address, "Sender address"));
+  put(32, required(sender.name, "Sender name"));
+  put(35, phone(sender.phone, "Sender phone"));
+  put(46, "060");
+  const requestedDate = dateOnly(shipment.requestedDeliveryDate, "Requested delivery date", false);
+  put(50, requestedDate);
+  if (requestedDate || shipment.requestedDeliveryTimeSlot?.trim())
+    put(51, yupuriTimeCode(shipment.requestedDeliveryTimeSlot));
+  put(54, "1");
+  put(55, watch);
+  put(69, "元払い");
+  put(83, watch);
+  put(84, "1");
+  put(86, "10");
   return fields;
 }
 
