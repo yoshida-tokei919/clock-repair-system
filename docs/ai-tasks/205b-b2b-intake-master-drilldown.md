@@ -25,4 +25,14 @@
 - `git diff --check`: PASS.
 - Independent review: no blocking findings.
 
-Production: pending。
+## Production
+
+- Status: complete.
+- Application commit: `c4b924683b9d9e6c2cc4ada3dc5d674a2bb639e5` (`feat: add B2B intake master drilldown`).
+- Railway deployment: `f16cb233-5b77-42b2-a99f-364955399005` — SUCCESS.
+- Production tag: `production-task205b-20261006`.
+- Railway production build: Prisma generate / Next.js compile / lint・type check / static pages 57/57 / build trace collection PASS.
+- Production smoke: `/`=200、`/login`=200、`/repairs/b2b-intake`未認証=307、`POST /api/repairs/b2b-intake`未認証=401。
+- Production health: service Online、replica running 1 / crashed 0、warning 0 / critical 0、recent failure 0。
+- schema / migration / RLS / GRANT / production DB変更なし。
+- Independent review: blocking findingなし。
