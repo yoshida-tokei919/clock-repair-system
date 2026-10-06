@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { getB2bBrandMasters, getB2bModelMasters } from "@/actions/b2b-intake-master-actions";
+import { changeBrand, changeModel, changeRef, matchingModel, modelCacheKey, optionsForRow, type ModelChoice, type RefChoice, type CaliberChoice } from "@/lib/b2b-intake-drilldown";
 
 // Keep the operator-facing cap in sync with the server validation.
 const B2B_BATCH_LIMIT = 30;
@@ -31,9 +33,61 @@ export function B2bBatchIntakeForm({ partners, brands }: Props) {
   const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
+  const [modelsByBrand, setModelsByBrand] = useState<Record<number, ModelChoice[]>>({});
+  const [calibersByBrand, setCalibersByBrand] = useState<Record<number, CaliberChoice[]>>({});
+  const [refsByModel, setRefsByModel] = useState<Record<string, RefChoice[]>>({});
+  const [calibersByModel, setCalibersByModel] = useState<Record<string, CaliberChoice[]>>({});
+  const requestedBrands = useRef(new Set<number>());
+  const requestedModels = useRef(new Set<string>());
+
+  useEffect(() => {
+    for (const row of rows) {
+      const brandId = Number(row.brandId);
+      if (!brandId || requestedBrands.current.has(brandId)) continue;
+      requestedBrands.current.add(brandId);
+      getB2bBrandMasters(brandId).then(({ models, calibers }) => {
+        setModelsByBrand((current) => ({ ...current, [brandId]: models }));
+        setCalibersByBrand((current) => ({ ...current, [brandId]: calibers }));
+      }).catch(() => {
+        requestedBrands.current.delete(brandId);
+        setError("時計マスター候補を取得できませんでした。手入力で続けられます。ブランドを選び直すと再試行します。");
+      });
+    }
+  }, [rows]);
+
+  useEffect(() => {
+    for (const row of rows) {
+      const brandId = Number(row.brandId);
+      const model = matchingModel(modelsByBrand[brandId] ?? [], row.model);
+      if (!model) continue;
+      const cacheKey = modelCacheKey(brandId, model.id);
+      if (requestedModels.current.has(cacheKey)) continue;
+      requestedModels.current.add(cacheKey);
+      getB2bModelMasters(brandId, model.id)
+        .then(({ refs, calibers }) => {
+          setRefsByModel((current) => ({ ...current, [cacheKey]: refs }));
+          setCalibersByModel((current) => ({ ...current, [cacheKey]: calibers }));
+        })
+        .catch(() => {
+          requestedModels.current.delete(cacheKey);
+          setError("Ref・Cal候補を取得できませんでした。手入力で続けられます。モデルを選び直すと再試行します。");
+        });
+    }
+  }, [rows, modelsByBrand]);
 
   function updateRow(key: number, field: Exclude<keyof Row, "key">, value: string) {
     setRows((current) => current.map((row) => row.key === key ? { ...row, [field]: value } : row));
+  }
+
+  function updateWatchField(key: number, field: "brandId" | "model" | "ref", value: string) {
+    setRows((current) => current.map((row) => {
+      if (row.key !== key) return row;
+      if (field === "brandId") return changeBrand(row, value);
+      if (field === "model") return changeModel(row, value);
+      const brandId = Number(row.brandId);
+      const model = matchingModel(modelsByBrand[brandId] ?? [], row.model);
+      return changeRef(row, value, model ? refsByModel[modelCacheKey(brandId, model.id)] ?? [] : []);
+    }));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -98,7 +152,9 @@ export function B2bBatchIntakeForm({ partners, brands }: Props) {
         {!partners.length && <p className="mt-2 text-sm text-red-700">登録済みの取引先がありません。</p>}
       </div>
 
-      {rows.map((row, index) => <section key={row.key} className="rounded-lg border bg-white p-4">
+      {rows.map((row, index) => {
+        const { models, refs, calibers } = optionsForRow(row, modelsByBrand, refsByModel, calibersByBrand, calibersByModel);
+        return <section key={row.key} className="rounded-lg border bg-white p-4">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">時計 {index + 1}</h2>
           <button type="button" className="text-sm text-red-700 disabled:opacity-40" disabled={rows.length === 1 || busy || uncertain} onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}>この行を削除</button>
@@ -106,17 +162,17 @@ export function B2bBatchIntakeForm({ partners, brands }: Props) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <label className="text-sm">取引先管理番号<input className={`${inputClass} mt-1`} maxLength={200} value={row.partnerRef} onChange={(e) => updateRow(row.key, "partnerRef", e.target.value)} disabled={busy || uncertain} /></label>
           <label className="text-sm">エンドユーザー名<input className={`${inputClass} mt-1`} maxLength={200} value={row.endUserName} onChange={(e) => updateRow(row.key, "endUserName", e.target.value)} disabled={busy || uncertain} /></label>
-          <label className="text-sm">ブランド *<select className={`${inputClass} mt-1`} value={row.brandId} onChange={(e) => updateRow(row.key, "brandId", e.target.value)} required disabled={busy || uncertain}>
+          <label className="text-sm">ブランド *<select className={`${inputClass} mt-1`} value={row.brandId} onChange={(e) => updateWatchField(row.key, "brandId", e.target.value)} required disabled={busy || uncertain}>
             <option value="">選択してください</option>
             {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.nameJp || brand.name}</option>)}
           </select></label>
-          <label className="text-sm">モデル<input className={`${inputClass} mt-1`} maxLength={200} value={row.model} onChange={(e) => updateRow(row.key, "model", e.target.value)} disabled={busy || uncertain} /></label>
-          <label className="text-sm">Ref<input className={`${inputClass} mt-1`} maxLength={200} value={row.ref} onChange={(e) => updateRow(row.key, "ref", e.target.value)} disabled={busy || uncertain} /></label>
+          <label className="text-sm">モデル<input className={`${inputClass} mt-1`} list={`b2b-model-${row.key}`} maxLength={200} value={row.model} onChange={(e) => updateWatchField(row.key, "model", e.target.value)} disabled={busy || uncertain || !row.brandId} placeholder="既存候補から選択、または入力" /><datalist id={`b2b-model-${row.key}`}>{models.map((model) => <option key={model.id} value={model.name} label={model.nameJp || model.name} />)}</datalist></label>
+          <label className="text-sm">Ref<input className={`${inputClass} mt-1`} list={`b2b-ref-${row.key}`} maxLength={200} value={row.ref} onChange={(e) => updateWatchField(row.key, "ref", e.target.value)} disabled={busy || uncertain || !row.brandId} placeholder="既存候補から選択、または入力" /><datalist id={`b2b-ref-${row.key}`}>{refs.map((ref) => <option key={ref.name} value={ref.name} label={ref.caliber ? `Cal ${ref.caliber.name}` : ref.name} />)}</datalist></label>
           <label className="text-sm">シリアル<input className={`${inputClass} mt-1`} maxLength={200} value={row.serial} onChange={(e) => updateRow(row.key, "serial", e.target.value)} disabled={busy || uncertain} /></label>
-          <label className="text-sm">Cal<input className={`${inputClass} mt-1`} maxLength={200} value={row.caliber} onChange={(e) => updateRow(row.key, "caliber", e.target.value)} disabled={busy || uncertain} /></label>
+          <label className="text-sm">Cal<input className={`${inputClass} mt-1`} list={`b2b-cal-${row.key}`} maxLength={200} value={row.caliber} onChange={(e) => updateRow(row.key, "caliber", e.target.value)} disabled={busy || uncertain || !row.brandId} placeholder="既存候補から選択、または入力" /><datalist id={`b2b-cal-${row.key}`}>{calibers.map((caliber) => <option key={caliber.name} value={caliber.name} />)}</datalist></label>
           <label className="text-sm sm:col-span-2">受付・依頼メモ<textarea className={`${inputClass} mt-1`} rows={2} maxLength={1000} value={row.note} onChange={(e) => updateRow(row.key, "note", e.target.value)} disabled={busy || uncertain} /></label>
         </div>
-      </section>)}
+      </section>})}
 
       {error && <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       <div className="flex gap-3">
