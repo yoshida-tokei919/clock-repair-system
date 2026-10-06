@@ -94,6 +94,9 @@ export default async function RepairsPage({
             <div className="flex items-center justify-between space-y-2">
                 <h2 className="text-3xl font-bold tracking-tight">修理案件一覧</h2>
                 <div className="flex items-center space-x-2">
+                    <Link href="/repairs/b2b-intake">
+                        <Button variant="outline">B2B一括受付</Button>
+                    </Link>
                     <Link href="/repairs/new">
                         <Button>
                             <PlusCircle className="mr-2 h-4 w-4" />
