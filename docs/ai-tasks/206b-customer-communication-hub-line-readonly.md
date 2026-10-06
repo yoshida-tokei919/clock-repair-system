@@ -1,6 +1,6 @@
 # Task206B — Customer Communication Hub LINE read-only
 
-Production: pending
+Production: complete
 
 ## Scope
 
@@ -29,8 +29,17 @@ Production: pending
 - `git diff --check`: PASS。
 - Production build (`node node_modules/next/dist/bin/next build`): PASS。新規routeは動的生成。
 - ローカル未認証 smoke: Hub GET 307（sign-inへ）、既存添付ファイル GET 401。
+- 独立Codex review: blocking findingなし。cross-customer leakage、auth/privacy、ordering/truncation、attachment安全性、既存画面へのregressionを確認。
 - 認証済みの実データ画面表示: 未確認。未紐付け/0件の分岐は read model test で確認。
 
 ## Production
 
-Production: pending。commit / push / deploy / production smoke は未実施。
+- Status: complete.
+- Application commit: `6d59d8d19ffc8ba87e956b8f23f4cec08c311d73` (`feat: add customer LINE communication hub`).
+- Railway deployment: `608f5ca0-7e50-4da2-8f71-22d7d5de1e86` — SUCCESS.
+- Production tag: `production-task206b-20261007`.
+- Railway production build: Prisma generate / Next.js compile / lint・type check PASS。
+- Production runtime: Next.js 15.5.27、`Ready in 227ms`、deployment status SUCCESS.
+- Production smoke: `/`=200、`/login`=200、`/customers`未認証=307、`/customers/1/communications`未認証=307。対象HTTP logsの `upstreamErrors` なし。
+- schema / migration / RLS / GRANT / production DB変更なし。LINE実送信なし。
+- 認証済み実データの手動画面確認は未実施。AI側のfocused test、type check、production build、未認証route smokeを完了条件とした。
