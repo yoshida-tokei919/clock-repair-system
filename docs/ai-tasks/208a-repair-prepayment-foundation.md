@@ -32,6 +32,17 @@ Prepayment creation APIs, Stripe Checkout/webhook branching, admin/customer UI, 
 - `npm run build`: PASS on retry, including Prisma generation, Next compilation, type checking, and 57/57 static pages. The first run hit a missing generated `.next/build-manifest.json` during page collection.
 - `git diff --check`: PASS.
 
-The SQL constraints have not been applied to a database in this task; independent review is required before production migration.
+## Production rollout — 2026-10-07
 
-Production: pending
+- Application commit: `b73553feeaba6c5a82c1da073c6f46c22cfc9d32` (`feat: add repair prepayment payment foundation`).
+- Pre-migration logical backup: `C:\Users\yoshi\clock-repair-backups\task208a-20261007T143046Z` (`roles.sql` / `schema.sql` / `data.sql` / SHA256 `manifest.txt`).
+- Supabase migration: `20261007143422 add_repair_prepayment_foundation`.
+- Production verification: `Payment` remained 0 rows; `kind` default is `INVOICE`; `PaymentKind` values, CHECK constraint, composite Repair/customer FK with `ON UPDATE/DELETE RESTRICT`, lookup index, and one-pending-prepayment partial unique index all match the reviewed migration.
+- Data API access remains unchanged: `anon` / `authenticated` / `service_role` have no table grants on `Payment`; no new table or GRANT was introduced.
+- Supabase Security Advisor reported no Task208A-specific new security finding. Existing server-only `rls_enabled_no_policy` INFO findings remain unrelated. Performance Advisor reports the new composite FK as not having an exact covering `(repairId, customerId)` index; the Task index is led by `repairId`, `Payment` is currently empty, and no additional DDL was added in this rollout.
+- Railway application deployment: `c9f8f1c1-5702-4ae7-9a06-e38464ba1b66` — `SUCCESS`, region `sin`.
+- Railway build: Prisma generation / Next compile / type checking / static pages 57/57 PASS. Runtime `Ready in 325ms`.
+- Production smoke: `/` = 200, `/login` = 200, `/repairs` unauthenticated = 307; observed HTTP `upstreamErrors` empty.
+- No live Stripe call, real card payment, customer payment link send, or refund was performed.
+
+Production: complete
