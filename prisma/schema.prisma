@@ -894,6 +894,7 @@ model Repair {
   storageLocationAssignments StorageLocationAssignment[]
   shipmentRepairs ShipmentRepair[]
   deliveryPreference RepairDeliveryPreference?
+  prepayments Payment[] @relation("RepairPrepayments")
 
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
@@ -1733,6 +1734,11 @@ enum PaymentStatus {
   CANCELED
 }
 
+enum PaymentKind {
+  INVOICE
+  REPAIR_PREPAYMENT
+}
+
 enum PaymentAttemptStatus {
   PENDING
   SUCCEEDED
@@ -1740,10 +1746,13 @@ enum PaymentAttemptStatus {
   CANCELED
 }
 
-// A receipt or payment-in-progress. Its allocations determine which invoices it settles.
+// A receipt or payment-in-progress. Invoice payments use allocations; repair prepayments precede an invoice.
 model Payment {
   id         Int             @id @default(autoincrement())
   customerId Int
+  kind       PaymentKind     @default(INVOICE)
+  repairId   Int?
+  purpose    String?
   amount     Int
   currency   String          @default("JPY")
   provider   PaymentProvider
@@ -1754,10 +1763,12 @@ model Payment {
   updatedAt  DateTime        @updatedAt
 
   customer    Customer            @relation(fields: [customerId], references: [id])
+  repair      Repair?             @relation("RepairPrepayments", fields: [repairId, customerId], references: [id, customerId], onDelete: Restrict, onUpdate: Restrict)
   allocations PaymentAllocation[]
   attempts    PaymentAttempt[]
 
   @@index([customerId, status])
+  @@index([repairId, kind, status])
   @@index([status, paidAt])
 }
 
