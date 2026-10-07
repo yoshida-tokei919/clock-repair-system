@@ -60,6 +60,7 @@ model Customer {
   payments          Payment[]
   warranties        Warranty[]
   lineUsers         LineUser[]
+  inquiryMessagePostIntakeRoutings InquiryMessagePostIntakeRouting[]
   repairIntakeInvites RepairIntakeInvite[]
 }
 
@@ -311,6 +312,7 @@ model InquiryMessage {
   lineUser LineUser      @relation(fields: [lineUserId], references: [id], onDelete: Restrict)
   files    InquiryFile[]
   classification InquiryMessageClassification?
+  postIntakeRouting InquiryMessagePostIntakeRouting?
   lineManagerChatEvidence LineManagerChat? @relation("LineManagerChatEvidence")
   confirmedLineManagerSendOutbox LineManagerSendOutbox? @relation("LineManagerSendOutboxConfirmedInquiryMessage")
 
@@ -363,6 +365,41 @@ model InquiryMessageRepairLink {
 
   @@id([classificationId, repairId])
   @@index([repairId])
+}
+
+// Direct post-intake routing is independent of InquiryWatch-derived links.
+model InquiryMessagePostIntakeRouting {
+  id                   Int                                @id @default(autoincrement())
+  inquiryMessageId     Int                                @unique
+  customerId           Int
+  source               InquiryMessageClassificationSource
+  confidence           InquiryAiConfidence?
+  evidence             String?
+  hasGeneralContent    Boolean                            @default(false)
+  hasUnassignedContent Boolean                            @default(false)
+  confirmedAt          DateTime?
+  createdAt            DateTime                           @default(now())
+  updatedAt            DateTime                           @updatedAt
+
+  message  InquiryMessage @relation(fields: [inquiryMessageId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  repairLinks InquiryMessagePostIntakeRepairLink[]
+
+  @@unique([id, customerId])
+  @@index([customerId])
+}
+
+model InquiryMessagePostIntakeRepairLink {
+  routingId Int
+  repairId Int
+  customerId Int
+  createdAt DateTime @default(now())
+
+  routing InquiryMessagePostIntakeRouting @relation(fields: [routingId, customerId], references: [id, customerId], onDelete: Cascade)
+  repair Repair @relation(fields: [repairId, customerId], references: [id, customerId], onDelete: Restrict)
+
+  @@id([routingId, repairId])
+  @@index([repairId, customerId])
 }
 
 model InquiryFile {
@@ -848,6 +885,7 @@ model Repair {
   publicCases   PublicCase[]
   inquiryWatchPromotion InquiryWatch? @relation("InquiryWatchPromotedRepair")
   inquiryMessageLinks InquiryMessageRepairLink[]
+  inquiryMessagePostIntakeLinks InquiryMessagePostIntakeRepairLink[]
   lineManagerSendOutboxes LineManagerSendOutbox[] @relation("LineManagerSendOutboxSourceRepair")
   workTimeSessions WorkTimeSession[]
   planningState RepairPlanningState?
@@ -856,7 +894,7 @@ model Repair {
   storageLocationAssignments StorageLocationAssignment[]
   shipmentRepairs ShipmentRepair[]
   deliveryPreference RepairDeliveryPreference?
-  
+
   deliveryNoteId Int?
   deliveryNote   DeliveryNote? @relation(fields: [deliveryNoteId], references: [id])
 
@@ -869,6 +907,7 @@ model Repair {
   warrantyId Int?
   warranty   Warranty? @relation(fields: [warrantyId], references: [id])
 
+  @@unique([id, customerId])
   @@index([repairIntakeInviteId])
 }
 
