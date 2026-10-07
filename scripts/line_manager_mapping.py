@@ -23,6 +23,9 @@ LOCAL_TEST_ORIGIN = "http://127.0.0.1:3000"
 class MappingWorkerError(Exception): pass
 
 
+class MappingConflictError(MappingWorkerError): pass
+
+
 @dataclass(frozen=True)
 class Evidence:
     inquiry_message_id: int
@@ -192,7 +195,11 @@ class HttpInternalApi:
                 if response.status != 200: raise MappingWorkerError("internal API failed")
                 data = json.loads(response.read().decode("utf-8"))
         except MappingWorkerError: raise
-        except (urllib.error.HTTPError, urllib.error.URLError, OSError, ValueError) as error:
+        except urllib.error.HTTPError as error:
+            if path == "/api/internal/line-manager-mapping/verify" and error.code == 409:
+                raise MappingConflictError("mapping verification conflict") from error
+            raise MappingWorkerError("internal API failed") from error
+        except (urllib.error.URLError, OSError, ValueError) as error:
             raise MappingWorkerError("internal API failed") from error
         if not isinstance(data, Mapping): raise MappingWorkerError("invalid internal API response")
         return data
@@ -209,7 +216,9 @@ class HttpInternalApi:
             "managerChatId": match.manager_chat_id,
         })
         item = data.get("item")
-        return data.get("ok") is True and isinstance(item, Mapping) and _id(item.get("id"), "mapping id") > 0 and item.get("lineUserId") == match.candidate.line_user_id and isinstance(item.get("verifiedAt"), str)
+        if data.get("ok") is not True or not isinstance(item, Mapping) or _id(item.get("id"), "mapping id") <= 0 or item.get("lineUserId") != match.candidate.line_user_id or not isinstance(item.get("verifiedAt"), str):
+            raise MappingWorkerError("invalid mapping verification response")
+        return True
 
 
 def _history_from_reader(reader: LineManagerReader, bot_id: str, chat_id: str) -> tuple[str, ...]:
@@ -229,6 +238,8 @@ def find_safe_matches(candidates: Sequence[Candidate], reader: LineManagerReader
                 if hit:
                     candidate, evidence = hit
                     found.setdefault(candidate.line_user_id, {}).setdefault((bot_id, chat_id), []).append(evidence)
+    # Even an empty candidate batch must prove that authenticated history reads work.
+    if scanned == 0: raise MappingWorkerError("no Manager chat history available")
     ambiguous_users = {user_id for user_id, destinations in found.items() if len(destinations) != 1}
     chat_users: dict[tuple[str, str], set[int]] = {}
     for user_id, destinations in found.items():
@@ -244,30 +255,54 @@ def find_safe_matches(candidates: Sequence[Candidate], reader: LineManagerReader
 
 
 def process_mapping_once(api: InternalApi, reader: LineManagerReader, *, apply: bool = False) -> MappingResult:
-    candidates = api.candidates()
-    if not candidates: return MappingResult("no_candidates", 0, 0, 0)
-    matches, scanned, ambiguous = find_safe_matches(candidates, reader)
-    if ambiguous: return MappingResult("ambiguous", len(candidates), scanned, len(matches))
-    if not matches: return MappingResult("ambiguous" if ambiguous else "no_match", len(candidates), scanned, 0)
+    try:
+        candidates = api.candidates()
+    except Exception:
+        return MappingResult("internal_api_unavailable", 0, 0, 0)
+    try:
+        matches, scanned, ambiguous = find_safe_matches(candidates, reader)
+    except Exception:
+        return MappingResult("manager_live_read_unavailable", len(candidates), 0, 0)
+    if not candidates: return MappingResult("healthy_no_candidates", 0, scanned, 0)
+    if ambiguous: return MappingResult("pending_ambiguity", len(candidates), scanned, len(matches))
+    if not matches: return MappingResult("pending_no_exact_match", len(candidates), scanned, 0)
     selected = matches[0]
     if not apply: return MappingResult("dry_run_match", len(candidates), scanned, len(matches))
-    return MappingResult("verified" if api.verify(selected) else "already_mapped", len(candidates), scanned, len(matches))
+    try:
+        verified = api.verify(selected)
+    except MappingConflictError:
+        return MappingResult("mapping_conflict", len(candidates), scanned, len(matches))
+    except Exception:
+        return MappingResult("internal_api_unavailable", len(candidates), scanned, len(matches))
+    return MappingResult("verified" if verified else "internal_api_unavailable", len(candidates), scanned, len(matches))
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only LINE Manager mapping verifier")
     parser.add_argument("--apply", action="store_true", help="record at most one already verified mapping")
     parser.add_argument("--local", action="store_true", help="use only the local test origin")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         token = os.environ.get("N8N_INTERNAL_TOKEN")
         if not token: raise MappingWorkerError("N8N_INTERNAL_TOKEN is required")
         api = HttpInternalApi(LOCAL_TEST_ORIGIN if args.local else PRODUCTION_ORIGIN, token)
-        result = process_mapping_once(api, LINELibAdapter.from_storage(fixed_storage_path()), apply=args.apply)
+        storage = fixed_storage_path()
+        if not storage.is_file(): raise MappingWorkerError("LINELib storage is required")
+        # The sender holds this existing lock for its entire lifetime. A manual
+        # sender therefore blocks mapping rather than racing lineoa reads.
+        from line_manager_sender_worker import single_instance
+        with single_instance():
+            try:
+                reader = LINELibAdapter.from_storage(storage)
+            except Exception:
+                result = MappingResult("manager_live_read_unavailable", 0, 0, 0)
+            else:
+                result = process_mapping_once(api, reader, apply=args.apply)
         print(f"status={result.status} candidate_count={result.candidate_count} scanned_chat_count={result.scanned_chat_count} safe_match_count={result.safe_match_count}")
-        return 0
-    except MappingWorkerError:
-        print("status=failed")
+        return 0 if result.status not in {"manager_live_read_unavailable", "internal_api_unavailable", "mapping_conflict"} else 1
+    except Exception as error:
+        status = "sender_lock_unavailable" if str(error) == "sender worker already running" else "configuration_failure"
+        print(f"status={status} candidate_count=0 scanned_chat_count=0 safe_match_count=0")
         return 1
 
 

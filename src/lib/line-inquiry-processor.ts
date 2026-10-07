@@ -245,6 +245,7 @@ async function ensureInboundMessageNotification(
             select: {
               displayName: true,
               linkedCustomer: { select: { name: true } },
+              lineManagerChat: { select: { id: true } },
             },
           },
         },
@@ -280,6 +281,7 @@ async function ensureInboundMessageNotification(
           messageCount,
           imageCount,
           inquiryStatus: inquiry.status,
+          destinationVerified: inquiry.lineUser.lineManagerChat !== null,
         }),
       },
       update: {},
@@ -295,6 +297,7 @@ function formatInquiryNotification(input: {
   messageCount: number;
   imageCount: number;
   inquiryStatus: string;
+  destinationVerified: boolean;
 }) {
   return [
     `[${input.kind}]`,
@@ -305,6 +308,7 @@ function formatInquiryNotification(input: {
     `Inbound messages: ${input.messageCount}`,
     `Stored images: ${input.imageCount}`,
     `Status: ${input.inquiryStatus}`,
+    ...(!input.destinationVerified ? ["LINE reply destination verification: pending"] : []),
     "AI processing: pending (not analyzed)",
   ].join("\n");
 }

@@ -52,6 +52,7 @@ function createFakeDb() {
       lineUser: {
         displayName: (users[users.length - 1]?.displayName as string | undefined) ?? null,
         linkedCustomer: null,
+        lineManagerChat: null,
       },
     }),
     findMany: async () => [],
@@ -116,6 +117,7 @@ test("claimed text inbox is persisted into Inquiry and marked PROCESSED", async 
   assert.equal(fake.messages[0]?.externalMessageId, "M-test");
   assert.equal(fake.notifications.length, 1);
   assert.equal(fake.notifications[0]?.kind, "NEW_INQUIRY");
+  assert.ok(String(fake.notifications[0]?.text).includes("LINE reply destination verification: pending"));
   assert.ok(!String(fake.notifications[0]?.text).includes(String(fake.messages[0]?.body)));
   assert.equal(fake.messages[0]?.body, "テスト相談");
   assert.equal(fake.inbox.status, "PROCESSED");
@@ -153,12 +155,14 @@ test("a linked Customer name is used for the notification identity", async () =>
     lineUser: {
       displayName: "Ignored LINE name",
       linkedCustomer: { name: "Official Customer Name" },
+      lineManagerChat: { id: 8 },
     },
   });
 
   await processLineWebhookInboxItem(fake.db, 1);
 
   assert.ok(String(fake.notifications[0]?.text).includes("Official Customer Nameさま（既存）からお問い合わせが来ています。"));
+  assert.ok(!String(fake.notifications[0]?.text).includes("LINE reply destination verification: pending"));
 });
 
 test("image inbox creates IMAGE message and calls the image handler", async () => {
@@ -242,7 +246,7 @@ test("multiple OPEN inquiries route the message to NEEDS_REVIEW notification", a
   (fake.db as any).inquiry.findUnique = async () => ({
     id: 3,
     status: "NEEDS_REVIEW",
-    lineUser: { displayName: null, linkedCustomer: null },
+    lineUser: { displayName: null, linkedCustomer: null, lineManagerChat: null },
   });
 
   await processLineWebhookInboxItem(fake.db, 1);
@@ -258,7 +262,7 @@ test("AI_PROCESSED Inquiry is reused and returned to AI_PENDING for a new inboun
   let update: any;
   (fake.db as any).inquiry.findMany = async () => [{ id: 8, status: "AI_PROCESSED" }];
   (fake.db as any).inquiry.update = async (input: any) => { update = input; return { id: 8, ...input.data }; };
-  (fake.db as any).inquiry.findUnique = async () => ({ id: 8, status: "AI_PENDING", lineUser: { displayName: null, linkedCustomer: null } });
+  (fake.db as any).inquiry.findUnique = async () => ({ id: 8, status: "AI_PENDING", lineUser: { displayName: null, linkedCustomer: null, lineManagerChat: null } });
 
   await processLineWebhookInboxItem(fake.db, 1);
 
@@ -282,7 +286,7 @@ test("a single NEEDS_REVIEW Inquiry is reused without changing its review state"
   let update: any;
   (fake.db as any).inquiry.findMany = async () => [{ id: 8, status: "NEEDS_REVIEW" }];
   (fake.db as any).inquiry.update = async (input: any) => { update = input; return { id: 8, ...input.data, status: "NEEDS_REVIEW" }; };
-  (fake.db as any).inquiry.findUnique = async () => ({ id: 8, status: "NEEDS_REVIEW", lineUser: { displayName: null, linkedCustomer: null } });
+  (fake.db as any).inquiry.findUnique = async () => ({ id: 8, status: "NEEDS_REVIEW", lineUser: { displayName: null, linkedCustomer: null, lineManagerChat: null } });
 
   await processLineWebhookInboxItem(fake.db, 1);
 

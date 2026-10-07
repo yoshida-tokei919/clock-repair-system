@@ -1,8 +1,15 @@
 from pathlib import Path
+from contextlib import nullcontext
+from contextlib import redirect_stdout
+import base64
 import inspect
+import io
 import os
+import shutil
+import subprocess
+import urllib.error
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import line_manager_mapping as mapping
 
@@ -83,23 +90,140 @@ class WorkerTests(unittest.TestCase):
         one = candidate(1, "one", "two")
         reader = FakeReader({"bot": [{"chatId": "a"}, {"chatId": "b"}]}, {("bot", "a"): {"list": [inbound("one", "a")]}, ("bot", "b"): {"list": [inbound("two", "b")]}})
         api = FakeApi([one])
-        self.assertEqual(mapping.process_mapping_once(api, reader, apply=True).status, "ambiguous"); self.assertEqual(api.verified, [])
+        self.assertEqual(mapping.process_mapping_once(api, reader, apply=True).status, "pending_ambiguity"); self.assertEqual(api.verified, [])
 
     def test_same_chat_for_two_users_is_ambiguous(self):
         api = FakeApi([candidate(1, "one"), candidate(2, "two")])
         result = mapping.process_mapping_once(api, self.reader(history=[inbound("one"), inbound("two")]), apply=True)
-        self.assertEqual(result.status, "ambiguous"); self.assertEqual(api.verified, [])
+        self.assertEqual(result.status, "pending_ambiguity"); self.assertEqual(api.verified, [])
 
     def test_no_candidates_and_no_match_do_not_write(self):
         no_candidates = FakeApi([])
-        self.assertEqual(mapping.process_mapping_once(no_candidates, self.reader()).status, "no_candidates")
+        reader = self.reader()
+        self.assertEqual(mapping.process_mapping_once(no_candidates, reader).status, "healthy_no_candidates")
+        self.assertEqual(reader.history_calls, [("bot", "chat")])
         no_match = FakeApi([candidate(1, "missing")])
-        self.assertEqual(mapping.process_mapping_once(no_match, self.reader(history=[inbound("other")]), apply=True).status, "no_match")
+        self.assertEqual(mapping.process_mapping_once(no_match, self.reader(history=[inbound("other")]), apply=True).status, "pending_no_exact_match")
         self.assertEqual(no_match.verified, [])
 
     def test_malformed_history_fails_closed(self):
         reader = FakeReader({"bot": [{"chatId": "chat"}]}, {("bot", "chat"): {"not": "a list"}})
-        with self.assertRaises(mapping.MappingWorkerError): mapping.process_mapping_once(FakeApi([candidate(1, "m")]), reader)
+        api = FakeApi([candidate(1, "m")])
+        self.assertEqual(mapping.process_mapping_once(api, reader, apply=True).status, "manager_live_read_unavailable")
+        self.assertEqual(api.verified, [])
+
+    def test_empty_manager_chat_list_is_not_healthy(self):
+        api = FakeApi([])
+        reader = FakeReader({"bot": []}, {})
+        self.assertEqual(mapping.process_mapping_once(api, reader, apply=True).status, "manager_live_read_unavailable")
+
+    def test_no_candidate_history_failure_is_sanitized(self):
+        api = FakeApi([])
+        reader = FakeReader({"bot": [{"chatId": "chat"}]}, {("bot", "chat"): {"secret": "private"}})
+        result = mapping.process_mapping_once(api, reader, apply=True)
+        self.assertEqual(result, mapping.MappingResult("manager_live_read_unavailable", 0, 0, 0))
+        self.assertEqual(api.verified, [])
+
+    def test_internal_api_failure_is_sanitized(self):
+        class FailingApi(FakeApi):
+            def candidates(self): raise RuntimeError("secret content")
+        self.assertEqual(mapping.process_mapping_once(FailingApi([]), self.reader(), apply=True).status, "internal_api_unavailable")
+
+    def test_verify_http_409_reports_sanitized_mapping_conflict(self):
+        api = mapping.HttpInternalApi(mapping.LOCAL_TEST_ORIGIN, "test-only")
+        matched = candidate(1, "match")
+        response_body = Mock()
+        response_body.read.side_effect = AssertionError("HTTP error body must not be read")
+        error = urllib.error.HTTPError("test", 409, "private conflict detail", {}, response_body)
+        with patch.object(api, "candidates", return_value=(matched,)), patch.object(mapping.urllib.request, "urlopen", side_effect=error) as request:
+            result = mapping.process_mapping_once(api, self.reader(history=[inbound("match")]), apply=True)
+        self.assertEqual(result, mapping.MappingResult("mapping_conflict", 1, 1, 1))
+        self.assertEqual(request.call_count, 1)
+        response_body.read.assert_not_called()
+        self.assertNotIn("private", result.status)
+
+    def test_verify_other_http_and_network_failures_remain_generic(self):
+        api = mapping.HttpInternalApi(mapping.LOCAL_TEST_ORIGIN, "test-only")
+        matched = candidate(1, "match")
+        with patch.object(api, "candidates", return_value=(matched,)):
+            for error in (urllib.error.HTTPError("test", 401, "private", {}, None), urllib.error.HTTPError("test", 503, "private", {}, None), urllib.error.URLError("private")):
+                with self.subTest(error=error), patch.object(mapping.urllib.request, "urlopen", side_effect=error):
+                    result = mapping.process_mapping_once(api, self.reader(history=[inbound("match")]), apply=True)
+                    self.assertEqual(result.status, "internal_api_unavailable")
+
+    def test_candidates_http_409_is_not_a_mapping_conflict(self):
+        api = mapping.HttpInternalApi(mapping.LOCAL_TEST_ORIGIN, "test-only")
+        with patch.object(mapping.urllib.request, "urlopen", side_effect=urllib.error.HTTPError("test", 409, "private", {}, None)):
+            self.assertEqual(mapping.process_mapping_once(api, self.reader(), apply=True).status, "internal_api_unavailable")
+
+    def test_main_defaults_to_dry_run_and_acquires_sender_lock(self):
+        api = FakeApi([candidate(1, "match")])
+        output = io.StringIO()
+        with patch.dict(os.environ, {"N8N_INTERNAL_TOKEN": "test-only"}), patch.object(mapping, "HttpInternalApi", return_value=api), patch.object(mapping, "fixed_storage_path", return_value=Path(__file__)), patch.object(mapping.LINELibAdapter, "from_storage", return_value=self.reader(history=[inbound("match")])), patch("line_manager_sender_worker.single_instance", return_value=nullcontext()) as lock, redirect_stdout(output):
+            self.assertEqual(mapping.main([]), 0)
+        lock.assert_called_once_with()
+        self.assertEqual(api.verified, [])
+        self.assertIn("status=dry_run_match", output.getvalue())
+
+    def test_main_explicit_apply_verifies_only_one(self):
+        api = FakeApi([candidate(1, "one"), candidate(2, "two")])
+        reader = FakeReader({"bot": [{"chatId": "a"}, {"chatId": "b"}]}, {("bot", "a"): {"list": [inbound("one", "a")]}, ("bot", "b"): {"list": [inbound("two", "b")]}})
+        output = io.StringIO()
+        with patch.dict(os.environ, {"N8N_INTERNAL_TOKEN": "test-only"}), patch.object(mapping, "HttpInternalApi", return_value=api), patch.object(mapping, "fixed_storage_path", return_value=Path(__file__)), patch.object(mapping.LINELibAdapter, "from_storage", return_value=reader), patch("line_manager_sender_worker.single_instance", return_value=nullcontext()), redirect_stdout(output):
+            self.assertEqual(mapping.main(["--apply"]), 0)
+        self.assertEqual(len(api.verified), 1)
+        self.assertIn("status=verified", output.getvalue())
+
+    def test_main_reports_mapping_conflict_as_failure(self):
+        class ConflictingApi(FakeApi):
+            def verify(self, match):
+                self.verified.append(match)
+                raise mapping.MappingConflictError("private conflict")
+        api = ConflictingApi([candidate(1, "match")])
+        output = io.StringIO()
+        with patch.dict(os.environ, {"N8N_INTERNAL_TOKEN": "test-only"}), patch.object(mapping, "HttpInternalApi", return_value=api), patch.object(mapping, "fixed_storage_path", return_value=Path(__file__)), patch.object(mapping.LINELibAdapter, "from_storage", return_value=self.reader(history=[inbound("match")])), patch("line_manager_sender_worker.single_instance", return_value=nullcontext()), redirect_stdout(output):
+            self.assertEqual(mapping.main(["--apply"]), 1)
+        self.assertEqual(len(api.verified), 1)
+        self.assertEqual(output.getvalue(), "status=mapping_conflict candidate_count=1 scanned_chat_count=1 safe_match_count=1\n")
+
+    def test_wrapper_has_explicit_apply_and_no_send_path(self):
+        source = (Path(__file__).parent / "start-line-manager-mapping.ps1").read_text(encoding="utf-8")
+        self.assertIn("if (-not $Apply)", source)
+        self.assertIn("GetEnvironmentVariable('N8N_INTERNAL_TOKEN', 'User')", source)
+        self.assertIn("$worker --apply", source)
+        self.assertIn("|pending_ambiguity|mapping_conflict|", source)
+        for name, prior in (("N8N_INTERNAL_TOKEN", "priorToken"), ("PYTHONDONTWRITEBYTECODE", "priorNoBytecode")):
+            self.assertIn(f"${prior} = [Environment]::GetEnvironmentVariable('{name}', 'Process')", source)
+            self.assertIn(f"[Environment]::SetEnvironmentVariable('{name}', ${prior}, 'Process')", source)
+        for forbidden in ("--allow-send", "line_manager_sender_worker.py", "start-line-manager-sender.ps1", "--local"):
+            self.assertNotIn(forbidden, source)
+
+    def test_wrapper_restores_existing_and_absent_process_environment(self):
+        powershell = shutil.which("powershell.exe")
+        if not powershell:
+            self.skipTest("Windows PowerShell unavailable")
+        wrapper = str(Path(__file__).parent / "start-line-manager-mapping.ps1").replace("'", "''")
+        # Exercise finally after both values change, while stopping before any
+        # token lookup or network operation in the isolated PowerShell host.
+        command = f"""
+$source = Get-Content -LiteralPath '{wrapper}' -Raw
+$source = $source.Replace('exit $exitCode', 'return').Replace('exit 1', 'return')
+$beforeInjection = $source
+$source = $source.Replace('if (-not $Apply) {{ throw ''Explicit apply is required'' }}', 'if (-not $Apply) {{ $env:N8N_INTERNAL_TOKEN = ''temporary''; $env:PYTHONDONTWRITEBYTECODE = ''1''; throw ''Test stop before network'' }}')
+if ($source -ceq $beforeInjection) {{ throw 'Test setup failed' }}
+$wrapper = [ScriptBlock]::Create($source)
+foreach ($value in @('sentinel', $null)) {{
+    [Environment]::SetEnvironmentVariable('N8N_INTERNAL_TOKEN', $value, 'Process')
+    [Environment]::SetEnvironmentVariable('PYTHONDONTWRITEBYTECODE', $value, 'Process')
+    $null = . $wrapper
+    foreach ($name in @('N8N_INTERNAL_TOKEN', 'PYTHONDONTWRITEBYTECODE')) {{
+        if ([Environment]::GetEnvironmentVariable($name, 'Process') -cne $value) {{ throw "Environment not restored: $name" }}
+    }}
+}}
+"""
+        encoded = base64.b64encode(command.encode("utf-16le")).decode("ascii")
+        result = subprocess.run([powershell, "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_fixed_storage_path_requires_localappdata(self):
         with patch.dict(os.environ, {}, clear=True):
