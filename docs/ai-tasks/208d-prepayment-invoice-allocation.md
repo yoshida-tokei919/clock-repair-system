@@ -14,4 +14,14 @@
 - Focused tests PASS 74/74 across `prepayment-allocation`, `invoice-payment`, `stripe-webhook-payment`, `repair-prepayment`, `repair-prepayment-checkout`, and `repair-prepayment-display`.
 - `npm run build` PASS, including Next.js static pages 57/57.
 - Independent review identified an overly broad migration and cross-Repair eligibility; both were corrected before final validation. No blocking finding remains.
-- No production migration, database mutation, deployment, push, real Stripe request, refund, or customer communication was performed.
+- Production rollout was completed after explicit user approval. No real Stripe request, refund, or customer communication was performed during rollout.
+
+## Production completion — 2026-10-08
+
+- Pre-migration logical backup: `C:\Users\yoshi\clock-repair-system-backups\task208d-20261008-233043` (`roles.sql`, `schema.sql`, `data.sql`).
+- Supabase production migration: `20261008143248 add_split_prepayment_allocations` on project `vpyjonjfpkpbvvjufbiu`.
+- Post-migration verification: `Payment`, `PaymentAllocation`, and `PaymentAttempt` remained at 0 rows; `PaymentAllocation_paymentId_invoiceId_key` exists as the expected composite unique index; the former `PaymentAllocation_paymentId_key` is absent.
+- Supabase Security Advisor remained at the same pre-existing INFO findings; Task208D introduced no new blocking finding.
+- Application implementation commit: `e0680c07767813a23573bbe27ff521628574ddea` (`feat: apply prepayments to invoice balances`).
+- Railway production deployment: `f147dba5-6909-41f0-b7b4-c846269300c5`, SUCCESS in region `sin`, for commit `e0680c0`.
+- Production smoke: `/` 200, `/login` 200, unauthenticated `/repairs` 307 to sign-in, invalid `/customer/invoices/<token>` 404. No live Stripe checkout/payment was invoked.
