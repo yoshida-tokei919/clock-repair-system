@@ -8,9 +8,9 @@ import { RepairCompletionNoticePanel } from "./RepairCompletionNoticePanel";
 import { RepairDeliveryRequestPanel } from "./RepairDeliveryRequestPanel";
 
 type Classification = { scope: "WATCHES" | "COMMON" | "UNASSIGNED"; source: "AI" | "MANUAL"; confidence: string | null; confirmedAt: string | null; watchIds: number[] } | null;
-type Message = { id: number; direction: "INBOUND" | "OUTBOUND"; messageType: "TEXT" | "IMAGE" | "FILE" | "OTHER"; body: string | null; receivedAt: string | null; sentAt: string | null; createdAt: string; status: string; classification: Classification; relatedRepairIds: number[]; relatedToCurrentRepair: boolean; files: { id: number; mimeType: string | null; width: number | null; height: number | null; uploadStatus: string }[] };
+type Message = { id: number; inquiryId: number; editable: boolean; direction: "INBOUND" | "OUTBOUND"; messageType: "TEXT" | "IMAGE" | "FILE" | "OTHER"; body: string | null; receivedAt: string | null; sentAt: string | null; createdAt: string; status: string; classification: Classification; relatedRepairIds: number[]; relatedToCurrentRepair: boolean; files: { id: number; mimeType: string | null; width: number | null; height: number | null; uploadStatus: string }[] };
 type Pending = { id: number; text: string; status: "APPROVED" | "CLAIMED" | "PRE_SEND_FAILED" | "POST_UNCONFIRMED"; approvedAt: string; createdAt: string; relatedRepairIds: number[]; relatedToCurrentRepair: boolean };
-type Payload = { available: boolean; sourceInquiryId: number | null; promotedAt: string | null; sendAvailable: boolean; mappingVerifiedAt: string | null; messages: Message[]; pendingOutboxes: Pending[]; siblingRepairs: { repairId: number; position: number; label: string | null; inquiryNumber: string | null }[]; watchOptions: { id: number; position: number; label: string | null }[]; hasEarlierMessages: boolean; unassignedCount: number };
+type Payload = { available: boolean; customerId: number; sourceInquiryId: number | null; promotedAt: string | null; sendAvailable: boolean; mappingVerifiedAt: string | null; messages: Message[]; pendingOutboxes: Pending[]; siblingRepairs: { repairId: number; position: number; label: string | null; inquiryNumber: string | null }[]; watchOptions: { id: number; position: number; label: string | null }[]; hasEarlierMessages: boolean };
 type Item = { kind: "message"; id: number; at: string; relatedToCurrentRepair: boolean; message: Message } | { kind: "outbox"; id: number; at: string; relatedToCurrentRepair: boolean; outbox: Pending };
 
 const statusLabels: Record<Pending["status"], string> = { APPROVED: "送信待ち", CLAIMED: "送信処理中", PRE_SEND_FAILED: "送信前エラー", POST_UNCONFIRMED: "送信確認中" };
@@ -19,7 +19,6 @@ const displayTime = (value: string) => new Intl.DateTimeFormat("ja-JP", { month:
 export function RepairLineConversation({ repairId }: { repairId: number }) {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showFull, setShowFull] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -42,7 +41,7 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
   const timeline: Item[] = payload ? [
     ...payload.messages.map((message) => ({ kind: "message" as const, id: message.id, at: message.receivedAt ?? message.sentAt ?? message.createdAt, relatedToCurrentRepair: message.relatedToCurrentRepair, message })),
     ...payload.pendingOutboxes.map((outbox) => ({ kind: "outbox" as const, id: outbox.id, at: outbox.approvedAt, relatedToCurrentRepair: outbox.relatedToCurrentRepair, outbox })),
-  ].filter((item) => showFull || item.relatedToCurrentRepair).sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime() || a.id - b.id) : [];
+  ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime() || a.id - b.id) : [];
 
   async function send() {
     if (!payload?.sendAvailable || !replyText.trim() || replyText.length > 5000 || sending) return;
@@ -67,7 +66,7 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
 
   return <section className="space-y-4 p-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h2 className="text-lg font-bold">LINE</h2><p className="text-sm text-zinc-600">元のInquiryに保存されたLINEのやり取りです。送信待ちは送信済みの証明ではありません。</p></div>
+      <div><h2 className="text-lg font-bold">LINE</h2><p className="text-sm text-zinc-600">この修理に関連付けられたLINEのやり取りです。送信待ちは送信済みの証明ではありません。</p></div>
       <Button type="button" variant="outline" size="sm" onClick={() => void refresh()} disabled={loading}>更新</Button>
     </div>
     {error && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -75,15 +74,13 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
     <RepairCompletionNoticePanel repairId={repairId} />
     <RepairDeliveryRequestPanel repairId={repairId} />
     {loading && !payload && <p className="text-sm text-zinc-500">LINE履歴を読み込んでいます…</p>}
-    {payload && !payload.available && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">このRepairに紐付く元のInquiryがないため、LINEのやり取りを表示できません。</p>}
+    {payload && !payload.available && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">この修理に関連付けられたLINEのやり取りはありません。</p>}
+    {payload && <Link className="text-sm text-blue-700 underline" href={`/customers/${payload.customerId}/communications`}>このお客様とのLINE履歴全体を見る</Link>}
     {payload?.available && <>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" size="sm" onClick={() => setShowFull((value) => !value)}>{showFull ? "この修理に関連するLINEのみ表示" : "このお客様とのLINE全体を見る"}</Button>
-        <span className="text-xs text-zinc-600">全体表示の対象は元のInquiryのみです。別のInquiryの履歴は含みません。</span>
-        <Link className="text-xs text-blue-700 underline" href={`/inquiries/${payload.sourceInquiryId}/review`}>元のInquiryを開く</Link>
+        {payload.sourceInquiryId && <Link className="text-xs text-blue-700 underline" href={`/inquiries/${payload.sourceInquiryId}/review`}>元のInquiryを開く</Link>}
       </div>
-      {payload.unassignedCount > 0 && <p className="text-xs text-amber-800">直近の表示対象に未特定・未分類のLINEが {payload.unassignedCount} 件あります。修理別表示では省かれます。</p>}
-      {payload.hasEarlierMessages && <p className="text-xs text-zinc-500">元のInquiryの直近200件を表示しています。</p>}
+      {payload.hasEarlierMessages && <p className="text-xs text-zinc-500">この修理に関連付けられた新しい200件を表示しています。</p>}
       <div className="max-h-[36rem] space-y-3 overflow-y-auto rounded border bg-zinc-50 p-3">
         {timeline.length === 0 && <p className="py-6 text-center text-sm text-zinc-500">表示するLINEはありません。</p>}
         {timeline.map((item, index) => {
@@ -93,25 +90,25 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
           const classification = item.kind === "message" ? item.message.classification : null;
           const outgoing = item.kind === "outbox" || item.message.direction === "OUTBOUND";
           return <div key={`${item.kind}-${item.id}`}>
-            {(index === 0 || (after && !previous)) && <div className="border-b py-2 text-center text-xs font-semibold text-zinc-600">{after ? "受付後" : "受付前"}</div>}
+            {payload.promotedAt !== null && (index === 0 || (after && !previous)) && <div className="border-b py-2 text-center text-xs font-semibold text-zinc-600">{after ? "受付後" : "受付前"}</div>}
             <div className={`flex ${outgoing ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-lg border p-3 text-sm ${item.kind === "outbox" ? "border-blue-200 bg-blue-50" : outgoing ? "border-emerald-200 bg-emerald-50" : "bg-white"}`}>
               <div className="mb-1 flex flex-wrap gap-1 text-xs">
                 {classification?.scope === "COMMON" && <span className="rounded bg-indigo-100 px-1">共通</span>}
-                {(!classification || classification.scope === "UNASSIGNED") && item.kind === "message" && <span className="rounded bg-zinc-200 px-1">未特定</span>}
+                {item.kind === "message" && !item.message.editable && <span className="rounded bg-indigo-100 px-1">受付後の関連</span>}
                 {links.map((id) => <span key={id} className="rounded bg-blue-100 px-1">{repairLabel(id)}</span>)}
                 {classification?.source && <span className="rounded bg-zinc-200 px-1">{classification.source === "MANUAL" ? "手動確定" : "AI"}</span>}
               </div>
               <p className="whitespace-pre-wrap break-words">{item.kind === "outbox" ? item.outbox.text : item.message.body}</p>
-              {item.kind === "message" && item.message.direction === "INBOUND" && item.message.messageType === "IMAGE" && <div className="space-y-2">{item.message.files.filter((file) => file.uploadStatus === "STORED").map((file) => <img key={file.id} src={`/api/inquiries/${payload.sourceInquiryId}/line/files/${file.id}`} alt="LINE受信画像" className="max-h-80 max-w-full rounded object-contain" loading="lazy" />)}</div>}
+              {item.kind === "message" && item.message.direction === "INBOUND" && item.message.messageType === "IMAGE" && <div className="space-y-2">{item.message.files.filter((file) => file.uploadStatus === "STORED").map((file) => <img key={file.id} src={`/api/inquiries/${item.message.inquiryId}/line/files/${file.id}`} alt="LINE受信画像" className="max-h-80 max-w-full rounded object-contain" loading="lazy" />)}</div>}
               {item.kind === "message" && item.message.messageType === "FILE" && <p className="text-zinc-500">ファイルメッセージ</p>}
               {item.kind === "message" && item.message.messageType === "OTHER" && <p className="text-zinc-500">その他のLINEメッセージ</p>}
               <div className="mt-2 text-right text-xs text-zinc-500">{item.kind === "outbox" ? statusLabels[item.outbox.status] : outgoing ? "送信済み" : "受信"} · {displayTime(item.at)}</div>
-              {item.kind === "message" && <ClassificationEditor key={`${item.id}-${classification?.confirmedAt ?? "none"}`} inquiryId={payload.sourceInquiryId!} message={item.message} watchOptions={payload.watchOptions} onSaved={refresh} />}
+              {item.kind === "message" && item.message.editable && <ClassificationEditor key={`${item.id}-${classification?.confirmedAt ?? "none"}`} inquiryId={item.message.inquiryId} message={item.message} watchOptions={payload.watchOptions} onSaved={refresh} />}
             </div></div>
           </div>;
         })}
       </div>
-      {!payload.sendAvailable && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">LINE送信先の確認がまだ完了していません。</p>}
+      {!payload.sendAvailable && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">元のInquiryまたは確認済みのLINE送信先がないため、この画面からの返信はできません。</p>}
       <div className="space-y-2 border-t pt-4"><label htmlFor="repair-line-reply" className="text-sm font-medium">お客様へのLINE返信</label>
         <Textarea id="repair-line-reply" value={replyText} onChange={(event) => { setReplyText(event.target.value); if (intentRef.current?.text !== event.target.value) intentRef.current = null; }} maxLength={5000} disabled={!payload.sendAvailable || sending} placeholder="お客様へ送る内容を入力" className="min-h-28" />
         <div className="flex flex-wrap justify-between gap-2 text-xs"><p className="text-amber-700">ここに入力した内容はお客様へのLINE送信用です。内部メモではありません。</p><span>{replyText.length} / 5000</span></div>
