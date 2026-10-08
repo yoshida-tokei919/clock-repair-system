@@ -98,7 +98,7 @@ function findInvoiceForSharePage(invoiceId: number) {
       paymentAllocations: {
         select: {
           allocatedAmount: true,
-          payment: { select: { status: true, provider: true, method: true, paidAt: true } },
+          payment: { select: { kind: true, status: true, provider: true, method: true, paidAt: true } },
         },
       },
     },
@@ -141,9 +141,11 @@ export default async function CustomerInvoicePage({
   const pdfHref = `/customer/invoices/${token}/invoice.pdf`;
   const billingMonth = formatBillingMonth(tokenRow.billingMonth, deliveryGroups);
   const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
+  const prepaymentApplied = invoice.paymentAllocations.reduce((sum, allocation) =>
+    sum + (allocation.payment.kind === "REPAIR_PREPAYMENT" && allocation.payment.status === "SUCCEEDED" ? allocation.allocatedAmount : 0), 0);
   const isPaid = paymentSummary.outstandingBalance === 0;
   const latestSucceededPayment = invoice.paymentAllocations
-    .filter(({ payment }) => payment.status === "SUCCEEDED")
+    .filter(({ payment }) => payment.status === "SUCCEEDED" && payment.kind === "INVOICE")
     .map(({ payment }) => payment)
     .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0))[0];
   const canPayOnline = invoice.customer.type === "individual"
@@ -202,6 +204,11 @@ export default async function CustomerInvoicePage({
               <dt className="text-xs font-bold text-slate-500">請求総額（税込）</dt>
               <dd className="mt-1 font-semibold">{formatCurrency(invoice.grossTotalAmount)}</dd>
             </div>
+            {invoice.customer.type === "individual" ? <>
+              <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">前受金充当額</dt><dd className="mt-1 font-semibold">{formatCurrency(prepaymentApplied)}</dd></div>
+              <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">今回請求額</dt><dd className="mt-1 font-semibold">{formatCurrency(invoice.grossTotalAmount - prepaymentApplied)}</dd></div>
+              <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">お支払い残額</dt><dd className="mt-1 font-semibold">{formatCurrency(paymentSummary.outstandingBalance)}</dd></div>
+            </> : null}
           </dl>
         </section>
 
@@ -262,12 +269,12 @@ export default async function CustomerInvoicePage({
                 <p className="font-semibold">お支払い済みです。</p>
                 <dl className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div>
-                    <dt className="text-xs font-bold text-emerald-700">お支払い額（税込）</dt>
-                    <dd className="mt-1 font-semibold">{formatCurrency(invoice.grossTotalAmount)}</dd>
+                    <dt className="text-xs font-bold text-emerald-700">今回のお支払い額（税込）</dt>
+                    <dd className="mt-1 font-semibold">{formatCurrency(latestSucceededPayment ? invoice.grossTotalAmount - prepaymentApplied : 0)}</dd>
                   </div>
                   <div>
                     <dt className="text-xs font-bold text-emerald-700">支払方法</dt>
-                    <dd className="mt-1 font-semibold">{paymentMethodLabel(latestSucceededPayment)}</dd>
+                    <dd className="mt-1 font-semibold">{latestSucceededPayment ? paymentMethodLabel(latestSucceededPayment) : "前受金充当"}</dd>
                   </div>
                 </dl>
               </div>

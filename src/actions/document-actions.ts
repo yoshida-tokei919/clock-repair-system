@@ -8,8 +8,36 @@ import {
 } from "@/lib/invoice-repair-snapshots";
 import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/lib/invoice-numbering";
 import { revalidatePath } from "next/cache";
+import { applyPrepaymentAllocations, availablePrepayment, findEligiblePrepayments, suggestPrepaymentAllocations, type RequestedAllocation } from "@/lib/prepayment-allocation";
 
-export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty') {
+export async function previewBulkInvoiceAllocations(repairIds: number[]) {
+    const ids = [...new Set(repairIds)];
+    if (!ids.length || ids.some(id => !Number.isSafeInteger(id) || id <= 0)) throw new Error("修理案件を選択してください");
+    const repairs = await prisma.repair.findMany({ where: { id: { in: ids } },
+        include: { customer: true, estimate: { include: { items: true } },
+            deliveryNote: { select: { slipNumber: true, issuedDate: true } } } });
+    if (repairs.length !== ids.length || repairs.some(repair => repair.invoiceId !== null)) throw new Error("請求対象が変更されました");
+    const groups = new Map<number, typeof repairs>();
+    for (const repair of repairs) groups.set(repair.customerId, [...(groups.get(repair.customerId) ?? []), repair]);
+    const result = [];
+    for (const [customerId, group] of groups) {
+        const gross = calculateIssuedInvoiceAmounts(group.reduce((sum, repair) => sum + calculateInvoiceRepairSubtotal(repair), 0)).grossTotalAmount;
+        const isB2C = group[0].customer.type === "individual";
+        const payments = isB2C ? await findEligiblePrepayments(prisma, customerId, group.map(repair => repair.id)) : [];
+        const receivedPrepaymentAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
+        const availablePrepaymentAmount = payments.reduce((sum, payment) => sum + availablePrepayment(payment), 0);
+        const eligible = payments.map(payment => ({ id: payment.id, repairId: payment.repairId, purpose: payment.purpose,
+            paidAt: payment.paidAt, receivedAmount: payment.amount,
+            availableAmount: availablePrepayment(payment) })).filter(payment => payment.availableAmount > 0);
+        result.push({ customerId, customerName: group[0].customer.name, isB2C, gross,
+            receivedPrepaymentAmount, availablePrepaymentAmount,
+            repairs: group.map(repair => ({ id: repair.id, inquiryNumber: repair.inquiryNumber })),
+            payments: eligible, suggested: suggestPrepaymentAllocations(payments, gross) });
+    }
+    return result;
+}
+
+export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty', allocationsByCustomer?: Record<number, RequestedAllocation[]>) {
     try {
         if (repairIds.length === 0) return { success: false, error: "No repairs selected" };
 
@@ -130,6 +158,10 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                   if (claimed.count !== customerRepairs.length) {
                     throw new Error("請求対象が変更されました。再読み込みしてください");
                   }
+                  if (isB2C) await applyPrepaymentAllocations(tx, {
+                    invoiceId: created.id, customerId, repairIds: customerRepairs.map(r => r.id),
+                    gross: created.grossTotalAmount, requested: allocationsByCustomer?.[customerId] ?? [],
+                  });
                   await tx.customer.update({ where: { id: customerId }, data: { seqInvoice: invoiceSeq } });
                   return created;
                 });

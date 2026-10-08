@@ -49,13 +49,13 @@ test("server helper reads only successful allocations for the requested invoice"
   await assert.rejects(getInvoiceOutstandingBalance(mockDb(null).db, 1), /見つかりません/);
 });
 
-test("creates exactly one full allocation from DB total, ignoring supplied amount", async () => {
+test("creates exactly one residual allocation from DB total, ignoring supplied amount", async () => {
   const { db, writes } = mockDb();
   const input = { invoiceId: 1, customerId: 7, provider: "STRIPE" as const, amount: 1 };
   await createInvoicePayment(db, input);
   assert.equal(writes.length, 1);
   assert.deepEqual(writes[0].data, {
-    customerId: 7, amount: 33000, currency: "JPY", provider: "STRIPE", method: null,
+    customerId: 7, kind: "INVOICE", amount: 33000, currency: "JPY", provider: "STRIPE", method: null,
     status: "PENDING", paidAt: null,
     allocations: { create: { invoiceId: 1, allocatedAmount: 33000 } },
   });
@@ -80,7 +80,7 @@ for (const status of ["CANCELED", "FAILED"] as const) {
   });
 }
 
-for (const amount of [1000, 33000, 34000]) {
+for (const amount of [33000, 34000]) {
   test("successful allocation " + amount + " prevents a duplicate full payment", async () => {
     const { db, writes } = mockDb({ ...issued,
       paymentAllocations: [{ allocatedAmount: amount, payment: { status: "SUCCEEDED" } }],
@@ -89,6 +89,28 @@ for (const amount of [1000, 33000, 34000]) {
     assert.equal(writes.length, 0);
   });
 }
+
+test("prepayment allocation of 44000 against gross 72600 creates a 28600 invoice payment", async () => {
+  const { db, writes } = mockDb({ ...issued, grossTotalAmount: 72600,
+    paymentAllocations: [{ allocatedAmount: 44000, payment: { status: "SUCCEEDED" } }] });
+  await createInvoicePayment(db, { invoiceId: 1, customerId: 7, provider: "STRIPE" });
+  assert.equal(writes[0].data.amount, 28600);
+  assert.equal(writes[0].data.allocations.create.allocatedAmount, 28600);
+});
+
+test("two prepayments of 44000 and 12000 produce 56000 applied", () => {
+  assert.equal(calculateInvoicePaymentSummary({ grossTotalAmount: 72600 }, [
+    { allocatedAmount: 44000, payment: { status: "SUCCEEDED" } },
+    { allocatedAmount: 12000, payment: { status: "SUCCEEDED" } },
+  ]).outstandingBalance, 16600);
+});
+
+test("30000 gross with 30000 prepayment allocation needs no Checkout payment", async () => {
+  const { db, writes } = mockDb({ ...issued, grossTotalAmount: 30000,
+    paymentAllocations: [{ allocatedAmount: 30000, payment: { status: "SUCCEEDED" } }] });
+  await assert.rejects(createInvoicePayment(db, { invoiceId: 1, customerId: 7, provider: "STRIPE" }), /未払い残高/);
+  assert.equal(writes.length, 0);
+});
 
 for (const status of ["paid", "void", "canceled"]) test("reject invoice status " + status, async () => {
   const { db, writes } = mockDb({ ...issued, status });

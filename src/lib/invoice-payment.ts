@@ -52,7 +52,7 @@ type CreateInvoicePaymentInput = {
 
 /**
  * Internal service, not a Server Action or HTTP endpoint. No client-supplied amount.
- * One atomic nested create plus unique paymentId enforces one Invoice per Payment.
+ * One atomic nested create creates one Invoice allocation for each Invoice payment.
  * A canceled/failed Payment may be replaced; pending or successful payments block it.
  */
 export async function createInvoicePayment(db: PrismaClient, input: CreateInvoicePaymentInput) {
@@ -86,12 +86,11 @@ export async function createInvoicePayment(db: PrismaClient, input: CreateInvoic
     if (invoice.paymentAllocations.some(allocation => allocation.payment.status === "PENDING")) {
       throw new Error("この請求書には処理中の支払いがあります");
     }
-    if (summary.paidAmount > 0) throw new Error("部分入金済みの請求書は今回の支払い対象外です");
-    const amount = assertIntegerYen(invoice.grossTotalAmount);
+    const amount = assertIntegerYen(summary.outstandingBalance);
     if (amount === 0) throw new Error("支払いには正の請求額が必要です");
     return tx.payment.create({
       data: {
-        customerId: invoice.customerId, amount, currency: "JPY", provider: input.provider,
+        customerId: invoice.customerId, kind: "INVOICE", amount, currency: "JPY", provider: input.provider,
         method, status, paidAt: input.paidAt ?? null,
         allocations: { create: { invoiceId: invoice.id, allocatedAmount: amount } },
       },

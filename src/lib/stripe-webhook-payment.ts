@@ -88,7 +88,7 @@ function assertPaymentState(attempt: StripePaymentAttempt, session: CheckoutSess
   if (payment.kind !== "INVOICE") throw new Error("Unsupported Payment kind");
   const [allocation] = payment.allocations;
   if (payment.allocations.length !== 1 || !allocation) throw new Error("Payment must have exactly one allocation");
-  if (allocation.allocatedAmount !== payment.amount || allocation.invoice.grossTotalAmount !== payment.amount) {
+  if (allocation.allocatedAmount !== payment.amount || payment.amount <= 0 || payment.currency !== "JPY") {
     throw new Error("Payment allocation amount does not match");
   }
   if (payment.customerId !== allocation.invoice.customerId) throw new Error("Payment customer does not match invoice customer");
@@ -148,6 +148,24 @@ export async function settleStripeCheckoutPayment(
     }
     if (attempt.status !== "PENDING" || attempt.payment.status !== "PENDING") {
       throw new Error("Payment and PaymentAttempt statuses do not match");
+    }
+
+    if (attempt.payment.kind === "INVOICE") {
+      const allocation = attempt.payment.allocations[0];
+      await tx.$queryRaw`SELECT "id" FROM "Invoice" WHERE "id" = ${allocation.invoice.id} FOR UPDATE`;
+      const invoice = await tx.invoice.findUnique({ where: { id: allocation.invoice.id },
+        select: { status: true, customerId: true, grossTotalAmount: true,
+          paymentAllocations: { select: { paymentId: true, allocatedAmount: true,
+            payment: { select: { status: true } } } } } });
+      if (!invoice || invoice.status !== "issued" || invoice.customerId !== attempt.payment.customerId
+        || invoice.grossTotalAmount !== allocation.invoice.grossTotalAmount) {
+        throw new Error("Invoice changed before Stripe settlement");
+      }
+      const otherSucceeded = invoice.paymentAllocations.reduce((sum, row) =>
+        sum + (row.paymentId !== attempt.payment.id && row.payment.status === "SUCCEEDED" ? row.allocatedAmount : 0), 0);
+      if (invoice.grossTotalAmount - otherSucceeded !== attempt.payment.amount) {
+        throw new Error("Invoice outstanding balance does not match Stripe payment");
+      }
     }
 
     await tx.paymentAttempt.update({

@@ -23,7 +23,7 @@ function session(overrides: Record<string, unknown> = {}) {
   } as any;
 }
 
-function mockDb(attempt = paymentAttempt()) {
+function mockDb(attempt = paymentAttempt(), otherAllocations: any[] = []) {
   const writes: any[] = [];
   const tx = {
     $queryRaw: async () => [{ id: attempt.paymentId }],
@@ -32,6 +32,9 @@ function mockDb(attempt = paymentAttempt()) {
       update: async (query: any) => { writes.push({ kind: "attempt", ...query }); },
     },
     payment: { update: async (query: any) => { writes.push({ kind: "payment", ...query }); } },
+    invoice: { findUnique: async () => ({ status: "issued", customerId: 7, grossTotalAmount: attempt.payment.allocations[0]?.invoice?.grossTotalAmount,
+      paymentAllocations: [...attempt.payment.allocations.map((row: any) => ({ paymentId: attempt.paymentId,
+        allocatedAmount: row.allocatedAmount, payment: { status: attempt.payment.status } })), ...otherAllocations] }) },
   };
   return { db: { $transaction: async (fn: any) => fn(tx) } as any, writes };
 }
@@ -103,6 +106,26 @@ test("paid repair prepayment settles without an invoice allocation", async () =>
   const { db, writes } = mockDb(prepaymentAttempt());
   assert.equal((await settleStripeCheckoutPayment(db, prepaymentSession(), new Date())).outcome, "settled");
   assert.equal(writes.length, 2);
+});
+
+test("44000 prepayment plus 28600 Stripe residual settles a 72600 invoice", async () => {
+  const attempt = paymentAttempt();
+  attempt.payment.amount = 28600;
+  attempt.payment.allocations[0].allocatedAmount = 28600;
+  attempt.payment.allocations[0].invoice.grossTotalAmount = 72600;
+  const { db, writes } = mockDb(attempt, [{ paymentId: 9, allocatedAmount: 44000, payment: { status: "SUCCEEDED" } }]);
+  assert.equal((await settleStripeCheckoutPayment(db, session({ amount_total: 28600 }), new Date())).outcome, "settled");
+  assert.equal(writes.length, 2);
+});
+
+test("Stripe residual is rejected when other succeeded allocations change", async () => {
+  const attempt = paymentAttempt();
+  attempt.payment.amount = 28600;
+  attempt.payment.allocations[0].allocatedAmount = 28600;
+  attempt.payment.allocations[0].invoice.grossTotalAmount = 72600;
+  const { db, writes } = mockDb(attempt, [{ paymentId: 9, allocatedAmount: 45000, payment: { status: "SUCCEEDED" } }]);
+  await assert.rejects(settleStripeCheckoutPayment(db, session({ amount_total: 28600 }), new Date()));
+  assert.equal(writes.length, 0);
 });
 
 test("replayed paid repair prepayment is idempotent", async () => {

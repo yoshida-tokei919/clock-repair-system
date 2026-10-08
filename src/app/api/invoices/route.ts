@@ -7,6 +7,7 @@ import {
 import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/lib/invoice-numbering";
 import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 import { prisma } from "@/lib/prisma";
+import { applyPrepaymentAllocations, type RequestedAllocation } from "@/lib/prepayment-allocation";
 
 // GET /api/invoices — 請求書一覧
 export async function GET() {
@@ -43,10 +44,11 @@ export async function GET() {
 // POST /api/invoices — 新規請求書作成（月次合算）
 export async function POST(req: NextRequest) {
     const body = await req.json();
-    const { customerId, repairIds, paymentDueDate } = body as {
+    const { customerId, repairIds, paymentDueDate, allocations = [] } = body as {
         customerId: number;
         repairIds: number[];
         paymentDueDate?: string;
+        allocations?: RequestedAllocation[];
     };
 
     if (!customerId || !repairIds?.length) {
@@ -84,6 +86,7 @@ export async function POST(req: NextRequest) {
     const amounts = calculateIssuedInvoiceAmounts(subtotal);
 
     // トランザクションで請求書作成・修理紐付け・SEQ更新
+    try {
     const invoice = await prisma.$transaction(async (tx) => {
         let newSeq: number;
         let invoiceNumber: string;
@@ -114,6 +117,10 @@ export async function POST(req: NextRequest) {
         if (claimed.count !== uniqueRepairIds.length) {
             throw new Error("請求対象が変更されました。再読み込みしてください");
         }
+        if (isB2C) await applyPrepaymentAllocations(tx, {
+            invoiceId: created.id, customerId, repairIds: uniqueRepairIds,
+            gross: created.grossTotalAmount, requested: allocations,
+        });
         await tx.customer.update({
             where: { id: customerId },
             data: { seqInvoice: newSeq },
@@ -122,4 +129,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(invoice, { status: 201 });
+    } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : "請求書を作成できません" }, { status: 409 });
+    }
 }

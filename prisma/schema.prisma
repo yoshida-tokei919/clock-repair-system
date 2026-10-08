@@ -1774,7 +1774,7 @@ model Payment {
 
 model PaymentAllocation {
   id              Int      @id @default(autoincrement())
-  paymentId       Int      @unique
+  paymentId       Int
   invoiceId       Int
   allocatedAmount Int
   createdAt       DateTime @default(now())
@@ -1783,6 +1783,7 @@ model PaymentAllocation {
   invoice Invoice @relation(fields: [invoiceId], references: [id])
 
   @@index([invoiceId])
+  @@unique([paymentId, invoiceId])
 }
 
 // Provider-specific attempts are separate because one Payment can require retries.

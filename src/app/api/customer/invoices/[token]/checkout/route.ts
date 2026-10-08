@@ -109,7 +109,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     return errorResponse("決済ページを準備中です。しばらくしてから再度お試しください。", 409);
   }
 
-  let payment: { id: number };
+  let payment: { id: number; amount: number };
   try {
     payment = await createInvoicePayment(prisma, {
       invoiceId: invoice.id,
@@ -134,7 +134,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
       line_items: [{
         price_data: {
           currency: "jpy",
-          unit_amount: invoice.grossTotalAmount,
+          unit_amount: payment.amount,
           product_data: {
             name: "時計修理代金 ご請求",
             description: `請求番号: ${invoice.invoiceNumber}`,

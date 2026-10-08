@@ -7,6 +7,7 @@ type Props = {
   paymentStatus: "paid" | "pending" | "unpaid" | "void";
   grossTotalAmount: number;
   paidAmount: number;
+  prepaymentAppliedAmount: number;
   outstandingBalance: number;
   latestSucceededPayment: { provider: string; method: string | null; paidAt: Date | null } | null;
 };
@@ -49,6 +50,8 @@ export function InvoicePaymentSummary(props: Props) {
       <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
         <div className="flex justify-between gap-3"><dt>支払状態</dt><dd className="font-medium">{paymentStatusLabel(props.paymentStatus)}</dd></div>
         <div className="flex justify-between gap-3"><dt>請求総額（税込）</dt><dd>{formatYen(props.grossTotalAmount)}</dd></div>
+        <div className="flex justify-between gap-3"><dt>前受金充当額</dt><dd>{formatYen(props.prepaymentAppliedAmount)}</dd></div>
+        <div className="flex justify-between gap-3"><dt>今回請求額</dt><dd>{formatYen(props.grossTotalAmount - props.prepaymentAppliedAmount)}</dd></div>
         <div className="flex justify-between gap-3"><dt>入金済額</dt><dd>{formatYen(props.paidAmount)}</dd></div>
         <div className="flex justify-between gap-3"><dt>未入金残高</dt><dd>{formatYen(props.outstandingBalance)}</dd></div>
         {props.paymentStatus === "paid" && method ? <div className="flex justify-between gap-3"><dt>支払方法</dt><dd>{method}</dd></div> : null}

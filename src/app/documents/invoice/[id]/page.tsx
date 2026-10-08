@@ -27,7 +27,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
             paymentAllocations: {
                 select: {
                     allocatedAmount: true,
-                    payment: { select: { provider: true, method: true, status: true, paidAt: true } },
+                    payment: { select: { kind: true, provider: true, method: true, status: true, paidAt: true } },
                 },
             },
         },
@@ -36,6 +36,8 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
     if (!invoice) return notFound();
 
     const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
+    const prepaymentAppliedAmount = invoice.paymentAllocations.reduce((sum, allocation) =>
+        sum + (allocation.payment.kind === "REPAIR_PREPAYMENT" && allocation.payment.status === "SUCCEEDED" ? allocation.allocatedAmount : 0), 0);
     const paymentStatus = invoice.status === "void" || invoice.status === "canceled"
         ? "void"
         : paymentSummary.outstandingBalance <= 0
@@ -44,7 +46,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
                 ? "pending"
                 : "unpaid";
     const latestSucceededPayment = invoice.paymentAllocations
-        .filter(({ payment }) => payment.status === "SUCCEEDED")
+        .filter(({ payment }) => payment.status === "SUCCEEDED" && payment.kind === "INVOICE")
         .map(({ payment }) => payment)
         .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0))[0] ?? null;
     const paymentSummaryPanel = (
@@ -55,6 +57,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
             paymentStatus={paymentStatus}
             grossTotalAmount={invoice.grossTotalAmount}
             paidAmount={paymentSummary.paidAmount}
+            prepaymentAppliedAmount={prepaymentAppliedAmount}
             outstandingBalance={paymentSummary.outstandingBalance}
             latestSucceededPayment={latestSucceededPayment}
         />

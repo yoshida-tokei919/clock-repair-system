@@ -10,7 +10,7 @@ import { FileText, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ClickToCopy } from "@/components/ui/click-to-copy";
-import { generateBulkDocument } from "@/actions/document-actions";
+import { generateBulkDocument, previewBulkInvoiceAllocations } from "@/actions/document-actions";
 import { cn } from "@/lib/utils";
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -33,6 +33,8 @@ interface RepairsTableClientProps {
 }
 
 export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
+    const [invoicePreview, setInvoicePreview] = useState<Awaited<ReturnType<typeof previewBulkInvoiceAllocations>> | null>(null);
+    const [requestedAllocations, setRequestedAllocations] = useState<Record<number, Record<number, number>>>({});
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [readRepairIds, setReadRepairIds] = useState<number[]>([]);
     const [activeMessage, setActiveMessage] = useState<{
@@ -67,12 +69,13 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         );
     };
 
-    const handleBulkAction = async (type: "delivery" | "estimate" | "invoice") => {
+    const handleBulkAction = async (type: "delivery" | "estimate" | "invoice", allocations?: Record<number, { paymentId: number; allocatedAmount: number }[]>) => {
         if (selectedIds.length === 0) return;
         setIsGenerating(true);
         try {
-            const result = await generateBulkDocument(selectedIds, type);
+            const result = await generateBulkDocument(selectedIds, type, allocations);
             if (result.success) {
+                setInvoicePreview(null);
                 toast({
                     title: "作成完了",
                     description: `${result.count}件のドキュメントを作成しました。`,
@@ -101,6 +104,26 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         } finally {
             setIsGenerating(false);
         }
+    };
+
+    const openInvoicePreview = async () => {
+        setIsGenerating(true);
+        try {
+            const preview = await previewBulkInvoiceAllocations(selectedIds);
+            setInvoicePreview(preview);
+            setRequestedAllocations(Object.fromEntries(preview.map(group => [group.customerId,
+                Object.fromEntries(group.suggested.map(row => [row.paymentId, row.allocatedAmount]))])));
+        } catch (error) {
+            toast({ title: "請求書の確認に失敗しました", description: error instanceof Error ? error.message : "再読み込みしてください", variant: "destructive" });
+        } finally { setIsGenerating(false); }
+    };
+
+    const confirmInvoice = async () => {
+        if (!invoicePreview) return;
+        const allocations = Object.fromEntries(invoicePreview.map(group => [group.customerId,
+            group.payments.map(payment => ({ paymentId: payment.id, allocatedAmount: requestedAllocations[group.customerId]?.[payment.id] ?? 0 }))
+                .filter(row => row.allocatedAmount > 0)]));
+        await handleBulkAction("invoice", allocations);
     };
 
     const handleMarkRead = async () => {
@@ -135,7 +158,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                         <Truck className="mr-2 h-4 w-4" />
                         納品書作成
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleBulkAction("invoice")} disabled={isGenerating}>
+                    <Button size="sm" variant="outline" onClick={openInvoicePreview} disabled={isGenerating}>
                         <FileText className="mr-2 h-4 w-4" />
                         請求書作成
                     </Button>
@@ -296,6 +319,47 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     </tbody>
                 </table>
             </div>
+            <Dialog open={invoicePreview !== null} onOpenChange={(open) => !open && !isGenerating && setInvoicePreview(null)}>
+                <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+                    <DialogHeader><DialogTitle>請求書と前受金の充当を確認</DialogTitle></DialogHeader>
+                    <div className="space-y-5 text-sm">
+                        {invoicePreview?.map(group => {
+                            const applied = group.payments.reduce((sum, payment) => sum + (requestedAllocations[group.customerId]?.[payment.id] ?? 0), 0);
+                            return <section key={group.customerId} className="space-y-2 rounded border p-3">
+                                <h3 className="font-semibold">{group.customerName}（{group.isB2C ? "一般" : "業者"}）</h3>
+                                <p>修理: {group.repairs.map(repair => repair.inquiryNumber).join("、")}</p>
+                                <p>修理総額（税込）: ¥{group.gross.toLocaleString()}</p>
+                                {group.isB2C && <>
+                                    <p>受領済み前受金: ¥{group.receivedPrepaymentAmount.toLocaleString()}</p>
+                                    <p>利用可能前受金: ¥{group.availablePrepaymentAmount.toLocaleString()}</p>
+                                    {group.payments.length === 0 && <p>利用可能な前受金はありません。</p>}
+                                    {group.payments.map(payment => <label key={payment.id} className="flex flex-wrap items-center justify-between gap-2 rounded bg-slate-50 p-2">
+                                        <span>前受金 #{payment.id} / 修理 #{payment.repairId} / {payment.purpose} / 入金 ¥{payment.receivedAmount.toLocaleString()} / 利用可能 ¥{payment.availableAmount.toLocaleString()} / {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "入金日未設定"}</span>
+                                        <input type="number" min={0} max={Math.min(payment.availableAmount, group.gross)} step={1}
+                                            className="w-28 rounded border p-1 text-right" aria-label={`前受金 ${payment.id} の充当額`}
+                                            value={requestedAllocations[group.customerId]?.[payment.id] ?? 0}
+                                            onChange={event => setRequestedAllocations(previous => ({ ...previous, [group.customerId]: {
+                                                ...previous[group.customerId], [payment.id]: Number(event.target.value),
+                                            } }))} />
+                                    </label>)}
+                                    <p>今回充当: ¥{applied.toLocaleString()}</p>
+                                    <p>今回請求額: ¥{(group.gross - applied).toLocaleString()}</p>
+                                    {(applied > group.gross || group.payments.some(payment => {
+                                        const amount = requestedAllocations[group.customerId]?.[payment.id] ?? 0;
+                                        return !Number.isSafeInteger(amount) || amount < 0 || amount > payment.availableAmount;
+                                    })) && <p className="text-red-700">充当額を利用可能額と請求総額の範囲にしてください。</p>}
+                                </>}
+                            </section>;
+                        })}
+                    </div>
+                    <DialogFooter><Button variant="outline" onClick={() => setInvoicePreview(null)} disabled={isGenerating}>戻る</Button>
+                        <Button onClick={confirmInvoice} disabled={isGenerating || invoicePreview?.some(group => {
+                            const amounts = group.payments.map(payment => requestedAllocations[group.customerId]?.[payment.id] ?? 0);
+                            return amounts.some((amount, index) => !Number.isSafeInteger(amount) || amount < 0 || amount > group.payments[index].availableAmount)
+                                || amounts.reduce((sum, amount) => sum + amount, 0) > group.gross;
+                        })}>この内容で請求書を作成</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
             <Dialog open={!!activeMessage} onOpenChange={(open) => !open && setActiveMessage(null)}>
                 <DialogContent>
                     <DialogHeader>

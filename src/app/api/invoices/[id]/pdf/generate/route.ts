@@ -122,6 +122,8 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     subtotalAmount: invoice.totalAmount,
     taxAmount: invoice.taxAmount,
     grossTotalAmount: invoice.grossTotalAmount,
+    prepaymentAppliedAmount: invoice.paymentAllocations.reduce((sum, allocation) =>
+      sum + (allocation.payment.kind === "REPAIR_PREPAYMENT" && allocation.payment.status === "SUCCEEDED" ? allocation.allocatedAmount : 0), 0),
     bankInfo: "三井住友銀行　店番411\n普通 3602468\nヨシダ シュウヘイ",
     b2cJobs,
   } satisfies InvoiceDocumentProps["data"];
@@ -133,6 +135,7 @@ function findInvoiceForPdf(invoiceId: number) {
     include: {
       customer: true,
       repairSnapshots: true,
+      paymentAllocations: { select: { allocatedAmount: true, payment: { select: { kind: true, status: true } } } },
       repairs: {
         include: {
           watch: { include: { brand: true, model: true, reference: true } },
