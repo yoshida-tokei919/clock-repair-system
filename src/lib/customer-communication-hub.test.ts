@@ -33,12 +33,13 @@ test("reads the newest 500 messages across linked users and CLOSED/open Inquirie
     customer: { findUnique: async () => ({ id: 7, type: "business", name: "Shop", companyName: "Shop" }) },
     lineUser: { findMany: async (query: any) => {
       queries.push(query);
-      return [{ id: 1, displayName: "A" }, { id: 2, displayName: "B" }];
+      return [{ id: 1, displayName: "A", lineManagerChat: null }, { id: 2, displayName: "B", lineManagerChat: null }];
     } },
     inquiryMessage: { findMany: async (query: any) => {
       queries.push(query);
       return rows;
     } },
+    lineManagerSendOutbox: { findMany: async () => [] },
   } as unknown as CustomerCommunicationDb;
 
   const hub = await getCustomerCommunicationHub(db, 7);
@@ -73,10 +74,70 @@ test("missing customer returns null; customer without linked LINE users has an e
       ? { id: 2, type: "individual", name: "Customer", companyName: null } : null },
     lineUser: { findMany: async () => [] },
     inquiryMessage: { findMany: async () => { messageQueries++; return []; } },
+    lineManagerSendOutbox: { findMany: async () => [] },
   } as unknown as CustomerCommunicationDb;
   assert.equal(await getCustomerCommunicationHub(db, 1), null);
   const hub = await getCustomerCommunicationHub(db, 2);
   assert.deepEqual(hub?.messages, []);
   assert.equal(hub?.hasEarlierMessages, false);
   assert.equal(messageQueries, 0);
+});
+
+test("verified destinations include multiple linked users and only existing anchors are sendable", async () => {
+  const db = {
+    customer: { findUnique: async () => ({ id: 7, type: "individual", name: "A", companyName: null }) },
+    lineUser: { findMany: async () => [
+      { id: 5, displayName: "First", lineManagerChat: { verifiedAt: date("2026-01-01T00:00:00Z") } },
+      { id: 6, displayName: null, lineManagerChat: { verifiedAt: date("2026-01-02T00:00:00Z") } },
+      { id: 7, displayName: "Unverified", lineManagerChat: null },
+    ] },
+    inquiry: { findFirst: async ({ where }: any) => where.lineUserId === 5 ? { id: 1 } : null },
+    inquiryMessage: { findMany: async () => [] },
+    lineManagerSendOutbox: { findMany: async () => [] },
+  } as unknown as CustomerCommunicationDb;
+  const hub = await getCustomerCommunicationHub(db, 7);
+  assert.deepEqual(hub?.destinations.map(({ lineUserId, label, sendAvailable }) => ({ lineUserId, label, sendAvailable })), [
+    { lineUserId: 5, label: "First", sendAvailable: true },
+    { lineUserId: 6, label: "LINEユーザー #6", sendAvailable: false },
+  ]);
+});
+
+test("one verified linked user is the sole sendable destination", async () => {
+  const db = {
+    customer: { findUnique: async () => ({ id: 7, type: "individual", name: "A", companyName: null }) },
+    lineUser: { findMany: async () => [{ id: 5, displayName: "First", lineManagerChat: { verifiedAt: date("2026-01-01T00:00:00Z") } }] },
+    inquiry: { findFirst: async () => ({ id: 21 }) },
+    inquiryMessage: { findMany: async () => [] },
+    lineManagerSendOutbox: { findMany: async () => [] },
+  } as unknown as CustomerCommunicationDb;
+  const hub = await getCustomerCommunicationHub(db, 7);
+  assert.equal(hub?.destinations.length, 1);
+  assert.equal(hub?.destinations[0].lineUserId, 5);
+  assert.equal(hub?.destinations[0].sendAvailable, true);
+});
+
+test("pending projection checks both LINE user identities and excludes terminal statuses", async () => {
+  let pendingQuery: any;
+  const makeRow = (id: number, inquiryUserId: number, chatUserId: number, status = "APPROVED") => ({
+    id, idempotencyKey: `customer-line-reply:7:${inquiryUserId}:key`, text: `reply ${id}`, status, approvedAt: date(`2026-01-0${id}T00:00:00Z`),
+    inquiry: { lineUserId: inquiryUserId }, lineManagerChat: { lineUserId: chatUserId },
+  });
+  const db = {
+    customer: { findUnique: async () => ({ id: 7, type: "business", name: "A", companyName: "A" }) },
+    lineUser: { findMany: async () => [{ id: 5, displayName: "A", lineManagerChat: null }] },
+    inquiryMessage: { findMany: async () => [] },
+    lineManagerSendOutbox: { findMany: async (query: any) => {
+      pendingQuery = query;
+      return [makeRow(1, 5, 5), makeRow(2, 5, 6), makeRow(3, 6, 6), makeRow(4, 5, 5, "POST_UNCONFIRMED"),
+        { ...makeRow(5, 5, 5), idempotencyKey: "customer-line-reply:7:6:key" }];
+    } },
+  } as unknown as CustomerCommunicationDb;
+  const hub = await getCustomerCommunicationHub(db, 7);
+  assert.deepEqual(hub?.pendingOutboxes.map((row) => row.id), [1, 4]);
+  assert.equal(pendingQuery.where.idempotencyKey.startsWith, "customer-line-reply:7:");
+  assert.deepEqual(pendingQuery.where.status.in, ["APPROVED", "CLAIMED", "PRE_SEND_FAILED", "POST_UNCONFIRMED"]);
+  assert.deepEqual(pendingQuery.orderBy, [{ approvedAt: "desc" }, { id: "desc" }]);
+  assert.equal(pendingQuery.take, 20);
+  assert.deepEqual(pendingQuery.where.inquiry.lineUser, { linkedCustomerId: 7 });
+  assert.deepEqual(pendingQuery.where.lineManagerChat.lineUser, { linkedCustomerId: 7 });
 });

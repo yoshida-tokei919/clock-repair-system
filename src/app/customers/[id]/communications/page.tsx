@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
+import { CustomerLineReply } from "@/components/customers/CustomerLineReply";
 import { getCustomerCommunicationHub } from "@/lib/customer-communication-hub";
 import { prisma } from "@/lib/prisma";
 
@@ -33,8 +34,23 @@ export default async function CustomerCommunicationsPage({ params }: { params: P
       <div>
         <Link className="text-sm text-blue-700 hover:underline" href="/customers">← 顧客一覧</Link>
         <h1 className="mt-3 text-2xl font-bold text-zinc-900">{displayName} のやり取り</h1>
-        <p className="mt-1 text-sm text-zinc-600">LINE履歴（読み取り専用）・{hub.messages.length}件</p>
+        <p className="mt-1 text-sm text-zinc-600">確認済みLINE履歴・{hub.messages.length}件</p>
       </div>
+
+      <CustomerLineReply customerId={customerId} destinations={hub.destinations} />
+
+      {hub.pendingOutboxes.length > 0 && <section className="space-y-3">
+        <h2 className="font-semibold">LINE送信待ち・結果確認中</h2>
+        <ol className="space-y-2">
+          {hub.pendingOutboxes.map((outbox) => <li key={outbox.id} className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+            <div className="text-xs text-amber-900">
+              {outbox.status === "POST_UNCONFIRMED" ? "送信結果確認中" : outbox.status === "PRE_SEND_FAILED" ? "送信前に失敗・再試行待ち" : outbox.status === "CLAIMED" ? "送信処理中" : "送信待ち"}
+              ・{formatDate(outbox.approvedAt)}・{userNames.get(outbox.lineUserId)}
+            </div>
+            <p className="mt-2 whitespace-pre-wrap break-words">{outbox.text}</p>
+          </li>)}
+        </ol>
+      </section>}
 
       {hub.hasEarlierMessages && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -91,7 +107,7 @@ export default async function CustomerCommunicationsPage({ params }: { params: P
           ))}
         </ol>
       )}
-      <p className="text-xs text-zinc-500">送信待ち・送信結果未確認のメッセージは履歴に含みません。</p>
+      <p className="text-xs text-zinc-500">送信待ち・送信結果未確認の内容は確認済み履歴には含みません。</p>
     </main>
   );
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { deleteCustomerSafely } from "@/lib/customer-deletion-safety";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -169,9 +170,7 @@ export async function getCustomerById(id: number) {
 
 export async function deleteCustomer(id: number) {
     try {
-        const repairCount = await prisma.repair.count({ where: { customerId: id } });
-        if (repairCount > 0) throw new Error("修理履歴がある顧客は削除できません。");
-        await prisma.customer.delete({ where: { id } });
+        await deleteCustomerSafely(prisma, id);
         revalidatePath("/customers");
         return { success: true };
     } catch (e: any) {
