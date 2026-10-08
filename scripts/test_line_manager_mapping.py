@@ -12,6 +12,8 @@ import unittest
 from unittest.mock import Mock, patch
 
 import line_manager_mapping as mapping
+import line_manager_sender_worker as sender
+from test_line_manager_sender_worker import lock_root
 
 
 def candidate(user, *message_ids):
@@ -156,12 +158,12 @@ class WorkerTests(unittest.TestCase):
         with patch.object(mapping.urllib.request, "urlopen", side_effect=urllib.error.HTTPError("test", 409, "private", {}, None)):
             self.assertEqual(mapping.process_mapping_once(api, self.reader(), apply=True).status, "internal_api_unavailable")
 
-    def test_main_defaults_to_dry_run_and_acquires_sender_lock(self):
+    def test_main_defaults_to_dry_run_and_acquires_operation_lock(self):
         api = FakeApi([candidate(1, "match")])
         output = io.StringIO()
-        with patch.dict(os.environ, {"N8N_INTERNAL_TOKEN": "test-only"}), patch.object(mapping, "HttpInternalApi", return_value=api), patch.object(mapping, "fixed_storage_path", return_value=Path(__file__)), patch.object(mapping.LINELibAdapter, "from_storage", return_value=self.reader(history=[inbound("match")])), patch("line_manager_sender_worker.single_instance", return_value=nullcontext()) as lock, redirect_stdout(output):
+        with patch.dict(os.environ, {"N8N_INTERNAL_TOKEN": "test-only"}), patch.object(mapping, "HttpInternalApi", return_value=api), patch.object(mapping, "fixed_storage_path", return_value=Path(__file__)), patch.object(mapping.LINELibAdapter, "from_storage", return_value=self.reader(history=[inbound("match")])), patch.object(mapping, "lineoa_operation", return_value=nullcontext()) as lock, redirect_stdout(output):
             self.assertEqual(mapping.main([]), 0)
-        lock.assert_called_once_with()
+        lock.assert_called_once_with(timeout_seconds=3)
         self.assertEqual(api.verified, [])
         self.assertIn("status=dry_run_match", output.getvalue())
 
@@ -169,7 +171,7 @@ class WorkerTests(unittest.TestCase):
         api = FakeApi([candidate(1, "one"), candidate(2, "two")])
         reader = FakeReader({"bot": [{"chatId": "a"}, {"chatId": "b"}]}, {("bot", "a"): {"list": [inbound("one", "a")]}, ("bot", "b"): {"list": [inbound("two", "b")]}})
         output = io.StringIO()
-        with patch.dict(os.environ, {"N8N_INTERNAL_TOKEN": "test-only"}), patch.object(mapping, "HttpInternalApi", return_value=api), patch.object(mapping, "fixed_storage_path", return_value=Path(__file__)), patch.object(mapping.LINELibAdapter, "from_storage", return_value=reader), patch("line_manager_sender_worker.single_instance", return_value=nullcontext()), redirect_stdout(output):
+        with patch.dict(os.environ, {"N8N_INTERNAL_TOKEN": "test-only"}), patch.object(mapping, "HttpInternalApi", return_value=api), patch.object(mapping, "fixed_storage_path", return_value=Path(__file__)), patch.object(mapping.LINELibAdapter, "from_storage", return_value=reader), patch.object(mapping, "lineoa_operation", return_value=nullcontext()), redirect_stdout(output):
             self.assertEqual(mapping.main(["--apply"]), 0)
         self.assertEqual(len(api.verified), 1)
         self.assertIn("status=verified", output.getvalue())
@@ -181,10 +183,42 @@ class WorkerTests(unittest.TestCase):
                 raise mapping.MappingConflictError("private conflict")
         api = ConflictingApi([candidate(1, "match")])
         output = io.StringIO()
-        with patch.dict(os.environ, {"N8N_INTERNAL_TOKEN": "test-only"}), patch.object(mapping, "HttpInternalApi", return_value=api), patch.object(mapping, "fixed_storage_path", return_value=Path(__file__)), patch.object(mapping.LINELibAdapter, "from_storage", return_value=self.reader(history=[inbound("match")])), patch("line_manager_sender_worker.single_instance", return_value=nullcontext()), redirect_stdout(output):
+        with patch.dict(os.environ, {"N8N_INTERNAL_TOKEN": "test-only"}), patch.object(mapping, "HttpInternalApi", return_value=api), patch.object(mapping, "fixed_storage_path", return_value=Path(__file__)), patch.object(mapping.LINELibAdapter, "from_storage", return_value=self.reader(history=[inbound("match")])), patch.object(mapping, "lineoa_operation", return_value=nullcontext()), redirect_stdout(output):
             self.assertEqual(mapping.main(["--apply"]), 1)
         self.assertEqual(len(api.verified), 1)
         self.assertEqual(output.getvalue(), "status=mapping_conflict candidate_count=1 scanned_chat_count=1 safe_match_count=1\n")
+
+    def test_sender_cycle_blocks_mapping_but_between_cycles_allows_it(self):
+        with lock_root() as root:
+            api = FakeApi([candidate(1, "match")])
+            output = io.StringIO()
+            reader = self.reader(history=[inbound("match")])
+            def sender_cycle(_api, _adapter, *, allow_send):
+                self.assertTrue(allow_send)
+                self.assertEqual(mapping.main(["--apply"]), 1)
+                bootstrap.assert_not_called()
+                self.assertEqual(api.verified, [])
+                return "no send candidate"
+            with patch.dict(os.environ, {"N8N_INTERNAL_TOKEN": "test-only"}), \
+                 patch.object(mapping, "HttpInternalApi", return_value=api), \
+                 patch.object(mapping, "fixed_storage_path", return_value=Path(__file__)), \
+                 patch.object(mapping.LINELibAdapter, "from_storage", return_value=reader) as bootstrap, \
+                 patch.object(mapping, "lineoa_operation", side_effect=lambda timeout_seconds: sender.lineoa_operation(root, timeout_seconds=0.1)), \
+                 patch.object(sender, "evidence_directory", return_value=root), \
+                 patch.object(sender, "HttpInternalApi"), \
+                 patch.object(sender, "fixed_storage_path", return_value=Path(__file__)), \
+                 patch.object(sender.LINELibAdapter, "from_storage", return_value=object()), \
+                 patch.object(sender, "process_cycle", side_effect=sender_cycle), \
+                 redirect_stdout(output):
+                self.assertEqual(sender.main(["--once", "--allow-send"]), 0)
+                with sender.single_instance(root):
+                    self.assertEqual(mapping.main(["--apply"]), 0)
+            self.assertEqual(output.getvalue().splitlines(), [
+                "status=lineoa_operation_busy candidate_count=0 scanned_chat_count=0 safe_match_count=0",
+                "status=no send candidate",
+                "status=verified candidate_count=1 scanned_chat_count=1 safe_match_count=1",
+            ])
+            self.assertEqual(len(api.verified), 1)
 
     def test_wrapper_has_explicit_apply_and_no_send_path(self):
         source = (Path(__file__).parent / "start-line-manager-mapping.ps1").read_text(encoding="utf-8")
@@ -192,6 +226,7 @@ class WorkerTests(unittest.TestCase):
         self.assertIn("GetEnvironmentVariable('N8N_INTERNAL_TOKEN', 'User')", source)
         self.assertIn("$worker --apply", source)
         self.assertIn("|pending_ambiguity|mapping_conflict|", source)
+        self.assertIn("lineoa_operation_busy", source)
         for name, prior in (("N8N_INTERNAL_TOKEN", "priorToken"), ("PYTHONDONTWRITEBYTECODE", "priorNoBytecode")):
             self.assertIn(f"${prior} = [Environment]::GetEnvironmentVariable('{name}', 'Process')", source)
             self.assertIn(f"[Environment]::SetEnvironmentVariable('{name}', ${prior}, 'Process')", source)

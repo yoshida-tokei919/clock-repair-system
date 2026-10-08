@@ -17,7 +17,7 @@ MUTEX = "Global\\ClockRepairSystem_LineManagerMappingN8n_206C2B"
 KEYS = {"status", "candidateCount", "scannedChatCount", "safeMatchCount", "runnerExitCode", "healthy", "alertDue"}
 HEALTHY = {"healthy_no_candidates", "verified"}
 PENDING = {"pending_no_exact_match", "pending_ambiguity"}
-FAILURE = {"mapping_conflict", "manager_live_read_unavailable", "internal_api_unavailable", "configuration_failure", "sender_lock_unavailable"}
+FAILURE = {"mapping_conflict", "manager_live_read_unavailable", "internal_api_unavailable", "configuration_failure", "lineoa_operation_busy"}
 STATUSES = HEALTHY | PENDING | FAILURE
 
 

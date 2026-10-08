@@ -7,7 +7,7 @@ $pollMilliseconds = 200
 $maxStdoutBytes = 4096
 $maxStderrBytes = 65536
 $alertInterval = [TimeSpan]::FromHours(6)
-$unhealthyStatuses = @('pending_no_exact_match', 'pending_ambiguity', 'mapping_conflict', 'manager_live_read_unavailable', 'internal_api_unavailable', 'configuration_failure', 'sender_lock_unavailable')
+$unhealthyStatuses = @('pending_no_exact_match', 'pending_ambiguity', 'mapping_conflict', 'manager_live_read_unavailable', 'internal_api_unavailable', 'configuration_failure', 'lineoa_operation_busy')
 
 function New-ConfigurationFailure {
     return [ordered]@{ status = 'configuration_failure'; candidateCount = 0; scannedChatCount = 0; safeMatchCount = 0; runnerExitCode = -1; healthy = $false; alertDue = $true }
@@ -183,7 +183,7 @@ function Read-RunnerResult {
     }
 
     $output = $output -creplace '\r?\n\z', ''
-    $pattern = '^status=(healthy_no_candidates|verified|pending_no_exact_match|pending_ambiguity|mapping_conflict|manager_live_read_unavailable|internal_api_unavailable|configuration_failure|sender_lock_unavailable) candidate_count=([0-9]+) scanned_chat_count=([0-9]+) safe_match_count=([0-9]+)$'
+    $pattern = '^status=(healthy_no_candidates|verified|pending_no_exact_match|pending_ambiguity|mapping_conflict|manager_live_read_unavailable|internal_api_unavailable|configuration_failure|lineoa_operation_busy) candidate_count=([0-9]+) scanned_chat_count=([0-9]+) safe_match_count=([0-9]+)$'
     if ($output -cnotmatch $pattern) { throw 'Runner result invalid' }
     $status = $Matches[1]
     $expectedExit = if ($status -in @('healthy_no_candidates', 'verified', 'pending_no_exact_match', 'pending_ambiguity')) { 0 } else { 1 }

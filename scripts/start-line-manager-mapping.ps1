@@ -15,7 +15,7 @@ try {
     $env:PYTHONDONTWRITEBYTECODE = '1'
     $output = @(& $python.Source -3 $worker --apply 2>$null)
     $exitCode = $LASTEXITCODE
-    if ($output.Count -ne 1 -or $output[0] -cnotmatch '^status=(healthy_no_candidates|verified|pending_no_exact_match|pending_ambiguity|mapping_conflict|manager_live_read_unavailable|internal_api_unavailable|configuration_failure|sender_lock_unavailable) candidate_count=\d+ scanned_chat_count=\d+ safe_match_count=\d+$') {
+    if ($output.Count -ne 1 -or $output[0] -cnotmatch '^status=(healthy_no_candidates|verified|pending_no_exact_match|pending_ambiguity|mapping_conflict|manager_live_read_unavailable|internal_api_unavailable|configuration_failure|lineoa_operation_busy) candidate_count=\d+ scanned_chat_count=\d+ safe_match_count=\d+$') {
         throw 'Worker output unavailable'
     }
     Write-Output $output[0]

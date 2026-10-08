@@ -16,6 +16,8 @@ import os
 import urllib.error
 import urllib.request
 
+from line_manager_sender_worker import LineoaOperationBusy, lineoa_operation
+
 PRODUCTION_ORIGIN = "https://yoshidawatchrepair.com"
 LOCAL_TEST_ORIGIN = "http://127.0.0.1:3000"
 
@@ -288,10 +290,7 @@ def main(argv: list[str] | None = None) -> int:
         api = HttpInternalApi(LOCAL_TEST_ORIGIN if args.local else PRODUCTION_ORIGIN, token)
         storage = fixed_storage_path()
         if not storage.is_file(): raise MappingWorkerError("LINELib storage is required")
-        # The sender holds this existing lock for its entire lifetime. A manual
-        # sender therefore blocks mapping rather than racing lineoa reads.
-        from line_manager_sender_worker import single_instance
-        with single_instance():
+        with lineoa_operation(timeout_seconds=3):
             try:
                 reader = LINELibAdapter.from_storage(storage)
             except Exception:
@@ -300,8 +299,11 @@ def main(argv: list[str] | None = None) -> int:
                 result = process_mapping_once(api, reader, apply=args.apply)
         print(f"status={result.status} candidate_count={result.candidate_count} scanned_chat_count={result.scanned_chat_count} safe_match_count={result.safe_match_count}")
         return 0 if result.status not in {"manager_live_read_unavailable", "internal_api_unavailable", "mapping_conflict"} else 1
-    except Exception as error:
-        status = "sender_lock_unavailable" if str(error) == "sender worker already running" else "configuration_failure"
+    except LineoaOperationBusy:
+        print("status=lineoa_operation_busy candidate_count=0 scanned_chat_count=0 safe_match_count=0")
+        return 1
+    except Exception:
+        status = "configuration_failure"
         print(f"status={status} candidate_count=0 scanned_chat_count=0 safe_match_count=0")
         return 1
 

@@ -16,6 +16,8 @@ from line_manager_sender import (
     evidence_directory, process_reconciliation_once, process_send_once,
 )
 
+OPERATION_LOCK_TIMEOUT_SECONDS = 5
+
 
 def fixed_storage_path() -> Path:
     local = os.environ.get("LOCALAPPDATA")
@@ -25,39 +27,54 @@ def fixed_storage_path() -> Path:
 
 
 @contextmanager
-def single_instance(root: Path | None = None) -> Iterator[None]:
+def _file_lock(name: str, busy_error: type[WorkerError], root: Path | None,
+               timeout_seconds: float | None) -> Iterator[None]:
     directory = evidence_directory(root)
     directory.mkdir(parents=True, exist_ok=True)
-    with (directory / "worker.lock").open("a+b") as lock:
-        try:
-            lock.seek(0)
-            if not lock.read(1):
-                lock.write(b"0")
-                lock.flush()
-            lock.seek(0)
-        except OSError as error:
-            raise WorkerError("sender worker already running") from error
+    with (directory / name).open("a+b") as lock:
+        deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
         if os.name == "nt":
             import msvcrt
-            try:
+            def acquire() -> None:
+                lock.seek(0)
                 msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-            except OSError as error:
-                raise WorkerError("sender worker already running") from error
-            try:
-                yield
-            finally:
+            def release() -> None:
                 lock.seek(0)
                 msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
         else:
             import fcntl
-            try:
+            def acquire() -> None:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError as error:
-                raise WorkerError("sender worker already running") from error
-            try:
-                yield
-            finally:
+            def release() -> None:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+        while True:
+            try:
+                acquire()
+                break
+            except OSError as error:
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise busy_error("lock unavailable") from error
+                time.sleep(0.1)
+        try:
+            yield
+        finally:
+            release()
+
+
+class LineoaOperationBusy(WorkerError):
+    pass
+
+
+@contextmanager
+def single_instance(root: Path | None = None) -> Iterator[None]:
+    with _file_lock("sender-service.lock", WorkerError, root, 0):
+        yield
+
+
+@contextmanager
+def lineoa_operation(root: Path | None = None, *, timeout_seconds: float | None = None) -> Iterator[None]:
+    with _file_lock("lineoa-operation.lock", LineoaOperationBusy, root, timeout_seconds):
+        yield
 
 
 def process_cycle(api, adapter, *, allow_send: bool, evidence_root: Path | None = None) -> str:
@@ -83,9 +100,19 @@ def main(argv: list[str] | None = None) -> int:
             raise WorkerError("N8N_INTERNAL_TOKEN is required")
         with single_instance():
             api = HttpInternalApi(PRODUCTION_ORIGIN, token)
-            adapter = LINELibAdapter.from_storage(fixed_storage_path())
+            adapter = None
             while True:
-                result = process_cycle(api, adapter, allow_send=args.allow_send)
+                try:
+                    if adapter is None:
+                        with lineoa_operation(timeout_seconds=OPERATION_LOCK_TIMEOUT_SECONDS):
+                            adapter = LINELibAdapter.from_storage(fixed_storage_path())
+                    with lineoa_operation(timeout_seconds=OPERATION_LOCK_TIMEOUT_SECONDS):
+                        result = process_cycle(api, adapter, allow_send=args.allow_send)
+                except LineoaOperationBusy:
+                    result = "lineoa operation busy; retry next cycle"
+                    if args.once:
+                        print(f"status={result}", flush=True)
+                        return 1
                 # Only fixed status strings leave the worker; no messages, IDs, or credentials.
                 print(f"status={result}", flush=True)
                 if args.once:
