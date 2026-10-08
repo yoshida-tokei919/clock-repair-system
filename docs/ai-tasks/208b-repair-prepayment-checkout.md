@@ -2,6 +2,12 @@
 
 Production: pending
 
+## Production routing hotfix
+
+- After the Task208B deploy, Next.js `next start` rejected sibling dynamic segments `[id]` and `[token]` under `/api/customer/repairs`, causing site-wide HTTP 500. The checkout route now lives under the existing `[id]` segment and interprets `params.id` as the customer access token. The public `/api/customer/repairs/<token>/prepayments/<paymentId>/checkout` URL and payment logic are unchanged.
+- Production remains pending until orchestration confirms the hotfix redeploy and production smoke.
+- Hotfix local validation: focused prepayment/invoice/webhook tests 59/59, `npx tsc --noEmit`, and `git diff --check` passed. An independent Desktop Commander run of `npm run build` passed with 57/57 static pages, then `next start` started cleanly on local port 3108 and `/login` returned 200 with no dynamic-segment slug error.
+
 ## Scope
 
 - Reuse the Task208A `Payment(kind=REPAIR_PREPAYMENT, repairId, purpose)` foundation. No schema, migration, RLS, or GRANT change.

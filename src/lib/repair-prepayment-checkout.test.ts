@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 import type { PrismaClient } from "@prisma/client";
 import { startRepairPrepaymentCheckout } from "./repair-prepayment-checkout";
+
+test("customer repair API uses one dynamic slug and keeps the prepayment checkout URL", () => {
+  const repairsPath = join(process.cwd(), "src", "app", "api", "customer", "repairs");
+  const dynamicSlugs = readdirSync(repairsPath, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && /^\[[^\]]+\]$/.test(entry.name))
+    .map(entry => entry.name);
+  assert.deepEqual(dynamicSlugs, ["[id]"]);
+  assert.ok(existsSync(join(repairsPath, "[id]", "prepayments", "[paymentId]", "checkout", "route.ts")));
+});
 
 function mockSetup(options: {
   sessionId?: string | null;

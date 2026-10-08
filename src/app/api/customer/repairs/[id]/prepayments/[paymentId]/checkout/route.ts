@@ -5,8 +5,8 @@ import { PrepaymentCheckoutError, startRepairPrepaymentCheckout } from "@/lib/re
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(_request: Request, { params }: { params: Promise<{ token: string; paymentId: string }> }) {
-  const { token, paymentId } = await params;
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string; paymentId: string }> }) {
+  const { id: token, paymentId } = await params;
   const id = /^[1-9]\d*$/.test(paymentId) ? Number(paymentId) : NaN;
   if (!Number.isSafeInteger(id) || !token?.trim()) return Response.json({ error: "Prepayment not found" }, { status: 404 });
   const secret = process.env.STRIPE_SECRET_KEY?.trim();
