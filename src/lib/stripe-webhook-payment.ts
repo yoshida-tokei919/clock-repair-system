@@ -1,4 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { calculateInvoicePaymentSummary } from "./invoice-payment";
+import { effectiveAllocation } from "./payment-accounting";
 
 type CheckoutSessionForPayment = {
   id: string;
@@ -30,6 +32,7 @@ type StripePaymentAttempt = {
     repair: { id: number; customerId: number } | null;
     allocations: Array<{
       allocatedAmount: number;
+      releases: { amount: number }[];
       invoice: { id: number; invoiceNumber: string; customerId: number; grossTotalAmount: number };
     }>;
   };
@@ -68,7 +71,7 @@ function assertPaymentState(attempt: StripePaymentAttempt, session: CheckoutSess
     if (payment.method !== "CARD" || payment.currency !== "JPY" || payment.amount <= 0
       || !payment.purpose?.trim() || !payment.repairId || !payment.repair
       || payment.repair.id !== payment.repairId || payment.repair.customerId !== payment.customerId
-      || payment.allocations.length !== 0) {
+      || (payment.status === "PENDING" && payment.allocations.length !== 0)) {
       throw new Error("Repair prepayment record is inconsistent");
     }
     if (!intentId || (attempt.paymentIntentId && attempt.paymentIntentId !== intentId)) {
@@ -90,6 +93,9 @@ function assertPaymentState(attempt: StripePaymentAttempt, session: CheckoutSess
   if (payment.allocations.length !== 1 || !allocation) throw new Error("Payment must have exactly one allocation");
   if (allocation.allocatedAmount !== payment.amount || payment.amount <= 0 || payment.currency !== "JPY") {
     throw new Error("Payment allocation amount does not match");
+  }
+  if (payment.status === "PENDING" && effectiveAllocation(allocation) !== payment.amount) {
+    throw new Error("Invoice payment allocation was released");
   }
   if (payment.customerId !== allocation.invoice.customerId) throw new Error("Payment customer does not match invoice customer");
 
@@ -114,6 +120,7 @@ const paymentAttemptInclude = {
       allocations: {
         select: {
           allocatedAmount: true,
+          releases: { select: { amount: true } },
           invoice: { select: { id: true, invoiceNumber: true, customerId: true, grossTotalAmount: true } },
         },
       },
@@ -132,9 +139,16 @@ export async function settleStripeCheckoutPayment(
   return db.$transaction(async (tx) => {
     const initial = await tx.paymentAttempt.findUnique({
       where: { checkoutSessionId: session.id },
-      select: { paymentId: true },
+      select: { paymentId: true, payment: { select: { kind: true,
+        allocations: { select: { invoiceId: true } } } } },
     });
     if (!initial) throw new Error("Stripe Checkout Session is not registered");
+
+    if (initial.payment.kind === "INVOICE") {
+      const invoiceIds = [...new Set(initial.payment.allocations.map(row => row.invoiceId))].sort((a, b) => a - b);
+      if (invoiceIds.length !== 1) throw new Error("Invoice payment allocation is inconsistent");
+      await tx.$queryRaw`SELECT "id" FROM "Invoice" WHERE "id" = ${invoiceIds[0]} FOR UPDATE`;
+    }
 
     await tx.$queryRaw`SELECT "id" FROM "Payment" WHERE "id" = ${initial.paymentId} FOR UPDATE`;
     const attempt = await tx.paymentAttempt.findUnique({
@@ -156,13 +170,14 @@ export async function settleStripeCheckoutPayment(
       const invoice = await tx.invoice.findUnique({ where: { id: allocation.invoice.id },
         select: { status: true, customerId: true, grossTotalAmount: true,
           paymentAllocations: { select: { paymentId: true, allocatedAmount: true,
-            payment: { select: { status: true } } } } } });
+            releases: { select: { amount: true } },
+            payment: { select: { status: true, kind: true, refunds: { select: { amount: true, status: true } } } } } } } });
       if (!invoice || invoice.status !== "issued" || invoice.customerId !== attempt.payment.customerId
         || invoice.grossTotalAmount !== allocation.invoice.grossTotalAmount) {
         throw new Error("Invoice changed before Stripe settlement");
       }
-      const otherSucceeded = invoice.paymentAllocations.reduce((sum, row) =>
-        sum + (row.paymentId !== attempt.payment.id && row.payment.status === "SUCCEEDED" ? row.allocatedAmount : 0), 0);
+      const otherSucceeded = calculateInvoicePaymentSummary(invoice,
+        invoice.paymentAllocations.filter(row => row.paymentId !== attempt.payment.id)).paidAmount;
       if (invoice.grossTotalAmount - otherSucceeded !== attempt.payment.amount) {
         throw new Error("Invoice outstanding balance does not match Stripe payment");
       }

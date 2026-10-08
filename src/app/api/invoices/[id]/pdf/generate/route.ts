@@ -12,6 +12,7 @@ import {
   deleteInvoicePdf,
   uploadInvoicePdf,
 } from "@/lib/invoice-pdf-storage";
+import { publishInvoicePdf } from "@/lib/invoice-pdf-publication";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -124,7 +125,8 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     taxAmount: invoice.taxAmount,
     grossTotalAmount: invoice.grossTotalAmount,
     prepaymentAppliedAmount: invoice.paymentAllocations.reduce((sum, allocation) =>
-      sum + (allocation.payment.kind === "REPAIR_PREPAYMENT" && allocation.payment.status === "SUCCEEDED" ? allocation.allocatedAmount : 0), 0),
+      sum + (allocation.payment.kind === "REPAIR_PREPAYMENT" && allocation.payment.status === "SUCCEEDED"
+        ? allocation.allocatedAmount - allocation.releases.reduce((released, row) => released + row.amount, 0) : 0), 0),
     bankInfo: "三井住友銀行　店番411\n普通 3602468\nヨシダ シュウヘイ",
     b2cJobs,
   } satisfies InvoiceDocumentProps["data"];
@@ -136,7 +138,8 @@ function findInvoiceForPdf(invoiceId: number) {
     include: {
       customer: true,
       repairSnapshots: true,
-      paymentAllocations: { select: { allocatedAmount: true, payment: { select: { kind: true, status: true } } } },
+      paymentAllocations: { select: { allocatedAmount: true, releases: { select: { amount: true } },
+        payment: { select: { kind: true, status: true } } } },
       repairs: {
         include: {
           watch: { include: { brand: true, model: true, reference: true } },
@@ -162,6 +165,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   if (!invoice) {
     return NextResponse.json({ ok: false, error: "Invoice not found" }, { status: 404 });
+  }
+
+  if (!["issued", "paid"].includes(invoice.status)) {
+    return NextResponse.json(
+      { ok: false, error: "取消済みの請求書はPDFを再生成できません。保存済みPDFをご確認ください。" },
+      { status: 409 },
+    );
   }
 
   if (!hasConsistentInvoiceSnapshots(invoice)) {
@@ -242,73 +252,24 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const storageKey = buildInvoicePdfStorageKey(invoice.id, pdfFile.id);
   const hash = calculateInvoicePdfHash(pdfBuffer);
-  let uploaded = false;
-
   try {
     await uploadInvoicePdf(storageKey, pdfBuffer);
-    uploaded = true;
-
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`
-        UPDATE "InvoicePdfFile"
-        SET "status" = 'superseded',
-            "supersededAt" = NOW()
-        WHERE "invoiceId" = ${invoice.id}
-          AND "status" = 'current'
-          AND "id" <> ${pdfFile.id}
-      `;
-
-      await tx.$executeRaw`
-        UPDATE "InvoicePdfFile"
-        SET "storageKey" = ${storageKey},
-            "fileSize" = ${pdfBuffer.byteLength},
-            "hash" = ${hash},
-            "status" = 'current'
-        WHERE "id" = ${pdfFile.id}
-      `;
-
-      await tx.$executeRaw`
-        UPDATE "Invoice"
-        SET "currentPdfFileId" = ${pdfFile.id}
-        WHERE "id" = ${invoice.id}
-      `;
-    });
-
-    return NextResponse.json({
-      ok: true,
-      pdfFileId: pdfFile.id,
-      invoiceId: invoice.id,
-      storageKey,
-      version: pdfFile.version,
-      status: "current",
-    });
   } catch (error) {
-    console.error("Invoice PDF generation failed", {
+    console.error("Invoice PDF upload failed", {
       invoiceId: invoice.id,
       pdfFileId: pdfFile.id,
       storageKey,
       error,
     });
-
-    if (uploaded) {
-      try {
-        await deleteInvoicePdf(storageKey);
-      } catch (deleteError) {
-        console.error("Invoice PDF cleanup failed", {
-          invoiceId: invoice.id,
-          pdfFileId: pdfFile.id,
-          storageKey,
-          error: deleteError,
-        });
-      }
-    }
-
     try {
       await prisma.$executeRaw`
         UPDATE "InvoicePdfFile"
         SET "status" = 'void',
             "supersededAt" = NOW()
-        WHERE "id" = ${pdfFile.id}
+        WHERE "id" = ${pdfFile.id} AND "status" = 'draft'
+          AND NOT EXISTS (
+            SELECT 1 FROM "Invoice" WHERE "id" = ${invoice.id} AND "currentPdfFileId" = ${pdfFile.id}
+          )
       `;
     } catch (voidError) {
       console.error("Invoice PDF void marker failed", {
@@ -323,4 +284,32 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       { status: 500 }
     );
   }
+
+  const publication = await publishInvoicePdf(prisma, {
+    invoiceId: invoice.id,
+    pdfFileId: pdfFile.id,
+    storageKey,
+    hash,
+    fileSize: pdfBuffer.byteLength,
+  }, deleteInvoicePdf);
+  if (publication === "uncertain") {
+    return NextResponse.json(
+      { ok: false, uncertain: true, error: "PDF公開結果が不明です。再生成せず、管理者がDBと保存先を確認してください。" },
+      { status: 503 },
+    );
+  }
+  if (publication === "failed") {
+    return NextResponse.json(
+      { ok: false, error: "Invoice PDF generation failed" },
+      { status: 500 },
+    );
+  }
+  return NextResponse.json({
+    ok: true,
+    pdfFileId: pdfFile.id,
+    invoiceId: invoice.id,
+    storageKey,
+    version: pdfFile.version,
+    status: "current",
+  });
 }

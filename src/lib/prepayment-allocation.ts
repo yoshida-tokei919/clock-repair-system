@@ -1,20 +1,19 @@
 import { Prisma } from "@prisma/client";
 import { assertIntegerYen } from "./invoice-payment";
+import { refundableAmount, type RefundAmount, type AllocationAmount } from "./payment-accounting";
 
 export type RequestedAllocation = { paymentId: number; allocatedAmount: number };
 
 type Candidate = {
   id: number; customerId: number; repairId: number | null; kind: string; status: string;
   currency: string; amount: number; paidAt: Date | null; purpose: string | null;
-  allocations: { allocatedAmount: number; invoiceId?: number }[];
+  allocations: (AllocationAmount & { invoiceId?: number })[];
+  refunds?: RefundAmount[];
 };
 
 export function availablePrepayment(payment: Candidate) {
   if (payment.kind !== "REPAIR_PREPAYMENT" || payment.status !== "SUCCEEDED" || payment.currency !== "JPY") return 0;
-  const used = payment.allocations.reduce((sum, row) => sum + assertIntegerYen(row.allocatedAmount), 0);
-  const amount = assertIntegerYen(payment.amount);
-  if (used > amount) throw new Error("前受金の配賦額が入金額を超えています");
-  return amount - used;
+  return refundableAmount({ ...payment, refunds: payment.refunds ?? [] });
 }
 
 export function suggestPrepaymentAllocations(payments: Candidate[], gross: number): RequestedAllocation[] {
@@ -34,7 +33,8 @@ export async function findEligiblePrepayments(
     where: { customerId, repairId: { in: repairIds }, kind: "REPAIR_PREPAYMENT", status: "SUCCEEDED", currency: "JPY" },
     select: { id: true, customerId: true, repairId: true, kind: true, status: true, currency: true,
       amount: true, paidAt: true, purpose: true,
-      allocations: { select: { allocatedAmount: true, invoiceId: true } } },
+      allocations: { select: { allocatedAmount: true, invoiceId: true, releases: { select: { amount: true } } } },
+      refunds: { select: { amount: true, status: true } } },
     orderBy: [{ paidAt: "asc" }, { id: "asc" }],
   });
 }
@@ -69,7 +69,8 @@ export async function applyPrepaymentAllocations(
     where: { id: { in: ids } },
     select: { id: true, customerId: true, repairId: true, kind: true, status: true, currency: true,
       amount: true, paidAt: true, purpose: true,
-      allocations: { select: { allocatedAmount: true, invoiceId: true } } },
+      allocations: { select: { allocatedAmount: true, invoiceId: true, releases: { select: { amount: true } } } },
+      refunds: { select: { amount: true, status: true } } },
   });
   if (payments.length !== ids.length) throw new Error("前受金が見つかりません");
   const repairSet = new Set(repairIds);

@@ -4,6 +4,7 @@ import crypto from "crypto";
 
 import { buildCustomerShareUrl } from "@/lib/customer-share-url";
 import { prisma } from "@/lib/prisma";
+import { InvoiceLineSendError, sendInvoiceLine } from "@/lib/invoice-line-send";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,11 +12,17 @@ export const dynamic = "force-dynamic";
 type InvoiceLineRow = {
   id: number;
   invoiceNumber: string;
+  status: string;
   billingMonth: string | null;
   publicToken: string | null;
   publicTokenCreatedAt: Date | null;
   currentPdfFileId: number | null;
   sentAt: Date | null;
+  lineSendRetryKey: string | null;
+  lineSendStartedAt: Date | null;
+  lineSendPdfFileId: number | null;
+  lineSendTo: string | null;
+  lineSendMessage: string | null;
   customerId: number;
   lineId: string | null;
   storageKey: string | null;
@@ -112,15 +119,32 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Invalid invoice id" }, { status: 400 });
   }
 
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)
+    || Object.keys(body).sort().join(",") !== "expectedRevision,operationKey"
+    || !Number.isInteger(body.expectedRevision) || body.expectedRevision < 0 || body.expectedRevision > 2147483647
+    || typeof body.operationKey !== "string"
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.operationKey)) {
+    return NextResponse.json({ ok: false, error: "Invalid LINE operation key", uncertain: false }, { status: 400 });
+  }
+  const operationKey: string = body.operationKey;
+  const expectedRevision: number = body.expectedRevision;
+
   const [invoice] = await prisma.$queryRaw<InvoiceLineRow[]>`
     SELECT
       i."id",
       i."invoiceNumber",
+      i."status",
       i."billingMonth",
       i."publicToken",
       i."publicTokenCreatedAt",
       i."currentPdfFileId",
       i."sentAt",
+      i."lineSendRetryKey",
+      i."lineSendStartedAt",
+      i."lineSendPdfFileId",
+      i."lineSendTo",
+      i."lineSendMessage",
       i."customerId",
       c."lineId",
       f."storageKey",
@@ -136,6 +160,22 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Invoice not found" }, { status: 404 });
   }
 
+  // The provider and finalization may have succeeded even if the browser lost our response.
+  if (invoice.lineSendRetryKey === operationKey && !invoice.lineSendStartedAt
+    && !invoice.lineSendPdfFileId && !invoice.lineSendTo && !invoice.lineSendMessage
+    && invoice.sentAt && invoice.publicToken) {
+    return NextResponse.json({ ok: true, invoiceId: invoice.id,
+      sharedUrl: buildCustomerShareUrl(`/customer/invoices/${invoice.publicToken}`, request.url),
+      sentAt: invoice.sentAt.toISOString() });
+  }
+
+  if (!["issued", "paid"].includes(invoice.status)) {
+    return NextResponse.json(
+      { ok: false, error: "Canceled invoice cannot be sent by LINE" },
+      { status: 409 },
+    );
+  }
+
   if (!invoice.currentPdfFileId || !invoice.storageKey) {
     return NextResponse.json(
       { ok: false, error: "Invoice PDF not generated" },
@@ -143,13 +183,7 @@ export async function POST(
     );
   }
 
-  const lineUserId = invoice.lineId?.trim();
-  if (!lineUserId) {
-    return NextResponse.json(
-      { ok: false, error: "LINE destination not configured" },
-      { status: 400 }
-    );
-  }
+  const lineUserId = invoice.lineId?.trim() ?? null;
 
   const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!accessToken) {
@@ -186,52 +220,20 @@ export async function POST(
     request.url
   );
 
-  const lineResponse = await fetch("https://api.line.me/v2/bot/message/push", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      to: lineUserId,
-      messages: [
-        {
-          type: "text",
-          text: buildInvoiceMessage(billingMonthLabel, sharedUrl),
-        },
-      ],
-    }),
-  });
-
-  if (!lineResponse.ok) {
-    const lineError = await lineResponse.text();
-    console.error("LINE invoice send failed", {
-      invoiceId: invoice.id,
-      status: lineResponse.status,
-      body: lineError,
-    });
-
-    return NextResponse.json(
-      { ok: false, error: "LINE send failed" },
-      { status: 502 }
-    );
+  let sentAt: Date;
+  try {
+    sentAt = await sendInvoiceLine(prisma, { invoiceId: invoice.id, pdfFileId: invoice.currentPdfFileId,
+      publicToken, to: lineUserId, message: buildInvoiceMessage(billingMonthLabel, sharedUrl), accessToken,
+      operationKey, expectedRevision });
+  } catch (error) {
+    if (error instanceof InvoiceLineSendError) return NextResponse.json({ ok: false, error: error.message,
+      retryable: error.uncertain, uncertain: error.uncertain,
+      manualVerificationRequired: error.manualVerificationRequired,
+      staleRevision: error.staleRevision }, { status: error.status });
+    console.error("LINE invoice send failed", { invoiceId: invoice.id, error });
+    return NextResponse.json({ ok: false, error: "LINE send status is uncertain. Retry the same operation",
+      retryable: true, uncertain: true }, { status: 502 });
   }
-
-  const sentAt = new Date();
-
-  await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`
-      UPDATE "Invoice"
-      SET "sentAt" = ${sentAt}
-      WHERE "id" = ${invoice.id}
-    `;
-
-    await tx.$executeRaw`
-      UPDATE "InvoicePdfFile"
-      SET "sentAt" = ${sentAt}
-      WHERE "id" = ${invoice.currentPdfFileId}
-    `;
-  });
 
   return NextResponse.json({
     ok: true,

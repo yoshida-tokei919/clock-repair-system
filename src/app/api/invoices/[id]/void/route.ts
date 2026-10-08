@@ -1,88 +1,37 @@
-import { requireAdminApi } from "@/lib/admin-api-auth";
+import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { voidInvoice, InvoiceVoidError } from "@/lib/invoice-void";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const unauthorized = await requireAdminApi();
-  if (unauthorized) return unauthorized;
-
-  const invoiceId = Number((await params).id);
-
-  if (!Number.isInteger(invoiceId)) {
-    return NextResponse.json({ ok: false, error: "Invalid invoice id" }, { status: 400 });
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
   }
-
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
-    select: {
-      id: true,
-      status: true,
-      invoiceNumber: true,
-      currentPdfFileId: true,
-      repairs: { select: { id: true } },
-    },
+  const admin = await prisma.admin.findUnique({
+    where: { email: session.user.email },
+    select: { id: true },
   });
-
-  if (!invoice) {
-    return NextResponse.json({ ok: false, error: "Invoice not found" }, { status: 404 });
+  if (!admin) {
+    return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
   }
 
-  if (invoice.status === "paid") {
-    return NextResponse.json(
-      { ok: false, error: "Paid invoice cannot be voided" },
-      { status: 400 }
-    );
+  const rawId = (await params).id;
+  const invoiceId = /^[1-9]\d*$/.test(rawId) ? Number(rawId) : NaN;
+  if (!Number.isSafeInteger(invoiceId)) return Response.json({ ok: false, error: "Invalid invoice ID" }, { status: 400 });
+  try {
+    const result = await voidInvoice(prisma, invoiceId, admin.id);
+    return Response.json({ ok: true, invoiceId: result.invoice.id, invoiceNumber: result.invoice.invoiceNumber,
+      status: result.invoice.status, releasedRepairCount: result.releasedRepairCount,
+      releasedAmount: result.releasedAmount });
+  } catch (error) {
+    if (error instanceof InvoiceVoidError) return Response.json({ ok: false, error: error.message }, { status: error.status });
+    console.error("Invoice void failed", { invoiceId, error });
+    return Response.json({ ok: false, error: "請求書取消に失敗しました" }, { status: 500 });
   }
-
-  if (invoice.status === "void" || invoice.status === "canceled") {
-    return NextResponse.json(
-      { ok: false, error: "Invoice already voided" },
-      { status: 400 }
-    );
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT "id" FROM "Invoice" WHERE "id" = ${invoice.id} FOR UPDATE`;
-    const current = await tx.invoice.findUnique({
-      where: { id: invoice.id },
-      select: { status: true, paymentAllocations: { select: { id: true } } },
-    });
-    if (!current || current.status !== "issued" || current.paymentAllocations.length > 0) {
-      return null;
-    }
-    const updatedInvoice = await tx.invoice.update({
-      where: { id: invoice.id },
-      data: { status: "void" },
-      select: { id: true, invoiceNumber: true, status: true },
-    });
-
-    const releasedRepairs = await tx.repair.updateMany({
-      where: { invoiceId: invoice.id },
-      data: { invoiceId: null },
-    });
-
-    return { updatedInvoice, releasedRepairCount: releasedRepairs.count };
-  });
-
-  if (!result) {
-    return NextResponse.json(
-      { ok: false, error: "支払いが存在する、または発行状態ではない請求書は取消できません" },
-      { status: 409 },
-    );
-  }
-
-  return NextResponse.json({
-    ok: true,
-    invoiceId: result.updatedInvoice.id,
-    invoiceNumber: result.updatedInvoice.invoiceNumber,
-    status: result.updatedInvoice.status,
-    releasedRepairCount: result.releasedRepairCount,
-  });
 }

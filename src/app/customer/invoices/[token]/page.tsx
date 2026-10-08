@@ -98,7 +98,9 @@ function findInvoiceForSharePage(invoiceId: number) {
       paymentAllocations: {
         select: {
           allocatedAmount: true,
-          payment: { select: { kind: true, status: true, provider: true, method: true, paidAt: true } },
+          releases: { select: { amount: true } },
+          payment: { select: { kind: true, status: true, provider: true, method: true, paidAt: true,
+            refunds: { select: { amount: true, status: true } } } },
         },
       },
     },
@@ -141,8 +143,7 @@ export default async function CustomerInvoicePage({
   const pdfHref = `/customer/invoices/${token}/invoice.pdf`;
   const billingMonth = formatBillingMonth(tokenRow.billingMonth, deliveryGroups);
   const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
-  const prepaymentApplied = invoice.paymentAllocations.reduce((sum, allocation) =>
-    sum + (allocation.payment.kind === "REPAIR_PREPAYMENT" && allocation.payment.status === "SUCCEEDED" ? allocation.allocatedAmount : 0), 0);
+  const prepaymentApplied = paymentSummary.prepaymentAppliedAmount;
   const isPaid = paymentSummary.outstandingBalance === 0;
   const latestSucceededPayment = invoice.paymentAllocations
     .filter(({ payment }) => payment.status === "SUCCEEDED" && payment.kind === "INVOICE")
@@ -150,7 +151,8 @@ export default async function CustomerInvoicePage({
     .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0))[0];
   const canPayOnline = invoice.customer.type === "individual"
     && invoice.status === "issued"
-    && paymentSummary.outstandingBalance > 0;
+    && paymentSummary.outstandingBalance > 0
+    && paymentSummary.invoiceRefundPendingAmount === 0;
   const checkoutState = (await searchParams)?.checkout;
 
   return (
@@ -161,6 +163,7 @@ export default async function CustomerInvoicePage({
           <h1 className="mt-1 text-2xl font-bold tracking-tight">請求書のご確認</h1>
           <p className="mt-2 text-sm text-slate-600">請求書の内容をご確認ください。</p>
         </header>
+        {(invoice.status === "void" || invoice.status === "canceled") && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">この請求書は取消済みです。お支払いは不要です。</div>}
 
         {(!isPaid || invoice.customer.type === "business") && checkoutState === "success" ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
@@ -207,12 +210,15 @@ export default async function CustomerInvoicePage({
             {invoice.customer.type === "individual" ? <>
               <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">前受金充当額</dt><dd className="mt-1 font-semibold">{formatCurrency(prepaymentApplied)}</dd></div>
               <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">今回請求額</dt><dd className="mt-1 font-semibold">{formatCurrency(invoice.grossTotalAmount - prepaymentApplied)}</dd></div>
-              <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">お支払い残額</dt><dd className="mt-1 font-semibold">{formatCurrency(paymentSummary.outstandingBalance)}</dd></div>
+              <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">請求入金の返金済額</dt><dd className="mt-1 font-semibold">{formatCurrency(paymentSummary.invoiceRefundedAmount)}</dd></div>
+              {paymentSummary.invoiceRefundPendingAmount > 0 && <div className="rounded-lg bg-amber-50 p-3"><dt className="text-xs font-bold text-amber-700">返金処理中</dt><dd className="mt-1 font-semibold">{formatCurrency(paymentSummary.invoiceRefundPendingAmount)}</dd></div>}
+              <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">差引入金済額</dt><dd className="mt-1 font-semibold">{formatCurrency(paymentSummary.paidAmount)}</dd></div>
+              {invoice.status === "issued" && <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">お支払い残額</dt><dd className="mt-1 font-semibold">{formatCurrency(paymentSummary.outstandingBalance)}</dd></div>}
             </> : null}
           </dl>
         </section>
 
-        {invoice.customer.type === "individual" && !isPaid ? (
+        {invoice.customer.type === "individual" && invoice.status === "issued" && !isPaid ? (
           <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
             <h2 className="text-base font-bold text-slate-900">銀行振込のご案内</h2>
             <dl className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3 text-sm">
@@ -240,7 +246,7 @@ export default async function CustomerInvoicePage({
         {invoice.customer.type === "individual" ? (
           <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
             <h2 className="text-base font-bold text-slate-900">お支払い状況</h2>
-            {canPayOnline ? (
+            {invoice.status === "void" || invoice.status === "canceled" ? <p className="mt-3 text-sm text-slate-600">取消済みの請求書です。</p> : canPayOnline ? (
               <>
                 <p className="mt-3 text-sm text-slate-600">
                   クレジットカード、Apple Pay、Google Payで安全にお支払いいただけます。
@@ -270,7 +276,7 @@ export default async function CustomerInvoicePage({
                 <dl className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div>
                     <dt className="text-xs font-bold text-emerald-700">今回のお支払い額（税込）</dt>
-                    <dd className="mt-1 font-semibold">{formatCurrency(latestSucceededPayment ? invoice.grossTotalAmount - prepaymentApplied : 0)}</dd>
+                    <dd className="mt-1 font-semibold">{formatCurrency(latestSucceededPayment ? paymentSummary.paidAmount - prepaymentApplied : 0)}</dd>
                   </div>
                   <div>
                     <dt className="text-xs font-bold text-emerald-700">支払方法</dt>

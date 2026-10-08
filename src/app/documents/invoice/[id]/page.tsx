@@ -27,7 +27,9 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
             paymentAllocations: {
                 select: {
                     allocatedAmount: true,
-                    payment: { select: { kind: true, provider: true, method: true, status: true, paidAt: true } },
+                    releases: { select: { amount: true } },
+                    payment: { select: { id: true, amount: true, kind: true, provider: true, method: true, status: true, paidAt: true,
+                        refunds: { select: { id: true, amount: true, status: true, reason: true } } } },
                 },
             },
         },
@@ -36,13 +38,12 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
     if (!invoice) return notFound();
 
     const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
-    const prepaymentAppliedAmount = invoice.paymentAllocations.reduce((sum, allocation) =>
-        sum + (allocation.payment.kind === "REPAIR_PREPAYMENT" && allocation.payment.status === "SUCCEEDED" ? allocation.allocatedAmount : 0), 0);
+    const prepaymentAppliedAmount = paymentSummary.prepaymentAppliedAmount;
     const paymentStatus = invoice.status === "void" || invoice.status === "canceled"
         ? "void"
         : paymentSummary.outstandingBalance <= 0
             ? "paid"
-            : invoice.paymentAllocations.some(({ payment }) => payment.status === "PENDING")
+            : invoice.paymentAllocations.some(({ payment }) => payment.status === "PENDING" || payment.refunds.some(refund => refund.status === "PENDING"))
                 ? "pending"
                 : "unpaid";
     const latestSucceededPayment = invoice.paymentAllocations
@@ -58,11 +59,14 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
             grossTotalAmount={invoice.grossTotalAmount}
             paidAmount={paymentSummary.paidAmount}
             prepaymentAppliedAmount={prepaymentAppliedAmount}
+            invoiceRefundPendingAmount={paymentSummary.invoiceRefundPendingAmount}
             outstandingBalance={paymentSummary.outstandingBalance}
             latestSucceededPayment={latestSucceededPayment}
+            invoicePayments={invoice.paymentAllocations.filter(row => row.payment.kind === "INVOICE").map(row => row.payment)}
         />
     );
-    const canVoidInvoice = invoice.status === "issued" && invoice.paymentAllocations.length === 0;
+    const canModifyInvoice = invoice.status === "issued" || invoice.status === "paid";
+    const canVoidInvoice = canModifyInvoice;
 
     const [currentPdfFile] = await prisma.$queryRaw<{
         id: number;
@@ -97,7 +101,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
                                 保存済みPDFを表示しています。管理画面と共有画面は同じPDFファイルを参照します。
                             </p>
                         </div>
-                        <InvoicePdfActions invoiceId={invoice.id} hasPdf={true} canVoidInvoice={canVoidInvoice} />
+                        <InvoicePdfActions invoiceId={invoice.id} lineSendRevision={invoice.lineSendRevision} hasPdf={true} canModifyInvoice={canModifyInvoice} canVoidInvoice={canVoidInvoice} />
                     </div>
                     {invoice.status === "void" ? (
                         <div className="mt-3 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -144,7 +148,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
                     管理画面と共有画面で同じPDFを表示するため、先に請求書PDFを生成してください。
                 </p>
                 <div className="mt-4">
-                    <InvoicePdfActions invoiceId={invoice.id} hasPdf={false} canVoidInvoice={canVoidInvoice} />
+                    <InvoicePdfActions invoiceId={invoice.id} lineSendRevision={invoice.lineSendRevision} hasPdf={false} canModifyInvoice={canModifyInvoice} canVoidInvoice={canVoidInvoice} />
                 </div>
                 {invoice.status === "void" ? (
                     <div className="mt-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

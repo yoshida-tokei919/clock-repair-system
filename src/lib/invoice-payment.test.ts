@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import test from "node:test";
 import type { PrismaClient, PaymentStatus } from "@prisma/client";
 import { calculateInvoicePaymentSummary, createInvoicePayment, getInvoiceOutstandingBalance } from "./invoice-payment";
@@ -31,7 +33,8 @@ test("only successful allocations are summed; overpayment is visible", () => {
   assert.deepEqual(calculateInvoicePaymentSummary({ grossTotalAmount: 1000 }, [
     { allocatedAmount: 500, payment: { status: "SUCCEEDED" } },
     { allocatedAmount: 600, payment: { status: "SUCCEEDED" } },
-  ]), { invoiceTotal: 1000, paidAmount: 1100, outstandingBalance: -100 });
+  ]), { invoiceTotal: 1000, paidAmount: 1100, prepaymentAppliedAmount: 0,
+    invoiceRefundedAmount: 0, invoiceRefundPendingAmount: 0, outstandingBalance: -100 });
 });
 
 for (const amount of [-1, 0.5, NaN, Infinity, 2147483648]) test("reject invalid yen " + amount, () => {
@@ -144,4 +147,13 @@ test("reject fake Stripe success and inconsistent provider/date combinations", a
   await assert.rejects(createInvoicePayment(db, { ...base, provider: "STRIPE", paidAt: new Date() }));
   await assert.rejects(createInvoicePayment(db, { ...base, provider: "MANUAL", method: "BANK_TRANSFER", status: "SUCCEEDED" }));
   assert.equal(writes.length, 0);
+});
+
+
+test("invoice list read model loads release and refund histories used by payment status", () => {
+  const source = readFileSync(resolve(process.cwd(), "src/app/api/invoices/route.ts"), "utf8");
+  assert.match(source, /releases:\s*\{\s*select:\s*\{\s*amount:\s*true\s*\}\s*\}/);
+  assert.match(source, /kind:\s*true/);
+  assert.match(source, /refunds:\s*\{\s*select:\s*\{\s*amount:\s*true,\s*status:\s*true\s*\}\s*\}/);
+  assert.match(source, /payment\.refunds\.some\(refund => refund\.status === "PENDING"\)/);
 });

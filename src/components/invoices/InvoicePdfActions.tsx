@@ -2,14 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getOrCreateInvoiceLineOperation, invoiceLineOperationStorageKey,
+  shouldClearInvoiceLineOperation } from "@/lib/invoice-line-operation";
 
 type InvoicePdfActionsProps = {
   invoiceId: number;
+  lineSendRevision: number;
   hasPdf: boolean;
+  canModifyInvoice: boolean;
   canVoidInvoice: boolean;
 };
 
-export function InvoicePdfActions({ invoiceId, hasPdf, canVoidInvoice }: InvoicePdfActionsProps) {
+export function InvoicePdfActions({ invoiceId, lineSendRevision, hasPdf, canModifyInvoice, canVoidInvoice }: InvoicePdfActionsProps) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -49,12 +53,22 @@ export function InvoicePdfActions({ invoiceId, hasPdf, canVoidInvoice }: Invoice
     setIsSendingLine(true);
 
     try {
+      // Save before POST so a lost HTTP response or same-tab reload reuses this operation.
+      const operation = getOrCreateInvoiceLineOperation(sessionStorage, invoiceId, lineSendRevision, () => crypto.randomUUID());
       const response = await fetch(`/api/invoices/${invoiceId}/line`, {
-        method: "POST",
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(operation),
       });
       const result = await response.json().catch(() => null);
 
-      if (!response.ok || result?.ok === false) {
+      if (shouldClearInvoiceLineOperation(response.status, result)) {
+        sessionStorage.removeItem(invoiceLineOperationStorageKey(invoiceId));
+      } else if (response.status === 409 && result?.staleRevision === true) {
+        sessionStorage.removeItem(invoiceLineOperationStorageKey(invoiceId));
+        router.refresh();
+      }
+
+      if (!response.ok || result?.ok !== true || typeof result?.sentAt !== "string") {
         throw new Error(result?.error || "LINE送信に失敗しました。");
       }
 
@@ -69,7 +83,7 @@ export function InvoicePdfActions({ invoiceId, hasPdf, canVoidInvoice }: Invoice
 
   async function voidInvoice() {
     const confirmed = window.confirm(
-      "この請求書を取消し、紐づく納品書を未請求状態に戻します。\n保存済みPDFと送信履歴は削除されません。\n請求書番号は再利用されません。\n実行してよろしいですか？"
+      "この請求書を取消し、紐づく納品書を未請求状態に戻します。\n有効な前受金充当は解除され、未使用の前受金に戻ります。返金は行いません。\n請求入金に未返金額や処理中の返金がある場合は取消できません。\n保存済みPDFと送信履歴は削除されません。\n請求書番号は再利用されません。\n実行してよろしいですか？"
     );
 
     if (!confirmed) return;
@@ -106,24 +120,26 @@ export function InvoicePdfActions({ invoiceId, hasPdf, canVoidInvoice }: Invoice
             >
               PDFを開く
             </a>
-            <button
-              type="button"
-              onClick={generatePdf}
-              disabled={isGenerating || isSendingLine || isVoiding}
-              className="inline-flex h-9 items-center justify-center rounded border border-blue-200 bg-blue-50 px-4 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isGenerating ? "生成中..." : "PDFを生成"}
-            </button>
-            <button
-              type="button"
-              onClick={sendLine}
-              disabled={isGenerating || isSendingLine || isVoiding}
-              className="inline-flex h-9 items-center justify-center rounded bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSendingLine ? "送信中..." : "LINEで送信"}
-            </button>
+            {canModifyInvoice ? <>
+              <button
+                type="button"
+                onClick={generatePdf}
+                disabled={isGenerating || isSendingLine || isVoiding}
+                className="inline-flex h-9 items-center justify-center rounded border border-blue-200 bg-blue-50 px-4 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isGenerating ? "生成中..." : "PDFを生成"}
+              </button>
+              <button
+                type="button"
+                onClick={sendLine}
+                disabled={isGenerating || isSendingLine || isVoiding}
+                className="inline-flex h-9 items-center justify-center rounded bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSendingLine ? "送信中..." : "LINEで送信"}
+              </button>
+            </> : null}
           </>
-        ) : (
+        ) : (canModifyInvoice ? (
           <button
             type="button"
             onClick={generatePdf}
@@ -132,7 +148,7 @@ export function InvoicePdfActions({ invoiceId, hasPdf, canVoidInvoice }: Invoice
           >
             {isGenerating ? "生成中..." : "PDFを生成"}
           </button>
-        )}
+        ) : null)}
         {canVoidInvoice ? (
           <button
             type="button"

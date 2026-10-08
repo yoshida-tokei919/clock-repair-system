@@ -22,25 +22,40 @@ export async function GET() {
             paymentAllocations: {
                 select: {
                     allocatedAmount: true,
-                    payment: { select: { status: true } },
+                    releases: { select: { amount: true } },
+                    payment: {
+                        select: {
+                            kind: true,
+                            status: true,
+                            refunds: { select: { amount: true, status: true } },
+                        },
+                    },
                 },
             },
         },
     });
 
     return NextResponse.json(invoices.map((invoice) => {
-        if (invoice.customer.type !== "individual") return invoice;
+        const responseInvoice = {
+            ...invoice,
+            paymentAllocations: invoice.paymentAllocations.map((allocation) => ({
+                allocatedAmount: allocation.allocatedAmount,
+                payment: { status: allocation.payment.status },
+            })),
+        };
+        if (invoice.customer.type !== "individual") return responseInvoice;
 
         const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
         const paymentStatus = invoice.status === "void" || invoice.status === "canceled"
             ? "void"
             : paymentSummary.outstandingBalance <= 0
                 ? "paid"
-                : invoice.paymentAllocations.some(({ payment }) => payment.status === "PENDING")
+                : invoice.paymentAllocations.some(({ payment }) =>
+                    payment.status === "PENDING" || payment.refunds.some(refund => refund.status === "PENDING"))
                     ? "pending"
                     : "unpaid";
 
-        return { ...invoice, paymentStatus };
+        return { ...responseInvoice, paymentStatus };
     }));
 }
 

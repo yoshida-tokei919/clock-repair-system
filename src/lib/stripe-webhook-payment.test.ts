@@ -28,7 +28,8 @@ function mockDb(attempt = paymentAttempt(), otherAllocations: any[] = []) {
   const tx = {
     $queryRaw: async () => [{ id: attempt.paymentId }],
     paymentAttempt: {
-      findUnique: async (query: any) => query.select ? { paymentId: attempt.paymentId } : attempt,
+      findUnique: async (query: any) => query.select ? { paymentId: attempt.paymentId,
+        payment: { kind: attempt.payment.kind, allocations: attempt.payment.allocations.map((row: any) => ({ invoiceId: row.invoice.id })) } } : attempt,
       update: async (query: any) => { writes.push({ kind: "attempt", ...query }); },
     },
     payment: { update: async (query: any) => { writes.push({ kind: "payment", ...query }); } },
@@ -125,6 +126,28 @@ test("Stripe residual is rejected when other succeeded allocations change", asyn
   attempt.payment.allocations[0].invoice.grossTotalAmount = 72600;
   const { db, writes } = mockDb(attempt, [{ paymentId: 9, allocatedAmount: 45000, payment: { status: "SUCCEEDED" } }]);
   await assert.rejects(settleStripeCheckoutPayment(db, session({ amount_total: 28600 }), new Date()));
+  assert.equal(writes.length, 0);
+});
+
+test("Stripe residual is rejected after prepayment allocation release", async () => {
+  const attempt = paymentAttempt();
+  attempt.payment.amount = 28600;
+  attempt.payment.allocations[0].allocatedAmount = 28600;
+  attempt.payment.allocations[0].invoice.grossTotalAmount = 72600;
+  const { db, writes } = mockDb(attempt, [{ paymentId: 9, allocatedAmount: 44000,
+    releases: [{ amount: 1000 }], payment: { kind: "REPAIR_PREPAYMENT", status: "SUCCEEDED" } }]);
+  await assert.rejects(settleStripeCheckoutPayment(db, session({ amount_total: 28600 }), new Date()), /outstanding/);
+  assert.equal(writes.length, 0);
+});
+
+test("Stripe residual is rejected after another invoice payment refund", async () => {
+  const attempt = paymentAttempt();
+  attempt.payment.amount = 28600;
+  attempt.payment.allocations[0].allocatedAmount = 28600;
+  attempt.payment.allocations[0].invoice.grossTotalAmount = 72600;
+  const { db, writes } = mockDb(attempt, [{ paymentId: 9, allocatedAmount: 44000,
+    payment: { kind: "INVOICE", status: "SUCCEEDED", refunds: [{ amount: 1000, status: "SUCCEEDED" }] } }]);
+  await assert.rejects(settleStripeCheckoutPayment(db, session({ amount_total: 28600 }), new Date()), /outstanding/);
   assert.equal(writes.length, 0);
 });
 

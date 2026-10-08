@@ -114,6 +114,8 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
         select: {
             id: true, amount: true, purpose: true, status: true,
             provider: true, method: true, createdAt: true, paidAt: true,
+            refunds: { select: { id: true, amount: true, status: true, reason: true } },
+            allocations: { select: { allocatedAmount: true, releases: { select: { amount: true } } } },
         },
     });
 

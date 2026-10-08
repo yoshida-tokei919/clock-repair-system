@@ -1,4 +1,5 @@
 import { ManualBankTransferPayment } from "@/components/invoices/ManualBankTransferPayment";
+import { InvoiceRefundControls } from "@/components/invoices/InvoiceRefundControls";
 
 type Props = {
   invoiceId: number;
@@ -8,8 +9,11 @@ type Props = {
   grossTotalAmount: number;
   paidAmount: number;
   prepaymentAppliedAmount: number;
+  invoiceRefundPendingAmount: number;
   outstandingBalance: number;
   latestSucceededPayment: { provider: string; method: string | null; paidAt: Date | null } | null;
+  invoicePayments: { id: number; amount: number; kind: string; provider: string; status: string;
+    refunds: { id: number; amount: number; status: string; reason: string }[] }[];
 };
 
 function formatYen(amount: number) {
@@ -53,11 +57,14 @@ export function InvoicePaymentSummary(props: Props) {
         <div className="flex justify-between gap-3"><dt>前受金充当額</dt><dd>{formatYen(props.prepaymentAppliedAmount)}</dd></div>
         <div className="flex justify-between gap-3"><dt>今回請求額</dt><dd>{formatYen(props.grossTotalAmount - props.prepaymentAppliedAmount)}</dd></div>
         <div className="flex justify-between gap-3"><dt>入金済額</dt><dd>{formatYen(props.paidAmount)}</dd></div>
-        <div className="flex justify-between gap-3"><dt>未入金残高</dt><dd>{formatYen(props.outstandingBalance)}</dd></div>
+        <div className="flex justify-between gap-3"><dt>請求入金の返金済額</dt><dd>{formatYen(props.invoicePayments.reduce((sum, payment) => sum + payment.refunds.filter(refund => refund.status === "SUCCEEDED").reduce((s, refund) => s + refund.amount, 0), 0))}</dd></div>
+        {props.invoiceRefundPendingAmount > 0 && <div className="flex justify-between gap-3"><dt>返金処理中</dt><dd>{formatYen(props.invoiceRefundPendingAmount)}</dd></div>}
+        {props.paymentStatus !== "void" && <div className="flex justify-between gap-3"><dt>未入金残高</dt><dd>{formatYen(props.outstandingBalance)}</dd></div>}
         {props.paymentStatus === "paid" && method ? <div className="flex justify-between gap-3"><dt>支払方法</dt><dd>{method}</dd></div> : null}
         {props.paymentStatus === "paid" && props.latestSucceededPayment?.paidAt ? <div className="flex justify-between gap-3"><dt>入金日時</dt><dd>{formatPaidAt(props.latestSucceededPayment.paidAt)}</dd></div> : null}
       </dl>
       {canRegisterManualPayment ? <ManualBankTransferPayment invoiceId={props.invoiceId} /> : null}
+      {props.invoicePayments.length > 0 && <InvoiceRefundControls payments={props.invoicePayments} />}
     </section>
   );
 }
