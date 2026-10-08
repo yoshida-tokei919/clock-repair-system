@@ -592,40 +592,99 @@ Task199の共通ShipmentデータをヤマトB2クラウド取込用CSVへ変換
 
 Task201Bはヤマト利用開始時に独立Taskとして実装し、Task201のゆうプリR安定運用を壊さない。
 
-#### Task202: ゆうプリR結果取込・配送状態同期
+#### Task202: 追跡番号回収・日本郵便配送状態同期
 
-ゆうプリR発送履歴CSVから以下を回収する。
+Task202A〜Cで、ゆうプリR発送履歴CSVのread-only解析、公式配達ステータス正規化候補、Shipment同期候補previewまではproduction実装済みとする。
 
-- お客様側管理番号
-- お問い合わせ番号
-- 引受関連日時
-- 配送完了日時
-- 配達ステータス集約コード
-- 配達ステータス明細コード
+ただし、日常運用で発送履歴CSVを何度も手動出力・再取込する方式は採用しない。
 
-送り状印刷だけでは発送済みにしない。
-**日本郵便の「引受」を実発送イベントとして扱う。**
+配送状態の主経路は以下へ変更する。
 
-PoCではCSV取込、送り状印刷、お問い合わせ番号採番、発送履歴CSV出力、照合、配達状況照会、10 / 0A = 引受予定まで確認済み。
-実際の郵便局引受後の引受確定・配達完了コードは実発送時に確認する。
+```text
+Shipment.trackingNumber
+↓
+日本郵便 Web追跡
+↓
+引受 / 輸送中 / 持出中 / 配達完了 / 例外
+↓
+ShipmentStatusへ正規化
+```
+
+- 送り状印刷だけでは発送済みにしない
+- 日本郵便の「引受」を実発送イベントとして扱う方針を維持する
+- 発送履歴CSV parser / previewはfallback・検証資産として残す
+- 配送状態監視のために人間が発送履歴CSVを繰り返し取得する運用は作らない
+- `trackingNumber`取得後は日本郵便Web追跡を定期確認する
+- Web追跡取得はOpenClaw必須依存にせず、業務アプリ側の定期worker / fetcherを第一候補とする
+- tracking保存、Shipment状態更新、通知、Repair納品完了は冪等性・監査・再実行安全性を持たせる
+
+現在の最大課題は、配送状態そのものより**送り状発行時に採番されたtrackingNumberをShipmentへ自動で戻すこと**である。
+
+#### ゆうプリクラウド移行候補
+
+Windows版ゆうプリRのGUI自動化は2026-10-06実機PoCで安定運用できなかったため、本命にしない。
+今後はブラウザ型の**ゆうプリクラウド**を第一候補として検証する。
+
+目標フロー:
+
+```text
+Shipment
+↓
+ゆうプリクラウド用CSV
+↓
+カタリ + Playwright
+↓
+CSV upload
+↓
+送り状PDF発行 / download
+↓
+指定A4プリンタへ固定印刷
+↓
+SHP-{Shipment.id}で照合
+↓
+trackingNumber取得
+↓
+Shipmentへ保存
+↓
+日本郵便Web追跡で配送状態同期
+```
+
+方針:
+
+- 現行ゆうプリR V3 adapterはfallbackとして維持する
+- ゆうプリクラウド固有CSVは新しいadapter境界へ閉じ込める
+- `SHP-{Shipment.id}` をお客様側管理番号として維持できるかPoCで確認する
+- PlaywrightはDOM操作可能なブラウザ業務に限定して使い、Windows GUI座標クリックへ戻さない
+- PDF取得後はPlaywrightで印刷ダイアログを操作せず、ローカル固定印刷処理から指定プリンタへ送る
+- 専用サーマルプリンタ購入は前提にせず、既存A4レーザープリンタ + クラウド対応送り状シートを第一候補とする
+- ラベル品番、注文方法、費用、料金後納契約/運賃条件、login/session/MFAは実サービスPoCで確認する
+- 発行後のtrackingNumberをDOMまたは公式出力データから機械取得できるかを確認する
+
+R-PS連携は有料fallback候補、ゆうパックプリントSkyは現事業規模では優先度を下げる。
 
 #### Task203: LINE作業完了連絡・配達希望日時
 
 RepairStatusが作業完了になった瞬間には自動送信しない。
+任意の「作業完了をLINE連絡」操作を明示トリガーとし、既存Outbox → Windows sender → lineoa → CONFIRMED基盤を使う。
 
-任意の「作業完了をLINE連絡」操作を明示トリガーとし、
+顧客へ以下を案内する。
 
 - 修理作業完了
 - 発送準備へ入ること
 - 希望配達日時の確認
 
-を送信する。
+配達希望は「希望なし / 日付希望 / 時間帯希望」を扱い、「希望なし」も選択画面で明示確定する。
+
+同一顧客に複数Repairがある場合は**原則まとめて発送**とし、配達希望日時もShipment単位で1回取得する。
+分割発送は例外操作として明示的に分ける。
+
+作業完了LINE → 顧客の配達希望日時回答までの本番E2E確認済みのフローを維持し、Shipment作成・送り状発行へ接続する。
 
 - completionNoticeSentAt（作業完了連絡送信日時）
 - requestedDeliveryDate（希望配達日）
 - requestedDeliveryTimeSlot（希望時間帯）
 
-をRepairStatusとは分離して管理する。
+はRepairStatusとは分離して管理する。
 
 #### Task204: 発送・配達自動連携
 
@@ -642,9 +701,84 @@ shippingNoticeSentAt（発送連絡送信日時）等で二重送信を防止す
 
 1Repairが複数Shipmentに紐づく場合、関連Shipmentすべてが配達完了した場合のみRepairを納品済みにする。
 
-### Stage D: B2B受付・一括運用 / 運用自動化
+### Stage D: Customer Communication Hub・B2B受付・運用自動化
 
-B2Cの主要フロー完成後は、B2Bの実運用差分と残っている省力化を以下の順で進める。B2Cで完成済みの共通基盤を再利用し、B2B専用schemaや専用処理は必要性が確認できたものだけ追加する。
+B2C/B2Bの顧客コミュニケーションを別々の会話システムに分けず、Customerを中心とした共通Hubとして扱う。
+業務データの正本は時計修理業務アプリに置き、OpenClaw等のAIエージェントへCustomer / Repair / Inquiryの別台帳を作らない。
+
+#### Customer Communication Hub / Task206系
+
+現在有効な共通方針:
+
+- LINE原文の正本は `InquiryMessage`
+- Customerに紐づくLineUser配下の複数Inquiryを横断表示する
+- CLOSED Inquiryも履歴から消さない
+- 案件化後に別Inquiryへ入った新着もCustomer全体履歴へ含める
+- Repair画面はCustomer Hubのprojectionとし、そのRepairに関連する会話だけを表示する
+- 1メッセージを複数Repairへ関連付けられる
+- Repair未割当、新規相談、再修理、請求・一般連絡をCustomer全体履歴から消さない
+- B2C/B2Bで別LINE ID基盤を作らず、共通 `LineUser` / verified `LineManagerChat` を使う
+- 将来GmailをB2B向けchannelとして同じCustomer Communication Hubへ追加する
+
+Task206A〜Eで、共通Hub設計、Customer単位read、post-intake関連付け、Repair projection、Customer単位LINE返信まで進めた構成を維持する。
+
+LINE通常トーク送信は以下の既存基盤を正本とする。
+
+```text
+Customer / Inquiry / Repair
+↓
+APPROVED LineManagerSendOutbox
+↓
+Windows sender
+↓
+lineoa
+↓
+LINE Official Account Manager
+↓
+reconciliation
+↓
+CONFIRMED
+↓
+OUTBOUND InquiryMessage確定
+```
+
+- Next.jsからLINEへ直接POSTしない
+- `APPROVED`を送信済みと扱わない
+- 実送信成功は`CONFIRMED`だけ
+- `POST_UNCONFIRMED`を盲目的に再送しない
+- Messaging API Push 200通/月を通常運用で消費しない方針を維持する
+- LineManagerChat verificationはManager inbound message.idと`InquiryMessage.externalMessageId`の完全一致だけをidentity evidenceとして使い、表示名/本文/時刻による曖昧matchingを行わない
+
+#### Task206F / 206G
+
+- Task206F: Gmail channel foundation。B2B向けにCustomer / Repair単位Hubへ追加する
+- Task206G: AI post-intake classification、Repair要約、未対応事項、顧客指定、決定事項、返信案を整備する
+- 人間が確定した分類・Repair関連付けをAIが上書きしない
+
+#### Task206H1 / H2 / H3
+
+- **H1 reply bridgeは残す**。`context / approve / status`の3操作でstale送信、二重送信、APPROVEDとCONFIRMEDの混同を防ぐ
+- H2 Personal Plugin / remote MCP / Supabase OAuth 2.1 / Auth Hook案は本番化せず保留する
+- **Task206H3としてOpenClaw local agent integration PoCを優先する**
+
+OpenClawの役割:
+
+```text
+時計修理業務アプリ
+= Customer / Repair / Inquiry / Shipment等の正本
+
+OpenClaw
+= LINE / Gmail / 通知 / AI判断 / 操作オーケストレーション
+
+n8n
+= Webhook / 定期処理 / 機械的配管
+
+カタリ + Playwright
+= ゆうプリクラウド等の決定的なブラウザ自動操作
+```
+
+OpenClawはローカルWindows PC常駐を第一候補とし、Customer Communication HubのDBを置き換えない。
+OpenClaw → H1で最新文脈取得、返信案提示、ヨシダの明示承認後だけapprove、最後にCONFIRMED確認まで行うPoCを先に実施する。
 
 #### 1. B2B受付フローの完成
 
@@ -661,24 +795,28 @@ B2Cの主要フロー完成後は、B2Bの実運用差分と残っている省�
 - 既存のb-PAC直接印刷基盤を再利用し、プリンター選択や印刷ダイアログ等の手数を減らす
 - 一括処理でもRepair / PhysicalTag対応関係を明示し、誤印刷・取り違えを防止する
 
-#### 3. Shipment / ゆうプリR残工程の仕上げ
+#### 3. Shipment / ゆうプリクラウド移行・残工程の仕上げ
 
-- 既存のShipment、ゆうプリR CSV、追跡番号、配達希望日時、LINE発送連絡を一つの運用フローとして仕上げる
+- 既存のShipment、ゆうプリR fallback、ゆうプリクラウド、追跡番号、配達希望日時、LINE発送連絡を一つの運用フローとして仕上げる
 - 同一顧客の複数Repairは原則まとめ発送とし、例外時だけ明示操作で分割発送できるようにする
 - 郵便局へ引き渡した後の手作業を増やさず、可能な範囲で自動同期・自動通知を優先する
 - CSVの再取得・再取込等を人間が何度も繰り返す運用は避ける
 
-#### 4. OpenClaw等によるLINE問い合わせ処理の省力化
+#### 4. OpenClawによるCustomer Communication Hub操作の省力化
 
 - 現在残っている「Slack通知を確認 → ChatGPTを開く → カタリへ処理依頼」の手動一手を減らす
-- LINE受信webhook、Slack通知、既存のAI要約 / 返信案生成フローを活かし、受付通知から返信案準備までをより自動化する
-- OpenClaw等の利用可否を検証し、追加のAPI従量課金を不必要に増やさない構成を優先する
-- LINEの実送信は既存方針どおり自動確定せず、人間確認を残す
+- OpenClawをCustomer Communication Hubの正本にはせず、業務アプリ/H1を操作するローカルAIエージェントとして使う
+- LINE受信webhook、Slack、n8nからOpenClawを起動し、Customer履歴取得、Repair文脈整理、返信案準備までを省力化する
+- LINE実送信はヨシダの明示承認後のみH1 `approve`を実行する
+- H1のsecretをLLM prompt / memory / logへ露出させない
+- `CONFIRMED`までstatus確認し、APPROVEDだけで送信済みと報告しない
+- PoC成功後にH2 Personal Plugin / OAuth案を正式に廃止するか判断する
 
 #### ハードウェアfollow-up
 
-- R65 NFCリーダー到着後、PC据置運用でUID読取・ScanSession接続の実機確認を行う
-- NFCはQR / shortCodeの既存運用を壊さず追加し、実機PoC未完了を理由にB2B受付・発送の進行を止めない
+- R65 NFCリーダーは到着済みで、USB変換アダプター経由のPC接続とHID UID読取まで確認済み
+- 今後はPC据置運用でScanSessionとの実業務接続を確認する
+- NFCはQR / shortCodeの既存運用を壊さず追加し、NFC実運用確認を理由にB2B受付・発送の進行を止めない
 
 #### ドキュメント運用
 
@@ -713,42 +851,44 @@ B2Cの主要フロー完成後は、B2Bの実運用差分と残っている省�
 - plannedShipDate（発送予定日）
 - Shipment（発送）
 - 発送スケジュール
-- ゆうプリR CSV入出力
-- 追跡番号
-- 日本郵便の引受検知
+- 現行ゆうプリR V3 CSV fallback
+- ゆうプリクラウド + Playwrightによる送り状PDF発行PoC
+- 追跡番号のShipment自動回収
+- 日本郵便Web追跡による引受・配送状態同期
 - LINE作業完了連絡
 - LINE発送通知
 - 配達完了 → Repair納品済み
 
 ### 目標業務フロー
 
-受付処理待ち → 現物受領 / PhysicalTag割当 → 見積り待ち → 必要時は見積り調査中 → 承認待ち（見積り不要 / 事前承認済みは省略）→ 部品待ち / 作業待ち → Scheduler v2 → NFC/QR scan → 今日の作業 / 実績計測 → ランニングテスト中 → 発送・引渡し待ち → 納品対象連続scan → plannedShipDate → Shipment / 梱包確認 → ゆうプリR → 日本郵便引受 → 発送LINE → 配送追跡 → 配達完了 → Repair納品済み
+受付処理待ち → 現物受領 / PhysicalTag割当 → 見積り待ち → 必要時は見積り調査中 → 承認待ち（見積り不要 / 事前承認済みは省略）→ 部品待ち / 作業待ち → Scheduler v2 → NFC/QR scan → 今日の作業 / 実績計測 → ランニングテスト中 → 発送・引渡し待ち → 納品対象連続scan → plannedShipDate → Shipment / 梱包確認 → ゆうプリクラウド（fallback: ゆうプリR）→ trackingNumber自動回収 → 日本郵便Web追跡で引受検知 → 発送LINE → 配送追跡 → 配達完了 → Repair納品済み
 
 ### 実施順
 
-既存Phase番号は維持するが、実際の開発順は当面以下を優先する。
+Stage A〜Cの主要基盤はproduction実装済みのため、今後は残っている手作業削減とCommunication Hub完成を優先する。
 
-1. Task188 WorkTimeSession基盤
-2. Task189 共通業務タイマーUI
-3. Task190 Scheduler設定・標準時間・実績学習
-4. Task191 発注リードタイム・部品待ち・作業中断
-5. Task192 納期逆算・実効容量preview
-6. Task193 分割スケジュール + Scheduler v2
-7. Task194 今日の作業
-8. Task195 実績フィードバック基盤
-9. Task196 PhysicalTag / NFC・QR基盤
-10. Task197 ScanSession・連続読取業務連携
-11. Task198 StorageLocation・現物保管場所管理
-12. Task199 Shipment基盤
-13. Task200 発送スケジュール
-14. Task201 ゆうプリR CSV出力
-15. Task201B ヤマトB2クラウド CSV出力adapter
-16. Task202 ゆうプリR結果取込・配送状態同期
-17. Task203 LINE作業完了連絡・配達希望日時
-18. Task204 発送・配達自動連携
-19. **本格運用開始**
-20. 運用実績によるScheduler・納期・リードタイム精度向上
-21. 事例公開・その他未完機能
+1. **Task206H3 OpenClaw local agent integration PoC**
+   - 既存OpenClaw環境確認
+   - OpenClaw → H1 `context / approve / status`
+   - secret非露出、明示承認、CONFIRMED確認
+2. **ゆうプリクラウド実サービスPoC**
+   - 利用条件 / ラベル / 既存A4プリンタ確認
+   - 手動でCSV登録 → PDF発行 → 印刷 → tracking確認を1件通す
+3. **ゆうプリクラウドadapter + Playwright PoC**
+   - Shipment → クラウド用CSV
+   - upload → PDF download → `SHP-{id}`照合 → tracking取得
+   - PDF指定プリンタ固定印刷
+4. **trackingNumber保存 + 日本郵便Web追跡同期**
+   - trackingNumberをShipmentへ安全に保存
+   - 引受 / 輸送中 / 持出中 / 配達完了 / 例外を定期同期
+5. **Task204 発送・配達自動連携の完成**
+   - 引受時actualShippedAt / Repair発送済み / LINE発送通知
+   - 配達完了時Repair納品済み
+6. **Task206F Gmail channel foundation**
+7. **Task206G AI post-intake classification / summaries**
+8. B2B受付・一括PhysicalTag / ラベル連続印刷等の残工程を、実運用上必要な差分だけ仕上げる
+9. 本格運用開始後、Scheduler・納期・リードタイム・Communication Hubの精度を運用実績で改善する
+10. 事例公開・その他未完機能
 
 Task番号・境界は各Task実装前の調査で必要に応じて再分割してよい。
 schema / migration / RLS / GRANT / LINE自動送信 / production DBを伴う高リスクTaskでは、実装担当と独立レビュー担当を分離し、本番変更前にユーザー承認を必須とする。
