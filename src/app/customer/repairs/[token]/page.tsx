@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { PaymentStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
@@ -12,15 +13,23 @@ import {
 } from "./CustomerRepairActions";
 import { CustomerExportTools, CustomerGuideAmountInput } from "./CustomerExportTools";
 import { CustomerB2CApprovalPanel } from "./CustomerB2CApprovalPanel";
+import { RepairPrepaymentCheckoutButton } from "@/components/customer/RepairPrepaymentCheckoutButton";
+import { PREPAYMENT_STATUS_LABELS } from "@/lib/repair-prepayment-display";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ prepayment?: string | string[] }>;
 };
 
 const repairInclude = {
   customer: true,
+  prepayments: {
+    where: { kind: "REPAIR_PREPAYMENT" as const, status: { in: ["PENDING", "SUCCEEDED"] as PaymentStatus[] } },
+    orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
+    select: { id: true, amount: true, purpose: true, status: true, paidAt: true },
+  },
   watch: { include: { brand: true, model: true, reference: true, caliber: true } },
   photos: {
     where: { customerVisible: true },
@@ -146,7 +155,7 @@ function needsCustomerApproval(repair: any) {
   return repair.approvalStatus === "pending" && repair.status === "承認待ち";
 }
 
-function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null }) {
+function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null; prepaymentReturn?: string }) {
   return (
     <main className="min-h-screen bg-[#f3f6fa] px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
       <div className="mx-auto max-w-2xl space-y-4">
@@ -155,6 +164,9 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string
           <h1 className="mt-1 text-2xl font-bold tracking-tight">修理状況・お見積</h1>
           {documentMeta && <p className="mt-2 text-sm text-slate-500">{documentMeta.estimateNumber} / {documentMeta.issuedDate.toLocaleDateString("ja-JP")}</p>}
         </header>
+
+        {prepaymentReturn === "success" && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">前受金のお支払い結果を確認中です。反映まで少し時間がかかる場合があります。</p>}
+        {prepaymentReturn === "cancel" && <p role="status" className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">前受金のお支払い画面から戻りました。お支払いを希望される場合は、下の前受金欄から再度お進みください。</p>}
 
         <CustomerRepairAccordionRoot initialOpenIndex={repairs[0]?.status === "作業中" ? -1 : 0}>
           {repairs.map((repair, index) => {
@@ -193,6 +205,25 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string
                   <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm"><div className="flex justify-between text-slate-600"><span>税抜小計</span><span className="font-mono">¥{subtotal.toLocaleString()}</span></div><div className="flex justify-between text-slate-600"><span>消費税（10%）</span><span className="font-mono">¥{taxAmount.toLocaleString()}</span></div><div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2"><span className="font-bold">税込合計</span><span className="font-mono text-xl font-bold text-blue-700">¥{total.toLocaleString()}</span></div></div>
                 </section>
 
+                {repair.prepayments.length > 0 && (
+                  <section className="rounded-xl border border-blue-200 bg-white p-4">
+                    <h2 className="text-lg font-bold">前受金 / 部品代先払い</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">こちらは部品代などの先払い（前受金）です。お支払い済みの金額は、最終精算時に受領済みとして反映します。</p>
+                    <ul className="mt-3 divide-y divide-slate-100">
+                      {repair.prepayments.map((payment: { id: number; amount: number; purpose: string | null; status: "PENDING" | "SUCCEEDED"; paidAt: Date | null }) => (
+                        <li key={payment.id} className="py-3">
+                          <div className="flex flex-wrap items-start justify-between gap-2 text-sm">
+                            <span className="font-medium break-words">{payment.purpose || "前受金"}</span>
+                            <span className="font-mono font-bold">¥{payment.amount.toLocaleString()}</span>
+                          </div>
+                          <p className="mt-1 text-sm text-slate-600">{PREPAYMENT_STATUS_LABELS[payment.status]}{payment.status === "SUCCEEDED" && payment.paidAt && ` · 入金日: ${payment.paidAt.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}`}</p>
+                          {payment.status === "PENDING" && <RepairPrepaymentCheckoutButton token={token} paymentId={payment.id} />}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
                 {explanationText && <section className="rounded-xl border border-slate-200 bg-slate-50 p-4"><h2 className="text-lg font-bold">ご案内</h2><div className="mt-3 min-h-32 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-sm leading-7 text-slate-800">{explanationText}</div></section>}
 
                 {customerPhotos.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{customerPhotos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo, token); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
@@ -207,7 +238,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta }: { token: string
   );
 }
 
-export default async function CustomerRepairPage({ params }: PageProps) {
+export default async function CustomerRepairPage({ params, searchParams }: PageProps) {
   const token = (await params).token?.trim();
   if (!token) return notFound();
 
@@ -470,7 +501,8 @@ export default async function CustomerRepairPage({ params }: PageProps) {
     );
   }
 
-  return <CustomerRepairB2CPage token={token} repairs={repairs} documentMeta={documentMeta} />;
+  const prepaymentReturn = (await searchParams).prepayment;
+  return <CustomerRepairB2CPage token={token} repairs={repairs} documentMeta={documentMeta} prepaymentReturn={typeof prepaymentReturn === "string" ? prepaymentReturn : undefined} />;
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">

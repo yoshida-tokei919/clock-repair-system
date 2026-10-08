@@ -5,6 +5,7 @@ import { RepairSchedulePanel } from "@/components/repairs/RepairSchedulePanel";
 import { RepairWorkTimerPanel } from "@/components/repairs/RepairWorkTimerPanel";
 import { RepairPlanningPanel } from "@/components/repairs/RepairPlanningPanel";
 import { PhysicalTagPanel } from "@/components/repairs/PhysicalTagPanel";
+import { RepairPrepaymentPanel } from "@/components/repairs/RepairPrepaymentPanel";
 import { recommendZoneForRepair } from "@/lib/storage-zone-repair";
 import { compareStorageZone, STORAGE_COMPARISON_LABELS } from "@/lib/storage-zone-recommendation";
 
@@ -106,6 +107,15 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
     });
 
     if (!repair) return notFound();
+
+    const prepayments = await prisma.payment.findMany({
+        where: { repairId: repair.id, kind: "REPAIR_PREPAYMENT" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: {
+            id: true, amount: true, purpose: true, status: true,
+            provider: true, method: true, createdAt: true, paidAt: true,
+        },
+    });
 
     const activeTagAssignment = await prisma.physicalTagAssignment.findFirst({
         where: { repairId: repair.id, releasedAt: null },
@@ -224,6 +234,7 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
                 priorityScore={repair.priorityScore}
             />
             <RepairPlanningPanel repairId={repair.id} />
+            <RepairPrepaymentPanel repairId={repair.id} isBusiness={repair.customer.type === "business"} payments={prepayments} />
             <PhysicalTagPanel
                 repairId={repair.id}
                 inquiryNumber={repair.inquiryNumber}
