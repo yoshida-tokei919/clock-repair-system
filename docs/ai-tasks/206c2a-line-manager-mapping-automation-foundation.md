@@ -1,6 +1,6 @@
 # Task206C2A — LINE Manager initial verified mapping automation foundation
 
-Production: pending
+Production: complete
 
 ## Scope
 
@@ -28,3 +28,11 @@ Production: pending
 - `git diff --check`: PASS.
 - Independent final Codex re-review after fixes: High / Medium / Low findings 0. Exact-ID identity, conflict handling, environment restoration, no-send boundary, sender lock, and Task scope were rechecked.
 - No live LINE Manager read, real LINE send, production DB mutation, n8n workflow change, Scheduled Task activation, push, or deploy was performed for this local validation.
+## Production activation - 2026-10-08
+
+- Task implementation commit after Task208B rebase: `5990d8f` (`feat: automate initial LINE Manager mapping`).
+- Production activation snapshot: `5f6bd6905fe46d9bffd3448a28b8ba7f42bdf3d6`; Railway deployment `bbc10b35-c235-49d7-88be-0baefc262440` completed `SUCCESS`.
+- Windows-local mapping runner is live through n8n and continues to use only exact inbound message-ID evidence. Push API is not used.
+- Owner-account real inbound self-test: `LineInboxProc001` execution `25045` succeeded and automatically invoked `LineManagerMap001` execution `25046`, also `success`. The mapping result was `healthy_no_candidates`, which is expected because that LineUser was already verified; the existing verified mapping was not deleted or recreated for testing.
+- The self-test therefore verifies the production trigger, Manager live-read probe, and already-verified reuse path. A genuinely new LineUser will provide the next natural observation of first-time automatic verification; no unsafe synthetic or destructive remapping was introduced to force that case.
+- Final combined LINE regression before activation: sender 9/9, existing sender logic 29/29, mapping 25/25, n8n adapter 19/19, TypeScript and PowerShell syntax PASS; independent review had no remaining High/Medium/Low blocker before activation.
