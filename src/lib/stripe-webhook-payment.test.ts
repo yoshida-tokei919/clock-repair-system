@@ -7,7 +7,8 @@ function paymentAttempt(overrides: Record<string, unknown> = {}) {
   const attempt = {
     id: 12, paymentId: 10, provider: "STRIPE", status: "PENDING", checkoutSessionId: "cs_test_123", paymentIntentId: null,
     payment: {
-      id: 10, customerId: 7, amount: 33000, currency: "JPY", provider: "STRIPE", status: "PENDING",
+      id: 10, kind: "INVOICE", customerId: 7, repairId: null, purpose: null, repair: null,
+      amount: 33000, currency: "JPY", provider: "STRIPE", method: "CARD", status: "PENDING",
       allocations: [{ allocatedAmount: 33000, invoice: { id: 3, invoiceNumber: "TI-003", customerId: 7, grossTotalAmount: 33000 } }],
     },
   };
@@ -84,3 +85,55 @@ test("a succeeded payment with a different PaymentIntent is rejected", async () 
   await assert.rejects(settleStripeCheckoutPayment(db, session(), new Date()));
   assert.equal(writes.length, 0);
 });
+
+function prepaymentAttempt(paymentOverrides: Record<string, unknown> = {}) {
+  return paymentAttempt({ payment: {
+    ...paymentAttempt().payment,
+    kind: "REPAIR_PREPAYMENT", repairId: 5, purpose: "部品前受金", method: "CARD",
+    repair: { id: 5, customerId: 7 }, allocations: [], ...paymentOverrides,
+  } });
+}
+
+function prepaymentSession(overrides: Record<string, unknown> = {}) {
+  return session({ metadata: { paymentKind: "REPAIR_PREPAYMENT", repairId: "5", customerId: "7",
+    paymentId: "10", paymentAttemptId: "12" }, ...overrides });
+}
+
+test("paid repair prepayment settles without an invoice allocation", async () => {
+  const { db, writes } = mockDb(prepaymentAttempt());
+  assert.equal((await settleStripeCheckoutPayment(db, prepaymentSession(), new Date())).outcome, "settled");
+  assert.equal(writes.length, 2);
+});
+
+test("replayed paid repair prepayment is idempotent", async () => {
+  const attempt = prepaymentAttempt({ status: "SUCCEEDED" });
+  attempt.status = "SUCCEEDED";
+  attempt.paymentIntentId = "pi_123";
+  const { db, writes } = mockDb(attempt);
+  assert.equal((await settleStripeCheckoutPayment(db, prepaymentSession(), new Date())).outcome, "idempotent");
+  assert.equal(writes.length, 0);
+});
+
+test("prepayment PaymentIntent mismatch writes nothing", async () => {
+  const attempt = prepaymentAttempt();
+  attempt.paymentIntentId = "pi_other";
+  const { db, writes } = mockDb(attempt);
+  await assert.rejects(settleStripeCheckoutPayment(db, prepaymentSession(), new Date()));
+  assert.equal(writes.length, 0);
+});
+
+for (const [name, payment, checkout] of [
+  ["amount", {}, { amount_total: 33001 }],
+  ["currency", {}, { currency: "usd" }],
+  ["metadata", {}, { metadata: { paymentKind: "REPAIR_PREPAYMENT", repairId: "6", customerId: "7", paymentId: "10", paymentAttemptId: "12" } }],
+  ["repair", { repairId: 6 }, {}],
+  ["customer", { customerId: 8 }, {}],
+  ["method", { method: "PAYPAY" }, {}],
+  ["allocation", { allocations: [{ allocatedAmount: 33000 }] }, {}],
+] as const) {
+  test(`prepayment ${name} mismatch writes nothing`, async () => {
+    const { db, writes } = mockDb(prepaymentAttempt(payment));
+    await assert.rejects(settleStripeCheckoutPayment(db, prepaymentSession(checkout), new Date()));
+    assert.equal(writes.length, 0);
+  });
+}

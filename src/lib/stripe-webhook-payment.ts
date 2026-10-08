@@ -18,11 +18,16 @@ type StripePaymentAttempt = {
   paymentIntentId: string | null;
   payment: {
     id: number;
+    kind: "INVOICE" | "REPAIR_PREPAYMENT";
     customerId: number;
+    repairId: number | null;
+    purpose: string | null;
     amount: number;
     currency: string;
     provider: "STRIPE" | "MANUAL";
+    method: "CARD" | "PAYPAY" | "BANK_TRANSFER" | null;
     status: "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELED";
+    repair: { id: number; customerId: number } | null;
     allocations: Array<{
       allocatedAmount: number;
       invoice: { id: number; invoiceNumber: string; customerId: number; grossTotalAmount: number };
@@ -50,7 +55,6 @@ function assertSameCurrency(left: string, right: string | null) {
 
 function assertPaymentState(attempt: StripePaymentAttempt, session: CheckoutSessionForPayment) {
   const { payment } = attempt;
-  const [allocation] = payment.allocations;
   const intentId = paymentIntentId(session.payment_intent);
 
   if (attempt.provider !== "STRIPE" || payment.provider !== "STRIPE") throw new Error("Payment provider does not match Stripe");
@@ -59,6 +63,30 @@ function assertPaymentState(attempt: StripePaymentAttempt, session: CheckoutSess
   if (payment.status !== "PENDING" && payment.status !== "SUCCEEDED") throw new Error("Payment is not pending");
   if (!Number.isSafeInteger(session.amount_total) || session.amount_total !== payment.amount) throw new Error("Stripe payment amount does not match");
   assertSameCurrency(payment.currency, session.currency);
+  if (attempt.paymentId !== payment.id) throw new Error("PaymentAttempt payment does not match");
+  if (payment.kind === "REPAIR_PREPAYMENT") {
+    if (payment.method !== "CARD" || payment.currency !== "JPY" || payment.amount <= 0
+      || !payment.purpose?.trim() || !payment.repairId || !payment.repair
+      || payment.repair.id !== payment.repairId || payment.repair.customerId !== payment.customerId
+      || payment.allocations.length !== 0) {
+      throw new Error("Repair prepayment record is inconsistent");
+    }
+    if (!intentId || (attempt.paymentIntentId && attempt.paymentIntentId !== intentId)) {
+      throw new Error("Stripe PaymentIntent does not match");
+    }
+    const metadata = session.metadata;
+    if (!metadata || Object.keys(metadata).sort().join(",") !== "customerId,paymentAttemptId,paymentId,paymentKind,repairId"
+      || metadata.paymentKind !== "REPAIR_PREPAYMENT"
+      || parseMetadataId(metadata, "repairId") !== payment.repairId
+      || parseMetadataId(metadata, "customerId") !== payment.customerId
+      || parseMetadataId(metadata, "paymentId") !== payment.id
+      || parseMetadataId(metadata, "paymentAttemptId") !== attempt.id) {
+      throw new Error("Stripe prepayment metadata does not match");
+    }
+    return intentId;
+  }
+  if (payment.kind !== "INVOICE") throw new Error("Unsupported Payment kind");
+  const [allocation] = payment.allocations;
   if (payment.allocations.length !== 1 || !allocation) throw new Error("Payment must have exactly one allocation");
   if (allocation.allocatedAmount !== payment.amount || allocation.invoice.grossTotalAmount !== payment.amount) {
     throw new Error("Payment allocation amount does not match");
@@ -80,7 +108,9 @@ function assertPaymentState(attempt: StripePaymentAttempt, session: CheckoutSess
 const paymentAttemptInclude = {
   payment: {
     select: {
-      id: true, customerId: true, amount: true, currency: true, provider: true, status: true,
+      id: true, kind: true, customerId: true, repairId: true, purpose: true, amount: true, currency: true,
+      provider: true, method: true, status: true,
+      repair: { select: { id: true, customerId: true } },
       allocations: {
         select: {
           allocatedAmount: true,
