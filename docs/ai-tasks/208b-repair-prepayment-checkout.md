@@ -1,11 +1,14 @@
 # Task208B — Repair prepayment backend and Stripe Checkout
 
-Production: pending
+Production: complete - 2026-10-08
 
 ## Production routing hotfix
 
 - After the Task208B deploy, Next.js `next start` rejected sibling dynamic segments `[id]` and `[token]` under `/api/customer/repairs`, causing site-wide HTTP 500. The checkout route now lives under the existing `[id]` segment and interprets `params.id` as the customer access token. The public `/api/customer/repairs/<token>/prepayments/<paymentId>/checkout` URL and payment logic are unchanged.
-- Production remains pending until orchestration confirms the hotfix redeploy and production smoke.
+- The initial Task208B deployment `0dc5030c-3f40-4c26-aa67-861a534b9370` reached Railway SUCCESS but production smoke found site-wide HTTP 500 from the dynamic-segment conflict. Railway redeploy `05a2cee4-1170-4974-9907-8ba87a22eead` restored the known-good Task208A source before the hotfix was deployed.
+- Hotfix commit `8d3e6a2765cc8236595e1b131840b98762226a6e` deployed as Railway `7dbe030c-56d7-44e3-a079-74a635a74677` in `sin` and reached SUCCESS. Runtime startup reported `Ready in 502ms` with no slug-name error.
+- Production smoke after the hotfix: `/`=200, `/login`=200, `/repairs` unauthenticated=307, prepayment admin POST unauthenticated=401, invalid prepayment Checkout=404, unsigned Stripe webhook=400; Railway HTTP logs showed no upstream errors for these requests.
+- Production tag: `production-task208b-20261008` at hotfix commit `8d3e6a2`. No real prepayment creation, Stripe Checkout Session creation, card charge, refund, or customer send was performed during production smoke.
 - Hotfix local validation: focused prepayment/invoice/webhook tests 59/59, `npx tsc --noEmit`, and `git diff --check` passed. An independent Desktop Commander run of `npm run build` passed with 57/57 static pages, then `next start` started cleanly on local port 3108 and `/login` returned 200 with no dynamic-segment slug error.
 
 ## Scope
@@ -23,11 +26,11 @@ Production: pending
 
 - Prisma validate: PASS with nonconnecting placeholder URL environment variables; no database access.
 - TypeScript `npx tsc --noEmit`: PASS.
-- Focused prepayment, invoice payment, and webhook tests: 58/58 PASS with mocked Stripe and Prisma. This includes the four admin amount boundaries, Checkout rejection of out-of-range stored Payments before Stripe calls, canonical return URLs for both token callers and the fallback, and paid-state fail-safe cases for retrieved and newly created Sessions.
+- Focused prepayment, invoice payment, webhook, and route-tree tests: 59/59 PASS with mocked Stripe and Prisma. This includes the four admin amount boundaries, Checkout rejection of out-of-range stored Payments before Stripe calls, canonical return URLs, paid-state fail-safes, and the single dynamic slug invariant.
 - `git diff --check`: PASS.
 - `npm run build`: PASS; 57/57 static pages and both new API routes included.
 - No real Stripe request or customer send was performed.
 
 ## Boundaries
 
-Task208C UI, final invoice application, refunds, LINE send, natural-language orchestration, production DB work, deploy, and push remain outside this task. The code is left uncommitted for independent review. A stable configured application origin is required before Checkout is available; without one the route returns 503. No live Stripe payment has been verified.
+Task208C UI, final invoice application, refunds, LINE send, and natural-language orchestration remain outside this task. A stable configured application origin is required before Checkout is available; without one the route returns 503. No live Stripe payment has been executed as part of Task208B production verification.
