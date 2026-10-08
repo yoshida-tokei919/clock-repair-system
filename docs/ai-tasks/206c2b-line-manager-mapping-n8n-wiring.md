@@ -1,6 +1,6 @@
 # Task206C2B — LINE Manager mapping n8n wiring foundation
 
-Production: pending
+Production: complete
 
 ## Repository contract
 
@@ -39,3 +39,14 @@ Before live activation, the orchestrator must take a fresh n8n backup, verify ID
 ## Repository validation
 
 Focused isolated tests use copied adapters, a copied reset script, and fake child PowerShell scripts. They make no Manager, API, Slack, or LINE call. Validate both PowerShell parsers, C2A mapping regression, and `git diff --check` before handoff. No generator or live import is needed for this foundation.
+
+## Production activation - 2026-10-08
+
+- Repository implementation commit after Task208B rebase: `bad01ab` (`feat: wire LINE Manager mapping automation`). Production application snapshot was `5f6bd6905fe46d9bffd3448a28b8ba7f42bdf3d6`; Railway deployment `bbc10b35-c235-49d7-88be-0baefc262440` completed `SUCCESS`.
+- Fresh n8n backup was taken before activation. The live workflows are `LineInboxProc001` (`LINE Inquiry Inbox Processor`), `LineManagerMap001` (`LINE Manager Mapping Processor`), and existing `SlackOutboxProc001`, all in the same personal project and active after restart.
+- `LineInboxProc001` preserves the existing one-minute schedule and inbox HTTP request exactly, adding only the validated `processed > 0` gate and call to `LineManagerMap001`.
+- `LineManagerMap001` runs the fixed local adapter after an inbound batch and also performs the periodic health path. Its Slack alert node reuses the existing operational-error destination/credential reference and emits only sanitized status/count fields.
+- n8n 2.19.5 disables Execute Command and Local File Trigger by default. The production launcher was backed up and changed process-locally to `NODES_EXCLUDE=["n8n-nodes-base.localFileTrigger"]`, enabling only Execute Command while Local File Trigger remains disabled. Independent security review returned GO; the known consequence is that trusted n8n workflow editors can execute host commands, so access remains administrator-only.
+- The first activation attempt correctly failed closed because Execute Command was still disabled. `LineManagerMap001` was unpublished and the original two-node inbox workflow was restored before retry. After the minimal launcher setting above, all three production workflows activated successfully and `/healthz` returned 200.
+- Owner-account real inbound self-test: inbound `InquiryMessage #30` was saved under new `Inquiry #3`; `LineInboxProc001` execution `25045` succeeded and automatically invoked `LineManagerMap001` execution `25046`, also `success`. The mapping result was `healthy_no_candidates`, expected because the owner LineUser already had a verified mapping; no mapping was deleted or recreated to force a synthetic first-time case.
+- Final state: mapping workflow active, inbox workflow active, Slack workflow active, sender service active, and there are no nonterminal LINE send outboxes.
