@@ -126,18 +126,7 @@ async function main() {
     }
     console.log(`Suppliers seeded: ${suppliers.length}件`)
 
-    // 1. Create Admin
-    const admin = await prisma.admin.upsert({
-        where: { email: 'admin@yoshida-watch.com' },
-        update: {},
-        create: {
-            name: 'Admin User',
-            email: 'admin@yoshida-watch.com',
-            passwordHash: 'hashed_password_here', // In future use bcrypt
-            role: 'admin',
-        },
-    })
-    console.log({ admin })
+    // Admin credentials are never created or changed by the normal seed.
 
     // 2. Create Partners (F-01/F-10 Enhancement)
     const partners = [

@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { useEffect, useState } from 'react';
+import { signIn, signOut, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,24 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
+    const { status } = useSession();
+    const [reauth, setReauth] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        setReauth(new URLSearchParams(window.location.search).get('reauth') === '1');
+    }, []);
+
+    useEffect(() => {
+        if (reauth === null || status !== 'authenticated') return;
+        if (reauth) {
+            void signOut({ redirect: false }).then(() => {
+                setReauth(false);
+                router.replace('/login');
+            });
+            return;
+        }
+        router.replace('/repairs');
+    }, [reauth, router, status]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,12 +52,16 @@ export default function LoginPage() {
             } else {
                 router.push('/repairs');
             }
-        } catch (err) {
+        } catch {
             setError('ログイン中にエラーが発生しました');
         } finally {
             setLoading(false);
         }
     };
+
+    if (reauth === null || status === 'loading' || status === 'authenticated') {
+        return <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4 text-sm text-slate-500">認証状態を確認しています...</div>;
+    }
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-100 p-4">
@@ -79,6 +101,7 @@ export default function LoginPage() {
                             <Input
                                 id="password"
                                 type="password"
+                                autoComplete="current-password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required

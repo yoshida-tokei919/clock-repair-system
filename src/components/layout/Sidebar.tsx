@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import AdminAccountControls from './AdminAccountControls'
 
 const NAV_ITEMS = [
   { href: '/admin', label: 'ダッシュボード', icon: '🏠' },
@@ -16,19 +17,20 @@ const NAV_ITEMS = [
   { href: '/orders', label: '発注管理', icon: '📦' },
   { href: '/masters/pricing', label: '料金マスタ', icon: '💴' },
   { href: '/settings/scheduler', label: 'スケジューラ設定', icon: '⏱️' },
+  { href: '/settings/account', label: 'アカウント', icon: '🔐' },
   { href: '/invoices', label: '請求書管理', icon: '📄' },
   { href: '/customers', label: '顧客管理', icon: '👤' },
   { href: '/line-users', label: 'LINEユーザー', icon: '💬' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ adminEmail }: { adminEmail: string }) {
   const pathname = usePathname()
   return (
     <header className="h-12 bg-gray-900 text-white flex items-center px-4 gap-1 sticky top-0 z-40">
       <span className="text-sm font-bold text-gray-300 whitespace-nowrap mr-3">
         ヨシダ時計修理工房
       </span>
-      <nav className="flex items-center gap-1 overflow-x-auto">
+      <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {NAV_ITEMS.map(item => (
           <Link key={item.href} href={item.href}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors whitespace-nowrap
@@ -40,6 +42,7 @@ export default function Sidebar() {
           </Link>
         ))}
       </nav>
+      <AdminAccountControls email={adminEmail} />
     </header>
   )
 }

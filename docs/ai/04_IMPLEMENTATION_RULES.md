@@ -52,6 +52,15 @@ Task指示で指定されたschema（DB定義）、seed（初期データ）、d
 - commit禁止と指定されたTaskではcommitしない
 - 正本と現行実装にTask対象外の差分を発見した場合、勝手に修正せず報告する
 
+## Admin認証情報の保護
+
+- AI・開発ツールは、test、seed、login復旧、Playwright、setup、通常開発で既存Adminのemail/passwordを自動作成・reset・変更しない。
+- repository内のリテラル、過去のTask文書、旧setup/resetスクリプト、seed、例、test fixtureは、現在のAdmin email/passwordの正本では決してない。そこから現在の認証情報を推測・表示・復元したり、それを使ってresetしたりしない。
+- 認証情報の変更は、ユーザーの明示承認を得た対象限定操作、または認証済みAdmin本人の明示操作に限る。
+- 現在の認証情報を変更する場合は、ユーザーが新しい値を明示して承認するか、認証済みAdmin本人がアプリ内で明示操作する。
+- login失敗の調査では、まずDB接続・runtimeの問題と認証情報の不一致を切り分ける。復旧目的でseed/setup/resetを実行しない。
+- 空DBの初回bootstrapは環境変数のみを使い、Adminが既に存在する場合は必ず失敗させる。
+
 ## Supabase Data API / GRANT
 
 2026年10月30日以降、Supabaseでは `public` schema（publicスキーマ）に新規作成したテーブルへData API用の権限が自動付与されない。
