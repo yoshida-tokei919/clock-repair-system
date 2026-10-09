@@ -1,24 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
-export async function findRepairIdByIdOrToken(value: string) {
-  const numericId = Number(value);
-  if (Number.isInteger(numericId)) {
-    const repair = await prisma.repair.findUnique({
-      where: { id: numericId },
-      select: { id: true },
-    });
-    if (repair) return repair.id;
-  }
+export async function findRepairIdByPublicToken(value: string) {
+  if (!value.trim()) return null;
 
-  const [row] = await prisma.$queryRaw<{ id: number }[]>`
-    SELECT "id"
-    FROM "Repair"
-    WHERE "publicToken" = ${value}
-    LIMIT 1
-  `;
+  const repair = await prisma.repair.findUnique({
+    where: { publicToken: value },
+    select: { id: true },
+  });
 
-  return row?.id ?? null;
+  return repair?.id ?? null;
 }
 
 export async function addStatusLogIfMissing(

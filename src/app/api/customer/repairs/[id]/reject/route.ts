@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { addStatusLogIfMissing, findRepairIdByIdOrToken } from "../_workflow";
+import { addStatusLogIfMissing, findRepairIdByPublicToken } from "../_workflow";
 
 const REJECT_STATUS = "保留";
 
@@ -15,7 +15,7 @@ export async function POST(
     return NextResponse.json({ error: "差戻し理由を入力してください。" }, { status: 400 });
   }
 
-  const repairId = await findRepairIdByIdOrToken((await params).id);
+  const repairId = await findRepairIdByPublicToken((await params).id);
   if (!repairId) {
     return NextResponse.json({ error: "修理案件が見つかりません。" }, { status: 404 });
   }

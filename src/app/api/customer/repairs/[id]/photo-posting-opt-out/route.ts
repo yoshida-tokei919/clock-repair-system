@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { enforceRepairPhotoPostingOptOut } from "@/lib/repair-photo-posting-opt-out";
-import { findRepairIdByIdOrToken } from "../_workflow";
+import { findRepairIdByPublicToken } from "../_workflow";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const repairId = await findRepairIdByIdOrToken((await params).id);
+  const repairId = await findRepairIdByPublicToken((await params).id);
   if (!repairId) return NextResponse.json({ error: "Repair not found" }, { status: 404 });
 
   const body = await request.json().catch(() => null);

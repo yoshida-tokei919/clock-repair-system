@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { parseReturnAddress, pendingReturnAddressUpdateWhere, returnAddressData, returnAddressResponse } from "@/lib/return-address";
-import { findRepairIdByIdOrToken } from "../_workflow";
+import { findRepairIdByPublicToken } from "../_workflow";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const repairId = await findRepairIdByIdOrToken((await params).id);
+  const repairId = await findRepairIdByPublicToken((await params).id);
   if (!repairId) return NextResponse.json({ error: "修理案件が見つかりません。" }, { status: 404 });
 
   let address;
