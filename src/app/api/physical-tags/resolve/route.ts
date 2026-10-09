@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   parsePhysicalTagIdentifier,
@@ -10,9 +9,8 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!(await getServerSession(authOptions))?.user) {
-    return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
-  }
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
 
   let identifier;
   try {

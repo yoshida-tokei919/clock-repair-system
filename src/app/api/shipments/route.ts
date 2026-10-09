@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
+  const admin = await prisma.admin.findUnique({ where: { email: session.user.email }, select: { id: true } });
+  if (!admin) return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
   let input;
   try {
     input = parseShipmentCreate(await request.json());
@@ -17,8 +19,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: failure.status === 500 ? "入力が不正です。" : failure.message }, { status: 400 });
   }
   try {
-    const admin = await prisma.admin.findUnique({ where: { email: session.user.email }, select: { id: true } });
-    if (!admin) return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
     return NextResponse.json(await createShipment(prisma, input), { status: 201 });
   } catch (error) {
     const failure = shipmentFailure(error);

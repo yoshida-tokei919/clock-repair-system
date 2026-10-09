@@ -1,9 +1,12 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
 
 // GET /api/masters/pricing
 export async function GET(request: Request) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         // 4クエリを並列実行 + Mapでルックアップをすべてо(1)に
         const [rules, brands, models, calibers] = await Promise.all([
@@ -38,6 +41,8 @@ export async function GET(request: Request) {
 
 // POST /api/masters/pricing
 export async function POST(request: Request) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         const body = await request.json();
         const { brandName, modelName, caliberName, workName, minPrice, maxPrice, customerType, notes } = body;

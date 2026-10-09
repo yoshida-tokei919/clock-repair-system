@@ -16,6 +16,7 @@ test("PhysicalTag resolver POST requires auth and validates before DB lookup", a
     '};',
   ].join("\n");
   const modules: Record<string, string> = {
+    "@/lib/admin-api-auth": "export const requireAdminApi = async () => globalThis.__physicalTagSession?.user ? null : { body: { error: '認証が必要です。' }, status: 401 };",
     "next-auth": "export const getServerSession = async () => globalThis.__physicalTagSession;",
     "next/server": "export const NextResponse = { json: (body, options) => ({ body, status: options?.status ?? 200 }) };",
     "@/lib/auth": "export const authOptions = {};",

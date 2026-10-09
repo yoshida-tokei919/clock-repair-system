@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import {
     buildInvoiceRepairSnapshotData,
@@ -11,6 +12,8 @@ import { applyPrepaymentAllocations, type RequestedAllocation } from "@/lib/prep
 
 // GET /api/invoices — 請求書一覧
 export async function GET() {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     const invoices = await prisma.invoice.findMany({
         orderBy: { issuedDate: "desc" },
         include: {
@@ -43,6 +46,8 @@ export async function GET() {
 
 // POST /api/invoices — 新規請求書作成（月次合算）
 export async function POST(req: NextRequest) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     const body = await req.json();
     const { customerId, repairIds, paymentDueDate, allocations = [] } = body as {
         customerId: number;

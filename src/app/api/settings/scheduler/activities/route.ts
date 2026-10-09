@@ -1,12 +1,12 @@
-import { getServerSession } from "next-auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { assertSettingsRows, parseActivityInput } from "@/lib/scheduler-settings-domain";
 import { settingsResponseError } from "@/lib/scheduler-settings";
 
 export async function PUT(request: Request) {
-  if (!(await getServerSession(authOptions))?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   try {
     const input = parseActivityInput(await request.json());
     const row = await prisma.$transaction(async tx => {

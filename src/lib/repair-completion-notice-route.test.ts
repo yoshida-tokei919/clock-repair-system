@@ -12,12 +12,13 @@ test("completion notice API keeps Admin auth and server-rebuilds the reviewed de
   const state = {
     session: null as unknown, admin: null as unknown, reads: 0, writes: 0,
     writeError: null as Error | null, createdBody: null as unknown,
+    adminReads: 0, jsonReads: 0,
   };
   const modules: Record<string, unknown> = {
     "next-auth": { getServerSession: async () => state.session },
     "next/server": { NextResponse: { json: (body: unknown, options?: { status?: number }) => ({ body, status: options?.status ?? 200 }) } },
     "@/lib/auth": { authOptions: {} },
-    "@/lib/prisma": { prisma: { admin: { findUnique: async () => state.admin } } },
+    "@/lib/prisma": { prisma: { admin: { findUnique: async () => { state.adminReads++; return state.admin; } } } },
     "@/lib/customer-share-url": { buildCustomerShareUrl: (path: string) => `https://example.test${path}` },
     "@/lib/line-manager-send-outbox": { LineManagerSendOutboxError: OutboxError },
     "@/lib/repair-public-token": {
@@ -52,15 +53,22 @@ test("completion notice API keeps Admin auth and server-rebuilds the reviewed de
   const route: Record<string, any> = {};
   new Function("require", "exports", code)((name: string) => modules[name], route);
   const context = { params: Promise.resolve({ id: "10" }) };
-  const request = (reviewedText = "FINAL") => new Request("http://localhost/api/repairs/10/completion-notice", {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ confirmed: true, introText: "完了", reviewedText }),
-  });
+  const request = (reviewedText = "FINAL") => {
+    const input = new Request("http://localhost/api/repairs/10/completion-notice", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ confirmed: true, introText: "完了", reviewedText }),
+    });
+    const read = input.json.bind(input);
+    input.json = async () => { state.jsonReads++; return read(); };
+    return input;
+  };
 
   assert.equal((await route.GET(new Request("http://localhost"), context)).status, 401);
   assert.equal((await route.POST(request(), context)).status, 401);
+  assert.equal(state.adminReads, 0); assert.equal(state.jsonReads, 0);
   state.session = { user: { email: "admin@example.com" } };
   assert.equal((await route.POST(request(), context)).status, 401);
+  assert.equal(state.adminReads, 1); assert.equal(state.jsonReads, 0);
   assert.equal(state.reads, 0); assert.equal(state.writes, 0);
 
   state.admin = { id: 1 };
@@ -74,6 +82,7 @@ test("completion notice API keeps Admin auth and server-rebuilds the reviewed de
 
   assert.equal((await route.GET(new Request("http://localhost"), context)).status, 200);
   assert.equal((await route.POST(request(), context)).status, 200);
+  assert.equal(state.jsonReads, 2);
   assert.deepEqual(state.createdBody, { confirmed: true, text: "FINAL" });
   assert.equal(state.reads, 3); assert.equal(state.writes, 1);
 

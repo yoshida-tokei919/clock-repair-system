@@ -1,7 +1,6 @@
-import { getServerSession } from "next-auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 
-import { authOptions } from "@/lib/auth";
 import {
   createInquiryLineReply,
   getInquiryLineChat,
@@ -29,8 +28,8 @@ async function parseJson(request: Request, errorMessage: string) {
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
 
   const inquiryId = inquiryIdFromParams((await params).id);
   if (!inquiryId) return NextResponse.json({ error: "Invalid inquiry ID" }, { status: 400 });
@@ -49,8 +48,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
 
   const inquiryId = inquiryIdFromParams((await params).id);
   if (!inquiryId) return NextResponse.json({ error: "Invalid inquiry ID" }, { status: 400 });
@@ -72,8 +71,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
 
   const inquiryId = inquiryIdFromParams((await params).id);
   if (!inquiryId) return NextResponse.json({ error: "Invalid inquiry ID" }, { status: 400 });

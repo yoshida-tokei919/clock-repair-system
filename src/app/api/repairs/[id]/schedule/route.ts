@@ -1,16 +1,13 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { Prisma } from "@prisma/client";
-import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseRepairScheduleInput } from "@/lib/repair-schedule";
 import { RepairScheduleNotFoundError, ScheduleSummaryConflictError, updateRepairSchedule } from "@/lib/repair-schedule-update";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
 
     const repairId = Number((await params).id);
     if (!/^\d+$/.test((await params).id) || !Number.isSafeInteger(repairId) || repairId <= 0) {

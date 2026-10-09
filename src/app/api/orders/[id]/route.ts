@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { assertShippingMethodChangeAllowed, getOrderArrivalUpdate, OrderExpectedArrivalError, parseOrderUpdateInput, shouldRecalculateOrderArrival } from "@/lib/order-expected-arrival";
@@ -19,6 +20,8 @@ import {
 } from "@/lib/repair-parts-status";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const orderId = Number((await params).id);
   if (!Number.isSafeInteger(orderId) || orderId <= 0) {
     return NextResponse.json({ error: "Invalid order" }, { status: 400 });

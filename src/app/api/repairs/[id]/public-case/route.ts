@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
@@ -22,6 +23,8 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const repairId = Number((await params).id);
   if (!Number.isInteger(repairId) || repairId <= 0) {
     return NextResponse.json({ error: "修理IDが不正です。" }, { status: 400 });

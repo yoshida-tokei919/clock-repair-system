@@ -197,7 +197,7 @@ test("POST route authenticates, recomputes in Serializable transaction, and maps
   const source = readFileSync("src/app/api/repairs/scheduler-v2-apply/route.ts", "utf8");
   assert.match(source, /export async function POST\(/);
   assert.doesNotMatch(source, /export async function (GET|PUT|PATCH|DELETE)\(/);
-  assert.ok(source.indexOf("if (!session?.user)") < source.indexOf("request.json()"));
+  assert.ok(source.indexOf("if (unauthorized) return unauthorized") < source.indexOf("request.json()"));
   assert.match(source, /prisma\.\$transaction\(tx => applySchedulerV2Revision\(tx, revision\)/);
   assert.match(source, /TransactionIsolationLevel\.Serializable/);
   assert.match(source, /isSchedulerV2ApplyConflict\(error\)/);

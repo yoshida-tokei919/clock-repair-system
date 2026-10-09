@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveRepairPartsReadiness } from "@/lib/repair-parts-readiness";
 import { parseRepairPlanningAction, planningStateView, RepairPlanningInputError } from "@/lib/repair-planning";
@@ -14,8 +13,8 @@ function repairIdParam(id: string): number | null {
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getServerSession(authOptions))?.user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const repairId = repairIdParam((await params).id);
   if (repairId === null) return NextResponse.json({ error: "Invalid repair ID" }, { status: 400 });
   try {
@@ -46,8 +45,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getServerSession(authOptions))?.user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const repairId = repairIdParam((await params).id);
   if (repairId === null) return NextResponse.json({ error: "Invalid repair ID" }, { status: 400 });
   let action;

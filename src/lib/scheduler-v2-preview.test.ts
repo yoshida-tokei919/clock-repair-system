@@ -126,7 +126,7 @@ test("route is GET-only, dynamic, RepeatableRead, and checks auth before databas
   assert.match(source, /export const dynamic = "force-dynamic"/);
   assert.match(source, /export async function GET\(/);
   assert.doesNotMatch(source, /export async function (POST|PUT|PATCH|DELETE)\(/);
-  assert.ok(source.indexOf("if (!session?.user)") < source.indexOf("prisma.$transaction"));
+  assert.ok(source.indexOf("if (unauthorized) return unauthorized") < source.indexOf("prisma.$transaction"));
   assert.match(source, /prisma\.\$transaction\(tx => loadSchedulerV2PreviewWithFeedback\(tx\)/);
   assert.match(source, /TransactionIsolationLevel\.RepeatableRead/);
 });

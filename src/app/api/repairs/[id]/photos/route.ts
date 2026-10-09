@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -15,6 +16,8 @@ export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         const repairId = parseInt((await params).id);
         if (isNaN(repairId)) {
@@ -39,6 +42,8 @@ export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         const repairId = Number((await params).id);
         if (isNaN(repairId)) {
@@ -86,6 +91,8 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         const repairId = Number((await params).id);
         if (!Number.isInteger(repairId) || repairId <= 0) {
@@ -129,6 +136,8 @@ export async function PATCH(
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         const repairId = Number((await params).id);
         const body = await req.json();

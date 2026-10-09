@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -41,6 +42,8 @@ function requireCustomerType(value?: string | null): "business" | "individual" {
 }
 
 export async function POST(req: Request) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         const body = await req.json();
 

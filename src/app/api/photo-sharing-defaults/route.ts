@@ -1,9 +1,12 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { photoSharingFallbacks, repairPhotoCategories } from "@/lib/repair-photo-sharing";
 
 export async function GET() {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   try {
     const rows = await prisma.photoSharingDefault.findMany();
     const values = Object.fromEntries(repairPhotoCategories.map((category) => [
@@ -18,6 +21,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   try {
     const body = await request.json();
     if (!Array.isArray(body.defaults)) {

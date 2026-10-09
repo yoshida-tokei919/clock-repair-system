@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { build, type Plugin } from "esbuild";
 import { Prisma } from "@prisma/client";
 import {
   parseAiPostIntakeRouting,
@@ -214,4 +215,50 @@ test("routing from a previous customer link is never exposed to the current cust
   state.message.inquiryCustomerId = 4;
   await assert.rejects(readPostIntakeRouting(db, 4, 7), PostIntakeRoutingConflictError);
   assert.deepEqual(state.links.map((link) => link.repairId), [21, 22]);
+});
+
+test("manual routing PATCH reads the body only for a current Admin", async () => {
+  const state = globalThis as typeof globalThis & {
+    __routingSession: unknown; __routingAdmin: boolean; __routingAdminReads: number;
+    __routingJsonReads: number; __routingWrites: number;
+  };
+  const modules: Record<string, string> = {
+    "next-auth": "export const getServerSession = async () => globalThis.__routingSession;",
+    "next/server": "export const NextResponse = { json: (body, options) => ({ body, status: options?.status ?? 200 }) };",
+    "@/lib/auth": "export const authOptions = {};",
+    "@/lib/prisma": "export const prisma = { admin: { findUnique: async () => { globalThis.__routingAdminReads++; return globalThis.__routingAdmin ? { id: 1 } : null; } } };",
+    "@/lib/post-intake-routing": [
+      "export const postIntakeRoutingErrorStatus = () => 400;",
+      "export const postIntakeRoutingId = value => Number(value);",
+      "export const readPostIntakeRouting = async () => ({});",
+      "export const upsertManualPostIntakeRouting = async () => { globalThis.__routingWrites++; return { ok: true }; };",
+    ].join("\n"),
+  };
+  const plugin: Plugin = { name: "routing-route-stubs", setup(api) {
+    api.onResolve({ filter: /^(?:next-auth|next\/server|@\/lib\/)/ }, args => ({ path: args.path, namespace: "stub" }));
+    api.onLoad({ filter: /.*/, namespace: "stub" }, args => ({ contents: modules[args.path], loader: "js" }));
+  } };
+  const built = await build({
+    entryPoints: ["src/app/api/customers/[id]/communications/line/[messageId]/routing/route.ts"],
+    bundle: true, platform: "node", format: "esm", write: false, plugins: [plugin],
+  });
+  const route = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].contents).toString("base64")}`);
+  const context = { params: Promise.resolve({ id: "3", messageId: "7" }) };
+  const request = { json: async () => { state.__routingJsonReads++; return { repairIds: [21] }; } };
+  state.__routingSession = null; state.__routingAdmin = true;
+  state.__routingAdminReads = 0; state.__routingJsonReads = 0; state.__routingWrites = 0;
+  assert.equal((await route.PATCH(request, context)).status, 401);
+  assert.equal(state.__routingAdminReads, 0);
+  assert.equal(state.__routingJsonReads, 0);
+  state.__routingSession = { user: { email: "former@example.test", role: "ADMIN" } };
+  state.__routingAdmin = false;
+  assert.equal((await route.PATCH(request, context)).status, 401);
+  assert.equal(state.__routingAdminReads, 1);
+  assert.equal(state.__routingJsonReads, 0);
+  assert.equal(state.__routingWrites, 0);
+  state.__routingAdmin = true;
+  assert.equal((await route.PATCH(request, context)).status, 200);
+  assert.equal(state.__routingAdminReads, 2);
+  assert.equal(state.__routingJsonReads, 1);
+  assert.equal(state.__routingWrites, 1);
 });

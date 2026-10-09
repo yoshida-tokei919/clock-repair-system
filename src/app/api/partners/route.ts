@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
@@ -5,6 +6,8 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 export async function GET() {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         const partners = await prisma.customer.findMany({
             where: { type: 'business', isPartner: true },
@@ -20,6 +23,8 @@ export async function GET() {
 
 
 export async function POST(req: Request) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         const body = await req.json();
         const { name, prefix, address, phone } = body;

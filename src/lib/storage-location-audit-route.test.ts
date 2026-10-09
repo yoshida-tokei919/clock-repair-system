@@ -16,6 +16,8 @@ test("audit route authenticates before reading input and maps success and errors
     message: error.status === 404 ? "棚卸し場所が見つかりません。" :
       error.status === 409 ? "棚卸し場所は使用できません。" : "棚卸し結果を確認できませんでした。" });
   const modules: Record<string, unknown> = {
+    "@/lib/admin-api-auth": { requireAdminApi: async () => session?.user ? null :
+      { body: { error: "認証が必要です。" }, status: 401 } },
     "next-auth": { getServerSession: async () => session },
     "next/server": { NextResponse: { json: (value: unknown, options?: { status: number }): AuditResponse =>
       ({ body: value, status: options?.status ?? 200 }) } },

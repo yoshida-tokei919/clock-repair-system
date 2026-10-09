@@ -1,7 +1,6 @@
-import { getServerSession } from "next-auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getInquiryFileSignedReadUrl, isR2InquiryFileKey } from "@/lib/r2-inquiry-files";
 
@@ -11,8 +10,8 @@ function positiveSafeId(value: string) {
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string; fileId: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
 
   const inquiryId = positiveSafeId((await params).id);
   const fileId = positiveSafeId((await params).fileId);

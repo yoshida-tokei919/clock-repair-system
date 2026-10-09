@@ -4,6 +4,7 @@ import { build, type Plugin } from "esbuild";
 
 test("legacy GET remains available while POST fails closed without a Prisma transaction", async () => {
   const modules: Record<string, string> = {
+    "@/lib/admin-api-auth": "export const requireAdminApi = async () => globalThis.__legacySession?.user ? null : { body: { error: '認証が必要です。' }, status: 401 };",
     "@prisma/client": "export const Prisma = { TransactionIsolationLevel: { Serializable: 'Serializable' } };",
     "next-auth": "export const getServerSession = async () => globalThis.__legacySession;",
     "next/server": "export const NextResponse = { json: (body, options) => ({ body, status: options?.status ?? 200 }) };",

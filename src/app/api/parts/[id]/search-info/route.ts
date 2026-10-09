@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server'
+﻿import { requireAdminApi } from "@/lib/admin-api-auth";
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   __partsMasterSearchInfoInternals,
@@ -6,6 +7,8 @@ import {
 } from '@/lib/parts-master-search-info'
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const id = Number((await params).id)
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: 'Invalid partsMasterId' }, { status: 400 })

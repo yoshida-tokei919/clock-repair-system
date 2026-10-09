@@ -1,9 +1,12 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/invoices/preview?customerId=1&month=2026-03
 // Returns uninvoiced repairs that belong to delivery notes issued in the target month.
 export async function GET(req: NextRequest) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     const { searchParams } = new URL(req.url);
     const customerId = parseInt(searchParams.get("customerId") || "");
     const month = searchParams.get("month"); // "YYYY-MM"

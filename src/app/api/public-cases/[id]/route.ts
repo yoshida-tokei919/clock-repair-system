@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
@@ -62,6 +63,8 @@ function workItemInputs(value: unknown): WorkItemInput[] | null {
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const publicCaseId = Number((await params).id);
   if (!Number.isInteger(publicCaseId) || publicCaseId <= 0) {
     return NextResponse.json({ error: "PublicCase IDが不正です。" }, { status: 400 });

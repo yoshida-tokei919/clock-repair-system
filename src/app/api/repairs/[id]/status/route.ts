@@ -1,9 +1,12 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { getRepairStatusTransition } from "@/lib/repair-status-transition";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const repairId = Number((await params).id);
   const { status } = await req.json();
 

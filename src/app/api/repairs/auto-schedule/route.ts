@@ -1,7 +1,6 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { Prisma } from "@prisma/client";
-import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { scheduleRevision } from "@/lib/auto-schedule-revision";
 import { buildSchedulePreview, SCHEDULE_HORIZON_DAYS, todayInJapan } from "@/lib/simple-auto-scheduler";
@@ -67,8 +66,8 @@ async function loadSchedule(tx: Prisma.TransactionClient, startDate: string) {
 }
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const startDate = todayInJapan(new Date());
   const result = await prisma.$transaction(tx => loadSchedule(tx, startDate), {
     isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -77,7 +76,7 @@ export async function GET() {
 }
 
 export async function POST() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   return NextResponse.json({ error: "旧自動スケジューラーの反映は終了しました。Scheduler v2 分割予定案を確認して反映してください。" }, { status: 409 });
 }

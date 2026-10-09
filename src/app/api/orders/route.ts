@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canAllocateRepairParts, getPreapprovalPendingOrderTarget, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
@@ -8,6 +9,8 @@ import {
 } from "@/lib/repair-parts-status";
 
 export async function GET(req: Request) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const { searchParams } = new URL(req.url);
   const repairId = searchParams.get("repairId");
   const orders = await prisma.orderRequest.findMany({
@@ -26,6 +29,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const { repairId, partsMasterId, quantity, totalRequiredQuantity } = await req.json();
   const normalizedRepairId = Number(repairId);
   const normalizedPartsMasterId = Number(partsMasterId);

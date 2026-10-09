@@ -1,7 +1,10 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     const id = parseInt((await params).id);
     if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 

@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SettingsError, parseStandardInput } from "@/lib/scheduler-settings-domain";
 import { assertUniqueStandard, settingsResponseError, validateStandardMasters } from "@/lib/scheduler-settings";
@@ -13,7 +12,8 @@ function idFromParams(params: { id: string }) {
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getServerSession(authOptions))?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   try {
     const id = idFromParams(await params);
     const input = parseStandardInput(await request.json());
@@ -24,7 +24,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getServerSession(authOptions))?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   try {
     const id = idFromParams(await params);
     await prisma.repairWorkTimeStandard.delete({ where: { id } });

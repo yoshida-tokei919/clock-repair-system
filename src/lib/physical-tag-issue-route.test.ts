@@ -8,7 +8,7 @@ test("issue route authenticates before body parsing or DB access", async () => {
     "next-auth": "export const getServerSession = async () => globalThis.__issueSession;",
     "next/server": "export const NextResponse = { json: (body, options) => ({ body, status: options?.status ?? 200 }) };",
     "@/lib/auth": "export const authOptions = {};",
-    "@/lib/prisma": "export const prisma = { admin: { findUnique: async args => { globalThis.__issueDbReads++; return { id: 42 }; } } };",
+    "@/lib/prisma": "export const prisma = { admin: { findUnique: async args => { globalThis.__issueDbReads++; return globalThis.__issueAdmin; } } };",
     "@/lib/physical-tag-issue": [
       "export const parsePhysicalTagIssue = body => { globalThis.__issueParses++; return body; };",
       "export const issuePhysicalTag = async () => { globalThis.__issueWrites++; return { shortCode: 'PT-000001' }; };",
@@ -33,7 +33,7 @@ test("issue route authenticates before body parsing or DB access", async () => {
   new Function("exports", "require", "module", code)(module.exports, localRequire, module);
   const globals = globalThis as typeof globalThis & {
     __issueSession: unknown; __issueDbReads: number; __issueParses: number;
-    __issueWrites: number; __issueJsonReads: number;
+    __issueWrites: number; __issueJsonReads: number; __issueAdmin: { id: number } | null;
   };
   globals.__issueSession = null;
   globals.__issueDbReads = globals.__issueParses = globals.__issueWrites = globals.__issueJsonReads = 0;
@@ -45,8 +45,15 @@ test("issue route authenticates before body parsing or DB access", async () => {
   assert.equal(globals.__issueParses, 0);
   assert.equal(globals.__issueWrites, 0);
   globals.__issueSession = { user: { email: "admin@example.test" } };
+  globals.__issueAdmin = null;
+  assert.equal((await module.exports.POST(request)).status, 401);
+  assert.equal(globals.__issueJsonReads, 0);
+  assert.equal(globals.__issueDbReads, 1);
+  assert.equal(globals.__issueParses, 0);
+  assert.equal(globals.__issueWrites, 0);
+  globals.__issueAdmin = { id: 42 };
   assert.deepEqual(await module.exports.POST(request), { body: { shortCode: "PT-000001" }, status: 200 });
   assert.equal(globals.__issueJsonReads, 1);
-  assert.equal(globals.__issueDbReads, 1);
+  assert.equal(globals.__issueDbReads, 2);
   assert.equal(globals.__issueWrites, 1);
 });

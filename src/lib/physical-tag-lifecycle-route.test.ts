@@ -8,7 +8,7 @@ test("all lifecycle routes authenticate before body parsing or DB access", async
     "next-auth": "export const getServerSession = async () => globalThis.__tagSession;",
     "next/server": "export const NextResponse = { json: (body, options) => ({ body, status: options?.status ?? 200 }) };",
     "@/lib/auth": "export const authOptions = {};",
-    "@/lib/prisma": "export const prisma = { admin: { findUnique: async args => { globalThis.__tagAdminReads++; globalThis.__tagAdminArgs = args; return { id: 42 }; } } };",
+    "@/lib/prisma": "export const prisma = { admin: { findUnique: async args => { globalThis.__tagAdminReads++; globalThis.__tagAdminArgs = args; return globalThis.__tagAdmin; } } };",
     "@/lib/physical-tag-lifecycle": [
       "export const parsePhysicalTagAction = (action, body) => { globalThis.__tagParses++; return { action, ...body }; };",
       "export const applyPhysicalTagAction = async (db, input, adminId) => { globalThis.__tagActions++; return { input, adminId }; };",
@@ -31,6 +31,7 @@ test("all lifecycle routes authenticate before body parsing or DB access", async
   const globals = globalThis as typeof globalThis & {
     __tagSession: unknown; __tagAdminReads: number; __tagAdminArgs: unknown;
     __tagParses: number; __tagActions: number; __tagJsonReads: number;
+    __tagAdmin: { id: number } | null;
   };
   for (const action of ["assign", "release", "replace"]) {
     const route = loadModule(`src/app/api/physical-tags/${action}/route.ts`);
@@ -50,6 +51,13 @@ test("all lifecycle routes authenticate before body parsing or DB access", async
     assert.equal(globals.__tagParses, 0);
     assert.equal(globals.__tagActions, 0);
     globals.__tagSession = { user: { email: "admin@example.test" } };
+    globals.__tagAdmin = null;
+    assert.equal((await route.POST(request)).status, 401);
+    assert.equal(globals.__tagJsonReads, 0);
+    assert.equal(globals.__tagAdminReads, 1);
+    assert.equal(globals.__tagParses, 0);
+    assert.equal(globals.__tagActions, 0);
+    globals.__tagAdmin = { id: 42 };
     assert.deepEqual(await route.POST(request), {
       body: { input: { action, repairId: 10 }, adminId: 42 }, status: 200,
     });
@@ -57,7 +65,7 @@ test("all lifecycle routes authenticate before body parsing or DB access", async
       where: { email: "admin@example.test" }, select: { id: true },
     });
     assert.equal(globals.__tagJsonReads, 1);
-    assert.equal(globals.__tagAdminReads, 1);
+    assert.equal(globals.__tagAdminReads, 2);
     assert.equal(globals.__tagActions, 1);
   }
 });

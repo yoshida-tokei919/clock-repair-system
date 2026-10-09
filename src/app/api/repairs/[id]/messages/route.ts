@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import crypto from "crypto";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -86,6 +87,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const repairId = Number((await params).id);
   if (!Number.isInteger(repairId)) {
     return NextResponse.json({ error: "修理IDが不正です。" }, { status: 400 });

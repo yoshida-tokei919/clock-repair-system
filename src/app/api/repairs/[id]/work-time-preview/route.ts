@@ -1,14 +1,13 @@
-import { getServerSession } from "next-auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getRepairWorkTimePreview } from "@/lib/repair-work-time-preview";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getServerSession(authOptions))?.user)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const repairId = Number((await params).id);
   if (!/^\d+$/.test((await params).id) || !Number.isSafeInteger(repairId) || repairId <= 0)
     return NextResponse.json({ error: "Invalid repair ID" }, { status: 400 });

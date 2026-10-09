@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
 import { type EstimateServerDocumentProps } from "@/components/pdf/EstimateServerDocument";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { authOptions } from "@/lib/auth";
 import {
   buildEstimatePdfStorageKey,
@@ -33,11 +34,9 @@ function getEstimatePdfFileName(estimateNumber: string) {
 }
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const session = await getServerSession(authOptions);
-
-  if (!session?.user) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
 
   const estimateDocumentId = Number((await params).id);
 
@@ -143,7 +142,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const fileName = getEstimatePdfFileName(estimateDocument.estimateNumber);
-  const generatedBy = session.user.email ?? session.user.name ?? null;
+  const generatedBy = session?.user?.email ?? session?.user?.name ?? null;
 
   let pdfFile: { id: number; version: number } | undefined;
 

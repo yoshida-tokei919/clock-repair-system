@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import path from "path";
 
 import { InvoiceDocument, type InvoiceDocumentProps } from "@/components/pdf/InvoiceDocument";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { authOptions } from "@/lib/auth";
 import {
   buildInvoicePdfStorageKey,
@@ -147,11 +148,9 @@ function findInvoiceForPdf(invoiceId: number) {
 }
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const session = await getServerSession(authOptions);
-
-  if (!session?.user) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
 
   const invoiceId = Number((await params).id);
 
@@ -189,7 +188,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const fileName = getInvoicePdfFileName(invoice.invoiceNumber);
-  const generatedBy = session.user.email ?? session.user.name ?? null;
+  const generatedBy = session?.user?.email ?? session?.user?.name ?? null;
 
   let pdfFile: { id: number; version: number } | undefined;
 

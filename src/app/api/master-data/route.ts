@@ -1,8 +1,11 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { findOrCreateBrand, findOrCreateCaliber, normalizeMasterName } from '@/lib/master-normalize'
 
 export async function GET() {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const [brands, watchBrands, movementMakers, models, calibers, suppliers, partCategories, partNames, partGrades] = await Promise.all([
     prisma.brand.findMany({ orderBy: { name: 'asc' } }),
     prisma.brand.findMany({ where: { isWatchBrand: true }, orderBy: { name: 'asc' } }),
@@ -70,6 +73,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const body = await req.json()
   const name = typeof body.name === 'string' ? body.name.trim() : ''
   const type = body.type

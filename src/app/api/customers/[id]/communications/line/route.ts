@@ -1,7 +1,6 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { Prisma } from "@prisma/client";
-import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { createCustomerLineReply, CustomerLineReplyNotFoundError, CustomerLineReplyUnavailableError } from "@/lib/customer-line-reply";
 import { InquiryLineChatInputError } from "@/lib/inquiry-line-chat";
 import { LineManagerSendOutboxError } from "@/lib/line-manager-send-outbox";
@@ -10,8 +9,8 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const rawCustomerId = (await params).id;
   const customerId = Number(rawCustomerId);
   if (!/^[1-9]\d*$/.test(rawCustomerId) || !Number.isSafeInteger(customerId)) {

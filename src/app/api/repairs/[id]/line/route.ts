@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { InquiryLineChatInputError, InquiryLineChatNotFoundError, InquiryLineChatUnavailableError } from "@/lib/inquiry-line-chat";
 import { LineManagerSendOutboxError } from "@/lib/line-manager-send-outbox";
 import { createRepairLineReply, getRepairLineChat } from "@/lib/repair-line-chat";
@@ -14,8 +13,8 @@ function repairId(value: string) {
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const id = repairId((await params).id);
   if (!id) return NextResponse.json({ error: "Invalid Repair ID" }, { status: 400 });
   try {
@@ -28,8 +27,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const id = repairId((await params).id);
   if (!id) return NextResponse.json({ error: "Invalid Repair ID" }, { status: 400 });
   let body: unknown;

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { prisma } from "@/lib/prisma";
 import { getRepairPhotoSignedReadUrl, isR2PublicCasePhotoKey } from "@/lib/r2-repair-photos";
 
@@ -14,8 +13,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ imageId: s
   if (!image) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const isPublic = image.publicCase.b2cPublishStatus === "PUBLISHED" && image.publicCase.reviewStatus === "APPROVED";
   if (!isPublic) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
   }
   if (isR2PublicCasePhotoKey(image.storagePath)) return NextResponse.redirect(await getRepairPhotoSignedReadUrl(image.storagePath));
   if (image.url && /^https?:|^data:/i.test(image.url)) return NextResponse.redirect(image.url);

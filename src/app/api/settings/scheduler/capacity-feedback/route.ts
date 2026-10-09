@@ -1,13 +1,13 @@
-import { getServerSession } from "next-auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadCapacityObservationFeedback } from "@/lib/capacity-observation-feedback";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!(await getServerSession(authOptions))?.user) return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   try { return NextResponse.json(await loadCapacityObservationFeedback(prisma)); }
   catch (error) {
     console.error("Capacity observation feedback failed", error);

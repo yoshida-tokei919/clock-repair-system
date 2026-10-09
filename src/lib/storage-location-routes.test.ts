@@ -21,6 +21,7 @@ const response = "export const NextResponse = { json: (body, options) => ({ body
 
 test("resolve route checks auth before body and DB and rejects malformed identifier", async () => {
   const modules = {
+    "@/lib/admin-api-auth": "export const requireAdminApi = async () => globalThis.__storageSession?.user ? null : { body: { error: '認証が必要です。' }, status: 401 };",
     "next-auth": "export const getServerSession = async () => globalThis.__storageSession;",
     "next/server": response,
     "@/lib/auth": "export const authOptions = {};",
@@ -69,12 +70,23 @@ test("move route requires email and real Admin before domain mutation", async ()
   assert.equal((await target.POST(request)).status, 401);
   assert.equal(globals.__storageJsonReads, 0);
   globals.__storageSession = { user: { email: "admin@example.com" } };
+  globals.__storageAdminId = null;
+  assert.equal((await target.POST(request)).status, 401);
+  assert.equal(globals.__storageJsonReads, 0);
+  assert.equal(globals.__storageAdminReads, 1);
+  assert.equal(globals.__storageParses, 0);
+  assert.equal(globals.__storageMoves, 0);
+  globals.__storageAdminId = 42;
   body = {};
   assert.equal((await target.POST(request)).status, 400);
-  assert.equal(globals.__storageAdminReads, 0);
+  assert.equal(globals.__storageAdminReads, 2);
+  assert.equal(globals.__storageJsonReads, 1);
+  assert.equal(globals.__storageParses, 1);
   body = { storageLocationId: 1, repairIds: [10] };
   globals.__storageAdminId = null;
   assert.equal((await target.POST(request)).status, 401);
+  assert.equal(globals.__storageJsonReads, 1);
+  assert.equal(globals.__storageParses, 1);
   assert.equal(globals.__storageMoves, 0);
   globals.__storageAdminId = 42;
   assert.deepEqual(await target.POST(request), { body: { adminId: 42 }, status: 200 });

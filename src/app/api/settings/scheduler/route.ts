@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { assertSettingsRows, parseSchedulerInput } from "@/lib/scheduler-settings-domain";
 import { getSchedulerSettings, settingsResponseError } from "@/lib/scheduler-settings";
@@ -8,13 +7,15 @@ import { getSchedulerSettings, settingsResponseError } from "@/lib/scheduler-set
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!(await getServerSession(authOptions))?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   try { return NextResponse.json(await getSchedulerSettings(prisma)); }
   catch (error) { const result = settingsResponseError(error); return NextResponse.json({ error: result.message }, { status: result.status }); }
 }
 
 export async function PUT(request: Request) {
-  if (!(await getServerSession(authOptions))?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   try {
     const input = parseSchedulerInput(await request.json());
     const setting = await prisma.$transaction(async tx => {

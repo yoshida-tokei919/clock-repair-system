@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { findOrCreateBrand } from "@/lib/master-normalize";
@@ -7,6 +8,8 @@ export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         const id = parseInt((await params).id);
         const body = await request.json();
@@ -57,6 +60,8 @@ export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const unauthorized = await requireAdminApi();
+    if (unauthorized) return unauthorized;
     try {
         const id = parseInt((await params).id);
         if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });

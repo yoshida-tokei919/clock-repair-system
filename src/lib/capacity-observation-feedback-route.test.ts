@@ -4,6 +4,7 @@ import { build, type Plugin } from "esbuild";
 
 test("capacity feedback GET requires auth and only reads when authenticated", async () => {
   const modules: Record<string, string> = {
+    "@/lib/admin-api-auth": "export const requireAdminApi = async () => globalThis.__capacitySession?.user ? null : { body: { error: '認証が必要です。' }, status: 401 };",
     "next-auth": "export const getServerSession = async () => globalThis.__capacitySession;",
     "next/server": "export const NextResponse = { json: (body, options) => ({ body, status: options?.status ?? 200 }) };",
     "@/lib/auth": "export const authOptions = {};",

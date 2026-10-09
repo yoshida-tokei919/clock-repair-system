@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -6,6 +7,8 @@ import {
 } from '@/lib/parts-master-growth-preview'
 
 export async function POST(req: Request) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   let body: unknown
   try {
     body = await req.json()

@@ -13,6 +13,11 @@ export async function handlePhysicalTagAction(request: Request, action: Physical
     return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
   }
 
+  const admin = await prisma.admin.findUnique({
+    where: { email: session.user.email }, select: { id: true },
+  });
+  if (!admin) return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
+
   let input;
   try {
     input = parsePhysicalTagAction(action, await request.json());
@@ -21,10 +26,6 @@ export async function handlePhysicalTagAction(request: Request, action: Physical
   }
 
   try {
-    const admin = await prisma.admin.findUnique({
-      where: { email: session.user.email }, select: { id: true },
-    });
-    if (!admin) return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
     return NextResponse.json(await applyPhysicalTagAction(prisma, input, admin.id));
   } catch (error) {
     const failure = physicalTagLifecycleFailure(error);

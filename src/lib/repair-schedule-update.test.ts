@@ -71,6 +71,7 @@ test("missing repair and concurrent summary change fail without a segment write"
 
 test("PATCH preserves auth and input validation, and maps a segmented date edit to 409", async () => {
   const modules: Record<string, string> = {
+    "@/lib/admin-api-auth": "export const requireAdminApi = async () => globalThis.__patchSession?.user ? null : { body: { error: '認証が必要です。' }, status: 401 };",
     "@prisma/client": "export const Prisma = { TransactionIsolationLevel: { Serializable: 'Serializable' }, PrismaClientKnownRequestError: class extends Error {} };",
     "next-auth": "export const getServerSession = async () => globalThis.__patchSession;",
     "next/server": "export const NextResponse = { json: (body, options) => ({ body, status: options?.status ?? 200 }) };",
@@ -83,7 +84,7 @@ test("PATCH preserves auth and input validation, and maps a segmented date edit 
       api.onResolve({ filter: /^@\/lib\/repair-schedule(?:-update)?$/ }, args => ({
         path: resolve("src/lib", args.path.endsWith("-update") ? "repair-schedule-update.ts" : "repair-schedule.ts"),
       }));
-      api.onResolve({ filter: /^(?:@prisma\/client|next-auth|next\/server|@\/lib\/auth|@\/lib\/prisma)$/ }, args =>
+      api.onResolve({ filter: /^(?:@prisma\/client|next-auth|next\/server|@\/lib\/admin-api-auth|@\/lib\/auth|@\/lib\/prisma)$/ }, args =>
         ({ path: args.path, namespace: "stub" }));
       api.onLoad({ filter: /.*/, namespace: "stub" }, args => ({ contents: modules[args.path], loader: "js" }));
     },

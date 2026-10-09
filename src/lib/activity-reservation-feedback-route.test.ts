@@ -4,6 +4,7 @@ import { build, type Plugin } from "esbuild";
 
 test("feedback GET requires auth, reads only, and reports isolated load failure", async () => {
   const modules: Record<string, string> = {
+    "@/lib/admin-api-auth": "export const requireAdminApi = async () => globalThis.__activityFeedbackSession?.user ? null : { body: { error: '認証が必要です。' }, status: 401 };",
     "next-auth": "export const getServerSession = async () => globalThis.__activityFeedbackSession;",
     "next/server": "export const NextResponse = { json: (body, options) => ({ body, status: options?.status ?? 200 }) };",
     "@/lib/auth": "export const authOptions = {};",

@@ -1,15 +1,14 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { InquiryWatchDecision } from "@prisma/client";
 
-import { authOptions } from "@/lib/auth";
 import { reconcileInquiryClosure, reconcileInquiryRepairIntakeInvites } from "@/lib/inquiry-lifecycle";
 import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
 import { prisma } from "@/lib/prisma";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const inquiryId = Number((await params).id);
   const body = await request.json().catch(() => null);
   const watchId = Number(body?.watchId);

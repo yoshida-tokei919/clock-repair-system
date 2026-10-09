@@ -1,3 +1,4 @@
+import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { photoSharingFallbacks, repairPhotoCategory, repairPhotoStage } from "@/lib/repair-photo-sharing";
@@ -6,6 +7,8 @@ import { deleteRepairPhotoObject, uploadRepairPhotoObject } from "@/lib/r2-repai
 const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export async function POST(request: NextRequest) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   try {
     const data = await request.formData();
     const file = data.get("file");
