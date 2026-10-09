@@ -6,7 +6,7 @@
 
 ![現行の公開ログイン画面。メールアドレス、パスワード、ログインボタン](../assets/screenshots/login-page.png)
 
-認証はNextAuth Credentialsを使う。serverは`Admin`のメールアドレスで管理者を探し、保存済みpassword hashを照合する。session方式はJWTである。主要な管理画面routeにはNextAuth middlewareの認証境界があり、個別APIでもserver側で認証や管理者条件を再検証するものがある。**画面にボタンが見えることだけを操作権限の根拠にしない。**middlewareの対象外もあるため、全routeがmiddlewareだけで守られるとは扱わない。
+認証はNextAuth Credentialsを使う。serverは`Admin`のメールアドレスで管理者を探し、保存済みpassword hashを照合する。session方式はJWTである。主要な管理画面routeにはNextAuth middlewareの認証境界があり、管理用APIはroute側でもAdmin認証を再検証する。2026-10-09の認証強化では、既存の顧客・取引先・請求・Repair・設定・発送等の管理APIを共通のroute-level Admin認証へ揃え、**未認証なら入力内容を処理する前に401で拒否する**範囲を拡大した。**画面にボタンが見えることだけを操作権限の根拠にしない。**顧客向けpublic token routeや内部連携routeは別の認証契約を持つため、全routeがmiddlewareだけで守られるとは扱わない。
 
 > **共用PCでの制限:** 現行UIにはログアウトボタンも`signOut`操作も実装されていない。「画面からログアウトできる」と案内しない。共用PCで作業を離れるときは、認証済み画面を他者が操作できる状態で放置しない。現行UI内でログアウトできないため、共用端末のセッション終了方法は別途運用ルールを定める必要がある。ログアウト機能が追加されたら、この節と画面画像を更新する。
 

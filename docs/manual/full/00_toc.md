@@ -59,3 +59,9 @@
 37. [エラー時の切り分け](37_troubleshooting.md)
 38. [バックアップ・migration・deployの考え方](38_backup-migration-deploy.md)
 39. [マニュアル更新手順](39_manual-update.md)
+
+## 第VIII部 追加の現行業務
+
+40. [Customer Communication HubとRepairのLINE履歴](40_customer-communication-hub.md)
+41. [B2B一括受付と管理タグ印刷](41_b2b-batch-intake.md)
+42. [B2C前受金・返金・最終請求への充当](42_repair-prepayment.md)

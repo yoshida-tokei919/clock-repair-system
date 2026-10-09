@@ -27,13 +27,13 @@
 
 顧客のLINEイベントはRailwayの`/api/line/webhook`へ届く。Next.jsは署名を検証し、対象イベントを`LineWebhookInbox`へ保存する。この時点の成功応答は**受信保存**を示し、Inquiry作成・画像保存・Slack投稿の完了ではない。
 
-Windowsローカルのn8nは定期的にNext.jsの内部processorを起動する。Inquiryへの割当、`InquiryMessage`保存、画像のR2保存、再試行判定はアプリ側で行う。通知はPostgreSQLの`SlackNotificationOutbox`へ記録し、別のn8n workflowがSlackへ投稿して結果をアプリへ返す。Slackは通知先であり、LINE本文やInquiryの正本ではない。n8nのSQLiteや実行履歴も業務データの正本にしない。詳しくは[第27章](27_line-webhook.md)・[第29章](29_n8n.md)を参照する。
+Windowsローカルのn8nは定期的にNext.jsの内部processorを起動する。処理件数が正の場合と定期health checkでは、別のmapping workflowからLINE Managerのchat・履歴照合を起動する。mappingは保存済みINBOUND message IDとManagerの受信message IDの完全一致だけを根拠にし、LINEは送信しない。Inquiryへの割当、`InquiryMessage`保存、画像のR2保存、再試行判定はアプリ側で行う。通知はPostgreSQLの`SlackNotificationOutbox`へ記録し、別のn8n workflowがSlackへ投稿して結果をアプリへ返す。Slackは通知先であり、LINE本文やInquiryの正本ではない。n8nのSQLiteや実行履歴も業務データの正本にしない。詳しくは[第27章](27_line-webhook.md)・[第29章](29_n8n.md)を参照する。
 
 ## 3.5 LINE送信は別のWindows senderで確認する
 
 管理画面で送信を明示すると、Next.jsは`LineManagerSendOutbox`に`APPROVED`の送信intentを保存する。`APPROVED`は送信待ちであり、送信済みではない。別のWindowsローカルsenderがoutboxを取得し、fenceとローカル証拠の保存を経て、lineoaからLINE Manager通常トークへ送信を試みる。**n8nはこの送信を行わない。**
 
-送信試行の応答だけでは成否を確定しない。senderがLINE Manager履歴の送信先・文面・識別情報を照合し、一致したときだけoutboxを`CONFIRMED`にする。その時に実Manager message IDを持つ`OUTBOUND InquiryMessage`が作られる。結果不明の`POST_UNCONFIRMED`を未送信と決めて再送しない。状態遷移と障害対応は[第28章](28_line-manager-sender.md)を参照する。
+senderとmappingは共通の短時間`lineoa-operation.lock`でManager操作を直列化する。送信試行の応答だけでは成否を確定しない。senderがLINE Manager履歴の送信先・文面・識別情報を照合し、一致したときだけoutboxを`CONFIRMED`にする。その時に実Manager message IDを持つ`OUTBOUND InquiryMessage`が作られる。結果不明の`POST_UNCONFIRMED`を未送信と決めて再送しない。状態遷移と障害対応は[第28章](28_line-manager-sender.md)を参照する。
 
 ## 3.6 Inquiry AIの明示実行
 
@@ -41,7 +41,7 @@ Windowsローカルのn8nは定期的にNext.jsの内部processorを起動する
 
 ## 3.7 決済と配送の外部境界
 
-Stripeの現行カード決済はCheckout Sessionを作成し、**署名を検証したWebhook**で支払結果を照合してからアプリのPaymentを確定する。Checkoutからの戻り画面だけで入金済みとはしない。
+Stripeの現行カード決済は、B2CのRepair前受金と最終請求書にCheckout Sessionを作成し、**署名を検証したWebhook**で支払結果を照合してからアプリのPaymentを確定する。入金済み前受金の請求書充当は別の明示操作である。Checkoutからの戻り画面だけで入金済みとはしない。
 
 日本郵便のゆうプリRは、現行ではShipmentからのV3取込CSV出力と、発送履歴CSVの**read-only preview**で接続する。CSV出力やプレビューで追跡番号・実発送・配達完了を自動保存しない。日本郵便の実引受に基づく配送状態同期とLINE発送通知は後続実装であり、現在使える機能として案内しない。詳細は[第25章](25_yupuri.md)・[第34章](34_external-integrations.md)を参照する。
 

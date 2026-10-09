@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | 日本郵便／ゆうプリR | ShipmentからCSV出力、履歴CSVをread-only preview | ファイル連携のみ |
 | ヤマトB2クラウド | 固定順97項目の調査 | 出力未実装・契約値待ち |
-| Stripe | B2C請求書のカードCheckoutと署名Webhook | 決済の実装経路 |
+| Stripe | B2C Repair前受金・請求書のカードCheckoutと署名Webhook | 前受金の請求書充当も実装。返金・充当取消は未実装 |
 | 銀行振込 | 人の着金確認後、Adminが手動登録 | 銀行APIなし |
 | PayPay／KOMOJU | 実行可能な決済経路なし | 未実装 |
 | LINE／n8n／Slack | 受信・送信、定期起動、通知を別々に担当 | 第27～30章参照 |
@@ -31,7 +31,7 @@
 | --- | --- |
 | `GET /api/shipments/[id]/yupuri-v3` | Admin認証、OUTBOUND・発送前のShipmentから読取専用出力。共通画面に出力ボタンはない |
 | V3 CSV | 100列、headerなし、CP932／Shift_JIS、BOMなし、CRLF。管理番号`SHP-{Shipment.id}` |
-| `POST /api/shipments/yupuri-history/preview` | Admin認証、履歴のraw値・照合候補・エラーと公式配送status code pairの説明を表示するだけ |
+| `/shipments`から履歴CSV preview | Admin認証、1ファイルのraw値・Shipment現在値と候補・競合・公式配送status code pairの説明を表示するだけ。apply操作なし |
 | 状態の確定 | `10/0A = 引受予定`は実引受ではない。`importableLater`も書込承認ではなく、実引受に基づく発送更新、追跡保存、配達更新は未実装 |
 
 **下段の区切り枠:** ヤマトB2クラウドは**調査完了／実装保留**。公式の固定順97項目を確認したが、契約ごとの請求先情報、依頼主情報、サービス設定と、受理済みテンプレート／実サンプルが不足する。現行アプリにB2 CSV出力UI・APIはない。実契約コードを印刷しない。
@@ -42,13 +42,13 @@
 
 ## 3ページ目 — Stripe Checkoutの要求経路
 
-**見出し:** 請求額をserverで確認し、カードCheckout Sessionを作る。
+**見出し:** B2C前受金と前受金充当後の請求額をserverで確認し、カードCheckout Sessionを作る。
 
 ```text
 顧客の請求画面 → POST checkout
-  → B2C／発行済み／正の総額・未入金残高を確認
-  → 処理中・部分入金を拒否
-  → Payment(STRIPE, CARD, PENDING) ＋ 単一Allocation
+  → B2C／発行済み／前受金充当後の請求額・未入金残高を確認
+  → 処理中の支払いを拒否し、現在の未入金残高を再計算
+  → 請求書支払い用Payment(STRIPE, CARD, PENDING)
   → PaymentAttempt(idempotency key)
   → Stripe Checkout Session(card, JPY) → URLを返す
 ```
@@ -73,8 +73,8 @@ Stripe → POST /api/stripe/webhook
   → raw bodyとstripe-signatureをWebhook secretで検証
   → checkout.session.completed かつ payment_status=paid のみ
   → 登録済みSessionを検索 → transactionでPayment行をlock
-  → provider／status／金額／通貨／単一Allocationを再照合
-  → 顧客・Invoice・metadata・記録済みPaymentIntentを照合
+  → Payment.kind／provider／status／金額／通貨を再照合
+  → 顧客・RepairまたはInvoice・metadata・記録済みPaymentIntentを照合
   → PaymentAttemptとPaymentをSUCCEEDED、paidAtを保存
 ```
 
@@ -85,7 +85,7 @@ Stripe → POST /api/stripe/webhook
 | Session・metadata・金額等が不一致 | 確定を拒否し、根拠を確認する |
 | paidでない／対象外イベント | Paymentを確定しない |
 
-**図下:** 顧客画面の入金済額は`SUCCEEDED`なPaymentのallocationから計算。画面遷移やWebhook到着だけで支払済み表示を作らない。
+**図下:** 前受金の入金済みと請求書への充当は別の事実。画面遷移やWebhook到着だけで支払済み表示を作らない。[第42章](../full/42_repair-prepayment.md)も参照。
 
 <div style="page-break-before: always;"></div>
 

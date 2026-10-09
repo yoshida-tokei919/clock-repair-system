@@ -21,6 +21,8 @@
 | 発送計画・実発送・追跡 | `Shipment.status`、`actualShippedAt`、`trackingNumber`等を各々確認。`Repair.status`との同一視や、status名だけによる配送会社の引受判定をしない |
 | LINE送信の確認 | `LineManagerSendOutbox`の`CONFIRMED`とManager履歴の照合。`APPROVED`はintent、`POST_UNCONFIRMED`は結果未確定。確認後に`OUTBOUND InquiryMessage`を作る |
 | カード入金の確定 | 署名付きStripe Webhookでpaid Sessionと登録済みAttempt等を照合した後の`Payment.status=SUCCEEDED`。success画面やWebhook到着だけでは確定しない |
+| 前受金の請求書充当 | 対象Repairの入金済み前受金に対する`PaymentAllocation`から、成功した`PaymentAllocationRelease`を差し引いた実効充当額。前受金の`SUCCEEDED`と請求書への充当は別の事実 |
+| 返金 | `PaymentRefund`の状態。`PENDING`は外部結果未確定、`SUCCEEDED`だけが返金確定額。返金後も元の`Payment.status=SUCCEEDED`は入金履歴として保持する |
 
 ### 問い合わせとSlack
 
@@ -36,7 +38,7 @@ Shipmentは1個口の記録で、Repairとは別に作成する。作成・梱�
 
 ### 送信と決済
 
-LINEの画面操作は送信待ちintentを作る。senderのPOST試行後も、Manager履歴を厳密に照合して`CONFIRMED`になるまで「送信済み」としない。StripeもCheckoutのsuccess URL表示と署名検証済みWebhookの到着を、無条件に支払確定としない。paid条件と登録情報の照合が成立し、`Payment`と`PaymentAttempt`が`SUCCEEDED`になった状態を確認する。詳細は[第28章](28_line-manager-sender.md)、[第34章](34_external-integrations.md)。
+LINEの画面操作は送信待ちintentを作る。senderのPOST試行後も、Manager履歴を厳密に照合して`CONFIRMED`になるまで「送信済み」としない。StripeもCheckoutのsuccess URL表示と署名検証済みWebhookの到着を、無条件に支払確定としない。paid条件と登録情報の照合が成立し、`Payment`と`PaymentAttempt`が`SUCCEEDED`になった状態を確認する。前受金の入金確定、請求書への充当、充当解放、返金はそれぞれ別の履歴である。Stripe返金の`PENDING`も「返金済み」または「返金失敗」と決めつけず、照合が必要な状態として扱う。詳細は[第28章](28_line-manager-sender.md)、[第34章](34_external-integrations.md)、[第42章](42_repair-prepayment.md)を参照する。
 
 ## 35.3 不明な値を別のstatusで埋めない
 

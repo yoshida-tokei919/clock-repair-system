@@ -52,6 +52,8 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 今後は機能のproduction反映状況に合わせて継続更新する。
 
+現行同期checkpoint: 2026-10-09。GitHub `main` / Railway productionは`73ffdbdd91aecfd6cec1f6b4562c56ae5b79cd4a`（Task209B）まで確認済み。Task208Eの返金・充当解放、Task209Aの管理API認証強化、Task209Bの顧客Repair token-only化を本原本へ反映する。進行中のOpenClaw Task206H4と、ゆうプリクラウドへの移行・自動化は完成機能として扱わず、production反映後に更新する。
+
 ## 第I部 システム概要・共通操作
 
 - 詳細版: [1 アプリでできること](full/01_capabilities.md) → [2 システム全体像](full/02_system-overview.md) → [3 システム構成とデータの流れ](full/03_system-architecture.md) → [4 ログイン・画面構成・共通操作](full/04_login-common-ui.md)
@@ -65,7 +67,12 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 ## LINE内部構造の章
 
-- 詳細版: [27 LINE WebhookとInquiry保存](full/27_line-webhook.md) → [28 LINE Manager Outbox / local sender / lineoa / 履歴照合](full/28_line-manager-sender.md)
+- 詳細版: [27 LINE WebhookとInquiry保存](full/27_line-webhook.md) → [28 LINE Manager Outbox / local sender / lineoa / 履歴照合](full/28_line-manager-sender.md) → [29 n8n連携](full/29_n8n.md)
+
+## 追加の現行業務
+
+- 詳細版: [40 Customer Communication HubとRepairのLINE履歴](full/40_customer-communication-hub.md) → [41 B2B一括受付と管理タグ印刷](full/41_b2b-batch-intake.md) → [42 B2C前受金・返金・最終請求への充当](full/42_repair-prepayment.md)
+- 簡易版: [23 顧客のLINE履歴と返信](quick/23_customer-line.md) → [24 B2B一括受付](quick/24_b2b-intake.md) → [25 B2C前受金・返金・請求](quick/25_repair-prepayment.md)
 
 ## データ保存・実行環境の章
 

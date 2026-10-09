@@ -25,7 +25,8 @@ LINE Manager senderはclaim後、外部POST前に**durable fence**を記録し�
 | --- | --- | --- |
 | Shipment作成 | `SHIPMENT_SELECT`はscanと人の選択確認までread-only。明示POST時にserverがRepair・顧客・返送先snapshotを再検証 | 通信断、または成功応答からShipment IDを確認できなければ、同じ選択の再confirmを画面でblock。発送一覧と既存個口を確認する。Shipment作成に外部送信のような万能idempotency keyがあるとは扱わない |
 | 梱包照合・タグrelease | 梱包対象の全件一致を確認し、release previewはread-only。明示POST時もShipmentとRepair集合、active assignment、タグ`ACTIVE`をserver側で再検証。`Serializable` transactionとguarded updateで全件atomic release | 通信断、5xx、成功応答不明は`uncertain`。同sessionからの再POSTをblockし、割当とShipmentを再取得して確認する |
-| Stripe Checkout・Webhook | `PaymentAttempt.idempotencyKey`をStripe Session作成にも渡す。既存open Sessionは再利用し、completeでWebhook未確定なら結果確認中。署名付きpaid Webhookは登録Session、金額等をtransaction内のPayment行lock下で再照合 | success画面だけで入金登録しない。Webhook再受信時にAttemptとPaymentがともに`SUCCEEDED`なら冪等に終了。不一致なら確定を拒否して調査する |
+| Stripe Checkout・Webhook | `PaymentAttempt.idempotencyKey`をStripe Session作成にも渡す。既存open Sessionは再利用し、completeでWebhook未確定なら結果確認中。署名付きpaid Webhookは登録Session、金額等をtransaction内のPayment行lock下で再照合 | success画面だけで入金登録しない。Session作成・保存の結果不明は同じkeyで再照合し、別Sessionを盲目的に作らない |
+| Stripe返金 | 外部POST前に`PaymentRefund(PENDING)`とidempotency keyをdurableに保存。1 Paymentにつき未解決の`PENDING`返金は最大1件として返金可能額を予約する | provider例外を即`FAILED`にせず`PENDING`で保持。「Stripe照合」は同じrefund IDまたは同じkeyで確認し、新しい返金を重ねない |
 
 Shipment作成の通信結果不明を「失敗した」と決めて再送すると、別IDの個口を二重作成し得る。`ShipmentRepair`の複合キーは同一個口内の同じRepairの重複を抑えるが、異なるShipment IDの二重個口は防がない。PhysicalTagのactive割当は`releasedAt IS NULL`のpartial unique indexでも制限する。releaseは再検証とatomic処理で部分解放を防ぐが、応答を失ったclientは成功か失敗かを推測できない。StripeのkeyとWebhookの冪等確定も、画面のsuccess表示を決済根拠へ変えるものではない。詳細は[第22章](22_shipment.md)、[第23章](23_shipment-packing.md)、[第24章](24_physical-tag-release.md)、[第34章](34_external-integrations.md)。
 
@@ -38,6 +39,8 @@ Shipment作成の通信結果不明を「失敗した」と決めて再送する
 | LINE Managerの`POST_UNCONFIRMED` | **再送禁止**。Manager履歴とのreconciliationで確認する。証拠不足・曖昧な候補は要確認 |
 | Shipment作成またはタグreleaseのHTTP結果不明 | **同じ操作を盲目的に再送しない**。Shipment一覧、個口ID、active assignment等を再取得し、実状態を調べる |
 | Stripeのcomplete SessionでWebhook未確定 | **追加Checkoutや手動入金確定を急がない**。Webhookと`Payment`／`PaymentAttempt`を照合する |
+| Stripe返金が`PENDING`／通信結果不明 | **新しい返金を作らない**。保存済み返金をStripe照合する。外部IDなしで長時間不明ならprovider側を手動確認 |
+| 銀行振込の返金記録 | アプリが送金する操作ではない。実際の外部返金を確認してから、同じ手動操作を記録する |
 | ゆうプリR履歴previewで未知code・重複・競合 | 候補のまま要確認。`10/0A`も実引受ではない。previewはtracking・statusを更新しない |
 
 read-only preview → 人の確認 → 明示mutationという順序も、誤操作と重複処理を抑える安全柵である。scanやCSV previewだけを確定操作にしない。判断の前提となる正本は[第35章](35_status-source-of-truth.md)を参照する。

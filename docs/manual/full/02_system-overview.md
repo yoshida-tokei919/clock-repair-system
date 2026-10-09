@@ -54,7 +54,7 @@ PhysicalTag連続scanで梱包照合
 [後続実装] 配達完了を確定 → Repair納品済み連携
 ```
 
-現行のゆうプリR連携は、V3 CSV出力と発送履歴CSVのread-only previewまでである。Task202Bでpreviewに公式配送status codeの組の説明表示が加わったが、追跡番号・実発送日時・配達完了日時・Shipment / Repair statusは書き戻さない。上図の`[後続実装]`部分はTask204等の範囲であり、現在使える操作として扱わない。
+現行のゆうプリR連携は、V3 CSV出力と`/shipments`から使える発送履歴CSVのread-only previewまでである。Task202Bで公式配送status codeの組の説明、Task202CでShipment現在値と候補の画面比較が加わったが、追跡番号・実発送日時・配達完了日時・Shipment / Repair statusは書き戻さない。上図の`[後続実装]`部分はTask204等の範囲であり、現在使える操作として扱わない。
 
 ## 2.2 「送付待ち」と「受付」の違い
 
@@ -97,7 +97,7 @@ Repairは修理案件の中心であり、次の情報を接続する。
      │
 [Windowsローカル n8n 2.19.5]
      │
-     ├─ LINE Inbox Processor
+     ├─ LINE Inbox Processor → LINE Manager mapping
      └──────────────→ [Slack]
 
 [管理画面]
@@ -127,10 +127,11 @@ n8nはローカル自動化基盤として利用する。アプリの正本デ�
 
 2026-10-04確認時点ではDockerではなく、Windowsローカルのn8n 2.19.5を使用している。Windowsタスクスケジューラ `YoshidaClockRepair-n8n` がログオン時に `C:\Users\yoshi\n8n-service\start-n8n.ps1` を起動する。
 
-active workflowは現在2本である。
+2026-10-08のactivation記録では、主要なactive workflowは3本である。
 
 1. `LINE Inquiry Inbox Processor` — 1分ごとにLINE Webhook Inboxの後処理APIを呼ぶ。
 2. `Slack Notification Outbox Processor` — 1分ごとにSlack通知Outboxをclaimし、Slack投稿後にsent / failedをアプリへ返す。
+3. `LINE Manager Mapping Processor` — Inboxでメッセージを処理した後と定期health checkで、保存済みINBOUND message IDとManager履歴のexact IDを照合する。LINE送信はしない。
 
 AI暫定分析とLINE Manager通常トーク送信はn8nの役割ではない。
 
@@ -183,7 +184,7 @@ OUTBOUND InquiryMessageを作成
 - Slack: 通知用。問い合わせ本文の正本ではない
 - LINE Official Account / LINE Manager: 顧客との会話
 - lineoa: 現行LINE Manager通常トーク送信系で使用するローカルライブラリ
-- n8n: Windowsローカルの定期処理・Slack連携
+- n8n: Windowsローカルの定期処理・mapping起動・Slack連携
 - inquiry-ai-bridge / カタリ: Inquiry AI暫定分析の明示実行
 - ゆうプリR: 日本郵便送り状作成と発送履歴連携
 - Brother QL-800: PhysicalTag修理袋ラベル印刷
