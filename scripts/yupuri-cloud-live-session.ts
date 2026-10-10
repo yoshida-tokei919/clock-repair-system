@@ -167,23 +167,50 @@ export function isJpToolboxUrl(value: string): boolean {
   } catch { return false; }
 }
 
-async function visibleUnique(page: Page, selector: string): Promise<boolean> {
-  const control = page.locator(selector);
-  return await control.count() === 1 && await control.isVisible() && await control.isEnabled();
+const JP_LOGIN_ENTRY_TEXT = "\u6599\u91d1\u5225\u5f8c\u7d0d\u304a\u5ba2\u3055\u307e\u756a\u53f7\u3067\u30ed\u30b0\u30a4\u30f3";
+const JP_LOGIN_ID_CHOICE_TEXT = "\u30ed\u30b0\u30a4\u30f3ID\u3067\u30ed\u30b0\u30a4\u30f3";
+
+type JpLoginState = "entry" | "loginId" | "final" | "pending" | "invalid";
+
+async function jpLoginState(page: Page): Promise<JpLoginState> {
+  if (page.isClosed() || !isJpToolboxUrl(page.url())) return "invalid";
+  const entry = page.getByText(JP_LOGIN_ENTRY_TEXT, { exact: true });
+  const loginId = page.getByText(JP_LOGIN_ID_CHOICE_TEXT, { exact: true });
+  const entryCount = await entry.count();
+  const loginIdCount = await loginId.count();
+  if (entryCount > 1 || loginIdCount > 1) return "invalid";
+  const entryVisible = entryCount === 1 && await entry.isVisible();
+  const loginIdVisible = loginIdCount === 1 && await loginId.isVisible();
+  if (entryVisible && loginIdVisible) return "invalid";
+
+  const required = await Promise.all(["#lgnIdsLogIds", "#pwdLogIds", "#loginLogIds"].map(async selector => {
+    const control = page.locator(selector);
+    const count = await control.count();
+    return { count, visible: count === 1 && await control.isVisible(),
+      enabled: count === 1 && await control.isEnabled() };
+  }));
+  const userId = page.locator("#usrIdsLogIds");
+  const userIdCount = await userId.count();
+  if (userIdCount > 1 || required.some(control => control.count > 1)) return "invalid";
+  const userIdVisible = userIdCount === 1 && await userId.isVisible();
+  const anyControlVisible = required.some(control => control.visible) || userIdVisible;
+  if (anyControlVisible) {
+    if (entryVisible || required.some(control => !control.visible || !control.enabled) ||
+      (userIdCount === 1 && !userIdVisible)) return "invalid";
+    return "final"; // The login-ID choice may remain visible beside the final controls.
+  }
+  if (loginIdVisible && await loginId.isEnabled()) return "loginId";
+  if (entryVisible && await entry.isEnabled()) return "entry";
+  return "pending";
 }
 
 export async function isVerifiedJpLogin(page: Page): Promise<boolean> {
-  if (!isJpToolboxUrl(page.url())) return false;
-  return await visibleUnique(page, "#lgnIdsLogIds") &&
-    await visibleUnique(page, "#pwdLogIds") &&
-    await visibleUnique(page, "#loginLogIds");
+  return await jpLoginState(page) === "final";
 }
 
 async function isJpLoginCandidate(page: Page): Promise<boolean> {
-  if (await isVerifiedJpLogin(page)) return true;
-  if (!isJpToolboxUrl(page.url())) return false;
-  const choice = page.getByText("ログインIDでログイン", { exact: true });
-  return await choice.count() === 1 && await choice.isVisible();
+  const state = await jpLoginState(page);
+  return state === "entry" || state === "loginId" || state === "final";
 }
 
 export async function isVerifiedToolboxPortal(page: Page): Promise<boolean> {
@@ -215,13 +242,29 @@ async function waitForOutcome(browser: Browser, page: Page, invoicesUrl: string,
   throw new Error("Cloud authentication outcome unavailable");
 }
 
-async function prepareLoginForm(page: Page): Promise<void> {
-  if (await isVerifiedJpLogin(page)) return;
-  if (!isJpToolboxUrl(page.url())) throw new Error("JP login page not verified");
-  const choice = page.getByText("ログインIDでログイン", { exact: true });
-  if (await choice.count() !== 1 || !await choice.isVisible()) throw new Error("JP login method unavailable");
-  await choice.click();
-  if (!await isVerifiedJpLogin(page)) throw new Error("JP login controls unavailable");
+async function waitForJpLoginState(page: Page, expected: "loginId" | "final", deadline: number): Promise<void> {
+  while (true) {
+    const state = await jpLoginState(page);
+    if (state === expected && Date.now() < deadline) return;
+    if (state === "invalid") throw new Error("JP login state changed or ambiguous");
+    if (Date.now() >= deadline) throw new Error(`JP login ${expected} transition timed out`);
+    await new Promise(resolve => setTimeout(resolve, Math.min(50, deadline - Date.now())));
+  }
+}
+
+async function prepareLoginForm(page: Page, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const state = await jpLoginState(page);
+  if (state === "final") return;
+  if (state === "entry") {
+    await page.getByText(JP_LOGIN_ENTRY_TEXT, { exact: true }).click();
+    await waitForJpLoginState(page, "loginId", deadline);
+  } else if (state !== "loginId") {
+    throw new Error("JP login method unavailable");
+  }
+  if (await jpLoginState(page) !== "loginId") throw new Error("JP login ID method unavailable");
+  await page.getByText(JP_LOGIN_ID_CHOICE_TEXT, { exact: true }).click();
+  await waitForJpLoginState(page, "final", deadline);
 }
 
 export async function ensureAuthenticatedInvoices(browser: Browser, invoicesUrl: string,
@@ -271,7 +314,7 @@ export async function ensureAuthenticatedInvoices(browser: Browser, invoicesUrl:
       }
       if (!await isJpLoginCandidate(page)) throw new Error("JP login page changed");
       await lease.claim(); // Durable one-attempt marker before any login-form interaction.
-      await prepareLoginForm(page);
+      await prepareLoginForm(page, timeoutMs);
       const userId = page.locator("#usrIdsLogIds");
       if (await userId.count() > 1) throw new Error("JP user ID control ambiguous");
       if (await userId.count() === 1) {

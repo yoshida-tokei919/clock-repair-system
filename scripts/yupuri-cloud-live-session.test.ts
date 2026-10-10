@@ -123,9 +123,18 @@ test("portal verification matches the observed ToolBox home and service detail, 
   assert.equal(await isVerifiedToolboxPortal(harness.page), false);
 });
 
-function authHarness(start: "login" | "portal" | "detail" | "cloud", onLoginIdClick?: () => Promise<void> | void) {
+const JP_LOGIN_ENTRY_TEXT = "\u6599\u91d1\u5225\u5f8c\u7d0d\u304a\u5ba2\u3055\u307e\u756a\u53f7\u3067\u30ed\u30b0\u30a4\u30f3";
+const JP_LOGIN_ID_CHOICE_TEXT = "\u30ed\u30b0\u30a4\u30f3ID\u3067\u30ed\u30b0\u30a4\u30f3";
+
+type LoginStep = "entry" | "choice" | "controls" | "controlsHiddenLabels" | "controlsBoth" |
+  "controlsDuplicateEntry" | "controlsDuplicateChoice" | "partial" | "pending" | "ambiguous" | "both" | "unexpected";
+
+function authHarness(start: "login" | "portal" | "detail" | "cloud", onLoginIdClick?: () => Promise<void> | void,
+  initialLoginStep: LoginStep = "controls", onChoiceClick?: (choice: string) => Promise<void> | void,
+  entryResult: LoginStep = "choice", revealDelayMs: { entry?: number; choice?: number | null } = {}) {
   const calls: string[] = [];
   let address = "about:blank";
+  let loginStep = initialLoginStep;
   let userId = "unexpected";
   let logoutVisible = true;
   let serviceUrl = CLOUD_SSO_URL;
@@ -140,20 +149,48 @@ function authHarness(start: "login" | "portal" | "detail" | "cloud", onLoginIdCl
         address.includes("btoolbox.post.japanpost.jp/portal/") || start === "cloud" ? url :
         start === "login" ? "https://btoolbox.post.japanpost.jp/login" :
           start === "detail" ? toolboxDetail : toolboxHome;
+      if (address.endsWith("/login")) loginStep = initialLoginStep;
     },
     getByRole: (role: string, options: { name?: string }) => {
       const visible = role === "tab" && address === url ||
         role === "link" && options.name === "ログアウト" && address.startsWith("https://btoolbox.post.japanpost.jp/portal/") && logoutVisible;
       return { count: async () => visible ? 1 : 0, isVisible: async () => visible };
     },
-    getByText: () => ({ count: async () => 0, isVisible: async () => false }),
+    getByText: (text: string, options: { exact?: boolean }) => {
+      const login = address.endsWith("/login") && options.exact === true;
+      const entry = text === JP_LOGIN_ENTRY_TEXT;
+      const choice = text === JP_LOGIN_ID_CHOICE_TEXT;
+      const visible = login && (entry && ["entry", "ambiguous", "both", "controlsBoth",
+        "controlsDuplicateEntry"].includes(loginStep) || choice && ["choice", "both", "controls",
+        "controlsBoth", "controlsDuplicateChoice", "partial"].includes(loginStep));
+      return {
+        count: async () => login && entry && ["ambiguous", "controlsDuplicateEntry"].includes(loginStep) ||
+          login && choice && loginStep === "controlsDuplicateChoice" ? 2 : login && (entry || choice) ? 1 : 0,
+        isVisible: async () => visible,
+        isEnabled: async () => true,
+        click: async () => {
+          calls.push(`click:text:${text}`);
+          await onChoiceClick?.(text);
+          const next = entry ? entryResult : "controls";
+          const delay = entry ? revealDelayMs.entry : revealDelayMs.choice;
+          if (delay === null) loginStep = "pending";
+          else if (delay) {
+            loginStep = "pending";
+            setTimeout(() => { loginStep = next; }, delay);
+          } else loginStep = next;
+        },
+      };
+    },
     locator: (selector: string) => {
-      const form = address.endsWith("/login");
+      const form = address.endsWith("/login") && ["controls", "controlsHiddenLabels", "controlsBoth",
+        "controlsDuplicateEntry", "controlsDuplicateChoice"].includes(loginStep);
+      const login = address.endsWith("/login");
       const known = ["#lgnIdsLogIds", "#usrIdsLogIds", "#pwdLogIds", "#loginLogIds"].includes(selector);
       const detailControl = address === toolboxDetail && ["#srvUtlUrl", "#srvUtl"].includes(selector);
       return {
-        count: async () => known && form || detailControl ? 1 : 0,
-        isVisible: async () => known && form || selector === "#srvUtl" && detailControl,
+        count: async () => known && login || detailControl ? 1 : 0,
+        isVisible: async () => known && (form || loginStep === "partial" && selector === "#lgnIdsLogIds") ||
+          selector === "#srvUtl" && detailControl,
         isEnabled: async () => true,
         getAttribute: async (name: string) => selector === "#srvUtlUrl" && name === "value" ? serviceUrl :
           selector === "#srvUtl" && name === "href" ? "javascript:void(0)" : null,
@@ -227,6 +264,170 @@ test("login uses one saved-credential sequence with an atomic pre-attempt latch,
       `goto:${CLOUD_SSO_URL}`,
     ]);
     await assert.rejects(stat(path), { code: "ENOENT" });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("first JP entry advances through login-ID choice only after the durable latch", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "yupuri-auth-"));
+  try {
+    const path = join(dir, "attempt");
+    const latchedClicks: string[] = [];
+    const checkLatch = async (choice: string) => {
+      assert.equal((await readFile(path, "utf8")).trim(), "attempted");
+      latchedClicks.push(choice);
+    };
+    const harness = authHarness("login", () => checkLatch("#lgnIdsLogIds"), "entry", checkLatch);
+    assert.equal(await ensureAuthenticatedInvoices(harness.browser, url, new LoginAttemptLatch(path), 500), harness.page);
+    assert.deepEqual(latchedClicks, [JP_LOGIN_ENTRY_TEXT, JP_LOGIN_ID_CHOICE_TEXT, "#lgnIdsLogIds"]);
+    assert.deepEqual(harness.calls, [
+      `goto:${CLOUD_SSO_URL}`, `goto:${CLOUD_SSO_URL}`,
+      `click:text:${JP_LOGIN_ENTRY_TEXT}`, `click:text:${JP_LOGIN_ID_CHOICE_TEXT}`, "user-fill:",
+      "click:#lgnIdsLogIds", "press:ArrowDown", "press:Enter", `goto:${CLOUD_SSO_URL}`,
+    ]);
+    await assert.rejects(stat(path), { code: "ENOENT" });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("second JP state clicks the exact login-ID choice without clicking the first entry", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "yupuri-auth-"));
+  try {
+    const path = join(dir, "attempt");
+    const harness = authHarness("login", undefined, "choice", async () => {
+      assert.equal((await readFile(path, "utf8")).trim(), "attempted");
+    });
+    assert.equal(await ensureAuthenticatedInvoices(harness.browser, url, new LoginAttemptLatch(path), 500), harness.page);
+    assert.deepEqual(harness.calls.filter(call => call.startsWith("click:text:")), [`click:text:${JP_LOGIN_ID_CHOICE_TEXT}`]);
+    assert.deepEqual(harness.calls.filter(call => call.startsWith("press:")), ["press:ArrowDown", "press:Enter"]);
+    await assert.rejects(stat(path), { code: "ENOENT" });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("observed final form accepts visible controls with one visible login-ID choice and hidden entry", async () => {
+  const observed = authHarness("login", undefined, "controls");
+  observed.setAddress("https://btoolbox.post.japanpost.jp/login");
+  for (const selector of ["#lgnIdsLogIds", "#usrIdsLogIds", "#pwdLogIds", "#loginLogIds"]) {
+    assert.equal(await observed.page.locator(selector).count(), 1);
+    assert.equal(await observed.page.locator(selector).isVisible(), true);
+  }
+  const entry = observed.page.getByText(JP_LOGIN_ENTRY_TEXT, { exact: true });
+  const choice = observed.page.getByText(JP_LOGIN_ID_CHOICE_TEXT, { exact: true });
+  assert.equal(await entry.count(), 1);
+  assert.equal(await entry.isVisible(), false);
+  assert.equal(await choice.count(), 1);
+  assert.equal(await choice.isVisible(), true);
+  assert.equal(await isVerifiedJpLogin(observed.page), true);
+  const legacy = authHarness("login", undefined, "controlsHiddenLabels");
+  legacy.setAddress("https://btoolbox.post.japanpost.jp/login");
+  assert.equal(await isVerifiedJpLogin(legacy.page), true);
+});
+
+test("partial controls revealed after the first click stop before the method choice", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "yupuri-auth-"));
+  try {
+    const path = join(dir, "attempt");
+    const harness = authHarness("login", undefined, "entry", undefined, "partial");
+    await assert.rejects(ensureAuthenticatedInvoices(harness.browser, url,
+      new LoginAttemptLatch(path), 500), /state changed or ambiguous/);
+    assert.deepEqual(harness.calls.filter(call => call.startsWith("click:text:")),
+      [`click:text:${JP_LOGIN_ENTRY_TEXT}`]);
+    assert.deepEqual(harness.calls.filter(call => call.startsWith("press:")), []);
+    assert.equal((await readFile(path, "utf8")).trim(), "attempted");
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+for (const transition of ["entry", "choice"] as const) {
+  test(`delayed ${transition} reveal succeeds with one click per transition`, async () => {
+    const dir = await mkdtemp(join(tmpdir(), "yupuri-auth-"));
+    try {
+      const path = join(dir, "attempt");
+      const harness = authHarness("login", undefined, "entry", undefined, "choice",
+        { [transition]: 70 });
+      assert.equal(await ensureAuthenticatedInvoices(harness.browser, url, new LoginAttemptLatch(path), 500), harness.page);
+      assert.deepEqual(harness.calls.filter(call => call.startsWith("click:text:")),
+        [`click:text:${JP_LOGIN_ENTRY_TEXT}`, `click:text:${JP_LOGIN_ID_CHOICE_TEXT}`]);
+      assert.deepEqual(harness.calls.filter(call => call.startsWith("press:")), ["press:ArrowDown", "press:Enter"]);
+      await assert.rejects(stat(path), { code: "ENOENT" });
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+}
+
+for (const transition of ["entry", "choice"] as const) {
+  test(`${transition} reveal timeout retains marker without credential keys or click retry`, async () => {
+    const dir = await mkdtemp(join(tmpdir(), "yupuri-auth-"));
+    try {
+      const path = join(dir, "attempt");
+      const harness = authHarness("login", undefined, "entry", undefined,
+        transition === "entry" ? "pending" : "choice", { choice: transition === "choice" ? null : undefined });
+      await assert.rejects(ensureAuthenticatedInvoices(harness.browser, url, new LoginAttemptLatch(path), 80),
+        /transition timed out/);
+      assert.deepEqual(harness.calls.filter(call => call.startsWith("click:text:")),
+        transition === "entry" ? [`click:text:${JP_LOGIN_ENTRY_TEXT}`] :
+          [`click:text:${JP_LOGIN_ENTRY_TEXT}`, `click:text:${JP_LOGIN_ID_CHOICE_TEXT}`]);
+      assert.deepEqual(harness.calls.filter(call => call.startsWith("press:")), []);
+      assert.equal((await readFile(path, "utf8")).trim(), "attempted");
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+}
+
+test("an existing attempt marker blocks the first JP entry before either form click", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "yupuri-auth-"));
+  try {
+    const path = join(dir, "attempt");
+    const latch = new LoginAttemptLatch(path);
+    await latch.runExclusive(lease => lease.claim());
+    const harness = authHarness("login", undefined, "entry");
+    await assert.rejects(ensureAuthenticatedInvoices(harness.browser, url, latch, 500), /already attempted/);
+    assert.deepEqual(harness.calls, [`goto:${CLOUD_SSO_URL}`]);
+    assert.equal((await readFile(path, "utf8")).trim(), "attempted");
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("simultaneously visible JP entry and login-ID choice fail before form clicks or credential keys", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "yupuri-auth-"));
+  try {
+    const path = join(dir, "attempt");
+    const harness = authHarness("login", undefined, "both");
+    await assert.rejects(ensureAuthenticatedInvoices(harness.browser, url, new LoginAttemptLatch(path), 30),
+      /outcome unavailable/);
+    assert.deepEqual(harness.calls, [`goto:${CLOUD_SSO_URL}`]);
+    await assert.rejects(stat(path), { code: "ENOENT" });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("visible controls with ambiguous labels or a partial form never reach credential keys", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "yupuri-auth-"));
+  try {
+    for (const step of ["controlsBoth", "controlsDuplicateEntry", "controlsDuplicateChoice", "partial"] as const) {
+      const harness = authHarness("login", undefined, step);
+      harness.setAddress("https://btoolbox.post.japanpost.jp/login");
+      assert.equal(await isVerifiedJpLogin(harness.page), false, step);
+      await assert.rejects(ensureAuthenticatedInvoices(harness.browser, url,
+        new LoginAttemptLatch(join(dir, step)), 30), /outcome unavailable/);
+      assert.deepEqual(harness.calls, [`goto:${CLOUD_SSO_URL}`], step);
+      assert.deepEqual(harness.calls.filter(call => call.startsWith("press:")), [], step);
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("ambiguous or unexpected JP entry never sends a credential key", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "yupuri-auth-"));
+  try {
+    for (const step of ["ambiguous", "unexpected"] as const) {
+      const path = join(dir, step);
+      const harness = authHarness("login", undefined, step);
+      await assert.rejects(ensureAuthenticatedInvoices(harness.browser, url, new LoginAttemptLatch(path), 30),
+        /outcome unavailable/);
+      assert.deepEqual(harness.calls, [`goto:${CLOUD_SSO_URL}`]);
+      await assert.rejects(stat(path), { code: "ENOENT" });
+    }
+    const path = join(dir, "missing-choice");
+    const harness = authHarness("login", undefined, "entry", undefined, "unexpected");
+    await assert.rejects(ensureAuthenticatedInvoices(harness.browser, url, new LoginAttemptLatch(path), 80),
+      /transition timed out/);
+    assert.deepEqual(harness.calls, [
+      `goto:${CLOUD_SSO_URL}`, `goto:${CLOUD_SSO_URL}`, `click:text:${JP_LOGIN_ENTRY_TEXT}`,
+    ]);
+    assert.equal((await readFile(path, "utf8")).trim(), "attempted");
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
