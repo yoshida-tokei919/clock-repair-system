@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ShipmentDirection, ShipmentHandoffMethod, ShipmentStatus, StorageLocationType } from "@prisma/client";
 import { activePhysicalTag, activeStorageLocation, sameCustomerShipmentContext, SCHEDULE_GROUPS, shipmentRepairSummary, shipmentScheduleGroup } from "@/lib/shipment-schedule";
 import YupuriHistoryPreview from "./YupuriHistoryPreview";
@@ -16,6 +16,7 @@ export type ScheduleShipment = {
   requestedDeliveryDate: string | null;
   requestedDeliveryTimeSlot: string | null;
   labelIssuedAt: string | null;
+  trackingNumber: string | null;
   carrierCode: string | null;
   serviceCode: string | null;
   handoffMethod: ShipmentHandoffMethod | null;
@@ -62,6 +63,34 @@ export default function ShipmentsClient({ rows, today }: { rows: ScheduleShipmen
   const [form, setForm] = useState<PlanningForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [issuingId, setIssuingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!rows.some(row => row.status === "READY")) return;
+    const timer = window.setInterval(() => router.refresh(), 15000);
+    return () => window.clearInterval(timer);
+  }, [rows, router]);
+
+  async function requestIssue(id: number) {
+    if (issuingId !== null || !window.confirm(`Shipment #${id} のゆうプリクラウド送り状発行を依頼しますか？`)) return;
+    setIssuingId(id);
+    setError("");
+    try {
+      const response = await fetch(`/api/shipments/${id}/yupuri-cloud`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmed: true }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(typeof result.error === "string" ? result.error : `発行依頼に失敗しました (${response.status})。`);
+      }
+      router.refresh();
+    } catch (cause) {
+      router.refresh();
+      setError(cause instanceof Error ? cause.message : "発行依頼の結果を確認できません。発送状態を再確認してください。");
+    } finally {
+      setIssuingId(null);
+    }
+  }
 
   async function save(id: number) {
     if (!form || saving) return;
@@ -145,7 +174,12 @@ export default function ShipmentsClient({ rows, today }: { rows: ScheduleShipmen
                 })}</td>
                 <td className="p-3">{row.plannedShipDate ?? "未設定"}</td>
                 <td className="p-3">{row.requestedDeliveryDate ?? "未設定"}<br />{row.requestedDeliveryTimeSlot ?? "時間帯未設定"}</td>
-                <td className="p-3">{row.labelIssuedAt ? <>発行済み<br /><span className="text-xs text-gray-600">{new Date(row.labelIssuedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</span></> : "未発行"}</td>
+                <td className="p-3">{row.labelIssuedAt ? <>発行済み<br /><span className="text-xs text-gray-600">{new Date(row.labelIssuedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</span></> : "未発行"}
+                  <br />追跡番号: {row.trackingNumber ?? "未取得"}
+                  {row.status === "DRAFT" && <div className="mt-2"><button type="button" disabled={issuingId !== null}
+                    onClick={() => requestIssue(row.id)} className="text-blue-700 hover:underline disabled:opacity-50">ゆうプリクラウド発行を依頼</button></div>}
+                  {row.status === "READY" && <p className="mt-2 text-amber-800">発行待ち・結果照合中</p>}
+                </td>
                 <td className="p-3">{row.carrierCode ?? "未設定"} / {row.serviceCode ?? "未設定"}<br />
                   {row.handoffMethod ? handoffLabels[row.handoffMethod] : "未設定"}</td>
                 <td className="p-3">{otherShipments.length === 0 ? "なし" : otherShipments.map(({ shipment, dayDifference }) =>

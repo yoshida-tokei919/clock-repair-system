@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { shipmentFailure, shipmentId } from "@/lib/shipment";
 import { YupuriCloudError, yupuriCloudCsv } from "@/lib/yupuri-cloud";
+import { cloudIssueFailure, parseIssueRequest, requestCloudIssue } from "@/lib/yupuri-cloud-issuance";
 
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ id: string }> };
@@ -52,6 +53,22 @@ export async function GET(_request: Request, { params }: Context) {
     }
     const failure = shipmentFailure(error);
     if (failure.status === 500) console.error("Yu-Pri Cloud export failed", error);
+    return NextResponse.json({ error: failure.message }, { status: failure.status });
+  }
+}
+
+export async function POST(request: Request, { params }: Context) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email || !(await prisma.admin.findUnique({ where: { email: session.user.email }, select: { id: true } }))) {
+    return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
+  }
+  try {
+    const id = shipmentId((await params).id);
+    const input = parseIssueRequest(await request.json());
+    return NextResponse.json(await requestCloudIssue(prisma, id, input), { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    const failure = cloudIssueFailure(error);
+    if (failure.status === 500) console.error("Yu-Pri Cloud issue request failed");
     return NextResponse.json({ error: failure.message }, { status: failure.status });
   }
 }

@@ -19,7 +19,7 @@ export default async function ShipmentsPage() {
     select: {
       id: true, direction: true, status: true, plannedShipDate: true, actualShippedAt: true,
       requestedDeliveryDate: true, requestedDeliveryTimeSlot: true, labelIssuedAt: true,
-      carrierCode: true, serviceCode: true, handoffMethod: true,
+      carrierCode: true, serviceCode: true, handoffMethod: true, trackingNumber: true,
       customer: { select: { id: true, name: true, type: true } },
       repairs: { select: { repair: { select: {
         id: true, inquiryNumber: true, status: true, deliveryNoteId: true,

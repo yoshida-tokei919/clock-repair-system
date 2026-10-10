@@ -12,6 +12,7 @@ const state = globalThis as typeof globalThis & {
   __ycExports: number;
   __ycErrorStatus: 409 | 422 | null;
   __ycSelect: Record<string, boolean> | null;
+  __ycIssueCalls: number;
 };
 
 async function route() {
@@ -65,6 +66,14 @@ async function route() {
         ]);
       },
     },
+    "@/lib/yupuri-cloud-issuance": {
+      cloudIssueFailure: (error: { status?: number; message: string }) => ({ status: error.status ?? 500, message: error.message }),
+      parseIssueRequest: (body: { confirmed?: boolean }) => {
+        if (body.confirmed !== true) throw { status: 400, message: "confirmation required" };
+        return { confirmed: true };
+      },
+      requestCloudIssue: async () => { state.__ycIssueCalls++; return { status: "READY" }; },
+    },
   };
 
   const source = readFileSync("src/app/api/shipments/[id]/yupuri-cloud/route.ts", "utf8");
@@ -79,8 +88,29 @@ async function route() {
   new Function("require", "module", "exports", compiled)(requireStub, module, module.exports);
   return module.exports as {
     GET: (request: Request, context: { params: Promise<{ id: string }> }) => Promise<Response>;
+    POST: (request: { json(): Promise<unknown> }, context: { params: Promise<{ id: string }> }) => Promise<Response>;
   };
 }
+
+test("Cloud issuance POST checks Admin and explicit confirmation before mutation", async () => {
+  const target = await route();
+  const context = { params: Promise.resolve({ id: "42" }) };
+  state.__ycSession = null; state.__ycAdmin = true; state.__ycIssueCalls = 0;
+  let reads = 0;
+  const body = { json: async () => { reads++; return { confirmed: true }; } };
+  assert.equal((await target.POST(body, context)).status, 401);
+  assert.equal(reads, 0);
+  state.__ycSession = { user: { email: "admin@example.com" } }; state.__ycAdmin = false;
+  assert.equal((await target.POST(body, context)).status, 401);
+  assert.equal(reads, 0);
+  state.__ycAdmin = true;
+  assert.equal((await target.POST(body, { params: Promise.resolve({ id: "bad" }) })).status, 400);
+  assert.equal(reads, 0);
+  assert.equal((await target.POST({ json: async () => ({ confirmed: false }) }, context)).status, 400);
+  assert.equal(state.__ycIssueCalls, 0);
+  assert.equal((await target.POST(body, context)).status, 200);
+  assert.equal(state.__ycIssueCalls, 1);
+});
 
 test("Cloud download requires Admin, performs one read-only Shipment lookup, and returns UTF-8 BOM CSV", async () => {
   const target = await route();
