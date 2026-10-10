@@ -5,15 +5,28 @@ from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 import json
 import math
 import os
+import re
 import time
+from uuid import uuid4
 
 
 class AuthStorageError(Exception):
     """A deliberately sanitized failure from the auth-storage utility."""
+
+
+CHAT_ORIGIN = "https://chat.line.biz/"
+CHAT_PATHS = frozenset({"/"})
+ACCOUNT_HOST = "account.line.biz"
+ACCESS_HOST = "access.line.me"
+ACCOUNT_PATHS = frozenset({"/login"})
+ACCESS_PATHS = frozenset({"/oauth2/v2.1/authorize"})
+ACCOUNT_CONTINUATION = "LINEアカウント"
+ACCESS_CONTINUATION = "ログイン"
+MAX_CONTINUATION_CLICKS = 2
 
 
 def fixed_paths(localappdata: str | None = None) -> tuple[Path, Path]:
@@ -82,9 +95,9 @@ def build_storage_payload(browser_cookies: Iterable[Any], now: datetime | int | 
     return {"cookies": cookies}
 
 
-def safe_status(cookie_count: int, bot_count: int, storage_path: Path | str) -> dict[str, Any]:
+def safe_status(cookie_count: int, bot_count: int) -> dict[str, Any]:
     """Return status data that cannot contain cookie or bot identifiers."""
-    return {"ok": True, "verified": True, "cookie_count": int(cookie_count), "bot_count": int(bot_count), "storage_path": str(storage_path)}
+    return {"ok": True, "verified": True, "cookie_count": int(cookie_count), "bot_count": int(bot_count)}
 
 
 def _get_write_json() -> Callable[[str, dict[str, Any]], Any]:
@@ -133,8 +146,147 @@ def _remove_storage_best_effort(storage_path: Path) -> None:
         pass
 
 
+def _trusted_stage(raw_url: str) -> str | None:
+    if raw_url == CHAT_ORIGIN:
+        return "chat.line.biz"
+    try:
+        parsed = urlsplit(raw_url)
+        hostname = (parsed.hostname or "").lower()
+        if (
+            parsed.scheme != "https"
+            or parsed.port is not None
+            or parsed.username
+            or parsed.password
+            or parsed.fragment
+            or parsed.netloc.lower() != hostname
+        ):
+            return None
+        if hostname == ACCOUNT_HOST and parsed.path in ACCOUNT_PATHS:
+            return ACCOUNT_HOST
+        if hostname == ACCESS_HOST and parsed.path in ACCESS_PATHS:
+            return ACCESS_HOST
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+def _explicit_auth_challenge_present(page: Any) -> bool:
+    selectors = (
+        'input[type="email"]', 'input[autocomplete="username" i]',
+        'input[type="password"]', 'input[autocomplete="current-password" i]',
+        'input[autocomplete="one-time-code" i]',
+        '[name*="captcha" i]', '[id*="captcha" i]', '[class*="captcha" i]',
+        '[id*="recaptcha" i]', '[class*="recaptcha" i]',
+        '[class*="qrcode" i]', '[id*="qrcode" i]',
+        '[class*="qr-code" i]', '[id*="qr-code" i]',
+        '[data-testid*="qr" i]',
+        'img[alt*="qr" i]', '[aria-label*="qr" i]',
+        'canvas',
+    )
+    for selector in selectors:
+        locator = page.locator(selector)
+        if any(locator.nth(index).is_visible() for index in range(locator.count())):
+            return True
+    challenge_text = re.compile(
+        r"\u30d1\u30b9\u30ad\u30fc.{0,32}"
+        r"(?:\u8a8d\u8a3c|\u672c\u4eba\u78ba\u8a8d|\u767b\u9332|\u4f5c\u6210|\u8a2d\u5b9a)|"
+        r"(?:\u8a8d\u8a3c|\u672c\u4eba\u78ba\u8a8d).{0,32}\u30d1\u30b9\u30ad\u30fc|"
+        r"\u8a8d\u8a3c\u30b3\u30fc\u30c9|\u78ba\u8a8d\u30b3\u30fc\u30c9|"
+        r"\u30ef\u30f3\u30bf\u30a4\u30e0\u30d1\u30b9\u30ef\u30fc\u30c9|"
+        r"\u4e8c\u6bb5\u968e\u8a8d\u8a3c|\u672c\u4eba\u78ba\u8a8d|"
+        r"QR\s*\u30b3\u30fc\u30c9|CAPTCHA|reCAPTCHA|"
+        r"one[- ]time password|\botp\b|verification code|two[- ]factor|\b2fa\b|"
+        r"(?:use|verify|verification|authenticate).{0,32}passkey|"
+        r"passkey.{0,32}(?:verify|verification|authenticate|identity)|"
+        r"(?:create|register|set up).{0,16}passkey",
+        re.I,
+    )
+    locator = page.get_by_text(challenge_text)
+    return any(locator.nth(index).is_visible() for index in range(locator.count()))
+
+
+def _credential_ui_present(page: Any) -> bool:
+    # Before continuing a login stage, any visible generic input is interactive auth.
+    for selector in ('input:not([type="hidden"])', 'textarea'):
+        locator = page.locator(selector)
+        if any(locator.nth(index).is_visible() for index in range(locator.count())):
+            return True
+    return _explicit_auth_challenge_present(page)
+
+
+def _continuation(page: Any, label: str) -> Any:
+    matches = []
+    for role in ("button", "link"):
+        locator = page.get_by_role(role, name=label, exact=True)
+        if locator.count() > 1:
+            raise AuthStorageError("ambiguous_login_continuation")
+        if locator.count() == 1 and locator.is_visible() and locator.is_enabled():
+            if role == "link":
+                href = locator.get_attribute("href")
+                if not href or _trusted_stage(urljoin(page.url, href)) is None:
+                    raise AuthStorageError("untrusted_login_destination")
+            matches.append(locator)
+    if len(matches) != 1:
+        raise AuthStorageError("login_continuation_unavailable")
+    return matches[0]
+
+
+def advance_authenticated_profile(page: Any) -> int:
+    """Follow only the two observed controls, without entering secrets."""
+    clicks = 0
+    while True:
+        stage = _trusted_stage(page.url)
+        if stage == "chat.line.biz":
+            if _explicit_auth_challenge_present(page):
+                raise AuthStorageError("interactive_login_required")
+            return clicks
+        if stage not in {ACCOUNT_HOST, ACCESS_HOST}:
+            raise AuthStorageError("untrusted_login_stage")
+        if _credential_ui_present(page):
+            raise AuthStorageError("interactive_login_required")
+        if clicks >= MAX_CONTINUATION_CLICKS or (clicks == 1 and stage != ACCESS_HOST) or (clicks == 0 and stage != ACCOUNT_HOST):
+            raise AuthStorageError("login_continuation_limit")
+        before_url = page.url
+        label = ACCOUNT_CONTINUATION if clicks == 0 else ACCESS_CONTINUATION
+        _continuation(page, label).click(timeout=10000)
+        clicks += 1
+        try:
+            page.wait_for_url(lambda url: str(url) != before_url, timeout=10000)
+        except Exception as exc:
+            raise AuthStorageError("login_navigation_missing") from exc
+
+
+def replace_validated_storage(payload: dict[str, Any], storage_path: Path) -> int:
+    """Validate a same-directory candidate before replacing live storage."""
+    candidate_path = storage_path.with_name(f".{storage_path.name}.{uuid4().hex}.tmp")
+    try:
+        write_storage(payload, candidate_path)
+        bot_count = validate_storage(candidate_path)
+        os.replace(candidate_path, storage_path)
+        return bot_count
+    except Exception as exc:
+        raise AuthStorageError("storage_refresh_failed") from exc
+    finally:
+        _remove_storage_best_effort(candidate_path)
+        _remove_storage_best_effort(candidate_path.with_name(candidate_path.name + ".lock"))
+
+
+def ensure_valid_storage() -> dict[str, Any]:
+    """Use existing fixed storage when it restores; recover only if it cannot."""
+    _, storage_path = fixed_paths()
+    if storage_path.is_file():
+        try:
+            bot_count = validate_storage(storage_path)
+            return {"ok": True, "verified": True, "bot_count": bot_count, "recovered": False}
+        except AuthStorageError:
+            pass
+    result = bootstrap()
+    result["recovered"] = True
+    return result
+
+
 def bootstrap() -> dict[str, Any]:
-    """Read the dedicated profile, persist filtered cookies, then verify storage."""
+    """Verify cookies from the dedicated profile before replacing live storage."""
     profile_path, storage_path = fixed_paths()
     if not profile_path.is_dir():
         raise AuthStorageError("profile_missing")
@@ -145,9 +297,8 @@ def bootstrap() -> dict[str, Any]:
             context = playwright.chromium.launch_persistent_context(str(profile_path), channel="chrome", headless=True)
             pages = context.pages
             page = pages[0] if pages else context.new_page()
-            page.goto("https://chat.line.biz/", wait_until="domcontentloaded", timeout=30000)
-            if urlsplit(page.url).hostname != "chat.line.biz":
-                raise AuthStorageError("profile_not_authenticated")
+            page.goto(CHAT_ORIGIN, wait_until="domcontentloaded", timeout=30000)
+            advance_authenticated_profile(page)
             browser_cookies = context.cookies()
     except AuthStorageError:
         raise
@@ -160,19 +311,21 @@ def bootstrap() -> dict[str, Any]:
             except Exception:
                 pass
     payload = build_storage_payload(browser_cookies)
-    write_storage(payload, storage_path)
-    try:
-        bot_count = validate_storage(storage_path)
-    except AuthStorageError:
-        _remove_storage_best_effort(storage_path)
-        raise
-    return safe_status(len(payload["cookies"]), bot_count, storage_path)
+    bot_count = replace_validated_storage(payload, storage_path)
+    return safe_status(len(payload["cookies"]), bot_count)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    import sys
+    args = sys.argv[1:] if argv is None else argv
     try:
-        result = bootstrap()
-    except AuthStorageError:
+        if args == ["--ensure-valid"]:
+            result = ensure_valid_storage()
+        elif not args:
+            result = bootstrap()
+        else:
+            raise AuthStorageError("unsupported_mode")
+    except Exception:
         print(json.dumps({"ok": False, "error": "auth_storage_failed"}, sort_keys=True))
         return 1
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
