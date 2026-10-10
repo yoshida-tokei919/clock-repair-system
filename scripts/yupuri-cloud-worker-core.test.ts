@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertSingleDisabledNextPage, cloudInvoicesUrl, JournalStore, oneAddedRow, runCloudJob, WorkerStop, type CloudBrowser, type CloudJob } from "./yupuri-cloud-worker-core";
+import { assertSingleDisabledNextPage, cloudInvoicesUrl, JournalStore, oneAddedRow, productionCloudInvoicesUrl, runCloudJob, WorkerStop, type CloudBrowser, type CloudJob } from "./yupuri-cloud-worker-core";
 
 const job: CloudJob = { shipmentId: 42, managementNumber: "SHP-42",
   csvBase64: Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from("SHP-42\r\n")]).toString("base64") };
@@ -20,6 +20,9 @@ test("production URL and pagination contracts", () => {
   assert.equal(cloudInvoicesUrl(), "https://btoolboxprintservice.jp/invoices/");
   assert.equal(cloudInvoicesUrl("https://btoolboxprintservice.jp/invoices"), "https://btoolboxprintservice.jp/invoices");
   assert.equal(cloudInvoicesUrl("http://localhost:3000/invoices/"), "http://localhost:3000/invoices/");
+  assert.equal(productionCloudInvoicesUrl(), "https://btoolboxprintservice.jp/invoices/");
+  assert.throws(() => productionCloudInvoicesUrl("http://localhost:3000/invoices/"), /Production Cloud URL/);
+  assert.throws(() => productionCloudInvoicesUrl("https://127.0.0.1:3000/invoices/"), /Production Cloud URL/);
   for (const url of ["https://example.com/invoices/", "https://static.btoolboxprintservice.jp/invoices/",
     "http://btoolboxprintservice.jp/invoices/", "https://btoolboxprintservice.jp:8443/invoices/",
     "https://btoolboxprintservice.jp/invoices/invoices.html", "https://btoolboxprintservice.jp/invoices/?x=1",

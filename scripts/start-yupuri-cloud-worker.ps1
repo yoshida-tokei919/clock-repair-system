@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 if ($PollSeconds -lt 5 -or $PollSeconds -gt 3600) { throw 'PollSeconds must be 5..3600' }
 $repo = Split-Path -Parent $PSScriptRoot
 $worker = Join-Path $PSScriptRoot 'yupuri-cloud-worker.ts'
+$session = Join-Path $PSScriptRoot 'open-yupuri-cloud-login.ps1'
 $tsx = Join-Path $repo 'node_modules\.bin\tsx.cmd'
 if (-not (Test-Path -LiteralPath $tsx -PathType Leaf)) { throw 'Run npm ci before starting the worker' }
 $token = [Environment]::GetEnvironmentVariable('N8N_INTERNAL_TOKEN', 'User')
@@ -19,6 +20,7 @@ foreach ($name in @('YUPURI_APP_ORIGIN', 'YUPURI_CLOUD_INVOICES_URL', 'YUPURI_CL
 $workerArgs = @($worker, '--poll-seconds', "$PollSeconds")
 if ($Once) { $workerArgs += '--once' }
 if ($AllowIssue) { $workerArgs += '--allow-issue' }
+if ($AllowIssue) { & $session }
 Push-Location $repo
 try { & $tsx @workerArgs; exit $LASTEXITCODE }
 finally { Pop-Location }

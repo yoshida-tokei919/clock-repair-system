@@ -1,9 +1,8 @@
-import { cloudInvoicesUrl } from "./yupuri-cloud-worker-core";
-import { cdpEndpoint, connectDedicatedEdge, edgeProfilePath, isInvoicesPageUrl, waitForAuthenticatedInvoices } from "./yupuri-cloud-live-session";
+import { productionCloudInvoicesUrl } from "./yupuri-cloud-worker-core";
+import { cdpEndpoint, connectDedicatedEdge, edgeProfilePath, ensureAuthenticatedInvoices, LoginAttemptLatch, loginAttemptLatchPath } from "./yupuri-cloud-live-session";
 
 async function main() {
-  const url = cloudInvoicesUrl(process.env.YUPURI_CLOUD_INVOICES_URL);
-  if (new URL(url).origin !== "https://btoolboxprintservice.jp") throw new Error("Production Cloud URL is required");
+  const url = productionCloudInvoicesUrl(process.env.YUPURI_CLOUD_INVOICES_URL);
   const endpoint = cdpEndpoint(process.env.YUPURI_CLOUD_CDP_URL);
   const profile = edgeProfilePath(process.env.LOCALAPPDATA ?? "");
   let browser;
@@ -13,12 +12,7 @@ async function main() {
     await new Promise(resolve => setTimeout(resolve, 500));
   }
   if (!browser) throw new Error("Dedicated Edge CDP endpoint unavailable");
-  const context = browser.contexts()[0];
-  if (!context) throw new Error("Dedicated Edge context unavailable");
-  const page = context.pages().find(candidate => isInvoicesPageUrl(candidate.url(), url)) ?? await context.newPage();
-  await page.goto(url, { waitUntil: "domcontentloaded" });
-  console.log("Sign in to Yu-Pri Cloud in the dedicated Edge window. Waiting for the invoices page...");
-  await waitForAuthenticatedInvoices(browser, url);
+  await ensureAuthenticatedInvoices(browser, url, new LoginAttemptLatch(loginAttemptLatchPath(process.env.LOCALAPPDATA ?? "")));
   console.log("Cloud login confirmed. Keep the dedicated Edge window open.");
 }
 

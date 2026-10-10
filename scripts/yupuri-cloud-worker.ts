@@ -2,9 +2,10 @@ import { type Page } from "@playwright/test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { cloudInvoicesUrl, JournalStore, oneAddedRow, runCloudJob, WorkerStop, type CloudApi, type CloudBrowser, type CloudJob, type CloudRow } from "./yupuri-cloud-worker-core";
-import { assertAuthenticatedInvoices, cdpEndpoint, connectDedicatedEdge, edgeProfilePath, findAuthenticatedInvoicesPage } from "./yupuri-cloud-live-session";
+import { JournalStore, oneAddedRow, productionCloudInvoicesUrl, runCloudJob, WorkerStop, type CloudApi, type CloudBrowser, type CloudJob, type CloudRow } from "./yupuri-cloud-worker-core";
+import { assertAuthenticatedInvoices, cdpEndpoint, connectDedicatedEdge, edgeProfilePath, ensureAuthenticatedInvoices, LoginAttemptLatch, loginAttemptLatchPath } from "./yupuri-cloud-live-session";
 import { inspectCloudExportRows, inspectCloudTab } from "./yupuri-cloud-listing";
+import { resolvePdfPrint } from "./yupuri-cloud-print";
 
 const appData = process.env.LOCALAPPDATA;
 if (!appData) throw new Error("LOCALAPPDATA is required");
@@ -180,11 +181,12 @@ async function run() {
     let livePage: Page | undefined;
     let invoicesUrl: string | undefined;
     if (options.allowIssue) {
-      invoicesUrl = cloudInvoicesUrl(process.env.YUPURI_CLOUD_INVOICES_URL);
+      invoicesUrl = productionCloudInvoicesUrl(process.env.YUPURI_CLOUD_INVOICES_URL);
       const filter = process.env.YUPURI_CLOUD_FILTER_NAME ?? "\u6642\u8a08\u4fee\u7406\u30a2\u30d7\u30ea17\u5217";
       if (!filter || filter.trim() !== filter) throw new Error("Invalid Cloud filter name");
       const edge = await connectDedicatedEdge(cdpEndpoint(process.env.YUPURI_CLOUD_CDP_URL), edgeProfilePath(appData ?? ""));
-      livePage = await findAuthenticatedInvoicesPage(edge, invoicesUrl);
+      livePage = await ensureAuthenticatedInvoices(edge, invoicesUrl,
+        new LoginAttemptLatch(loginAttemptLatchPath(appData ?? "")));
       browser = new PlaywrightCloudBrowser(livePage, invoicesUrl, filter);
     }
     do {
@@ -200,7 +202,7 @@ async function run() {
           const printer = process.env.YUPURI_CLOUD_PRINTER_NAME;
           const printPdf = printer ? async (path: string) => {
             const module = await import("pdf-to-printer");
-            await module.print(path, { printer });
+            await resolvePdfPrint(module)(path, { printer });
           } : undefined;
           const result = await runCloudJob(job, api, browser, journal, true, printPdf);
           console.log(`shipment=${result.shipmentId} stage=${result.status}`);

@@ -45,7 +45,7 @@ if (-not $listener) {
         "`"--user-data-dir=$profile`"",
         '--enable-automation',
         '--no-first-run',
-        'https://btoolboxprintservice.jp/invoices/'
+        'https://auth.btoolboxprintservice.jp/sso'
     )
     Start-Process -FilePath $edge -ArgumentList $arguments | Out-Null
 }

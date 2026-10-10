@@ -48,6 +48,14 @@ export function cloudInvoicesUrl(configured = "https://btoolboxprintservice.jp/i
   return url.href;
 }
 
+export function productionCloudInvoicesUrl(configured?: string): string {
+  const url = cloudInvoicesUrl(configured);
+  if (new URL(url).origin !== "https://btoolboxprintservice.jp") {
+    throw new Error("Production Cloud URL is required");
+  }
+  return url;
+}
+
 export function assertSingleDisabledNextPage(count: number, enabled: boolean | null): void {
   if (count !== 1 || enabled !== false) throw new Error("Cloud pagination is ambiguous");
 }
