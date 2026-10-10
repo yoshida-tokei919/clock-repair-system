@@ -767,15 +767,30 @@ OpenClawの役割:
 時計修理業務アプリ
 = Customer / Repair / Inquiry / Shipment等の正本
 
-OpenClaw
-= LINE / Gmail / 通知 / AI判断 / 操作オーケストレーション
+API / DB / code
+= 構造化データ取得 / 厳密な計算 / 状態更新
 
 n8n
-= Webhook / 定期処理 / 機械的配管
+= Webhook / 定期処理 / 固定条件分岐 / 機械的配管
+
+AI
+= 自然言語理解 / 文脈判断 / 要約 / 分類 / 返信案 / 固定実装前の暫定業務ロジック
 
 カタリ + Playwright
 = ゆうプリクラウド等の決定的なブラウザ自動操作
+
+OpenClaw
+= AI判断に加えて、画面を見ながら操作先・手順を変える必要がある業務
+
+H1 / 専用Bridge
+= LINE通常トーク送信 / 決済等、安全制御が必要な重要操作
 ```
+
+2026-10-10のTask206H5再整理では、OpenClawを万能実行基盤にはしない方針を確定した。固定ルールはAPI / code / n8n、決定的なブラウザ操作はPlaywright、自然言語・文脈判断はAIを優先し、OpenClawは「AI判断 + 臨機応変なUI操作」が両方必要な場面へ限定する。
+
+また、固定ルールで処理できる業務でも専用実装前はAIの汎用理解を暫定ロジックとして利用してよい。画面DOM / accessibility snapshot / 汎用API等をAIへ渡して先に仮運用し、頻出・決定的な処理が固まった段階でAPI / n8n / Playwrightへ移す。H5BのRepair readはこのPoCとして位置付け、恒久的な構造化データ取得はAPI / DB / n8nを優先する。H5C以降はOpenClawありきで自動着手せず、業務ユースケースを棚卸しして必要性を判断する。
+
+詳細: `docs/ai-tasks/206h5-ai-automation-layering-decision.md`
 
 OpenClawはローカルWindows PC常駐を第一候補とし、Customer Communication HubのDBを置き換えない。
 OpenClaw → H1で最新文脈取得、返信案提示、ヨシダの明示承認後だけapprove、最後にCONFIRMED確認まで行うPoCを先に実施する。
