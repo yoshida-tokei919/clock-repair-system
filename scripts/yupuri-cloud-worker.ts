@@ -1,13 +1,14 @@
-import { chromium, type BrowserContext, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { assertSingleDisabledNextPage, cloudInvoicesUrl, JournalStore, oneAddedRow, runCloudJob, WorkerStop, type CloudApi, type CloudBrowser, type CloudJob, type CloudRow } from "./yupuri-cloud-worker-core";
+import { cloudInvoicesUrl, JournalStore, oneAddedRow, runCloudJob, WorkerStop, type CloudApi, type CloudBrowser, type CloudJob, type CloudRow } from "./yupuri-cloud-worker-core";
+import { assertAuthenticatedInvoices, cdpEndpoint, connectDedicatedEdge, edgeProfilePath, findAuthenticatedInvoicesPage } from "./yupuri-cloud-live-session";
+import { inspectCloudExportRows, inspectCloudTab } from "./yupuri-cloud-listing";
 
 const appData = process.env.LOCALAPPDATA;
 if (!appData) throw new Error("LOCALAPPDATA is required");
 const localRoot = join(appData, "clock-repair-system", "yupuri-cloud");
-const profile = join(appData, "clock-repair-system", "yupuri-cloud-browser");
 const pdfDir = join(localRoot, "pdf");
 const journal = new JournalStore(join(localRoot, "journal"));
 
@@ -61,11 +62,7 @@ class PlaywrightCloudBrowser implements CloudBrowser {
   constructor(private readonly page: Page, private readonly invoicesUrl: string, private readonly filterName: string) {}
   private async invoices() {
     await this.page.goto(this.invoicesUrl, { waitUntil: "domcontentloaded" });
-    if (new URL(this.page.url()).pathname.replace(/\/$/, "") !== "/invoices" ||
-      new URL(this.page.url()).origin !== new URL(this.invoicesUrl).origin ||
-      await this.page.getByRole("tab", { name: "\u767a\u884c\u5f8c", exact: true }).count() !== 1) {
-      throw new Error("Cloud session or invoice page unavailable");
-    }
+    await assertAuthenticatedInvoices(this.page, this.invoicesUrl);
   }
   private async matchingRows(managementNumber: string) {
     const rows = this.page.getByRole("row");
@@ -78,19 +75,8 @@ class PlaywrightCloudBrowser implements CloudBrowser {
   }
   async find(managementNumber: string): Promise<CloudRow | null> {
     await this.invoices();
-    const inspect = async (tabName: string) => {
-      const tab = this.page.getByRole("tab", { name: tabName, exact: true });
-      if (await tab.count() !== 1) throw new Error("Cloud tab ambiguous");
-      await tab.click();
-      const matches = await this.matchingRows(managementNumber);
-      const nextPage = this.page.getByRole("button", { name: "次の500件", exact: true });
-      const count = await nextPage.count();
-      assertSingleDisabledNextPage(count, count === 1 ? await nextPage.isEnabled() : null);
-      if (matches.length > 1) throw new Error("Duplicate Cloud management number");
-      return matches[0] ? await matches[0].innerText() : null;
-    };
-    const issued = await inspect("\u767a\u884c\u5f8c");
-    const unissued = await inspect("\u767a\u884c\u524d");
+    const issued = await inspectCloudTab(this.page, "\u767a\u884c\u5f8c", managementNumber);
+    const unissued = await inspectCloudTab(this.page, "\u767a\u884c\u524d", managementNumber);
     if (issued && unissued) throw new Error("Cloud management number occurs on both tabs");
     if (issued) {
       const numbers = [...issued.matchAll(/(?<!\d)\d{12}(?!\d)/g)].map(match => match[0]);
@@ -103,10 +89,7 @@ class PlaywrightCloudBrowser implements CloudBrowser {
     await this.invoices();
     await this.page.getByRole("button", { name: "送り状のダウンロード" }).click();
     await this.page.waitForURL("**/invoices/export");
-    const rows = this.page.getByRole("row").filter({ hasText: "シート式ラベル(ユ00783)" }).filter({ hasText: "発行済み" });
-    const result: string[] = [];
-    for (let i = 0, count = await rows.count(); i < count; i++) result.push(await rows.nth(i).innerText());
-    return result;
+    return inspectCloudExportRows(this.page);
   }
   async upload(csv: Buffer, managementNumber: string) {
     await this.invoices();
@@ -148,12 +131,13 @@ class PlaywrightCloudBrowser implements CloudBrowser {
     await this.invoices();
     await this.page.getByRole("button", { name: "送り状のダウンロード" }).click();
     await this.page.waitForURL("**/invoices/export");
+    const after = await inspectCloudExportRows(this.page);
+    const addedIndex = oneAddedRow(before, after);
     const rows = this.page.getByRole("row").filter({ hasText: "シート式ラベル(ユ00783)" }).filter({ hasText: "発行済み" });
-    const after: string[] = [];
-    for (let i = 0, count = await rows.count(); i < count; i++) {
-      after.push(await rows.nth(i).innerText());
+    const added = rows.nth(addedIndex);
+    if (await rows.count() !== after.length || await added.innerText() !== after[addedIndex]) {
+      throw new Error("Cloud PDF row changed after inspection");
     }
-    const added = rows.nth(oneAddedRow(before, after));
     const button = added.getByRole("button", { name: "ダウンロード", exact: true });
     if (await button.count() !== 1) {
       throw new Error("Cloud PDF cannot be correlated to one issue");
@@ -191,17 +175,24 @@ async function run() {
   await mkdir(localRoot, { recursive: true });
   const lock = join(localRoot, "worker.lock");
   await mkdir(lock); // A second instance fails; stale locks require an explicit operator review.
-  let context: BrowserContext | undefined;
   try {
     let browser: CloudBrowser | undefined;
+    let livePage: Page | undefined;
+    let invoicesUrl: string | undefined;
     if (options.allowIssue) {
-      const url = cloudInvoicesUrl(process.env.YUPURI_CLOUD_INVOICES_URL);
+      invoicesUrl = cloudInvoicesUrl(process.env.YUPURI_CLOUD_INVOICES_URL);
       const filter = process.env.YUPURI_CLOUD_FILTER_NAME ?? "\u6642\u8a08\u4fee\u7406\u30a2\u30d7\u30ea17\u5217";
       if (!filter || filter.trim() !== filter) throw new Error("Invalid Cloud filter name");
-      context = await chromium.launchPersistentContext(profile, { channel: "msedge", headless: false, acceptDownloads: true });
-      browser = new PlaywrightCloudBrowser(context.pages()[0] ?? await context.newPage(), url, filter);
+      const edge = await connectDedicatedEdge(cdpEndpoint(process.env.YUPURI_CLOUD_CDP_URL), edgeProfilePath(appData ?? ""));
+      livePage = await findAuthenticatedInvoicesPage(edge, invoicesUrl);
+      browser = new PlaywrightCloudBrowser(livePage, invoicesUrl, filter);
     }
     do {
+      if (livePage && invoicesUrl) {
+        // Recheck the live SSO session before requesting any job from the internal API.
+        await livePage.goto(invoicesUrl, { waitUntil: "domcontentloaded" });
+        await assertAuthenticatedInvoices(livePage, invoicesUrl);
+      }
       const job = await api.next();
       if (job) {
         console.log(`shipment=${job.shipmentId} stage=${options.allowIssue ? "processing" : "preview"}`);
@@ -218,14 +209,16 @@ async function run() {
       if (!options.once) await delay(options.seconds * 1000);
     } while (!options.once);
   } finally {
-    await context?.close();
     await rm(lock, { recursive: true, force: true });
   }
 }
 
-run().catch(error => {
+run().then(() => {
+  // The process exit drops CDP without sending Browser.close to Edge.
+  process.exit(0);
+}).catch(error => {
   // Do not emit browser, HTTP, CSV, PDF, or profile contents to service logs.
   if (error instanceof WorkerStop) console.error(error.message);
   else console.error("Yu-Pri Cloud worker stopped; inspect the local journal and Cloud UI before retrying");
-  process.exitCode = 1;
+  process.exit(1);
 });
