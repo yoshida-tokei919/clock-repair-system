@@ -1,45 +1,85 @@
-# Task201G — Yu-Pri Cloud operational hardening
+# Task201G ? Yu-Pri Cloud operational hardening
 
-Status: application code deployed; Windows Scheduled Task activation pending. Rollout-gate follow-up validated locally.
+Status: production application/rollout gate deployed; Windows Worker registered in non-issuing mode; approved production E2E completed successfully. Live-service compatibility corrections are validated locally and pending a new production approval.
 
 ## Boundary
 
-This task changes only the local dedicated Edge login helper, worker service-hours gate, Scheduled Task installer gate, related tests, and this record. No schema, migration, DB, environment, application API, LINE, or other Task changes.
+This task changes only the local dedicated Edge login/session helper, Yu-Pri Cloud worker timing/reconciliation behavior, Scheduled Task rollout gate, related tests, and this record. No schema, migration, RLS, GRANT, LINE, auth, payment, or application business API contract is changed by the live-service correction.
 
 ## Official entry and remembered auto-login
 
-- JP Business ToolBox official public entry is `https://www.post.japanpost.jp/bizpost/service/businesstoolbox/`. Its red Login link targets `https://btoolbox.post.japanpost.jp/`.
-- On 2026-10-11 the user verified in the dedicated Edge profile `%LOCALAPPDATA%\clock-repair-system\yupuri-cloud\edge-profile` that, after manually enabling auto-login once, a full Edge close and reopen followed by the official public entry → Login reached `https://btoolbox.post.japanpost.jp/portal/PT/PTPT/PTPT0001.do?op=init` without the credential form.
-- Reusing an open browser after logout did not auto-login. A full dedicated Edge restart is required for recovery. All `msedge.exe` processes with the exact dedicated profile are counted, including renderer/crashpad children that lack root CDP flags. Profile extraction accepts unquoted no-space values, quoted values with spaces, and quoted whole arguments with or without spaces; duplicate or ambiguous flags fail closed. Restart requires exactly one browser root with that profile, `--remote-debugging-address=127.0.0.1`, and the configured CDP port, without a `--type=` child flag. Its PID alone is rechecked and stopped; all children must exit naturally within the bounded wait. Missing/duplicate roots, leftover children, or an occupied CDP port fail closed for manual cleanup. The normal Edge profile is never selected.
-- The official public Login link opens a separate tab while the original entry remains unchanged. The helper begins with exactly one public-entry tab, requires exactly one visible official Login link with the exact ToolBox href, arms a context new-page wait before one click, and accepts exactly one new ToolBox page whose opener is the public entry. It rechecks that the original tab still has the exact public-entry URL after the new page opens, during portal proof, and before closing the original tab. It proves the authenticated portal only on the new page, then closes the original public entry. The resulting single page navigates through the exact `https://auth.btoolboxprintservice.jp/sso` entry and must show authenticated Cloud invoices. Extra/unexpected tabs fail closed; old rendered tabs cannot prove authentication.
-- Portal proof is allowlisted: the exact remembered-login home URL `https://btoolbox.post.japanpost.jp/portal/PT/PTPT/PTPT0001.do?op=init` requires one visible `ログアウト` link and no login candidate. The actual username field `#usrIdsLogIds`, the other known login controls, and both login-choice texts are candidates when visible or duplicated, even if every duplicate is hidden. Count or visibility inspection errors fail closed. The exact service-detail URL `https://btoolbox.post.japanpost.jp/portal/SV/SVSV/SVSV0001.do` requires one hidden `#srvUtlUrl` with the exact Cloud SSO URL and one visible `#srvUtl`. Other portal pages do not prove authentication, even if they show Logout. Exact URL spelling excludes ports, credentials, fragments, and extra queries.
-- If a ToolBox login form appears, the helper stops with manual recovery instructions: log in manually, enable auto-login, then restart the dedicated Edge. Native credential popup selection, saved-credential keys, and the one-attempt marker are removed from normal operation. The old repo-external `auto-login-attempted` marker is not read or deleted; operators may inspect it separately.
-- Login does not automatically click login-method choices, fill fields, send `ArrowDown`/`Enter`, or retry credentials.
+- JP Business ToolBox official public entry is `https://www.post.japanpost.jp/bizpost/service/businesstoolbox/`. The official Login CTA targets `https://btoolbox.post.japanpost.jp/`.
+- The dedicated Edge profile is `%LOCALAPPDATA%\clock-repair-system\yupuri-cloud\edge-profile`, with CDP on `127.0.0.1:18822`. After auto-login is enabled once, a full close/reopen of this dedicated profile followed by official public entry ? Login can reach the authenticated ToolBox portal without credential entry.
+- Login recovery never types credentials, selects saved-password UI, sends native keys, or uses the old `auto-login-attempted` marker. A real login form remains a manual-recovery stop condition.
+- The current public page contains more than one visible official `????` CTA with the same exact ToolBox href. The helper now accepts one or more visible exact official Login CTAs only when each candidate keeps the raw exact href and `target="_blank"`, and clicks exactly one. Unrelated hrefs do not qualify.
+- A new `target=_blank` page is observed briefly with `Page.url() === ""` before the official SAML URL appears. Only this empty initial state, `about:blank`, or the strict official `btoolbox.post.japanpost.jp` host is accepted during handoff. External URLs and other browser pages still fail closed.
+- The authenticated ToolBox home remains allowlisted to the exact portal URL. Current live DOM exposes one visible exact `?????` anchor with `href="javascript:void(0);"`; this anchor plus absence of login controls proves the home. The service-detail proof remains the exact `#srvUtlUrl` Cloud SSO target plus visible `#srvUtl` on the exact service-detail URL. Arbitrary portal pages cannot prove authentication.
+- Cloud SSO may finish its redirect after the initial navigation resolves. Invoice proof therefore first waits for the authenticated `???` tab to become visible, then strictly verifies the final Cloud invoices URL and authenticated UI. It does not relax the final URL allowlist.
 
-## Service hours
+## Service hours and topology
 
-- The ToolBox UI states official availability **06:00–24:00 JST**. The separate **automation operational window is 06:00 inclusive to 23:55 exclusive JST**. The intentional five-minute buffer stops the application from initiating any new JP ToolBox/Cloud browser action, navigation, PDF HTTP retrieval, or print operation at or after 23:55. Bounded Playwright actions and fresh guards limit pending work, but Windows/Playwright scheduling cannot provide an atomic OS-level dispatch guarantee or guarantee when an already initiated request finishes.
-- Outside the automation window, `--once` skips without ToolBox/Cloud browser access or label issuance. A long-running worker waits until 06:00; after the overnight wait, it restarts the dedicated Edge and reestablishes portal and Cloud proof. If the PowerShell Edge restart crosses the cutoff and exits nonzero, the worker classifies it as window closure and follows the same wait path.
-- Browser clicks and checkbox selection perform a bounded actionability trial, then recheck the automation window before a one-second bounded action. File selection waits for the input to attach, then rechecks before its bounded action. Browser navigation, PDF HTTP retrieval, and print have fresh guards. The internal app API is not a Japan Post service request; the worker also suspends its pipeline at the automation cutoff. If the window closes during an in-flight job, it stops initiating further operations and retains the journal for reconciliation of uncertain issuance or printing.
-- The dedicated Edge launcher rechecks the 23:55 cutoff immediately before `Start-Process`. Closing an already-open temporary PDF popup and internal/local cleanup make no JP service request and remain allowed after the cutoff.
-- Operational Cloud use requires exactly one browser context with the authenticated worker page and no other open tab before browser actions and immediately before internal completion and print dispatch, including after a journal write. Only PDF download may temporarily have one new popup in that context, which must be attributable to the worker page; cleanup requires the single-page topology again. An extra context or unrelated tab fails closed without closing unrelated pages.
+- JP Business ToolBox official availability is **06:00?24:00 JST**. The separate automation operational window remains **06:00 inclusive to 23:55 exclusive JST** to leave a five-minute safety buffer.
+- Browser side effects have fresh service-window guards. Click/check/file actions use bounded Playwright actionability checks and recheck the window immediately before dispatch. PDF HTTP retrieval and printing also recheck the window.
+- Worker operation requires exactly one browser context and one worker page. Only the attributable PDF popup may temporarily add one page; unrelated or extra tabs/contexts fail closed.
+- The Scheduled Task remains registered against canonical `C:\Users\yoshi\clock-repair-system` with **no `-AllowIssue`**. Automatic real issuance is therefore still disabled even though one approved manual E2E used `-Once -AllowIssue`.
 
-## Existing safeguards and rollout
+## Live Cloud URL and propagation behavior
 
-- Cloud issuance still requires the production Cloud origin, authenticated invoices proof before each internal `next` request, and the existing journal reconciliation/print-attempt guard. The production `YUPURI_APP_ORIGIN` requires exact raw spelling; localhost remains available for development. The `pdf-to-printer` import accepts callable `print` or `default.print`.
-- Installer registration remains restricted to clean canonical `C:\Users\yoshi\clock-repair-system` `main` matching local `origin/main` and live remote `main`. `-ReviewedCommit` identifies the independently reviewed Task201G source baseline; it must be an ancestor of current `main`, must itself contain the Task201G correction files / login protocol / safety record, and every protected Task201G runtime source must remain unchanged between that reviewed commit and current `HEAD`. Later unrelated commits are therefore allowed, while any later Yu-Pri runtime drift fails closed.
-- Protected runtime files are `start-yupuri-cloud-worker.ps1`, `open-yupuri-cloud-login.ps1`, `await-yupuri-cloud-login.ts`, `yupuri-cloud-live-session.ts`, `yupuri-cloud-actions.ts`, `yupuri-cloud-listing.ts`, `yupuri-cloud-worker-core.ts`, and `yupuri-cloud-worker.ts`. The installer itself, tests, docs, and `.gitignore` may evolve as rollout mechanics without silently authorizing runtime drift.
-- Python `__pycache__/` and `*.py[cod]` are ignored as generated runtime cache. This avoids false dirty-tree failures caused by the LINE Manager Python helpers while preserving the clean-tree rejection for all other untracked or modified files.
-- Task201G application code commit `97f4751a13aec9a3d5bc616b06ec286fa59f1e06` was pushed to `main`; Railway deployment `01c1238b-0c4f-456d-9d91-6ca77a5ec2ba` completed `SUCCESS`; production tag is `production-task201g-20261012`.
-- The redesigned Windows Worker remains disabled and has not issued or printed a live label. The follow-up rollout-gate change is local only until separately approved for commit/push/deploy.
+- Production invoices origin remains exactly `https://btoolboxprintservice.jp/invoices/`.
+- The live service canonicalizes workflow pages to trailing-slash URLs such as `/invoices/upload/`. Upload/export waits now accept only the exact production host and exact `/invoices/upload` or `/invoices/upload/`, and exact `/invoices/export` or `/invoices/export/`. Query strings, fragments, credentials, explicit ports, HTTP, lookalike hosts, and wrong workflow paths remain rejected.
+- Live Cloud processing is asynchronous: after upload, the row may take several seconds to become visible; after issuance, the tracking number may also take several seconds to appear. The worker now performs bounded **read-only** reconciliation waits only. `upload()` and `issue()` are still invoked at most once; transport failures or unresolved state still stop for review.
+- `PlaywrightCloudBrowser.waitForPropagation()` checks single-page topology and the service window before and after a 3-second wait. Core reconciliation performs at most two such waits after upload or issue. No side effect is repeated by the wait loop.
 
-## Local verification
+## Rollout safeguards
 
-- Post-rebase focused Node tests: 42/42 PASS using in-process TypeScript transpilation, including cutoff/wait calculations, duplicate hidden login candidates, later browser contexts/pages blocking completion and print, Edge restart cutoff classification, popup cleanup, URL/portal proof, and journal reconciliation. Direct `node --import tsx --test` could not start its test subprocesses in this environment (`spawn EPERM`); this was an execution error before assertions, not an assertion failure. The temporary in-process runner was removed. The two existing Playwright browser-launch tests remain unverified in this environment.
-- Dedicated Edge root/child process-selection and 23:55 cutoff fixture PASS. Installer CRLF regression is covered: the working-copy protocol regex accepts LF and CRLF while retaining the exact protocol value.
-- Rollout-gate follow-up fixture PASS: missing/invalid SHA, non-ancestor reviewed commit, pre-Task baseline, wrong/missing working-copy protocol, dirty tree, protected runtime drift, and missing required source all fail closed; a later unrelated main commit passes when the original reviewed Task201G baseline remains unchanged.
-- Real-repo comparison confirms `97f4751` is an ancestor of base `168deda`, with zero diff across all protected Yu-Pri runtime files. The intervening production commit changes only `docs/ai-tasks/206h1c-line-manager-handle-timeout.md`, `scripts/line_manager_auth_storage.py`, and `scripts/test_line_manager_auth_storage.py`.
-- PowerShell parse for installer + fixture, TypeScript `--noEmit --incremental false`, and `git diff --check` PASS for the follow-up.
-- Codex independent review is unavailable during the current usage-limit window. The follow-up was implemented and reviewed by Katari per explicit user instruction; no Scheduled Task registration, live login, label issuance, printing, push, or deploy has been performed by this follow-up.
+- Installer registration remains restricted to clean canonical `C:\Users\yoshi\clock-repair-system` `main` matching local `origin/main` and live remote `main`.
+- `-ReviewedCommit` identifies a reviewed Task201G baseline. Later unrelated commits are allowed only when all protected Yu-Pri runtime files remain unchanged; protected runtime drift fails closed.
+- Protected runtime includes `start-yupuri-cloud-worker.ps1`, `open-yupuri-cloud-login.ps1`, `await-yupuri-cloud-login.ts`, `yupuri-cloud-live-session.ts`, `yupuri-cloud-actions.ts`, `yupuri-cloud-listing.ts`, `yupuri-cloud-worker-core.ts`, and `yupuri-cloud-worker.ts`.
+- Because this live-service correction changes protected runtime files, the existing reviewed baseline must **not** be used to silently re-register an issuing worker. Any future registration from this correction requires the reviewed correction commit to be supplied explicitly after production approval.
+- Python `__pycache__/` and `*.py[cod]` remain ignored as generated runtime cache; other dirty-tree state still blocks rollout.
 
-Production: application code deployed; Windows Worker activation pending.
+## Production rollout before live E2E correction
+
+- Task201G application correction commit: `97f4751a13aec9a3d5bc616b06ec286fa59f1e06`.
+- Rollout-gate follow-up commit: `4a47fb76425f8383a36742da7c6304aa666891b1`.
+- Railway deployment for `4a47fb7`: `0a803108-12e9-4cb7-a096-9e8728d48d88` ? `SUCCESS`.
+- Production tag: `production-task201g-rollout-gate-20261012`.
+- Production smoke: `/` 200, `/login` 200, `/repairs` unauthenticated 307, `/shipments` unauthenticated 307, no relevant Railway `upstreamErrors`.
+- `ClockRepair-YuPriCloudWorker` is registered/Ready on canonical repo with `HasAllowIssue=False`; the legacy `ClockRepair-YuPriCloudSession` remains disabled.
+- A non-issuing `-Once` dry-run at 06:00 JST reached `GET /api/internal/yupuri-cloud/next` 200 and exited 0 without Cloud login, issue, PDF, print, or Shipment completion.
+
+## Approved production E2E ? 2026-10-12
+
+The user explicitly approved creating test data and issuing/printing one real test label because a true production E2E was required.
+
+- Before the test, production had zero eligible `READY + JAPAN_POST + YU_PACK + unissued` shipments.
+- A dedicated TEST Customer (`id=2`) and TEST Shipment (`id=2`, management number `SHP-2`) were created without any Repair association. The destination snapshot used Japan Post headquarters' public business address so no real customer address was used.
+- The first live attempts failed closed before issuance and exposed the Login CTA, empty-new-tab, portal-proof, Cloud-redirect, and trailing-slash compatibility issues documented above. Journal/Cloud/DB reconciliation was checked before every recovery; no blind re-upload or second issue click was performed.
+- CSV upload was confirmed asynchronously as `SHP-2 = unissued` before issuance recovery.
+- After one issue click, the worker stopped `tracking-uncertain`; a later read-only Cloud reconciliation proved `SHP-2 = issued` with one 12-digit tracking number. Recovery from journal stage `issuing` did **not** click Issue again.
+- Final worker run completed with exit code 0 and log `shipment=2 stage=completed`.
+- Production `Shipment.id=2` is now `LABEL_ISSUED`, has the Cloud tracking number and `labelIssuedAt`, and keeps `actualShippedAt = null`. Label issuance/printing is intentionally not treated as postal acceptance/shipment.
+- Railway logs show `GET /api/internal/yupuri-cloud/next` 200 and `POST /api/internal/yupuri-cloud/complete` 200 for the successful recovery, with no upstream error.
+- Label PDF exists at `%LOCALAPPDATA%\clock-repair-system\yupuri-cloud\pdf\shipment-2.pdf` (77,737 bytes in this run).
+- Local journal for Shipment 2 reached `stage=completed`, with `printAttempted=true` and `printCompleted=true`. `NEC MultiWriter 5750C` was `Normal` before execution and the print command returned successfully. Physical paper output itself remains an external/manual confirmation item.
+- TEST Customer/Shipment records and the issued Cloud label are intentionally retained for audit. They were not deleted after the test. Cleanup, if desired, is a separate destructive operation and was not performed.
+- Scheduled Task configuration was not changed by the manual E2E; it remains non-issuing (`-AllowIssue` absent).
+
+## Local verification of live-service correction
+
+In the isolated Task201G worktree, after separating all concurrent Task206G1 changes:
+
+- `yupuri-cloud-live-session.test.ts`: **20/20 PASS**.
+- `yupuri-cloud-worker-browser.test.ts`: **17/17 PASS**.
+- `yupuri-cloud-worker-core.test.ts`: **10/10 PASS**.
+- `yupuri-cloud-listing.test.ts`: **5/5 PASS**.
+- `yupuri-cloud-print.test.ts`: **1/1 PASS**.
+- Total focused Node tests: **53/53 PASS**.
+- Dedicated Edge PowerShell process fixture: PASS.
+- Installer reviewed-baseline/CRLF/dirty-tree/protected-drift fixture: PASS.
+- `npx tsc --noEmit --incremental false`: PASS in the isolated Task201G worktree.
+- `git diff --check`: PASS.
+- No temporary `.task201g-*` debug runner is retained.
+- Codex independent review is unavailable during the current usage-limit window. The correction was implemented and reviewed by Katari under the user's explicit instruction; independent review remains unperformed.
+
+Production for the **new live-service correction**: pending. Do not push/deploy or enable automatic issuance without a new explicit production approval.

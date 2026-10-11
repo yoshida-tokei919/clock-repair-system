@@ -68,9 +68,10 @@ export async function isAuthenticatedInvoices(page: Page, invoicesUrl: string): 
 }
 
 export async function assertAuthenticatedInvoices(page: Page, invoicesUrl: string): Promise<void> {
-  if (!isInvoicesPageUrl(page.url(), invoicesUrl)) throw new Error("Cloud session or invoice page unavailable");
   await page.getByRole("tab", { name: "発行後", exact: true }).waitFor({ state: "visible", timeout: 15000 });
-  if (!await isAuthenticatedInvoices(page, invoicesUrl)) throw new Error("Cloud session or invoice page unavailable");
+  if (!isInvoicesPageUrl(page.url(), invoicesUrl) || !await isAuthenticatedInvoices(page, invoicesUrl)) {
+    throw new Error("Cloud session or invoice page unavailable");
+  }
 }
 
 export function isJpToolboxUrl(value: string): boolean {
@@ -80,6 +81,10 @@ export function isJpToolboxUrl(value: string): boolean {
       url.protocol === "https:" && url.hostname === "btoolbox.post.japanpost.jp" &&
       !url.port && !url.username && !url.password;
   } catch { return false; }
+}
+
+export function isExpectedToolboxHandoffUrl(value: string): boolean {
+  return value === "" || value === "about:blank" || isJpToolboxUrl(value);
 }
 
 const JP_LOGIN_ENTRY_TEXT = "料金別後納お客さま番号でログイン";
@@ -107,7 +112,7 @@ export async function isVerifiedToolboxPortal(page: Page): Promise<boolean> {
   if ((address !== TOOLBOX_PORTAL_HOME_URL && address !== TOOLBOX_SERVICE_DETAIL_URL) ||
     await isJpLoginCandidate(page)) return false;
   if (address === TOOLBOX_PORTAL_HOME_URL) {
-    const logout = page.getByRole("link", { name: "ログアウト", exact: true });
+    const logout = page.locator('a[href="javascript:void(0);"]', { hasText: /^\s*\u30ed\u30b0\u30a2\u30a6\u30c8\s*$/ });
     return await logout.count() === 1 && await logout.isVisible();
   }
   const sso = page.locator("#srvUtlUrl");
@@ -174,7 +179,8 @@ async function waitForPortalOrLogin(browser: Browser, context: BrowserContext, e
     assertToolboxAutomationWindowOpen(now());
     assertLoginTabs(context, entry, opened, page);
     assertPublicEntryUnchanged(entry);
-    if (page.url() !== "about:blank" && !isJpToolboxUrl(page.url())) {
+    const address = page.url();
+    if (!isExpectedToolboxHandoffUrl(address)) {
       throw new Error("Official Login opened an unexpected page");
     }
     if (await isVerifiedToolboxPortal(page)) return;
@@ -197,8 +203,20 @@ export async function ensureAuthenticatedInvoices(browser: Browser, invoicesUrl:
   assertToolboxAutomationWindowOpen(now());
   await entry.goto(TOOLBOX_PUBLIC_ENTRY_URL, { waitUntil: "domcontentloaded", timeout: timeoutMs });
   if (entry.url() !== TOOLBOX_PUBLIC_ENTRY_URL) throw new Error("Official ToolBox entry page unavailable");
-  const login = entry.locator(`a[href="${TOOLBOX_LOGIN_URL}"]`);
-  if (await login.count() !== 1 || !await login.isVisible()) throw new Error("Official ToolBox Login link unavailable");
+  const loginCandidates = entry.locator(`a[href="${TOOLBOX_LOGIN_URL}"]`, { hasText: /^\s*\u30ed\u30b0\u30a4\u30f3\s*$/ });
+  const loginCount = await loginCandidates.count();
+  const visibleLogins = [];
+  for (let i = 0; i < loginCount; i++) {
+    const candidate = loginCandidates.nth(i);
+    if (!await candidate.isVisible()) continue;
+    if (await candidate.getAttribute("href") !== TOOLBOX_LOGIN_URL ||
+      await candidate.getAttribute("target") !== "_blank") {
+      throw new Error("Official ToolBox Login link unavailable");
+    }
+    visibleLogins.push(candidate);
+  }
+  if (visibleLogins.length < 1) throw new Error("Official ToolBox Login link unavailable");
+  const login = visibleLogins[0];
   const opened: Page[] = [];
   const onPage = (page: Page) => { opened.push(page); };
   context.on("page", onPage);

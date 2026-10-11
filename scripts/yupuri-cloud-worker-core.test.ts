@@ -64,6 +64,30 @@ test("worker uploads once, reconciles exact row, downloads PDF, prints and compl
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test("bounded propagation waits absorb delayed upload and issue visibility without repeating side effects", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "yupuri-worker-"));
+  try {
+    let row: "none" | "unissued" | "issued" = "none";
+    let waits = 0; let uploads = 0; let issues = 0; let completes = 0;
+    const browser: CloudBrowser = {
+      find: async () => row === "none" ? null : { state: row, trackingNumber: row === "issued" ? "398007150100" : null },
+      exportRows: async () => [],
+      upload: async () => { uploads++; },
+      issue: async () => { issues++; },
+      downloadNewPdf: async () => "label.pdf",
+      waitForPropagation: async () => {
+        waits++;
+        if (waits === 1) row = "unissued";
+        else if (waits === 2) row = "issued";
+      },
+    };
+    const store = new JournalStore(dir);
+    const api = { next: async () => job, complete: async () => { completes++; } };
+    assert.equal((await runCloudJob(job, api, browser, store, true)).status, "completed");
+    assert.deepEqual([waits, uploads, issues, completes], [2, 1, 1, 1]);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test("uncertain upload and preexisting remote row stop without reupload", async () => {
   const dir = await mkdtemp(join(tmpdir(), "yupuri-worker-"));
   try {

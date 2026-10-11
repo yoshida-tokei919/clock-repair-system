@@ -16,6 +16,7 @@ export interface CloudBrowser {
   upload(csv: Buffer, managementNumber: string): Promise<void>;
   issue(managementNumber: string): Promise<void>;
   downloadNewPdf(exportBefore: string[], managementNumber: string): Promise<string>;
+  waitForPropagation?(): Promise<void>;
 }
 
 export class WorkerStop extends Error {
@@ -86,6 +87,16 @@ function checkedJob(job: CloudJob): void {
   }
 }
 
+async function findAfterPropagation(browser: CloudBrowser, managementNumber: string,
+  ready: (row: CloudRow | null) => boolean): Promise<CloudRow | null> {
+  let row = await browser.find(managementNumber);
+  for (let attempt = 0; attempt < 2 && !ready(row) && browser.waitForPropagation; attempt++) {
+    await browser.waitForPropagation();
+    row = await browser.find(managementNumber);
+  }
+  return row;
+}
+
 function tracking(row: CloudRow | null, id: number): string {
   if (!row || row.state !== "issued" || !row.trackingNumber || !/^\d{12}$/.test(row.trackingNumber)) {
     throw new WorkerStop("tracking-uncertain", id);
@@ -116,7 +127,7 @@ export async function runCloudJob(job: CloudJob, api: CloudApi, browser: CloudBr
     journal = { shipmentId: id, managementNumber: job.managementNumber, stage: "started" };
     await store.write(journal);
     await browser.upload(Buffer.from(job.csvBase64, "base64"), job.managementNumber);
-    row = await browser.find(job.managementNumber);
+    row = await findAfterPropagation(browser, job.managementNumber, candidate => candidate !== null);
   }
   if (!row) throw new WorkerStop("upload-uncertain", id);
   if (row.state === "unissued") {
@@ -125,7 +136,7 @@ export async function runCloudJob(job: CloudJob, api: CloudApi, browser: CloudBr
     journal.stage = "issuing";
     await store.write(journal);
     await browser.issue(job.managementNumber);
-    row = await browser.find(job.managementNumber);
+    row = await findAfterPropagation(browser, job.managementNumber, candidate => candidate?.state === "issued");
   }
   const trackingNumber = tracking(row, id);
   if (journal.trackingNumber && journal.trackingNumber !== trackingNumber) throw new WorkerStop("tracking-conflict", id);

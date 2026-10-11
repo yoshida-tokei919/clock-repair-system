@@ -4,7 +4,7 @@ import type { Browser, BrowserContext, Locator, Page } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertCloudPageTopology, appOrigin, edgeRestartExitError, PlaywrightCloudBrowser, withCloudPdfPopup } from "./yupuri-cloud-worker";
+import { assertCloudPageTopology, appOrigin, edgeRestartExitError, isCloudWorkflowUrl, PlaywrightCloudBrowser, withCloudPdfPopup } from "./yupuri-cloud-worker";
 import { ToolboxServiceClosedError } from "./yupuri-cloud-live-session";
 import { JournalStore, runCloudJob, type CloudJob } from "./yupuri-cloud-worker-core";
 import { inspectCloudTab } from "./yupuri-cloud-listing";
@@ -21,6 +21,23 @@ test("raw production app origin rejects normalized aliases and retains localhost
     "https://yoshidawatchrepair.com/", "https://yoshidawatchrepair.com?x=1"]) {
     assert.throws(() => appOrigin(value), value);
   }
+});
+
+test("Cloud workflow URL proof accepts only canonical upload/export paths with optional trailing slash", () => {
+  for (const page of ["upload", "export"] as const) {
+    assert.equal(isCloudWorkflowUrl(`https://btoolboxprintservice.jp/invoices/${page}`, page), true);
+    assert.equal(isCloudWorkflowUrl(`https://btoolboxprintservice.jp/invoices/${page}/`, page), true);
+    for (const value of [
+      `https://btoolboxprintservice.jp/invoices/${page}?x=1`,
+      `https://btoolboxprintservice.jp/invoices/${page}/#x`,
+      `https://btoolboxprintservice.jp:443/invoices/${page}/`,
+      `https://user@btoolboxprintservice.jp/invoices/${page}/`,
+      `https://btoolboxprintservice.jp.evil.example/invoices/${page}/`,
+      `http://btoolboxprintservice.jp/invoices/${page}/`,
+    ]) assert.equal(isCloudWorkflowUrl(value, page), false, value);
+  }
+  assert.equal(isCloudWorkflowUrl("https://btoolboxprintservice.jp/invoices/export/", "upload"), false);
+  assert.equal(isCloudWorkflowUrl("https://btoolboxprintservice.jp/invoices/upload/", "export"), false);
 });
 
 test("Edge restart failure at cutoff enters closed-window handling", () => {

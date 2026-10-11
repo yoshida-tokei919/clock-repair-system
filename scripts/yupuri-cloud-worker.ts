@@ -28,6 +28,12 @@ function args() {
   return { once: values.includes("--once"), allowIssue: values.includes("--allow-issue"), seconds };
 }
 
+export function isCloudWorkflowUrl(value: string, page: "upload" | "export"): boolean {
+  return page === "upload"
+    ? /^https:\/\/btoolboxprintservice\.jp\/invoices\/upload\/?$/.test(value)
+    : /^https:\/\/btoolboxprintservice\.jp\/invoices\/export\/?$/.test(value);
+}
+
 export function appOrigin(configured = process.env.YUPURI_APP_ORIGIN ?? "https://yoshidawatchrepair.com") {
   const url = new URL(configured);
   const local = ["localhost", "127.0.0.1"].includes(url.hostname);
@@ -128,6 +134,13 @@ export class PlaywrightCloudBrowser implements CloudBrowser {
     assertCloudPageTopology(this.page, popup);
   }
   assertOperationalPage(): void { this.assertTopology(); }
+  async waitForPropagation(): Promise<void> {
+    this.assertTopology();
+    this.serviceGuard();
+    await delay(3000);
+    this.serviceGuard();
+    this.assertTopology();
+  }
   private beforeAction(): void { this.assertTopology(); this.serviceGuard(); }
   private async invoices() {
     this.beforeAction();
@@ -161,7 +174,7 @@ export class PlaywrightCloudBrowser implements CloudBrowser {
     await this.invoices();
     this.beforeAction();
     await guardedCloudClick(this.page.getByRole("button", { name: "送り状のダウンロード" }), () => this.beforeAction());
-    await this.page.waitForURL("**/invoices/export");
+    await this.page.waitForURL(url => isCloudWorkflowUrl(url.href, "export"));
     this.assertTopology();
     const rows = await inspectCloudExportRows(this.page);
     this.assertTopology();
@@ -171,7 +184,7 @@ export class PlaywrightCloudBrowser implements CloudBrowser {
     await this.invoices();
     this.beforeAction();
     await this.page.goto(new URL("/invoices/upload", this.invoicesUrl).href, { waitUntil: "domcontentloaded" });
-    await this.page.waitForURL("**/invoices/upload");
+    await this.page.waitForURL(url => isCloudWorkflowUrl(url.href, "upload"));
     this.assertTopology();
     const filter = this.page.locator("#shippingDataFilterId");
     if (await filter.count() !== 1) throw new Error("Cloud filter input ambiguous");
@@ -217,7 +230,7 @@ export class PlaywrightCloudBrowser implements CloudBrowser {
     await this.invoices();
     this.beforeAction();
     await guardedCloudClick(this.page.getByRole("button", { name: "送り状のダウンロード" }), () => this.beforeAction());
-    await this.page.waitForURL("**/invoices/export");
+    await this.page.waitForURL(url => isCloudWorkflowUrl(url.href, "export"));
     this.assertTopology();
     const after = await inspectCloudExportRows(this.page);
     const addedIndex = oneAddedRow(before, after);

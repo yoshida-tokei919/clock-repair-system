@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Browser, Page } from "@playwright/test";
 import { join } from "node:path";
-import { assertDedicatedEdgeCommandLine, assertToolboxAutomationWindowOpen, cdpEndpoint, edgeProfilePath,
-  ensureAuthenticatedInvoices, isInvoicesPageUrl, isJpLoginCandidate, isJpToolboxUrl, isToolboxServiceOpen,
+import { assertAuthenticatedInvoices, assertDedicatedEdgeCommandLine, assertToolboxAutomationWindowOpen, cdpEndpoint, edgeProfilePath,
+  ensureAuthenticatedInvoices, isExpectedToolboxHandoffUrl, isInvoicesPageUrl, isJpLoginCandidate, isJpToolboxUrl, isToolboxServiceOpen,
   isToolboxAutomationWindowOpen, msUntilToolboxAutomationWindowOpen, isVerifiedToolboxPortal, TOOLBOX_PUBLIC_ENTRY_URL,
   TOOLBOX_LOGIN_URL, CLOUD_SSO_URL } from "./yupuri-cloud-live-session";
 
@@ -38,15 +38,14 @@ function harness(outcome: "portal" | "login" | "sso-login" | "no-page" | "duplic
           (outcome === "sso-login" ? "https://btoolbox.post.japanpost.jp/login" : invoices) : target;
         if (target === CLOUD_SSO_URL && outcome === "extra-on-sso") emit(makePage("https://example.com"));
       },
-      locator: (selector: string) => ({
-        count: async () => entry && selector === `a[href="${TOOLBOX_LOGIN_URL}"]` ? loginLinks :
-          address.endsWith("/login") && selector === "#lgnIdsLogIds" ? 1 : 0,
-        isVisible: async () => entry && selector === `a[href="${TOOLBOX_LOGIN_URL}"]` ||
-          address.endsWith("/login") && selector === "#lgnIdsLogIds",
-        nth: () => ({ isVisible: async () => address.endsWith("/login") && selector === "#lgnIdsLogIds" }),
-        click: async (options?: { trial?: boolean }) => {
-          if (options?.trial) return;
-          if (!entry || selector !== `a[href="${TOOLBOX_LOGIN_URL}"]`) throw new Error("Credential control clicked");
+      locator: (selector: string, options?: { hasText?: RegExp }) => {
+        const officialLogin = entry && selector === `a[href="${TOOLBOX_LOGIN_URL}"]` &&
+          (!options?.hasText || options.hasText.test("\u30ed\u30b0\u30a4\u30f3"));
+        const portalLogout = address === portal && selector === 'a[href="javascript:void(0);"]' &&
+          (!options?.hasText || options.hasText.test("\u30ed\u30b0\u30a2\u30a6\u30c8"));
+        const clickOfficial = async (clickOptions?: { trial?: boolean }) => {
+          if (clickOptions?.trial) return;
+          if (!officialLogin) throw new Error("Credential control clicked");
           if (!pageWait) throw new Error("Page wait was not armed before click");
           actions.push("click:official-login");
           if (outcome === "no-page") { rejectPageWait?.(new Error("Timeout waiting for page")); return; }
@@ -55,8 +54,21 @@ function harness(outcome: "portal" | "login" | "sso-login" | "no-page" | "duplic
             outcome === "unexpected" ? "https://example.com" : portal,
           false, outcome === "unrelated" ? null : pages[0]));
           if (outcome === "duplicate") emit(makePage(portal, false, pages[0]));
-        },
-      }),
+        };
+        return {
+          count: async () => officialLogin ? loginLinks : portalLogout ? 1 :
+            address.endsWith("/login") && selector === "#lgnIdsLogIds" ? 1 : 0,
+          isVisible: async () => officialLogin || portalLogout || address.endsWith("/login") && selector === "#lgnIdsLogIds",
+          nth: (index: number) => ({
+            isVisible: async () => officialLogin ? index < loginLinks :
+              address.endsWith("/login") && selector === "#lgnIdsLogIds",
+            getAttribute: async (name: string) => officialLogin && index < loginLinks ?
+              (name === "href" ? TOOLBOX_LOGIN_URL : name === "target" ? "_blank" : null) : null,
+            click: clickOfficial,
+          }),
+          click: clickOfficial,
+        };
+      },
       getByRole: (role: string, options: { name?: string }) => ({
         count: async () => role === "link" && options.name === "ログアウト" && address === portal ||
           role === "tab" && options.name === "発行後" && address === invoices ? 1 : 0,
@@ -94,6 +106,15 @@ test("dedicated CDP identity rejects another Edge profile or port", () => {
   assert.throws(() => assertDedicatedEdgeCommandLine(flags.map(flag => flag.startsWith("--remote-debugging-port=") ?
     "--remote-debugging-port=18821" : flag), cdpEndpoint(), profile));
   assert.throws(() => cdpEndpoint("http://localhost:18822"));
+});
+
+test("new target-blank page may be empty only before the official ToolBox handoff", () => {
+  assert.equal(isExpectedToolboxHandoffUrl(""), true);
+  assert.equal(isExpectedToolboxHandoffUrl("about:blank"), true);
+  assert.equal(isExpectedToolboxHandoffUrl("https://btoolbox.post.japanpost.jp/auth/realms/realm1/protocol/saml/clients/portal"), true);
+  assert.equal(isExpectedToolboxHandoffUrl("https://btoolbox.post.japanpost.jp/portal/PT/PTPT/PTPT0001.do?op=init"), true);
+  assert.equal(isExpectedToolboxHandoffUrl("https://example.com/"), false);
+  assert.equal(isExpectedToolboxHandoffUrl("edge://newtab/"), false);
 });
 
 test("official hours and conservative JST automation cutoff are distinct", () => {
@@ -172,12 +193,16 @@ test("new portal cannot hide navigation of original public entry", async () => {
   assert.equal(h.entry.isClosed(), false);
 });
 
-test("missing or duplicate official Login link and duplicate tabs fail closed", async () => {
-  for (const links of [0, 2]) {
-    const h = harness("portal", links);
-    await assert.rejects(ensureAuthenticatedInvoices(h.browser, invoices, 50, openTime), /Official ToolBox Login link unavailable/);
-    assert.deepEqual(h.actions, [`goto:${TOOLBOX_PUBLIC_ENTRY_URL}`]);
-  }
+test("duplicate official Login CTAs are accepted but only one is clicked", async () => {
+  const h = harness("portal", 2);
+  await ensureAuthenticatedInvoices(h.browser, invoices, 50, openTime);
+  assert.equal(h.actions.filter(action => action === "click:official-login").length, 1);
+});
+
+test("missing official Login link and duplicate tabs fail closed", async () => {
+  const missing = harness("portal", 0);
+  await assert.rejects(ensureAuthenticatedInvoices(missing.browser, invoices, 50, openTime), /Official ToolBox Login link unavailable/);
+  assert.deepEqual(missing.actions, [`goto:${TOOLBOX_PUBLIC_ENTRY_URL}`]);
   const tabs = harness("portal", 1, 2);
   await assert.rejects(ensureAuthenticatedInvoices(tabs.browser, invoices, 50, openTime), /exactly one tab/);
   assert.deepEqual(tabs.actions, []);
@@ -208,15 +233,18 @@ test("official entry navigation rechecks hours after tab inspection", async () =
 
 test("official Login actionability wait cannot dispatch after hours close", async () => {
   const h = harness();
+  let closed = false;
   const original = h.entry.locator.bind(h.entry);
-  h.entry.locator = ((selector: string) => {
-    const item = original(selector);
-    return { ...item, click: async (options?: { trial?: boolean }) => {
-      if (options?.trial) { closed = true; return; }
-      await item.click(options);
+  h.entry.locator = ((selector: string, options?: { hasText?: RegExp }) => {
+    const item = original(selector, options as never) as any;
+    return { ...item, nth: (index: number) => {
+      const nth = item.nth(index);
+      return { ...nth, click: async (clickOptions?: { trial?: boolean }) => {
+        if (clickOptions?.trial) { closed = true; return; }
+        await nth.click(clickOptions);
+      } };
     } };
   }) as Page["locator"];
-  let closed = false;
   await assert.rejects(ensureAuthenticatedInvoices(h.browser, invoices, 50,
     () => closed ? new Date("2026-10-11T14:55:00Z") : openTime()), /automation window/);
   assert.deepEqual(h.actions, [`goto:${TOOLBOX_PUBLIC_ENTRY_URL}`]);
@@ -228,8 +256,10 @@ test("username, ambiguous controls and text, and inspection errors block portal 
     url: () => portal, isClosed: () => false,
     locator: (actual: string) => ({ count: async () => {
       if (inspectionError === "count" && actual === selector) throw new Error("count failed");
+      if (actual === 'a[href="javascript:void(0);"]') return 1;
       return actual === selector ? visible.length : 0;
     },
+      isVisible: async () => actual === 'a[href="javascript:void(0);"]',
       nth: (index: number) => ({ isVisible: async () => {
         if (inspectionError === "visibility") throw new Error("inspection failed");
         return visible[index];
@@ -260,6 +290,19 @@ test("username, ambiguous controls and text, and inspection errors block portal 
     assert.equal(await isJpLoginCandidate(labelPage), true);
     assert.equal(await isVerifiedToolboxPortal(labelPage), false);
   }
+});
+
+test("invoice proof waits for the SSO redirect before enforcing the final URL", async () => {
+  let address = CLOUD_SSO_URL;
+  const page = {
+    url: () => address, isClosed: () => false,
+    getByRole: () => ({
+      waitFor: async () => { address = invoices; },
+      count: async () => 1, isVisible: async () => true,
+    }),
+  } as unknown as Page;
+  await assert.doesNotReject(assertAuthenticatedInvoices(page, invoices));
+  assert.equal(address, invoices);
 });
 
 test("portal and invoices URL proof reject unrelated pages", async () => {
@@ -295,10 +338,13 @@ test("exact official URL constants and strict invoice URL policy", () => {
 test("ToolBox portal requires official host and authenticated proof", async () => {
   const make = (url: string, logout = false, sso: string | null = null, use = false, ssoVisible = false) => ({
     url: () => url, isClosed: () => false,
-    getByRole: () => ({ count: async () => logout ? 1 : 0, isVisible: async () => logout }),
-    locator: (selector: string) => ({ count: async () => selector === "#srvUtlUrl" && sso !== null || selector === "#srvUtl" && use ? 1 : 0,
-      getAttribute: async () => sso, isVisible: async () => selector === "#srvUtlUrl" ? ssoVisible : use,
-      nth: () => ({ isVisible: async () => false }) }),
+    getByRole: () => ({ count: async () => 0, isVisible: async () => false }),
+    locator: (selector: string) => {
+      const logoutAnchor = selector === 'a[href="javascript:void(0);"]' && logout;
+      return { count: async () => logoutAnchor || selector === "#srvUtlUrl" && sso !== null || selector === "#srvUtl" && use ? 1 : 0,
+        getAttribute: async () => sso, isVisible: async () => logoutAnchor ? true : selector === "#srvUtlUrl" ? ssoVisible : use,
+        nth: () => ({ isVisible: async () => false }) };
+    },
     getByText: () => ({ count: async () => 0, nth: () => ({ isVisible: async () => false }) }),
   } as unknown as Page);
   for (const url of ["https://btoolbox.post.japanpost.jp/login", "https://btoolbox.post.japanpost.jp/portal/other",
