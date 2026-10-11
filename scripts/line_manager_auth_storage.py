@@ -23,12 +23,14 @@ CHAT_PATHS = frozenset({"/"})
 ACCOUNT_HOST = "account.line.biz"
 ACCESS_HOST = "access.line.me"
 ACCOUNT_PATHS = frozenset({"/login"})
-ACCESS_PATHS = frozenset({"/oauth2/v2.1/authorize"})
+ACCESS_PATHS = frozenset({"/oauth2/v2.1/login", "/oauth2/v2.1/authorize"})
+SSO_TRANSITION_URL = "https://access.line.me/oauth2/v2.1/ssoLogin"
 ACCOUNT_CONTINUATION = "LINEアカウント"
 ACCESS_CONTINUATION = "ログイン"
 MAX_CONTINUATION_CLICKS = 2
 CONTINUATION_RENDER_WAIT_MS = 5000
 CONTINUATION_POLL_MS = 250
+SSO_TRANSITION_WAIT_MS = 10000
 
 
 def fixed_paths(localappdata: str | None = None) -> tuple[Path, Path]:
@@ -217,22 +219,48 @@ def _credential_ui_present(page: Any) -> bool:
 
 
 def _continuation(page: Any, label: str) -> Any:
-    matches = []
-    for role in ("button", "link"):
-        locator = page.get_by_role(role, name=label, exact=True)
-        if locator.count() > 1:
-            raise AuthStorageError("ambiguous_login_continuation")
-        if locator.count() == 1 and locator.is_visible() and locator.is_enabled():
-            if role == "link":
-                href = locator.get_attribute("href")
-                if not href or _trusted_stage(urljoin(page.url, href)) is None:
-                    raise AuthStorageError("untrusted_login_destination")
-            matches.append((role, locator))
-    if len(matches) > 1:
+    # One querySelectorAll snapshot makes uniqueness across both roles atomic.
+    # element_handles does not wait for a missing selector to resolve later.
+    try:
+        button = page.get_by_role("button", name=label, exact=True)
+        link = page.get_by_role("link", name=label, exact=True)
+        handles = button.or_(link).element_handles()
+    except Exception as exc:
+        raise AuthStorageError("login_continuation_unavailable") from exc
+    if len(handles) > 1:
         raise AuthStorageError("ambiguous_login_continuation")
-    if not matches:
+    if not handles:
         raise AuthStorageError("login_continuation_unavailable")
-    return matches[0]
+    target = handles[0]
+    try:
+        descriptor = target.evaluate(
+            "(element) => ({ tag: element.tagName.toLowerCase(), "
+            "role: element.getAttribute('role'), type: element.getAttribute('type'), "
+            "href: element.getAttribute('href'), connected: element.isConnected })"
+        )
+        if not isinstance(descriptor, dict) or descriptor.get("connected") is not True:
+            raise AuthStorageError("login_continuation_unavailable")
+        tag, declared_role = descriptor.get("tag"), descriptor.get("role")
+        href = descriptor.get("href")
+        if declared_role is not None:
+            role = declared_role if declared_role in {"button", "link"} else None
+        elif tag == "button" or (tag == "input" and descriptor.get("type") in {"button", "submit", "reset"}):
+            role = "button"
+        elif tag in {"a", "area"} and href is not None:
+            role = "link"
+        else:
+            role = None
+        if role is None:
+            raise AuthStorageError("login_continuation_unavailable")
+        if not target.is_visible() or not target.is_enabled():
+            raise AuthStorageError("login_continuation_unavailable")
+        if (role == "link" and not href) or (href is not None and (not href or _trusted_stage(urljoin(page.url, href)) is None)):
+            raise AuthStorageError("untrusted_login_destination")
+    except AuthStorageError:
+        raise
+    except Exception as exc:
+        raise AuthStorageError("login_continuation_unavailable") from exc
+    return role, target
 
 
 def _wait_for_continuation(page: Any, label: str, expected_stage: str) -> bool | None:
@@ -264,6 +292,28 @@ def _wait_for_continuation(page: Any, label: str, expected_stage: str) -> bool |
         page.wait_for_timeout(min(CONTINUATION_POLL_MS, remaining_ms))
 
 
+def _wait_for_sso_transition(page: Any, before_url: str) -> None:
+    """Observe the second navigation and exact no-click SSO path to chat root."""
+    deadline = time.monotonic() + SSO_TRANSITION_WAIT_MS / 1000
+    navigation_seen = False
+    while True:
+        url = page.url
+        if url == CHAT_ORIGIN:
+            if _explicit_auth_challenge_present(page):
+                raise AuthStorageError("interactive_login_required")
+            return
+        if url == SSO_TRANSITION_URL:
+            navigation_seen = True
+        elif url != before_url or navigation_seen:
+            raise AuthStorageError("untrusted_login_stage")
+        if _credential_ui_present(page):
+            raise AuthStorageError("interactive_login_required")
+        remaining_ms = (deadline - time.monotonic()) * 1000
+        if remaining_ms <= 0:
+            raise AuthStorageError("login_navigation_missing")
+        page.wait_for_timeout(min(CONTINUATION_POLL_MS, remaining_ms))
+
+
 def advance_authenticated_profile(page: Any) -> int:
     """Follow only the two observed controls, without entering secrets."""
     clicks = 0
@@ -287,26 +337,23 @@ def advance_authenticated_profile(page: Any) -> int:
             raise AuthStorageError("untrusted_login_stage")
         if _credential_ui_present(page):
             raise AuthStorageError("interactive_login_required")
-        role, control = _continuation(page, label)
-        try:
-            target = control.element_handle(timeout=1)
-        except Exception as exc:
-            raise AuthStorageError("login_continuation_unavailable") from exc
-        if target is None:
+        role, target = _continuation(page, label)
+        before_url = page.url
+        if _trusted_stage(before_url) != stage:
+            raise AuthStorageError("untrusted_login_stage")
+        if _credential_ui_present(page):
+            raise AuthStorageError("interactive_login_required")
+        current_role, current = _continuation(page, label)
+        if current_role != role:
             raise AuthStorageError("login_continuation_unavailable")
         try:
-            if not target.is_visible() or not target.is_enabled():
+            if not target.evaluate("(element, current) => element === current", current):
                 raise AuthStorageError("login_continuation_unavailable")
-            if role == "link":
-                href = target.get_attribute("href")
-                if not href or _trusted_stage(urljoin(page.url, href)) is None:
-                    raise AuthStorageError("untrusted_login_destination")
         except AuthStorageError:
             raise
         except Exception as exc:
             raise AuthStorageError("login_continuation_unavailable") from exc
-        before_url = page.url
-        if _trusted_stage(before_url) != stage:
+        if _trusted_stage(page.url) != stage:
             raise AuthStorageError("untrusted_login_stage")
         if _credential_ui_present(page):
             raise AuthStorageError("interactive_login_required")
@@ -317,6 +364,9 @@ def advance_authenticated_profile(page: Any) -> int:
         except Exception as exc:
             raise AuthStorageError("login_continuation_unavailable") from exc
         clicks += 1
+        if clicks == MAX_CONTINUATION_CLICKS:
+            _wait_for_sso_transition(page, before_url)
+            continue
         try:
             page.wait_for_url(lambda url: str(url) != before_url, timeout=10000)
         except Exception as exc:
