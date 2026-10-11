@@ -27,6 +27,8 @@ ACCESS_PATHS = frozenset({"/oauth2/v2.1/authorize"})
 ACCOUNT_CONTINUATION = "LINEアカウント"
 ACCESS_CONTINUATION = "ログイン"
 MAX_CONTINUATION_CLICKS = 2
+CONTINUATION_RENDER_WAIT_MS = 5000
+CONTINUATION_POLL_MS = 250
 
 
 def fixed_paths(localappdata: str | None = None) -> tuple[Path, Path]:
@@ -225,10 +227,41 @@ def _continuation(page: Any, label: str) -> Any:
                 href = locator.get_attribute("href")
                 if not href or _trusted_stage(urljoin(page.url, href)) is None:
                     raise AuthStorageError("untrusted_login_destination")
-            matches.append(locator)
-    if len(matches) != 1:
+            matches.append((role, locator))
+    if len(matches) > 1:
+        raise AuthStorageError("ambiguous_login_continuation")
+    if not matches:
         raise AuthStorageError("login_continuation_unavailable")
     return matches[0]
+
+
+def _wait_for_continuation(page: Any, label: str, expected_stage: str) -> bool | None:
+    """Wait briefly for a missing control while rechecking the auth boundary."""
+    deadline = time.monotonic() + CONTINUATION_RENDER_WAIT_MS / 1000
+    while True:
+        stage = _trusted_stage(page.url)
+        if stage == "chat.line.biz":
+            return None  # Let the outer state machine verify the final chat page.
+        if stage != expected_stage:
+            raise AuthStorageError("untrusted_login_stage")
+        if _credential_ui_present(page):
+            raise AuthStorageError("interactive_login_required")
+        try:
+            _continuation(page, label)
+        except AuthStorageError as exc:
+            if str(exc) != "login_continuation_unavailable":
+                raise
+        else:
+            # The page may have changed while the locators were inspected.
+            if _trusted_stage(page.url) != expected_stage:
+                continue
+            if _credential_ui_present(page):
+                raise AuthStorageError("interactive_login_required")
+            return True
+        remaining_ms = (deadline - time.monotonic()) * 1000
+        if remaining_ms <= 0:
+            raise AuthStorageError("login_continuation_unavailable")
+        page.wait_for_timeout(min(CONTINUATION_POLL_MS, remaining_ms))
 
 
 def advance_authenticated_profile(page: Any) -> int:
@@ -246,9 +279,43 @@ def advance_authenticated_profile(page: Any) -> int:
             raise AuthStorageError("interactive_login_required")
         if clicks >= MAX_CONTINUATION_CLICKS or (clicks == 1 and stage != ACCESS_HOST) or (clicks == 0 and stage != ACCOUNT_HOST):
             raise AuthStorageError("login_continuation_limit")
-        before_url = page.url
         label = ACCOUNT_CONTINUATION if clicks == 0 else ACCESS_CONTINUATION
-        _continuation(page, label).click(timeout=10000)
+        ready = _wait_for_continuation(page, label, stage)
+        if ready is None:
+            continue
+        if _trusted_stage(page.url) != stage:
+            raise AuthStorageError("untrusted_login_stage")
+        if _credential_ui_present(page):
+            raise AuthStorageError("interactive_login_required")
+        role, control = _continuation(page, label)
+        try:
+            target = control.element_handle(timeout=1)
+        except Exception as exc:
+            raise AuthStorageError("login_continuation_unavailable") from exc
+        if target is None:
+            raise AuthStorageError("login_continuation_unavailable")
+        try:
+            if not target.is_visible() or not target.is_enabled():
+                raise AuthStorageError("login_continuation_unavailable")
+            if role == "link":
+                href = target.get_attribute("href")
+                if not href or _trusted_stage(urljoin(page.url, href)) is None:
+                    raise AuthStorageError("untrusted_login_destination")
+        except AuthStorageError:
+            raise
+        except Exception as exc:
+            raise AuthStorageError("login_continuation_unavailable") from exc
+        before_url = page.url
+        if _trusted_stage(before_url) != stage:
+            raise AuthStorageError("untrusted_login_stage")
+        if _credential_ui_present(page):
+            raise AuthStorageError("interactive_login_required")
+        # dispatch_event is scoped to this ElementHandle, with no actionability
+        # auto-wait or locator replacement. The page is closed after bootstrap.
+        try:
+            target.dispatch_event("click")
+        except Exception as exc:
+            raise AuthStorageError("login_continuation_unavailable") from exc
         clicks += 1
         try:
             page.wait_for_url(lambda url: str(url) != before_url, timeout=10000)

@@ -14,6 +14,7 @@ from unittest.mock import patch
 import line_manager_auth_storage as auth
 
 NOW = datetime(2026, 9, 23, tzinfo=timezone.utc)
+TEST_CLOCK = [0.0]
 
 
 class FakeLocator:
@@ -22,26 +23,81 @@ class FakeLocator:
     def count(self):
         if self.selector is not None:
             return len(self.page.visible_selectors.get(self.selector, []))
+        if self.page.role_elements is not None:
+            return len(self.page.exact_elements(self.role, self.label))
+        if self.page.role_counts is not None:
+            return self.page.role_counts.get((self.role, self.label), 0)
         return int(self.role == "button" and self.label == self.page.expected_label())
     def nth(self, index):
         return FakeLocator(self.page, selector=self.selector, index=index)
     def is_visible(self):
-        return self.page.visible_selectors[self.selector][self.index] if self.selector is not None else True
-    def is_enabled(self): return True
+        if self.selector is not None:
+            return self.page.visible_selectors[self.selector][self.index]
+        if self.page.role_elements is not None:
+            return self.page.exact_elements(self.role, self.label)[0].is_visible()
+        return True
+    def is_enabled(self):
+        if self.page.role_elements is not None:
+            return self.page.exact_elements(self.role, self.label)[0].is_enabled()
+        return True
+    def get_attribute(self, name):
+        assert name == "href"
+        return self.page.hrefs.get((self.role, self.label))
+    def element_handle(self, **kwargs):
+        self.page.handle_timeouts.append(kwargs.get("timeout"))
+        if self.count() != 1:
+            raise TimeoutError("synthetic target missing")
+        target = self.page.exact_elements(self.role, self.label)[0]
+        self.page.handles.append(target)
+        return target
     def click(self, **kwargs):
+        raise AssertionError("Locator.click must not activate a continuation")
+
+
+class FakeElementHandle:
+    def __init__(self, page, role, label):
+        self.page, self.role, self.label = page, role, label
+        self.attached = self.visible = self.enabled = True
+    def is_visible(self): return self.attached and self.visible
+    def is_enabled(self): return self.attached and self.enabled
+    def get_attribute(self, name):
+        assert name == "href"
+        return self.page.hrefs.get((self.role, self.label))
+    def dispatch_event(self, event):
+        assert event == "click"
+        if not self.attached or not self.visible or not self.enabled:
+            raise AssertionError("stale or non-actionable target activated")
+        self.page.activations.append((self, event))
         self.page.clicks += 1
         self.page.url = self.page.transitions.pop(0)
 
 
 class FakePage:
-    def __init__(self, url, transitions=(), labels=None, visible_selectors=None, visible_texts=()):
+    def __init__(self, url, transitions=(), labels=None, visible_selectors=None, visible_texts=(),
+                 role_counts=None, hrefs=None, on_poll=None, role_elements=None):
         self.url, self.transitions = url, list(transitions)
         self.labels = list(labels or ("LINEアカウント", "ログイン"))
         self.visible_selectors = visible_selectors or {}
         self.visible_texts = list(visible_texts)
+        self.role_counts, self.hrefs, self.on_poll = role_counts, hrefs or {}, on_poll
+        self.role_elements = role_elements
+        self.default_elements = {}
         self.clicks = 0
+        self.handle_timeouts = []
+        self.handles = []
+        self.activations = []
+        self.poll_ticks = 0
     def expected_label(self):
         return self.labels[self.clicks] if self.clicks < len(self.labels) else None
+    def exact_elements(self, role, label):
+        if self.role_elements is not None:
+            return [element for element in self.role_elements
+                    if element.attached and element.role == role and element.label == label]
+        key = (role, label)
+        if key not in self.default_elements:
+            self.default_elements[key] = FakeElementHandle(self, role, label)
+        return [self.default_elements[key]] if (self.role_counts.get(key, 0) if self.role_counts is not None
+                                                else int(role == "button" and label == self.expected_label())) == 1 else []
     def get_by_role(self, role, name, exact=False):
         assert exact
         return FakeLocator(self, role, name)
@@ -52,9 +108,20 @@ class FakePage:
         return FakeLocator(self, selector="__challenge_text__")
     def wait_for_url(self, predicate, **kwargs):
         if not predicate(self.url): raise TimeoutError("synthetic no navigation")
+    def wait_for_timeout(self, milliseconds):
+        TEST_CLOCK[0] += milliseconds / 1000
+        self.poll_ticks += 1
+        if self.on_poll:
+            self.on_poll(self)
 
 
 class AuthStorageTests(unittest.TestCase):
+    def setUp(self):
+        TEST_CLOCK[0] = 0.0
+        monotonic = patch.object(auth.time, "monotonic", side_effect=lambda: TEST_CLOCK[0])
+        monotonic.start()
+        self.addCleanup(monotonic.stop)
+
     def test_continuation_labels_are_exact_observed_values(self):
         self.assertEqual(auth.ACCOUNT_CONTINUATION, "LINEアカウント")
         self.assertEqual(auth.ACCESS_CONTINUATION, "ログイン")
@@ -106,6 +173,8 @@ class AuthStorageTests(unittest.TestCase):
         page = FakePage("https://account.line.biz/login?state=opaque", ["https://chat.line.biz/"])
         self.assertEqual(auth.advance_authenticated_profile(page), 1)
         self.assertEqual(page.clicks, 1)
+        self.assertEqual(page.handle_timeouts, [1])
+        self.assertEqual(page.activations, [(page.handles[0], "click")])
 
     def test_account_then_access_then_chat_uses_exact_two_controls(self):
         page = FakePage("https://account.line.biz/login?state=opaque", [
@@ -113,6 +182,236 @@ class AuthStorageTests(unittest.TestCase):
         ])
         self.assertEqual(auth.advance_authenticated_profile(page), 2)
         self.assertEqual(page.clicks, 2)
+
+    def test_delayed_account_control_gets_one_click(self):
+        counts = {("button", auth.ACCOUNT_CONTINUATION): 0}
+        def reveal(page):
+            if page.poll_ticks == 3:
+                counts[("button", auth.ACCOUNT_CONTINUATION)] = 1
+        page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"],
+                        role_counts=counts, on_poll=reveal)
+        self.assertEqual(auth.advance_authenticated_profile(page), 1)
+        self.assertEqual((page.poll_ticks, page.clicks), (3, 1))
+
+    def test_delayed_access_control_gets_two_clicks(self):
+        counts = {("button", auth.ACCOUNT_CONTINUATION): 1, ("button", auth.ACCESS_CONTINUATION): 0}
+        def reveal(page):
+            if page.poll_ticks == 2:
+                counts[("button", auth.ACCESS_CONTINUATION)] = 1
+        page = FakePage("https://account.line.biz/login", [
+            "https://access.line.me/oauth2/v2.1/authorize", "https://chat.line.biz/"
+        ], role_counts=counts, on_poll=reveal)
+        self.assertEqual(auth.advance_authenticated_profile(page), 2)
+        self.assertEqual((page.poll_ticks, page.clicks), (2, 2))
+
+    def test_stage_change_after_wait_readiness_stops_before_click(self):
+        original_wait = auth._wait_for_continuation
+        for destination in ("https://access.line.me/oauth2/v2.1/authorize", "https://example.invalid/login"):
+            with self.subTest(destination=destination):
+                page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"])
+                def wait_then_redirect(*args):
+                    ready = original_wait(*args)
+                    self.assertTrue(ready)
+                    page.url = destination
+                    return ready
+                with patch.object(auth, "_wait_for_continuation", side_effect=wait_then_redirect):
+                    with self.assertRaisesRegex(auth.AuthStorageError, "untrusted_login_stage"):
+                        auth.advance_authenticated_profile(page)
+                self.assertEqual(page.clicks, 0)
+
+    def test_challenge_after_wait_readiness_stops_before_click(self):
+        page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"])
+        original_wait = auth._wait_for_continuation
+        def wait_then_reveal(*args):
+            ready = original_wait(*args)
+            self.assertTrue(ready)
+            page.visible_selectors['input:not([type="hidden"])'] = [True]
+            return ready
+        with patch.object(auth, "_wait_for_continuation", side_effect=wait_then_reveal):
+            with self.assertRaisesRegex(auth.AuthStorageError, "interactive_login_required"):
+                auth.advance_authenticated_profile(page)
+        self.assertEqual(page.clicks, 0)
+
+    def test_reresolved_control_failure_is_immediate_and_does_not_click(self):
+        original_wait = auth._wait_for_continuation
+        for kind, error in (("ambiguous", "ambiguous_login_continuation"),
+                            ("untrusted", "untrusted_login_destination"),
+                            ("missing", "login_continuation_unavailable")):
+            with self.subTest(kind=kind):
+                counts = {("button", auth.ACCOUNT_CONTINUATION): 1}
+                page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"], role_counts=counts)
+                def wait_then_change(*args):
+                    ready = original_wait(*args)
+                    self.assertTrue(ready)
+                    counts[("button", auth.ACCOUNT_CONTINUATION)] = 2 if kind == "ambiguous" else 0
+                    if kind == "untrusted":
+                        counts[("link", auth.ACCOUNT_CONTINUATION)] = 1
+                        page.hrefs[("link", auth.ACCOUNT_CONTINUATION)] = "https://example.invalid/login"
+                    return ready
+                with patch.object(auth, "_wait_for_continuation", side_effect=wait_then_change):
+                    with self.assertRaisesRegex(auth.AuthStorageError, error):
+                        auth.advance_authenticated_profile(page)
+                self.assertEqual((page.poll_ticks, page.clicks), (0, 0))
+
+    def test_stage_or_challenge_change_during_reresolution_stops_before_click(self):
+        original_continuation = auth._continuation
+        for kind, error in (("stage", "untrusted_login_stage"),
+                            ("challenge", "interactive_login_required")):
+            with self.subTest(kind=kind):
+                page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"])
+                resolutions = 0
+                def resolve_then_change(*args):
+                    nonlocal resolutions
+                    control = original_continuation(*args)
+                    resolutions += 1
+                    if resolutions == 2:
+                        if kind == "stage":
+                            page.url = "https://example.invalid/login"
+                        else:
+                            page.visible_selectors['input:not([type="hidden"])'] = [True]
+                    return control
+                with patch.object(auth, "_continuation", side_effect=resolve_then_change):
+                    with self.assertRaisesRegex(auth.AuthStorageError, error):
+                        auth.advance_authenticated_profile(page)
+                self.assertEqual(resolutions, 2)
+                self.assertEqual(page.clicks, 0)
+
+    def test_challenge_during_first_stage_wait_stops_without_click(self):
+        counts = {("button", auth.ACCOUNT_CONTINUATION): 0}
+        def reveal(page):
+            if page.poll_ticks == 2:
+                counts[("button", auth.ACCOUNT_CONTINUATION)] = 1
+                page.visible_selectors['input:not([type="hidden"])'] = [True]
+        page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"],
+                        role_counts=counts, on_poll=reveal)
+        with self.assertRaisesRegex(auth.AuthStorageError, "interactive_login_required"):
+            auth.advance_authenticated_profile(page)
+        self.assertEqual((page.poll_ticks, page.clicks), (2, 0))
+
+    def test_challenge_during_second_stage_wait_stops_after_one_click(self):
+        counts = {("button", auth.ACCOUNT_CONTINUATION): 1, ("button", auth.ACCESS_CONTINUATION): 0}
+        def reveal(page):
+            if page.poll_ticks == 2:
+                page.visible_selectors['input[autocomplete="one-time-code" i]'] = [True]
+        page = FakePage("https://account.line.biz/login", [
+            "https://access.line.me/oauth2/v2.1/authorize", "https://chat.line.biz/"
+        ], role_counts=counts, on_poll=reveal)
+        with self.assertRaisesRegex(auth.AuthStorageError, "interactive_login_required"):
+            auth.advance_authenticated_profile(page)
+        self.assertEqual((page.poll_ticks, page.clicks), (2, 1))
+
+    def test_stage_change_while_waiting_stops_without_stale_click(self):
+        for destination in ("https://access.line.me/oauth2/v2.1/authorize", "https://example.invalid/login"):
+            with self.subTest(destination=destination):
+                counts = {("button", auth.ACCOUNT_CONTINUATION): 0}
+                def redirect(page):
+                    page.url = destination
+                    counts[("button", auth.ACCOUNT_CONTINUATION)] = 1
+                page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"],
+                                role_counts=counts, on_poll=redirect)
+                with self.assertRaisesRegex(auth.AuthStorageError, "untrusted_login_stage"):
+                    auth.advance_authenticated_profile(page)
+                self.assertEqual((page.poll_ticks, page.clicks), (1, 0))
+
+    def test_final_chat_transition_while_waiting_uses_outer_validation(self):
+        page = FakePage("https://account.line.biz/login", role_counts={},
+                        on_poll=lambda current: setattr(current, "url", "https://chat.line.biz/"))
+        self.assertEqual(auth.advance_authenticated_profile(page), 0)
+        self.assertEqual((page.poll_ticks, page.clicks), (1, 0))
+
+    def test_ambiguous_control_fails_without_polling(self):
+        page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"],
+                        role_counts={("button", auth.ACCOUNT_CONTINUATION): 2})
+        with self.assertRaisesRegex(auth.AuthStorageError, "ambiguous_login_continuation"):
+            auth.advance_authenticated_profile(page)
+        self.assertEqual((page.poll_ticks, page.clicks), (0, 0))
+
+    def test_button_and_trusted_link_ambiguity_never_waits_for_one_to_disappear(self):
+        counts = {("button", auth.ACCOUNT_CONTINUATION): 1,
+                  ("link", auth.ACCOUNT_CONTINUATION): 1}
+        def remove_link(page):
+            counts[("link", auth.ACCOUNT_CONTINUATION)] = 0
+        page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"],
+                        role_counts=counts,
+                        hrefs={("link", auth.ACCOUNT_CONTINUATION): "https://access.line.me/oauth2/v2.1/authorize"},
+                        on_poll=remove_link)
+        with self.assertRaisesRegex(auth.AuthStorageError, "ambiguous_login_continuation"):
+            auth.advance_authenticated_profile(page)
+        self.assertEqual((page.poll_ticks, page.clicks), (0, 0))
+
+    def test_wait_ready_old_element_loses_exact_name_and_new_element_is_clicked(self):
+        page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"], role_elements=[])
+        old = FakeElementHandle(page, "button", auth.ACCOUNT_CONTINUATION)
+        new = FakeElementHandle(page, "button", auth.ACCOUNT_CONTINUATION)
+        page.role_elements.append(old)
+        original_wait = auth._wait_for_continuation
+        def wait_then_replace(*args):
+            ready = original_wait(*args)
+            self.assertTrue(ready)
+            self.assertEqual(page.handles, [])
+            old.label = "別の操作"
+            page.role_elements.append(new)
+            return ready
+        with patch.object(auth, "_wait_for_continuation", side_effect=wait_then_replace):
+            self.assertEqual(auth.advance_authenticated_profile(page), 1)
+        self.assertTrue(old.is_visible() and old.is_enabled())
+        self.assertEqual(page.handles, [new])
+        self.assertEqual(page.activations, [(new, "click")])
+
+    def test_fresh_exact_control_disappearing_before_handle_lookup_fails_closed(self):
+        page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"], role_elements=[])
+        control = FakeElementHandle(page, "button", auth.ACCOUNT_CONTINUATION)
+        page.role_elements.append(control)
+        original_handle = FakeLocator.element_handle
+        def disappear_before_handle(locator, **kwargs):
+            if locator.role == "button" and locator.label == auth.ACCOUNT_CONTINUATION:
+                control.label = "別の操作"
+            return original_handle(locator, **kwargs)
+        with patch.object(FakeLocator, "element_handle", disappear_before_handle):
+            with self.assertRaisesRegex(auth.AuthStorageError, "login_continuation_unavailable"):
+                auth.advance_authenticated_profile(page)
+        self.assertEqual((page.poll_ticks, page.clicks), (0, 0))
+        self.assertEqual(page.handle_timeouts, [1])
+        self.assertEqual(page.handles, [])
+        self.assertEqual(page.activations, [])
+
+    def test_freshly_pinned_target_becoming_non_actionable_fails_without_replacement(self):
+        for state in ("attached", "enabled", "visible"):
+            with self.subTest(state=state):
+                page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"])
+                original_handle = FakeLocator.element_handle
+                def pin_then_invalidate(locator, **kwargs):
+                    target = original_handle(locator, **kwargs)
+                    setattr(target, state, False)
+                    return target
+                with patch.object(FakeLocator, "element_handle", pin_then_invalidate):
+                    with self.assertRaisesRegex(auth.AuthStorageError, "login_continuation_unavailable"):
+                        auth.advance_authenticated_profile(page)
+                self.assertEqual((page.poll_ticks, page.clicks), (0, 0))
+                self.assertEqual(len(page.handles), 1)
+                self.assertEqual(page.activations, [])
+
+    def test_activation_uses_pinned_target_without_locator_click_or_actionability_wait(self):
+        page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"])
+        self.assertEqual(auth.advance_authenticated_profile(page), 1)
+        self.assertEqual(page.handle_timeouts, [1])
+        self.assertEqual(page.activations, [(page.handles[0], "click")])
+
+    def test_untrusted_link_fails_without_polling(self):
+        page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"],
+                        role_counts={("link", auth.ACCOUNT_CONTINUATION): 1},
+                        hrefs={("link", auth.ACCOUNT_CONTINUATION): "https://example.invalid/login"})
+        with self.assertRaisesRegex(auth.AuthStorageError, "untrusted_login_destination"):
+            auth.advance_authenticated_profile(page)
+        self.assertEqual((page.poll_ticks, page.clicks), (0, 0))
+
+    def test_missing_control_times_out_without_click(self):
+        page = FakePage("https://account.line.biz/login", ["https://chat.line.biz/"],
+                        role_counts={("button", auth.ACCOUNT_CONTINUATION): 0})
+        with self.assertRaisesRegex(auth.AuthStorageError, "login_continuation_unavailable"):
+            auth.advance_authenticated_profile(page)
+        self.assertEqual((page.poll_ticks, page.clicks), (20, 0))
+        self.assertEqual(TEST_CLOCK[0], 5.0)
 
     def test_third_step_fails_after_two_clicks(self):
         page = FakePage("https://account.line.biz/login", [
