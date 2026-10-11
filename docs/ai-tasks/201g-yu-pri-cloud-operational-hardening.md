@@ -1,6 +1,6 @@
 # Task201G — Yu-Pri Cloud operational hardening
 
-Status: post-rebase local validation and independent review complete; production rollout pending.
+Status: application code deployed; Windows Scheduled Task activation pending. Rollout-gate follow-up validated locally.
 
 ## Boundary
 
@@ -27,15 +27,19 @@ This task changes only the local dedicated Edge login helper, worker service-hou
 ## Existing safeguards and rollout
 
 - Cloud issuance still requires the production Cloud origin, authenticated invoices proof before each internal `next` request, and the existing journal reconciliation/print-attempt guard. The production `YUPURI_APP_ORIGIN` requires exact raw spelling; localhost remains available for development. The `pdf-to-printer` import accepts callable `print` or `default.print`.
-- Installer registration remains restricted to clean canonical `C:\Users\yoshi\clock-repair-system` main at the exact independently reviewed commit matching local and remote `main`. The reviewed correction commit and tracked runtime source must include `scripts/yupuri-cloud-actions.ts`. No Scheduled Task is registered or changed by this correction.
-- After independent review, Task201G was cleanly rebased onto `origin/main` at `1396bfa30d049527d79e6c5333541d8059fdedfc`, with no overlapping files. The LINE commits `590c2a4` and `7f35d32` are incorporated in the base; the Task201G changes do not modify their LINE files.
-- The local installer CRLF correction and independent re-review are complete with no production-blocking finding. Production rollout remains pending; the redesigned flow has not been activated or verified by a live end-to-end run.
+- Installer registration remains restricted to clean canonical `C:\Users\yoshi\clock-repair-system` `main` matching local `origin/main` and live remote `main`. `-ReviewedCommit` identifies the independently reviewed Task201G source baseline; it must be an ancestor of current `main`, must itself contain the Task201G correction files / login protocol / safety record, and every protected Task201G runtime source must remain unchanged between that reviewed commit and current `HEAD`. Later unrelated commits are therefore allowed, while any later Yu-Pri runtime drift fails closed.
+- Protected runtime files are `start-yupuri-cloud-worker.ps1`, `open-yupuri-cloud-login.ps1`, `await-yupuri-cloud-login.ts`, `yupuri-cloud-live-session.ts`, `yupuri-cloud-actions.ts`, `yupuri-cloud-listing.ts`, `yupuri-cloud-worker-core.ts`, and `yupuri-cloud-worker.ts`. The installer itself, tests, docs, and `.gitignore` may evolve as rollout mechanics without silently authorizing runtime drift.
+- Python `__pycache__/` and `*.py[cod]` are ignored as generated runtime cache. This avoids false dirty-tree failures caused by the LINE Manager Python helpers while preserving the clean-tree rejection for all other untracked or modified files.
+- Task201G application code commit `97f4751a13aec9a3d5bc616b06ec286fa59f1e06` was pushed to `main`; Railway deployment `01c1238b-0c4f-456d-9d91-6ca77a5ec2ba` completed `SUCCESS`; production tag is `production-task201g-20261012`.
+- The redesigned Windows Worker remains disabled and has not issued or printed a live label. The follow-up rollout-gate change is local only until separately approved for commit/push/deploy.
 
 ## Local verification
 
 - Post-rebase focused Node tests: 42/42 PASS using in-process TypeScript transpilation, including cutoff/wait calculations, duplicate hidden login candidates, later browser contexts/pages blocking completion and print, Edge restart cutoff classification, popup cleanup, URL/portal proof, and journal reconciliation. Direct `node --import tsx --test` could not start its test subprocesses in this environment (`spawn EPERM`); this was an execution error before assertions, not an assertion failure. The temporary in-process runner was removed. The two existing Playwright browser-launch tests remain unverified in this environment.
-- Dedicated Edge root/child process-selection and 23:55 cutoff fixture PASS. Installer reviewed-commit fixture PASS, covering missing/invalid reviewed SHA, non-HEAD commit, CRLF source, wrong/missing working-copy protocol, dirty tree, missing actions file, and missing login opener. The CRLF regression is now covered: the working-copy protocol regex accepts LF and CRLF while retaining the exact protocol value. The fixture's dirty-tree response is stubbed only for its wrong/missing protocol cases so those later gates can be exercised; production clean-main validation is unchanged. All five changed PowerShell scripts parse successfully.
-- Post-rebase TypeScript `--noEmit --incremental false` and `git diff --check` PASS.
-- No live login, label issuance, printing, Scheduled Task registration, commit, push, or deploy was performed.
+- Dedicated Edge root/child process-selection and 23:55 cutoff fixture PASS. Installer CRLF regression is covered: the working-copy protocol regex accepts LF and CRLF while retaining the exact protocol value.
+- Rollout-gate follow-up fixture PASS: missing/invalid SHA, non-ancestor reviewed commit, pre-Task baseline, wrong/missing working-copy protocol, dirty tree, protected runtime drift, and missing required source all fail closed; a later unrelated main commit passes when the original reviewed Task201G baseline remains unchanged.
+- Real-repo comparison confirms `97f4751` is an ancestor of base `168deda`, with zero diff across all protected Yu-Pri runtime files. The intervening production commit changes only `docs/ai-tasks/206h1c-line-manager-handle-timeout.md`, `scripts/line_manager_auth_storage.py`, and `scripts/test_line_manager_auth_storage.py`.
+- PowerShell parse for installer + fixture, TypeScript `--noEmit --incremental false`, and `git diff --check` PASS for the follow-up.
+- Codex independent review is unavailable during the current usage-limit window. The follow-up was implemented and reviewed by Katari per explicit user instruction; no Scheduled Task registration, live login, label issuance, printing, push, or deploy has been performed by this follow-up.
 
-Production: pending.
+Production: application code deployed; Windows Worker activation pending.

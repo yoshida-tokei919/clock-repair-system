@@ -27,7 +27,7 @@ if (-not $Enable) {
 if ($ReviewedCommit -cnotmatch '^[0-9a-fA-F]{40}$') {
     throw 'Enabled registration requires -ReviewedCommit with a full 40-hex commit ID'
 }
-# Rollout supplies the independently reviewed exact canonical HEAD.
+# Rollout supplies the independently reviewed Task201G source commit. Later unrelated main commits are allowed only when protected Task201G runtime sources are unchanged.
 if (-not (Test-Path -LiteralPath (Join-Path $repo '.git') -PathType Container)) {
     throw 'Canonical repository metadata is unavailable'
 }
@@ -52,7 +52,8 @@ $changes = & git -C $repo status --porcelain --untracked-files=all 2>$null
 if ($LASTEXITCODE -ne 0 -or $changes) { throw 'Canonical repository has unreviewed local changes' }
 $reviewedType = & git -C $repo cat-file -t $ReviewedCommit 2>$null
 if ($LASTEXITCODE -ne 0 -or $reviewedType -cne 'commit') { throw 'Reviewed commit does not resolve to a commit' }
-if ($ReviewedCommit -cne $head) { throw 'Reviewed commit does not match canonical HEAD' }
+& git -C $repo merge-base --is-ancestor $ReviewedCommit $head 2>$null
+if ($LASTEXITCODE -ne 0) { throw 'Reviewed commit is not an ancestor of canonical HEAD' }
 $reviewedFiles = @(& git -C $repo diff-tree --no-commit-id --name-only -r $ReviewedCommit 2>$null)
 if ($LASTEXITCODE -ne 0 -or
     $reviewedFiles -cnotcontains 'scripts/yupuri-cloud-live-session.ts' -or
@@ -73,9 +74,23 @@ if ($LASTEXITCODE -ne 0 -or ($reviewedTask -join "`n") -cnotmatch 'Official entr
 $required = @('docs/ai-tasks/201g-yu-pri-cloud-operational-hardening.md',
     'scripts/install-yupuri-cloud-worker-task.ps1', 'scripts/start-yupuri-cloud-worker.ps1',
     'scripts/open-yupuri-cloud-login.ps1', 'scripts/await-yupuri-cloud-login.ts',
-    'scripts/yupuri-cloud-live-session.ts', 'scripts/yupuri-cloud-actions.ts', 'scripts/yupuri-cloud-worker.ts')
+    'scripts/yupuri-cloud-live-session.ts', 'scripts/yupuri-cloud-actions.ts', 'scripts/yupuri-cloud-listing.ts',
+    'scripts/yupuri-cloud-worker-core.ts', 'scripts/yupuri-cloud-worker.ts')
 & git -C $repo ls-files --error-unmatch -- $required 1>$null 2>$null
 if ($LASTEXITCODE -ne 0) { throw 'Reviewed worker source files are missing' }
+$protectedRuntime = @(
+    'scripts/start-yupuri-cloud-worker.ps1',
+    'scripts/open-yupuri-cloud-login.ps1',
+    'scripts/await-yupuri-cloud-login.ts',
+    'scripts/yupuri-cloud-live-session.ts',
+    'scripts/yupuri-cloud-actions.ts',
+    'scripts/yupuri-cloud-listing.ts',
+    'scripts/yupuri-cloud-worker-core.ts',
+    'scripts/yupuri-cloud-worker.ts')
+$diffArgs = @('-C', $repo, 'diff', '--quiet', $ReviewedCommit, $head, '--') + $protectedRuntime
+& git @diffArgs
+if ($LASTEXITCODE -eq 1) { throw 'Protected Task201G source changed after reviewed commit' }
+if ($LASTEXITCODE -ne 0) { throw 'Protected Task201G source comparison failed' }
 $sessionSource = Get-Content -LiteralPath (Join-Path $repo 'scripts/yupuri-cloud-live-session.ts') -Raw -Encoding utf8
 if ($sessionSource -notmatch '(?m)^export const CLOUD_LOGIN_PROTOCOL = 3;\r?$') {
     throw 'Reviewed Cloud login protocol is missing'

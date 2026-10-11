@@ -6,6 +6,10 @@
 # testing
 /coverage
 
+# Python runtime caches
+__pycache__/
+*.py[cod]
+
 # next.js
 /.next/
 /out/

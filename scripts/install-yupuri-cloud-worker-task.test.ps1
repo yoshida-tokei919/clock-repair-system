@@ -18,11 +18,19 @@ try {
     & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid add .
     & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'fixture main' 1>$null
     if ($LASTEXITCODE -ne 0) { throw 'Fixture commit failed' }
-    $ancestor = (& git.exe -C $fixture rev-parse HEAD).Trim()
+    $preTaskAncestor = (& git.exe -C $fixture rev-parse HEAD).Trim()
+
     New-Item -ItemType Directory -Path (Join-Path $fixture 'docs\ai-tasks') -Force | Out-Null
-    $taskFiles = @('scripts/install-yupuri-cloud-worker-task.ps1', 'scripts/start-yupuri-cloud-worker.ps1',
-        'scripts/open-yupuri-cloud-login.ps1', 'scripts/await-yupuri-cloud-login.ts',
-        'scripts/yupuri-cloud-live-session.ts', 'scripts/yupuri-cloud-actions.ts', 'scripts/yupuri-cloud-worker.ts',
+    $taskFiles = @(
+        'scripts/install-yupuri-cloud-worker-task.ps1',
+        'scripts/start-yupuri-cloud-worker.ps1',
+        'scripts/open-yupuri-cloud-login.ps1',
+        'scripts/await-yupuri-cloud-login.ts',
+        'scripts/yupuri-cloud-live-session.ts',
+        'scripts/yupuri-cloud-actions.ts',
+        'scripts/yupuri-cloud-listing.ts',
+        'scripts/yupuri-cloud-worker-core.ts',
+        'scripts/yupuri-cloud-worker.ts',
         'docs/ai-tasks/201g-yu-pri-cloud-operational-hardening.md')
     foreach ($file in $taskFiles) {
         $target = Join-Path $fixture $file
@@ -38,17 +46,19 @@ try {
     $utf8 = [System.Text.UTF8Encoding]::new($false)
     [System.IO.File]::WriteAllText($sessionFile, $sessionSource, $utf8)
     & git.exe -C $fixture add .
-    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'reviewed fixture' 1>$null
+    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'reviewed Task201G fixture' 1>$null
     if ($LASTEXITCODE -ne 0) { throw 'Reviewed fixture commit failed' }
+    $reviewedCommit = (& git.exe -C $fixture rev-parse HEAD).Trim()
+
     & git.exe -C $fixture remote add origin https://github.com/yoshida-tokei919/clock-repair-system
-    $mainHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
-    & git.exe -C $fixture update-ref refs/remotes/origin/main $mainHead
-    $fixtureTree = (& git.exe -C $fixture rev-parse "${mainHead}^{tree}").Trim()
+    $global:remoteMainHead = $reviewedCommit
+    & git.exe -C $fixture update-ref refs/remotes/origin/main $global:remoteMainHead
+    $fixtureTree = (& git.exe -C $fixture rev-parse "${reviewedCommit}^{tree}").Trim()
     $nonAncestor = (& git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit-tree $fixtureTree -m unrelated).Trim()
 
     function git {
         if ($args -contains 'ls-remote') {
-            "$mainHead`trefs/heads/main"
+            "$global:remoteMainHead`trefs/heads/main"
             $global:LASTEXITCODE = 0
             return
         }
@@ -56,8 +66,16 @@ try {
             $global:LASTEXITCODE = 0
             return
         }
-        & git.exe @args
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            & git.exe @args 2>$null
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
     }
+
     $global:registrationCalls = 0
     $global:enableCalls = 0
     function New-ScheduledTaskAction { [pscustomobject]@{ kind = 'action' } }
@@ -66,6 +84,11 @@ try {
     function New-ScheduledTaskSettingsSet { [pscustomobject]@{ kind = 'settings' } }
     function Register-ScheduledTask { $global:registrationCalls++; [pscustomobject]@{ kind = 'registered' } }
     function Enable-ScheduledTask { $global:enableCalls++; [pscustomobject]@{ kind = 'enabled' } }
+
+    function Reset-RegistrationCounters {
+        $global:registrationCalls = 0
+        $global:enableCalls = 0
+    }
     function Assert-Rejected([string]$reviewed, [string]$expected) {
         try {
             if ($reviewed) { & $gateScript -Enable -RepoRoot $fixture -ReviewedCommit $reviewed }
@@ -78,45 +101,68 @@ try {
         }
         throw "Expected gate rejection: $expected"
     }
+    function Assert-Accepted([string]$reviewed) {
+        $result = & $gateScript -Enable -RepoRoot $fixture -ReviewedCommit $reviewed
+        if ($result -notmatch 'status=enabled' -or $global:registrationCalls -ne 1 -or $global:enableCalls -ne 1) {
+            throw 'Valid reviewed Task201G baseline did not pass all source gates'
+        }
+        Reset-RegistrationCounters
+    }
+
     Assert-Rejected '' 'requires -ReviewedCommit'
     Assert-Rejected 'not-a-commit' 'requires -ReviewedCommit'
-    Assert-Rejected $nonAncestor 'does not match canonical HEAD'
-    Assert-Rejected $ancestor 'does not match canonical HEAD'
-    $result = & $gateScript -Enable -RepoRoot $fixture -ReviewedCommit $mainHead
-    if ($result -notmatch 'status=enabled' -or $global:registrationCalls -ne 1 -or $global:enableCalls -ne 1) {
-        throw 'Valid reviewed HEAD did not pass all source gates'
-    }
-    $global:registrationCalls = 0
-    $global:enableCalls = 0
+    Assert-Rejected $nonAncestor 'not an ancestor of canonical HEAD'
+    Assert-Rejected $preTaskAncestor 'does not contain the Task201G correction files'
+    Assert-Accepted $reviewedCommit
+
     [System.IO.File]::WriteAllText($sessionFile, $sessionSource.Replace('CLOUD_LOGIN_PROTOCOL = 3;', 'CLOUD_LOGIN_PROTOCOL = 4;'), $utf8)
-    Assert-Rejected $mainHead 'unreviewed local changes'
+    Assert-Rejected $reviewedCommit 'unreviewed local changes'
     # Bypass only the fixture's dirty-tree response to exercise the later
-    # working-copy protocol gate against the same valid reviewed commit.
+    # working-copy protocol gate against the same reviewed commit.
     $global:allowDirtyProtocolFixture = $true
-    Assert-Rejected $mainHead 'Reviewed Cloud login protocol is missing'
+    Assert-Rejected $reviewedCommit 'Reviewed Cloud login protocol is missing'
     [System.IO.File]::WriteAllText($sessionFile, $sessionSource.Replace('export const CLOUD_LOGIN_PROTOCOL = 3;', ''), $utf8)
-    Assert-Rejected $mainHead 'Reviewed Cloud login protocol is missing'
+    Assert-Rejected $reviewedCommit 'Reviewed Cloud login protocol is missing'
     $global:allowDirtyProtocolFixture = $false
     [System.IO.File]::WriteAllText($sessionFile, $sessionSource, $utf8)
-    Remove-Item -LiteralPath (Join-Path $fixture 'scripts/yupuri-cloud-actions.ts') -Force
+
+    # Later unrelated main commits are allowed when protected Task201G runtime
+    # sources remain unchanged. The reviewed baseline remains the Task201G commit.
+    Set-Content -LiteralPath (Join-Path $fixture 'unrelated.txt') -Value 'later unrelated change' -Encoding utf8
+    & git.exe -C $fixture add unrelated.txt
+    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'later unrelated main change' 1>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Unrelated fixture commit failed' }
+    $unrelatedHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
+    $global:remoteMainHead = $unrelatedHead
+    & git.exe -C $fixture update-ref refs/remotes/origin/main $global:remoteMainHead
+    Assert-Accepted $reviewedCommit
+    Assert-Rejected $unrelatedHead 'does not contain the Task201G correction files'
+
+    # A later change to any protected Task201G runtime source must fail closed.
+    Add-Content -LiteralPath (Join-Path $fixture 'scripts\yupuri-cloud-worker.ts') -Value '// protected drift fixture'
+    & git.exe -C $fixture add scripts/yupuri-cloud-worker.ts
+    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'change protected worker source' 1>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Protected-drift fixture commit failed' }
+    $global:remoteMainHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
+    & git.exe -C $fixture update-ref refs/remotes/origin/main $global:remoteMainHead
+    Assert-Rejected $reviewedCommit 'Protected Task201G source changed after reviewed commit'
+
+    & git.exe -C $fixture reset --hard $unrelatedHead 1>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Fixture reset after protected drift failed' }
+    $global:remoteMainHead = $unrelatedHead
+    & git.exe -C $fixture update-ref refs/remotes/origin/main $global:remoteMainHead
+
+    # Current-tree required files remain mandatory even when the reviewed
+    # Task201G commit is an ancestor of main.
+    Remove-Item -LiteralPath (Join-Path $fixture 'scripts\install-yupuri-cloud-worker-task.ps1') -Force
     & git.exe -C $fixture add -u
-    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'missing guarded actions' 1>$null
-    if ($LASTEXITCODE -ne 0) { throw 'Missing-actions fixture commit failed' }
-    $mainHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
-    & git.exe -C $fixture update-ref refs/remotes/origin/main $mainHead
-    Assert-Rejected $mainHead 'correction files|source files are missing'
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'yupuri-cloud-actions.ts') -Destination (Join-Path $fixture 'scripts/yupuri-cloud-actions.ts')
-    & git.exe -C $fixture add .
-    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'restore guarded actions' 1>$null
-    if ($LASTEXITCODE -ne 0) { throw 'Restored-actions fixture commit failed' }
-    Remove-Item -LiteralPath (Join-Path $fixture 'scripts/open-yupuri-cloud-login.ps1') -Force
-    & git.exe -C $fixture add -u
-    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'missing login opener' 1>$null
-    if ($LASTEXITCODE -ne 0) { throw 'Missing-opener fixture commit failed' }
-    $mainHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
-    & git.exe -C $fixture update-ref refs/remotes/origin/main $mainHead
-    Assert-Rejected $mainHead 'correction files'
-    'Installer reviewed-commit gates PASS (missing/invalid SHA, non-HEAD, CRLF source, wrong/missing protocol, dirty tree, missing actions, missing login opener)'
+    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'missing installer source' 1>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Missing-installer fixture commit failed' }
+    $global:remoteMainHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
+    & git.exe -C $fixture update-ref refs/remotes/origin/main $global:remoteMainHead
+    Assert-Rejected $reviewedCommit 'Reviewed worker source files are missing'
+
+    'Installer reviewed-baseline gates PASS (missing/invalid SHA, non-ancestor, pre-Task baseline, CRLF protocol, unrelated later main, protected source drift, dirty tree, missing required source)'
 } finally {
     $resolved = [System.IO.Path]::GetFullPath($fixture)
     $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
