@@ -1,6 +1,13 @@
-import { chromium, type Browser, type Page } from "@playwright/test";
-import { mkdir, open, rmdir, stat, unlink } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import { guardedCloudClick } from "./yupuri-cloud-actions";
+
+export const TOOLBOX_PUBLIC_ENTRY_URL = "https://www.post.japanpost.jp/bizpost/service/businesstoolbox/";
+export const TOOLBOX_LOGIN_URL = "https://btoolbox.post.japanpost.jp/";
+export const TOOLBOX_PORTAL_HOME_URL = "https://btoolbox.post.japanpost.jp/portal/PT/PTPT/PTPT0001.do?op=init";
+export const TOOLBOX_SERVICE_DETAIL_URL = "https://btoolbox.post.japanpost.jp/portal/SV/SVSV/SVSV0001.do";
+export const CLOUD_SSO_URL = "https://auth.btoolboxprintservice.jp/sso";
+export const CLOUD_LOGIN_PROTOCOL = 3;
 
 export function cdpEndpoint(value = "http://127.0.0.1:18822"): string {
   const match = /^http:\/\/127\.0\.0\.1:([1-9]\d{3,4})$/.exec(value);
@@ -19,68 +26,6 @@ export function edgeProfilePath(localAppData: string): string {
     throw new Error("Cloud Edge profile must be outside the repository");
   }
   return profile;
-}
-
-export const CLOUD_SSO_URL = "https://auth.btoolboxprintservice.jp/sso";
-
-export function cloudSsoBootstrapUrl(value = CLOUD_SSO_URL): string {
-  // Compare the original spelling too: URL() normalizes empty queries, fragments and ports.
-  if (value !== CLOUD_SSO_URL) throw new Error("Invalid Cloud SSO bootstrap URL");
-  return value;
-}
-
-export function loginAttemptLatchPath(localAppData: string): string {
-  return join(dirname(edgeProfilePath(localAppData)), "auto-login-attempted");
-}
-
-export const CLOUD_LOGIN_LOCK_PROTOCOL = 2;
-
-class LoginLockUnavailableError extends Error {}
-
-export class LoginAttemptLatch {
-  constructor(private readonly path: string) {}
-  async isClaimed(): Promise<boolean> {
-    try { await stat(this.path); return true; }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-      throw error;
-    }
-  }
-  // mkdir is exclusive across Node processes on Windows. Never break an abandoned
-  // lock automatically: a dead process may have already sent a credential key.
-  async runExclusive<T>(action: (lease: LoginAttemptLease) => Promise<T>, waitMs = 90000): Promise<T> {
-    await mkdir(dirname(this.path), { recursive: true });
-    const lockPath = `${this.path}.lock`;
-    const deadline = Date.now() + waitMs;
-    while (true) {
-      try { await mkdir(lockPath); break; }
-      catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-        if (Date.now() >= deadline) throw new LoginLockUnavailableError("Cloud login lock unavailable; manual recovery required");
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }
-    try { return await action(new LoginAttemptLease(this.path)); }
-    finally { await rmdir(lockPath); }
-  }
-}
-
-class LoginAttemptLease {
-  constructor(private readonly path: string) {}
-  async claim(): Promise<void> {
-    let file;
-    try { file = await open(this.path, "wx", 0o600); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error("Automatic Cloud login already attempted; manual recovery required");
-      throw error;
-    }
-    try { await file.writeFile("attempted\n"); }
-    finally { await file.close(); }
-  }
-  async clearAfterAuthenticated(): Promise<void> {
-    try { await unlink(this.path); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-  }
 }
 
 function oneFlag(args: string[], name: string): string {
@@ -103,32 +48,19 @@ export function assertDedicatedEdgeCommandLine(args: string[], endpoint: string,
 export async function connectDedicatedEdge(endpoint: string, profile: string): Promise<Browser> {
   const safeEndpoint = cdpEndpoint(endpoint);
   const browser = await chromium.connectOverCDP(safeEndpoint, { timeout: 5000 });
+  const session = await browser.newBrowserCDPSession();
   try {
-    const session = await browser.newBrowserCDPSession();
-    try {
-      const result = await session.send("Browser.getBrowserCommandLine");
-      assertDedicatedEdgeCommandLine(result.arguments, safeEndpoint, profile);
-    } finally { await session.detach(); }
+    const result = await session.send("Browser.getBrowserCommandLine");
+    assertDedicatedEdgeCommandLine(result.arguments, safeEndpoint, profile);
     return browser;
-  } catch (error) {
-    // The caller exits on failure, which drops CDP without a Browser.close command.
-    throw error;
-  }
+  } finally { await session.detach(); }
 }
 
 export function isInvoicesPageUrl(actual: string, expected: string): boolean {
-  try {
-    const page = new URL(actual);
-    const invoices = new URL(expected);
-    return page.origin === invoices.origin && page.pathname.replace(/\/$/, "") === "/invoices" &&
-      (page.search === "" || page.search === "?tab=printed" || page.search === "?tab=not_printed") &&
-      page.href === `${page.origin}${page.pathname}${page.search}` &&
-      !page.hash && !page.username && !page.password;
-  } catch { return false; }
+  return expected === "https://btoolboxprintservice.jp/invoices/" &&
+    /^https:\/\/btoolboxprintservice\.jp\/invoices\/?(?:\?tab=(?:printed|not_printed))?$/.test(actual);
 }
 
-// This checks rendered UI only; it is not fresh server authentication proof.
-// Marker reset additionally requires an exact-SSO navigation on the probe page.
 export async function isAuthenticatedInvoices(page: Page, invoicesUrl: string): Promise<boolean> {
   if (page.isClosed() || !isInvoicesPageUrl(page.url(), invoicesUrl)) return false;
   const tab = page.getByRole("tab", { name: "発行後", exact: true });
@@ -141,201 +73,172 @@ export async function assertAuthenticatedInvoices(page: Page, invoicesUrl: strin
   if (!await isAuthenticatedInvoices(page, invoicesUrl)) throw new Error("Cloud session or invoice page unavailable");
 }
 
-export async function findAuthenticatedInvoicesPage(browser: Browser, invoicesUrl: string): Promise<Page> {
-  for (const context of browser.contexts()) {
-    for (const page of context.pages()) {
-      if (await isAuthenticatedInvoices(page, invoicesUrl)) return page;
-    }
-  }
-  throw new Error("Cloud session or invoice page unavailable");
-}
-
-export async function waitForAuthenticatedInvoices(browser: Browser, invoicesUrl: string,
-  pollIntervalMs = 250): Promise<Page> {
-  while (browser.isConnected()) {
-    try { return await findAuthenticatedInvoicesPage(browser, invoicesUrl); }
-    catch { await new Promise(resolve => setTimeout(resolve, pollIntervalMs)); }
-  }
-  throw new Error("Cloud Edge session closed before authentication");
-}
-
 export function isJpToolboxUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "btoolbox.post.japanpost.jp" &&
+    return /^https:\/\/btoolbox\.post\.japanpost\.jp(?:\/|$)/.test(value) &&
+      url.protocol === "https:" && url.hostname === "btoolbox.post.japanpost.jp" &&
       !url.port && !url.username && !url.password;
   } catch { return false; }
 }
 
-const JP_LOGIN_ENTRY_TEXT = "\u6599\u91d1\u5225\u5f8c\u7d0d\u304a\u5ba2\u3055\u307e\u756a\u53f7\u3067\u30ed\u30b0\u30a4\u30f3";
-const JP_LOGIN_ID_CHOICE_TEXT = "\u30ed\u30b0\u30a4\u30f3ID\u3067\u30ed\u30b0\u30a4\u30f3";
+const JP_LOGIN_ENTRY_TEXT = "料金別後納お客さま番号でログイン";
+const JP_LOGIN_ID_CHOICE_TEXT = "ログインIDでログイン";
 
-type JpLoginState = "entry" | "loginId" | "final" | "pending" | "invalid";
-
-async function jpLoginState(page: Page): Promise<JpLoginState> {
-  if (page.isClosed() || !isJpToolboxUrl(page.url())) return "invalid";
-  const entry = page.getByText(JP_LOGIN_ENTRY_TEXT, { exact: true });
-  const loginId = page.getByText(JP_LOGIN_ID_CHOICE_TEXT, { exact: true });
-  const entryCount = await entry.count();
-  const loginIdCount = await loginId.count();
-  if (entryCount > 1 || loginIdCount > 1) return "invalid";
-  const entryVisible = entryCount === 1 && await entry.isVisible();
-  const loginIdVisible = loginIdCount === 1 && await loginId.isVisible();
-  if (entryVisible && loginIdVisible) return "invalid";
-
-  const required = await Promise.all(["#lgnIdsLogIds", "#pwdLogIds", "#loginLogIds"].map(async selector => {
-    const control = page.locator(selector);
-    const count = await control.count();
-    return { count, visible: count === 1 && await control.isVisible(),
-      enabled: count === 1 && await control.isEnabled() };
-  }));
-  const userId = page.locator("#usrIdsLogIds");
-  const userIdCount = await userId.count();
-  if (userIdCount > 1 || required.some(control => control.count > 1)) return "invalid";
-  const userIdVisible = userIdCount === 1 && await userId.isVisible();
-  const anyControlVisible = required.some(control => control.visible) || userIdVisible;
-  if (anyControlVisible) {
-    if (entryVisible || required.some(control => !control.visible || !control.enabled) ||
-      (userIdCount === 1 && !userIdVisible)) return "invalid";
-    return "final"; // The login-ID choice may remain visible beside the final controls.
+export async function isJpLoginCandidate(page: Page): Promise<boolean> {
+  if (page.isClosed() || !isJpToolboxUrl(page.url())) return false;
+  try {
+    for (const item of [
+      ...["#lgnIdsLogIds", "#usrIdsLogIds", "#pwdLogIds", "#loginLogIds"].map(selector => page.locator(selector)),
+      ...[JP_LOGIN_ENTRY_TEXT, JP_LOGIN_ID_CHOICE_TEXT].map(label => page.getByText(label, { exact: true })),
+    ]) {
+      const count = await item.count();
+      if (count > 1 || (count === 1 && await item.nth(0).isVisible())) return true;
+    }
+    return false;
+  } catch {
+    // An inspection failure cannot be used as evidence of an authenticated portal.
+    return true;
   }
-  if (loginIdVisible && await loginId.isEnabled()) return "loginId";
-  if (entryVisible && await entry.isEnabled()) return "entry";
-  return "pending";
-}
-
-export async function isVerifiedJpLogin(page: Page): Promise<boolean> {
-  return await jpLoginState(page) === "final";
-}
-
-async function isJpLoginCandidate(page: Page): Promise<boolean> {
-  const state = await jpLoginState(page);
-  return state === "entry" || state === "loginId" || state === "final";
 }
 
 export async function isVerifiedToolboxPortal(page: Page): Promise<boolean> {
   const address = page.url();
-  if (!/^https:\/\/btoolbox\.post\.japanpost\.jp\/portal\//.test(address) ||
-    !isJpToolboxUrl(address) || await isJpLoginCandidate(page)) return false;
-  const logout = page.getByRole("link", { name: "ログアウト", exact: true });
-  if (await logout.count() === 1 && await logout.isVisible()) return true;
-  if (new URL(address).pathname !== "/portal/SV/SVSV/SVSV0001.do") return false;
+  if ((address !== TOOLBOX_PORTAL_HOME_URL && address !== TOOLBOX_SERVICE_DETAIL_URL) ||
+    await isJpLoginCandidate(page)) return false;
+  if (address === TOOLBOX_PORTAL_HOME_URL) {
+    const logout = page.getByRole("link", { name: "ログアウト", exact: true });
+    return await logout.count() === 1 && await logout.isVisible();
+  }
   const sso = page.locator("#srvUtlUrl");
   const serviceUse = page.locator("#srvUtl");
-  return await sso.count() === 1 && await sso.getAttribute("value") === CLOUD_SSO_URL &&
+  return await sso.count() === 1 && !await sso.isVisible() && await sso.getAttribute("value") === CLOUD_SSO_URL &&
     await serviceUse.count() === 1 && await serviceUse.isVisible();
 }
 
-type AuthOutcome = { kind: "cloud"; page: Page } | { kind: "login" | "portal"; page: Page };
+export function isToolboxServiceOpen(now: Date = new Date()): boolean {
+  const hour = Number(new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo", hour: "2-digit", hourCycle: "h23",
+  }).format(now));
+  return hour >= 6 && hour < 24;
+}
 
-async function waitForOutcome(browser: Browser, page: Page, invoicesUrl: string,
-  accepted: ReadonlySet<"login" | "portal">, timeoutMs: number): Promise<AuthOutcome> {
+const JST_DAY_MS = 24 * 60 * 60 * 1000;
+const AUTOMATION_OPEN_MS = 6 * 60 * 60 * 1000;
+const AUTOMATION_CUTOFF_MS = (23 * 60 + 55) * 60 * 1000;
+
+function jstTimeOfDayMs(now: Date): number {
+  return ((now.getTime() + 9 * 60 * 60 * 1000) % JST_DAY_MS + JST_DAY_MS) % JST_DAY_MS;
+}
+
+export function isToolboxAutomationWindowOpen(now: Date = new Date()): boolean {
+  const time = jstTimeOfDayMs(now);
+  return time >= AUTOMATION_OPEN_MS && time < AUTOMATION_CUTOFF_MS;
+}
+
+export function msUntilToolboxAutomationWindowOpen(now: Date = new Date()): number {
+  if (isToolboxAutomationWindowOpen(now)) return 0;
+  const time = jstTimeOfDayMs(now);
+  return time < AUTOMATION_OPEN_MS ? AUTOMATION_OPEN_MS - time : JST_DAY_MS - time + AUTOMATION_OPEN_MS;
+}
+
+export class ToolboxServiceClosedError extends Error {
+  constructor() { super("JP Business ToolBox automation window is 06:00–23:55 JST"); }
+}
+
+export function assertToolboxAutomationWindowOpen(now: Date = new Date()): void {
+  if (!isToolboxAutomationWindowOpen(now)) throw new ToolboxServiceClosedError();
+}
+
+function assertLoginTabs(context: BrowserContext, entry: Page, opened: Page[], portal?: Page): void {
+  const expected = portal ? [entry, portal] : [entry];
+  const pages = context.pages().filter(page => !page.isClosed());
+  if (opened.length !== (portal ? 1 : 0) || (portal && opened[0] !== portal) ||
+    pages.length !== expected.length ||
+    expected.some(page => !pages.includes(page))) {
+    throw new Error("Unexpected dedicated Edge tab; close it manually and restart login recovery");
+  }
+}
+
+function assertPublicEntryUnchanged(entry: Page): void {
+  if (entry.isClosed() || entry.url() !== TOOLBOX_PUBLIC_ENTRY_URL) {
+    throw new Error("Official ToolBox entry changed during Login handoff");
+  }
+}
+
+async function waitForPortalOrLogin(browser: Browser, context: BrowserContext, entry: Page,
+  opened: Page[], page: Page, timeoutMs: number,
+  now: () => Date): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (browser.isConnected() && !page.isClosed() && Date.now() < deadline) {
-    // Only this navigation's page can prove its outcome. A rendered invoices tab
-    // elsewhere may have lost server auth before this SSO or credential attempt.
-    if (await isAuthenticatedInvoices(page, invoicesUrl)) return { kind: "cloud", page };
-    if (accepted.has("login") && await isJpLoginCandidate(page)) return { kind: "login", page };
-    if (accepted.has("portal") && await isVerifiedToolboxPortal(page)) return { kind: "portal", page };
+    assertToolboxAutomationWindowOpen(now());
+    assertLoginTabs(context, entry, opened, page);
+    assertPublicEntryUnchanged(entry);
+    if (page.url() !== "about:blank" && !isJpToolboxUrl(page.url())) {
+      throw new Error("Official Login opened an unexpected page");
+    }
+    if (await isVerifiedToolboxPortal(page)) return;
+    if (await isJpLoginCandidate(page)) {
+      throw new Error("ToolBox login form appeared. Log in manually with auto-login enabled, then restart the dedicated Edge.");
+    }
     await new Promise(resolve => setTimeout(resolve, 250));
   }
-  throw new Error("Cloud authentication outcome unavailable");
-}
-
-async function waitForJpLoginState(page: Page, expected: "loginId" | "final", deadline: number): Promise<void> {
-  while (true) {
-    const state = await jpLoginState(page);
-    if (state === expected && Date.now() < deadline) return;
-    if (state === "invalid") throw new Error("JP login state changed or ambiguous");
-    if (Date.now() >= deadline) throw new Error(`JP login ${expected} transition timed out`);
-    await new Promise(resolve => setTimeout(resolve, Math.min(50, deadline - Date.now())));
-  }
-}
-
-async function prepareLoginForm(page: Page, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  const state = await jpLoginState(page);
-  if (state === "final") return;
-  if (state === "entry") {
-    await page.getByText(JP_LOGIN_ENTRY_TEXT, { exact: true }).click();
-    await waitForJpLoginState(page, "loginId", deadline);
-  } else if (state !== "loginId") {
-    throw new Error("JP login method unavailable");
-  }
-  if (await jpLoginState(page) !== "loginId") throw new Error("JP login ID method unavailable");
-  await page.getByText(JP_LOGIN_ID_CHOICE_TEXT, { exact: true }).click();
-  await waitForJpLoginState(page, "final", deadline);
+  throw new Error("ToolBox portal was not confirmed. Log in manually with auto-login enabled, then restart the dedicated Edge.");
 }
 
 export async function ensureAuthenticatedInvoices(browser: Browser, invoicesUrl: string,
-  latch: LoginAttemptLatch, timeoutMs = 30000): Promise<Page> {
-  const clearAfterFreshSso = async (page: Page): Promise<Page> => {
-    try {
-      return await latch.runExclusive(async lease => {
-        // The lock may have been held by a credential attempt after our first
-        // probe. Refresh the SSO proof while holding it before deleting a marker.
-        let confirmed = await probe(new Set(["portal", "login"]));
-        if (confirmed.kind === "portal") confirmed = await probe(new Set(["login"]));
-        if (confirmed.kind !== "cloud") throw new Error("Cloud invoices not confirmed");
-        await lease.clearAfterAuthenticated();
-        return page;
-      }, 1000);
-    } catch (error) {
-      if (!(error instanceof LoginLockUnavailableError)) throw error;
-      // Fresh SSO can be used, but an active or abandoned lock retains the marker.
-      if (!await isAuthenticatedInvoices(page, invoicesUrl)) throw new Error("Cloud invoices not confirmed");
-      return page;
-    }
-  };
-  // Startup always proves authentication through a new exact-SSO request.
-  // A pre-existing rendered invoices tab is never session evidence.
+  timeoutMs = 30000, now: () => Date = () => new Date()): Promise<Page> {
+  assertToolboxAutomationWindowOpen(now());
   const context = browser.contexts()[0];
-  if (!context) throw new Error("Dedicated Edge context unavailable");
-  const page = await context.newPage();
-  const probe = async (accepted: ReadonlySet<"login" | "portal">): Promise<AuthOutcome> => {
-    await page.goto(cloudSsoBootstrapUrl(), { waitUntil: "domcontentloaded", timeout: timeoutMs });
-    return waitForOutcome(browser, page, invoicesUrl, accepted, timeoutMs);
-  };
-  let outcome = await probe(new Set(["login", "portal"]));
-  if (outcome.kind === "cloud") return clearAfterFreshSso(page);
-  if (outcome.kind === "portal") {
-    outcome = await probe(new Set(["login"]));
-    if (outcome.kind === "cloud") return clearAfterFreshSso(page);
-  }
-  if (await latch.isClaimed()) throw new Error("Automatic Cloud login already attempted; manual recovery required");
-  return latch.runExclusive(async lease => {
-      // Another helper may have completed SSO while this one waited for the lock.
-      // Probe again under the lock before claiming or sending any credential key.
-      let lockedOutcome = await probe(new Set(["login", "portal"]));
-      if (lockedOutcome.kind === "portal") lockedOutcome = await probe(new Set(["login"]));
-      if (lockedOutcome.kind === "cloud") {
-        await lease.clearAfterAuthenticated();
-        return page;
-      }
-      if (!await isJpLoginCandidate(page)) throw new Error("JP login page changed");
-      await lease.claim(); // Durable one-attempt marker before any login-form interaction.
-      await prepareLoginForm(page, timeoutMs);
-      const userId = page.locator("#usrIdsLogIds");
-      if (await userId.count() > 1) throw new Error("JP user ID control ambiguous");
-      if (await userId.count() === 1) {
-        if (!await userId.isVisible()) throw new Error("JP user ID control unavailable");
-        await userId.fill("");
-      }
-      if (!await isVerifiedJpLogin(page)) throw new Error("JP login controls changed");
-      const loginId = page.locator("#lgnIdsLogIds");
-      try {
-        await loginId.click();
-        await loginId.press("ArrowDown");
-        await loginId.press("Enter");
-      } catch {
-        // Navigation during selection is uncertain. Never send another key.
-      }
-      await waitForOutcome(browser, page, invoicesUrl, new Set(["portal"]), timeoutMs);
-      // Even a post-key Cloud rendering must be confirmed by a fresh,
-      // credential-free request to the exact official SSO entry.
-      const confirmed = await probe(new Set());
-      if (confirmed.kind !== "cloud") throw new Error("Cloud invoices not confirmed");
-      await lease.clearAfterAuthenticated();
-      return page;
+  if (!context || browser.contexts().length !== 1) throw new Error("Dedicated Edge context unavailable");
+  const pages = context.pages().filter(page => !page.isClosed());
+  if (pages.length !== 1) throw new Error("Dedicated Edge must have exactly one tab; restart it before login recovery");
+  const entry = pages[0];
+  assertToolboxAutomationWindowOpen(now());
+  await entry.goto(TOOLBOX_PUBLIC_ENTRY_URL, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+  if (entry.url() !== TOOLBOX_PUBLIC_ENTRY_URL) throw new Error("Official ToolBox entry page unavailable");
+  const login = entry.locator(`a[href="${TOOLBOX_LOGIN_URL}"]`);
+  if (await login.count() !== 1 || !await login.isVisible()) throw new Error("Official ToolBox Login link unavailable");
+  const opened: Page[] = [];
+  const onPage = (page: Page) => { opened.push(page); };
+  context.on("page", onPage);
+  try {
+    assertLoginTabs(context, entry, opened);
+    assertToolboxAutomationWindowOpen(now());
+    const newPage = context.waitForEvent("page", { timeout: timeoutMs }).catch(() => {
+      throw new Error("Official Login did not open a new ToolBox page; restart login recovery");
     });
+    const [, portal] = await Promise.all([
+      guardedCloudClick(login, () => assertToolboxAutomationWindowOpen(now())), newPage,
+    ]);
+    assertLoginTabs(context, entry, opened, portal);
+    assertPublicEntryUnchanged(entry);
+    if (portal === entry) throw new Error("Official Login did not open a new ToolBox page");
+    if (await portal.opener() !== entry) throw new Error("Official Login opened an unrelated page");
+    await waitForPortalOrLogin(browser, context, entry, opened, portal, timeoutMs, now);
+    assertLoginTabs(context, entry, opened, portal);
+    assertPublicEntryUnchanged(entry);
+    assertToolboxAutomationWindowOpen(now());
+    await entry.close();
+    if (opened.length !== 1 || context.pages().filter(page => !page.isClosed()).length !== 1 ||
+      context.pages().filter(page => !page.isClosed())[0] !== portal) {
+      throw new Error("Unexpected dedicated Edge tab; close it manually and restart login recovery");
+    }
+    assertToolboxAutomationWindowOpen(now());
+    await portal.goto(CLOUD_SSO_URL, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+    assertToolboxAutomationWindowOpen(now());
+    if (opened.length !== 1 || context.pages().filter(page => !page.isClosed()).length !== 1 ||
+      context.pages().filter(page => !page.isClosed())[0] !== portal) {
+      throw new Error("Unexpected dedicated Edge tab; close it manually and restart login recovery");
+    }
+    if (await isJpLoginCandidate(portal)) {
+      throw new Error("ToolBox login form appeared. Log in manually with auto-login enabled, then restart the dedicated Edge.");
+    }
+    await assertAuthenticatedInvoices(portal, invoicesUrl);
+    if (opened.length !== 1 || context.pages().filter(page => !page.isClosed()).length !== 1 ||
+      context.pages().filter(page => !page.isClosed())[0] !== portal) {
+      throw new Error("Unexpected dedicated Edge tab; close it manually and restart login recovery");
+    }
+    return portal;
+  } finally { context.off("page", onPage); }
 }

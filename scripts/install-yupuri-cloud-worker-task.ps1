@@ -56,25 +56,29 @@ if ($ReviewedCommit -cne $head) { throw 'Reviewed commit does not match canonica
 $reviewedFiles = @(& git -C $repo diff-tree --no-commit-id --name-only -r $ReviewedCommit 2>$null)
 if ($LASTEXITCODE -ne 0 -or
     $reviewedFiles -cnotcontains 'scripts/yupuri-cloud-live-session.ts' -or
+    $reviewedFiles -cnotcontains 'scripts/open-yupuri-cloud-login.ps1' -or
+    $reviewedFiles -cnotcontains 'scripts/yupuri-cloud-actions.ts' -or
+    $reviewedFiles -cnotcontains 'scripts/yupuri-cloud-worker.ts' -or
     $reviewedFiles -cnotcontains 'docs/ai-tasks/201g-yu-pri-cloud-operational-hardening.md') {
     throw 'Reviewed commit does not contain the Task201G correction files'
 }
 $reviewedSession = & git -C $repo show "${ReviewedCommit}:scripts/yupuri-cloud-live-session.ts" 2>$null
-if ($LASTEXITCODE -ne 0 -or ($reviewedSession -join "`n") -cnotmatch '(?m)^export const CLOUD_LOGIN_LOCK_PROTOCOL = 2;$') {
+if ($LASTEXITCODE -ne 0 -or ($reviewedSession -join "`n") -cnotmatch '(?m)^export const CLOUD_LOGIN_PROTOCOL = 3;$') {
     throw 'Reviewed commit does not contain the corrected Cloud login protocol'
 }
 $reviewedTask = & git -C $repo show "${ReviewedCommit}:docs/ai-tasks/201g-yu-pri-cloud-operational-hardening.md" 2>$null
-if ($LASTEXITCODE -ne 0 -or ($reviewedTask -join "`n") -cnotmatch 'Fresh SSO proof required before clearing auto-login-attempted') {
+if ($LASTEXITCODE -ne 0 -or ($reviewedTask -join "`n") -cnotmatch 'Official entry and remembered auto-login') {
     throw 'Reviewed commit does not contain the Task201G safety record'
 }
 $required = @('docs/ai-tasks/201g-yu-pri-cloud-operational-hardening.md',
     'scripts/install-yupuri-cloud-worker-task.ps1', 'scripts/start-yupuri-cloud-worker.ps1',
-    'scripts/yupuri-cloud-live-session.ts', 'scripts/yupuri-cloud-worker.ts')
+    'scripts/open-yupuri-cloud-login.ps1', 'scripts/await-yupuri-cloud-login.ts',
+    'scripts/yupuri-cloud-live-session.ts', 'scripts/yupuri-cloud-actions.ts', 'scripts/yupuri-cloud-worker.ts')
 & git -C $repo ls-files --error-unmatch -- $required 1>$null 2>$null
 if ($LASTEXITCODE -ne 0) { throw 'Reviewed worker source files are missing' }
 $sessionSource = Get-Content -LiteralPath (Join-Path $repo 'scripts/yupuri-cloud-live-session.ts') -Raw -Encoding utf8
-if ($sessionSource -notmatch '(?m)^export const CLOUD_LOGIN_LOCK_PROTOCOL = 2;$') {
-    throw 'Reviewed Cloud login lock protocol is missing'
+if ($sessionSource -notmatch '(?m)^export const CLOUD_LOGIN_PROTOCOL = 3;\r?$') {
+    throw 'Reviewed Cloud login protocol is missing'
 }
 $token = [Environment]::GetEnvironmentVariable('N8N_INTERNAL_TOKEN', 'User')
 if ([string]::IsNullOrWhiteSpace($token)) { throw 'User N8N_INTERNAL_TOKEN is unavailable' }

@@ -21,13 +21,22 @@ try {
     $ancestor = (& git.exe -C $fixture rev-parse HEAD).Trim()
     New-Item -ItemType Directory -Path (Join-Path $fixture 'docs\ai-tasks') -Force | Out-Null
     $taskFiles = @('scripts/install-yupuri-cloud-worker-task.ps1', 'scripts/start-yupuri-cloud-worker.ps1',
-        'scripts/yupuri-cloud-live-session.ts', 'scripts/yupuri-cloud-worker.ts',
+        'scripts/open-yupuri-cloud-login.ps1', 'scripts/await-yupuri-cloud-login.ts',
+        'scripts/yupuri-cloud-live-session.ts', 'scripts/yupuri-cloud-actions.ts', 'scripts/yupuri-cloud-worker.ts',
         'docs/ai-tasks/201g-yu-pri-cloud-operational-hardening.md')
     foreach ($file in $taskFiles) {
         $target = Join-Path $fixture $file
         New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
         Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) $file) -Destination $target -Force
     }
+    $sessionFile = Join-Path $fixture 'scripts/yupuri-cloud-live-session.ts'
+    $sessionSource = [System.IO.File]::ReadAllText($sessionFile)
+    $sessionSource = $sessionSource.Replace("`r`n", "`n").Replace("`n", "`r`n")
+    if (-not $sessionSource.Contains("export const CLOUD_LOGIN_PROTOCOL = 3;`r`n")) {
+        throw 'Fixture session source is missing the CRLF protocol line'
+    }
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($sessionFile, $sessionSource, $utf8)
     & git.exe -C $fixture add .
     & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'reviewed fixture' 1>$null
     if ($LASTEXITCODE -ne 0) { throw 'Reviewed fixture commit failed' }
@@ -40,6 +49,10 @@ try {
     function git {
         if ($args -contains 'ls-remote') {
             "$mainHead`trefs/heads/main"
+            $global:LASTEXITCODE = 0
+            return
+        }
+        if ($global:allowDirtyProtocolFixture -and $args -contains 'status') {
             $global:LASTEXITCODE = 0
             return
         }
@@ -73,7 +86,37 @@ try {
     if ($result -notmatch 'status=enabled' -or $global:registrationCalls -ne 1 -or $global:enableCalls -ne 1) {
         throw 'Valid reviewed HEAD did not pass all source gates'
     }
-    'Installer reviewed-commit gates PASS (missing, invalid, non-HEAD ancestor, non-ancestor, positive source gate)'
+    $global:registrationCalls = 0
+    $global:enableCalls = 0
+    [System.IO.File]::WriteAllText($sessionFile, $sessionSource.Replace('CLOUD_LOGIN_PROTOCOL = 3;', 'CLOUD_LOGIN_PROTOCOL = 4;'), $utf8)
+    Assert-Rejected $mainHead 'unreviewed local changes'
+    # Bypass only the fixture's dirty-tree response to exercise the later
+    # working-copy protocol gate against the same valid reviewed commit.
+    $global:allowDirtyProtocolFixture = $true
+    Assert-Rejected $mainHead 'Reviewed Cloud login protocol is missing'
+    [System.IO.File]::WriteAllText($sessionFile, $sessionSource.Replace('export const CLOUD_LOGIN_PROTOCOL = 3;', ''), $utf8)
+    Assert-Rejected $mainHead 'Reviewed Cloud login protocol is missing'
+    $global:allowDirtyProtocolFixture = $false
+    [System.IO.File]::WriteAllText($sessionFile, $sessionSource, $utf8)
+    Remove-Item -LiteralPath (Join-Path $fixture 'scripts/yupuri-cloud-actions.ts') -Force
+    & git.exe -C $fixture add -u
+    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'missing guarded actions' 1>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Missing-actions fixture commit failed' }
+    $mainHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
+    & git.exe -C $fixture update-ref refs/remotes/origin/main $mainHead
+    Assert-Rejected $mainHead 'correction files|source files are missing'
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'yupuri-cloud-actions.ts') -Destination (Join-Path $fixture 'scripts/yupuri-cloud-actions.ts')
+    & git.exe -C $fixture add .
+    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'restore guarded actions' 1>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Restored-actions fixture commit failed' }
+    Remove-Item -LiteralPath (Join-Path $fixture 'scripts/open-yupuri-cloud-login.ps1') -Force
+    & git.exe -C $fixture add -u
+    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'missing login opener' 1>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Missing-opener fixture commit failed' }
+    $mainHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
+    & git.exe -C $fixture update-ref refs/remotes/origin/main $mainHead
+    Assert-Rejected $mainHead 'correction files'
+    'Installer reviewed-commit gates PASS (missing/invalid SHA, non-HEAD, CRLF source, wrong/missing protocol, dirty tree, missing actions, missing login opener)'
 } finally {
     $resolved = [System.IO.Path]::GetFullPath($fixture)
     $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())

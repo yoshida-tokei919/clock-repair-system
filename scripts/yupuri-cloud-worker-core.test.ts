@@ -21,13 +21,16 @@ test("production URL and pagination contracts", () => {
   assert.equal(cloudInvoicesUrl("https://btoolboxprintservice.jp/invoices"), "https://btoolboxprintservice.jp/invoices");
   assert.equal(cloudInvoicesUrl("http://localhost:3000/invoices/"), "http://localhost:3000/invoices/");
   assert.equal(productionCloudInvoicesUrl(), "https://btoolboxprintservice.jp/invoices/");
+  assert.throws(() => productionCloudInvoicesUrl("https://btoolboxprintservice.jp/invoices"), /Production Cloud URL/);
   assert.throws(() => productionCloudInvoicesUrl("http://localhost:3000/invoices/"), /Production Cloud URL/);
   assert.throws(() => productionCloudInvoicesUrl("https://127.0.0.1:3000/invoices/"), /Production Cloud URL/);
   for (const url of ["https://example.com/invoices/", "https://static.btoolboxprintservice.jp/invoices/",
     "http://btoolboxprintservice.jp/invoices/", "https://btoolboxprintservice.jp:8443/invoices/",
+    "https://btoolboxprintservice.jp:443/invoices/",
     "https://btoolboxprintservice.jp/invoices/invoices.html", "https://btoolboxprintservice.jp/invoices/?x=1",
     "https://btoolboxprintservice.jp/invoices/#x", "https://user@btoolboxprintservice.jp/invoices/"]) {
     assert.throws(() => cloudInvoicesUrl(url), url);
+    assert.throws(() => productionCloudInvoicesUrl(url), url);
   }
   assert.doesNotThrow(() => assertSingleDisabledNextPage(1, false));
   for (const state of [[0, null], [1, true], [2, false], [1, null]] as const) {

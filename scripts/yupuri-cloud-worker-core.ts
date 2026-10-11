@@ -40,7 +40,8 @@ export function oneAddedRow(before: string[], after: string[]): number {
 export function cloudInvoicesUrl(configured = "https://btoolboxprintservice.jp/invoices/"): string {
   const url = new URL(configured);
   const local = ["localhost", "127.0.0.1"].includes(url.hostname);
-  if (url.username || url.password || url.search || url.hash ||
+  if ((!local && !/^https:\/\/btoolboxprintservice\.jp(?:\/|$)/.test(configured)) ||
+    url.username || url.password || url.search || url.hash ||
     (local ? !["http:", "https:"].includes(url.protocol) :
       url.protocol !== "https:" || url.hostname !== "btoolboxprintservice.jp") ||
     !["/invoices", "/invoices/"].includes(url.pathname) ||
@@ -49,11 +50,9 @@ export function cloudInvoicesUrl(configured = "https://btoolboxprintservice.jp/i
 }
 
 export function productionCloudInvoicesUrl(configured?: string): string {
-  const url = cloudInvoicesUrl(configured);
-  if (new URL(url).origin !== "https://btoolboxprintservice.jp") {
-    throw new Error("Production Cloud URL is required");
-  }
-  return url;
+  const value = configured ?? "https://btoolboxprintservice.jp/invoices/";
+  if (value !== "https://btoolboxprintservice.jp/invoices/") throw new Error("Production Cloud URL is required");
+  return cloudInvoicesUrl(value);
 }
 
 export function assertSingleDisabledNextPage(count: number, enabled: boolean | null): void {
@@ -95,7 +94,7 @@ function tracking(row: CloudRow | null, id: number): string {
 }
 
 export async function runCloudJob(job: CloudJob, api: CloudApi, browser: CloudBrowser, store: JournalStore,
-  allowIssue: boolean, printPdf?: (path: string) => Promise<void>) {
+  allowIssue: boolean, printPdf?: (path: string) => Promise<void>, beforeSideEffect?: () => void) {
   checkedJob(job);
   const id = job.shipmentId;
   let journal = await store.read(id);
@@ -108,6 +107,7 @@ export async function runCloudJob(job: CloudJob, api: CloudApi, browser: CloudBr
     if (row?.state === "unissued") throw new WorkerStop("preexisting-unissued-row", id);
     if (row?.state === "issued") {
       const trackingNumber = tracking(row, id);
+      beforeSideEffect?.();
       await api.complete({ shipmentId: id, managementNumber: job.managementNumber, trackingNumber });
       journal = { shipmentId: id, managementNumber: job.managementNumber, trackingNumber, stage: "completed", recovered: true };
       await store.write(journal);
@@ -134,6 +134,7 @@ export async function runCloudJob(job: CloudJob, api: CloudApi, browser: CloudBr
   if (journal.stage !== "completed") {
     journal.stage = "issued";
     await store.write(journal);
+    beforeSideEffect?.();
     await api.complete({ shipmentId: id, managementNumber: job.managementNumber, trackingNumber });
     journal.stage = "completed";
     await store.write(journal);
@@ -146,8 +147,10 @@ export async function runCloudJob(job: CloudJob, api: CloudApi, browser: CloudBr
   }
   if (printPdf && !journal.printCompleted) {
     if (journal.printAttempted) throw new WorkerStop("print-uncertain", id);
+    beforeSideEffect?.();
     journal.printAttempted = true;
     await store.write(journal);
+    beforeSideEffect?.();
     await printPdf(journal.pdfPath);
     journal.printCompleted = true;
     await store.write(journal);

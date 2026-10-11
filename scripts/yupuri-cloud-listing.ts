@@ -1,16 +1,17 @@
 import type { Page } from "@playwright/test";
 import { setTimeout as delay } from "node:timers/promises";
 import { assertSingleDisabledNextPage } from "./yupuri-cloud-worker-core";
+import { guardedCloudClick } from "./yupuri-cloud-actions";
 
 function exactManagement(text: string, managementNumber: string) {
   return text.split(/\s+/).includes(managementNumber);
 }
 
 export async function inspectCloudTab(page: Page, tabName: string, managementNumber: string,
-  timeoutMs = 3000, pollMs = 100): Promise<string | null> {
+  timeoutMs = 3000, pollMs = 100, beforeClick: () => void = () => {}): Promise<string | null> {
   const tab = page.getByRole("tab", { name: tabName, exact: true });
   if (await tab.count() !== 1) throw new Error("Cloud tab ambiguous");
-  await tab.click();
+  await guardedCloudClick(tab, beforeClick);
   // Cloud can select a tab before replacing its rows, with no reliable loading marker.
   // Observe the whole bounded window; an initially empty table is not proof of absence.
   const deadline = Date.now() + timeoutMs;
