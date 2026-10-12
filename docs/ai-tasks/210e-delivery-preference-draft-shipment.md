@@ -1,6 +1,6 @@
 # Task210E - delivery preference to DRAFT Shipment
 
-Production: pending.
+Production: complete.
 
 ## Scope
 
@@ -29,7 +29,6 @@ Production: pending.
 - `npx tsc --noEmit --incremental false`: PASS.
 - `npx next build`: PASS on host (Next.js 15.5.27; compile/lint/type checks passed; static generation 59/59). The earlier Codex sandbox `spawn EPERM` was environment-specific.
 - `git diff --check`: PASS.
-- Production mutation and deployment: not performed.
 
 ## Independent review
 
@@ -37,4 +36,15 @@ Production: pending.
 - Initial review found and corrected: manual/public Shipment concurrency lacked a shared Repair lock boundary; single-Repair POST validated a pre-lock snapshot; grouped context accepted a future unanswered group Shipment too broadly.
 - Follow-up review found and corrected one remaining race: manual create acquired Repair locks but still created a second Shipment after observing an active outbound Shipment. Manual create now fails closed after the locked fresh read for any active outbound overlap.
 - Historical CANCELLED, actually shipped, and INBOUND Shipment cases remain non-blocking.
-- Final read-only review found no remaining blocking issue within Task210E scope. Production remains pending explicit approval.
+- Final read-only review found no remaining blocking issue within Task210E scope.
+
+## Production
+
+- User approval: 2026-10-12.
+- Application commit: `a9da82325d681a5894bb14a98812583ea2c0f0b7` (`feat: auto-create delivery preference shipments`).
+- No schema, migration, RLS, GRANT, environment-variable, or production DB migration change was required.
+- Railway application deployment: `336026fd-06a9-407c-8398-bfb13ba1f7f9`, source `main@a9da823`, region `sin`, status `SUCCESS`.
+- Railway build passed Prisma Client generation, Next.js 15.5.27 compile, lint/type validation, and static generation 59/59. Runtime reached `Ready` in 558ms.
+- Non-destructive production smoke: `/` 200, `/login` 200, unauthenticated `/repairs` 307, invalid Task203 delivery API token 404, invalid Task210D intake-delivery API token 404, and unauthenticated `POST /api/shipments` 401. Railway HTTP logs showed no upstream errors for the smoke requests.
+- No real customer token, delivery-preference answer, Shipment/ShipmentRepair mutation, LINE send, outbox creation, Stripe action, or customer-data mutation was used for smoke testing.
+- Production tag: `production-task210e-20261012` (created after the final docs-only deployment succeeds).
