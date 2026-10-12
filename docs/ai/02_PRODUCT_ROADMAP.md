@@ -712,6 +712,8 @@ DRAFT Shipmentの間は配達希望の手動変更を許可し、顧客フォー
 はRepairStatusとは分離して管理する。
 #### Task204: 発送・配達自動連携
 
+Status: **Task204A-E software production complete（2026-10-13）**。実荷物での引受 → LINE発送通知 → 配送 → 配達完了 → Repair納品済みのE2E確認が残る。persistent tracking syncはこのE2E確認までOFFを維持する。
+
 配送会社の「引受」を検知した時点で、
 
 - Shipmentを実発送状態へ更新
@@ -832,6 +834,8 @@ n8n
 
 #### 1. B2B受付フローの完成
 
+Status: **Task205A-C production complete**。一括受付、master drill-down、自由入力＋候補検索、movement / base Cal、依頼内容入力まで本番反映済み。
+
 - 取引先起点で複数本をまとめて受け付けられるようにする
 - 時計情報は既存Repairと同じマスタdrill-downを再利用し、自由入力と既存候補の絞り込みを両立する
 - 依頼内容を受付時に入力できるようにする
@@ -839,6 +843,8 @@ n8n
 - 新規入力値を次回候補へ再利用する場合も、既存マスタの正本性を壊さない方法で行う
 
 #### 2. B2B一括PhysicalTag発行・ラベル連続印刷
+
+Status: **Task205D production complete**。software上の一括準備・直接印刷経路は完成。Brother QL-800実機での複数枚連続出力確認は残る。
 
 - B2B一括受付で作成した複数RepairへPhysicalTagを安全に割り当てる
 - Brother QL-800 + DK-2205を前提に、複数本の修理袋ラベルを連続印刷できるようにする
@@ -915,35 +921,27 @@ n8n
 
 ### 実施順
 
-B2Cの問い合わせ → 受付 → 共有 → 発送判断 → ゆうプリ → 配送追跡 → 納品を一つの顧客導線として完成させる。LINE関連の既存Taskとの競合を避けるため、まず進行中のTask206G1を安全に完了させ、その後Task210系へ進む。
+B2Cの主要顧客導線は、Task206G1、Task210A-F、Task201G-OPS、Task204A-Eまでsoftware production反映済み。今後は実発送E2EとB2B残工程へ軸足を移す。
 
-1. **Task206G1 — Communication AI Briefを完了**
-   - 現在の未commit実装を独立レビューし、schema / migrationを含むため本番反映は明示承認後に行う
-   - Task210B / Task204Cと同じCommunication Hub / LINE周辺の競合を先に解消する
-2. **Task210A — intake shared-page grouping**
-   - 同一受付の複数Repairを1共有URLへまとめる
-3. **Task210B — intake completion shared-page LINE notice**
-   - 受付完了後に共有URLを既存通常トーク基盤で1回案内する
-4. **Task210C — customer shipping decision**
-   - 完成分を先に送る / 全件完成まで待つ、を発送グループ単位で扱う
-5. **Task210D — shipment-level delivery preference**
-   - 配達希望を今回発送するRepairグループ単位で1回取得する
-6. **Task210E — delivery preference → DRAFT Shipment auto-create**
-   - 顧客回答からShipmentを冪等に自動作成する
-7. **Task210F — delivery preference revision / issue lock**
-   - DRAFT中の変更とREADY以降のlockを完成させる
-8. **Task201G-OPS — ゆうプリクラウド自動発行の運用化** ✅ production運用化完了（2026-10-13）
-   - reviewed runtime整合確認・rollout gate修正・persistent `-AllowIssue` 有効化まで完了
-   - 送り状発行は実発送扱いにせず、旧Session Disabled / NEC固定印刷を維持
-9. **Task204A — Japan Post tracking read-only poller** ← 次Task
-10. **Task204B — Shipment tracking state sync**
-11. **Task204C — 引受時の追跡番号付きLINE発送通知**
-12. **Task204D — 共有ページ配送状況表示**
-13. **Task204E — 配達完了 → Repair納品済み**
-14. **Task206F Gmail channel foundation**
-15. B2B受付・一括PhysicalTag / ラベル連続印刷等の残工程を、実運用上必要な差分だけ仕上げる
-16. 本格運用開始後、Scheduler・納期・リードタイム・Communication Hubの精度を運用実績で改善する
-17. 事例公開・その他未完機能
+1. **実発送E2E — Task204 live validation**
+   - 実発送可能な案件で、trackingNumber回収 → 日本郵便「引受」 → LINE発送通知 → 輸送 → 配達完了 → Repair納品済みを通す
+   - E2E確認前はpersistent tracking syncをOFFのまま維持する
+2. **Task206F — Gmail channel foundation**
+   - B2B向けメールをCustomer / Repair単位のCommunication Hubへ統合する
+   - Gmailのmessage/thread identity、OAuth、同期、返信thread、添付、送信確認をLINE senderと分離して実装する
+3. **Task207系 — 帳票delivery channel / 5750C印刷 / 月次請求送付**
+   - 見積書Gmail送信
+   - 納品書 `NEC MultiWriter 5750C` 明示印刷
+   - 請求書LINE通常トーク / 郵送振り分け
+   - 郵送請求書の5750C一括印刷
+   - 月末締め翌月末支払期日の自動設定
+4. **B2B E2E継続**
+   - `docs/ai/06_B2B_E2E_RUN_LOG.md` を正本に、実案件を受付 → 案件化 → 見積 → 作業 → 納品 → Shipment → 請求まで通す
+   - 通しテストを止める不足だけ独立Taskとして最小実装する
+5. **B2B複数店舗・請求集約**
+   - 同一会社の複数店舗、指定請求先店舗、既存請求書の集約、納品書単位明細、元請求書との紐付けをTask分割して実装する
+6. 本格運用開始後、Scheduler・納期・リードタイム・Communication Hubの精度を運用実績で改善する
+7. 事例公開・その他未完機能
 
 H2 / H5B / H5Cは保留のままでも上記B2C顧客導線を進められる。H3 / H4 / H5Aの既存PoC・即時化成果は必要箇所で再利用するが、新しい送信正本にはしない。
 

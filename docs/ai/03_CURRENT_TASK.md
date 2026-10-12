@@ -1,413 +1,107 @@
 # CURRENT TASK
 
-## 現在のcheckpoint — 2026-10-03
-
-このファイルは、現在の実装Taskとproductionの現在地だけを管理する。
-過去Taskの詳細は `docs/ai-tasks/` と各runbookを参照する。
-
-## Production
-
-- Production source snapshot: `1d19e1d27b17d8d3543e17fe36352ae979fad91c`
-- Included application commits:
-  - Task196E: `13fd1b0` — `feat: update physical tag label for dk2205`
-  - Task203A: `c6c9971` — `feat: add repair completion notice foundation`
-  - Task201B: `1d19e1d` — investigation-only docs checkpoint
-- Deploy source: GitHub `main` → Railway, exact commit `1d19e1d27b17d8d3543e17fe36352ae979fad91c`
-- Railway deployment: `01bb8bca-82ca-4888-8d6e-e2590d2adb1b`
-- Deployment status: `SUCCESS`
-- Production tags: `production-task196e-20261003`, `production-task203a-20261003`
-- Region: `sin`
-- Runtime: Next.js 15.5.27, Ready in 475ms
-- Railway production build: compile / type check PASS、static pages 56/56
-- Supabase migration: none; schema / migration / RLS / GRANT / production DB mutationなし
-- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、`/shipments`未認証=307、Task203A completion-notice GET未認証=401。Railway HTTP logsの`upstreamErrors`なし。
-- 実LINE送信なし。Task203AはAPPROVED outbox intent作成基盤までで、UI / Shipment配達希望日時更新 / sender worker変更は未実装。
-
-Production: Task196E / Task203A production complete. Task201B investigation complete; B2 Cloud CSV実装は一次資料のformat evidence待ち。
-
-## Stage B 現在地
-
-### Task196A–C
-
-PhysicalTag schema foundation、authenticated resolver、assign / release / replace lifecycleはproduction完了。
-
-### Task196D — PhysicalTag発行・QRラベル
-
-Software status: production complete
-
-- Application commit: `07a62846ca77c12faf7160457f354d4e929440bf`
-- Railway deployment: `29270eee-e41f-4c1c-b591-2823860d6e6a` — SUCCESS
-- Production tag: `production-task196d-20261001`
-- `PT-000001`形式のshortCode、opaque random qrToken、任意NFC UID、Repairへの即時assignを実装。
-- Repair詳細へPhysicalTag管理パネルと62×29mm QRラベルPDF導線を追加。
-- QR payloadはqrTokenのみ。Repair ID / inquiryNumber / PIIをQRへ含めない。
-- legacy `/api/print-tag` とRepair-ID / inquiryNumber QRを撤去。
-- Production smoke完了。
-- Brotherプリンター実機での62×29mm印刷品質・余白・QR読取確認はハードウェア到着後に実施する。これはソフトウェアproduction反映とは分離して追跡する。
-- 詳細: `docs/ai-tasks/196d-physical-tag-label-flow.md`
-
-### Task197 — 共通scan receiver / ScanSession
-
-Status: production complete
-
-- Application commit: `684a5cff462f2b3713e7ee67993d12fb7946530a`
-- Railway deployment: `54274dcf-d047-4dc3-92e6-b2e63295c55b` — SUCCESS
-- Production tag: `production-task197-20261002`
-- 管理画面全体へkeyboard-wedge/HID + 手入力の共通scan receiverを追加。
-- modes: `OPEN_REPAIR`, `TIMER`, `BATCH_SELECT`, `DELIVERY_NOTE`, `SHIPMENT_SELECT`
-- resolver APIを再利用し、NOT_FOUND / RETIRED / UNASSIGNED / AMBIGUOUSを明示。
-- TIMERはscanだけで状態変更せず、人間の確認後に開始/切替。
-- DELIVERY_NOTE / SHIPMENT_SELECTは別顧客混入をblockし、実際の帳票・Shipment作成は行わない。
-- FIFO queue、最大16件、750ms同一raw scan debounceを実装。
-- R65固有UID形式は未推測のまま。
-- 詳細: `docs/ai-tasks/197-scan-session-receiver.md`
-
-### Task198A — StorageLocation schema foundation
-
-Status: production complete
-
-- Application commit: `4f0664281933761f28cf27f519e62ddbb2b868ac`
-- Railway deployment: `ceecb7e7-f90a-498b-9fec-dc420de09ec9` — SUCCESS
-- Production tag: `production-task198a-20261002`
-- Supabase migration: `20261001204201 add_storage_location_foundation`
-- StorageLocation / StorageLocationAssignment / StorageLocationTypeを追加。
-- StorageLocationはRepair.status / RepairWorkPlan / PhysicalTagから独立。
-- 1 Repairにつきactive StorageLocationAssignmentは最大1件。
-- 1 StorageLocationには複数Repairを配置可能。
-- server-only: RLS enabled、policyなし、anon/authenticated/service_roleへtable/sequence権限なし。
-- 詳細: `docs/ai-tasks/198a-storage-location-schema-foundation.md`
-
-### Task198B — StorageLocation move flow / ScanSession接続
-
-Status: production complete
-
-- Application commit: `aeaa0be6723b526de87af74e18c9faac61c3a5b1`
-- Railway deployment: `b457c062-0330-4699-9646-25703fdd0967` — SUCCESS
-- Production tag: `production-task198b-20261002`
-- schema / migration変更なし。
-- authenticated StorageLocation resolverを追加。
-- identifier types: NFC_UID / QR_TOKEN / SHORT_CODE。
-- resolver status: NOT_FOUND / INACTIVE / RESOLVED。
-- authenticated StorageLocation move APIを追加。
-- 最大100 Repairを1つのSerializable transactionで同一Locationへ移動可能。
-- 旧assignment release → 新assignment createで履歴保持。
-- 同一Locationはno-op。
-- actual Admin.idを監査保存。
-- stale state / P2002 / P2034は409。
-- ScanSessionへ `LOCATION_MOVE` modeを追加。
-- 先に移動先Locationをscanし、その後PhysicalTag/Repairを複数scan。
-- scanだけではDB変更せず、明示確認後に移動。
-- 移動成功後はdestinationを保持し、次のbatchを同じ場所へ連続移動可能。
-- 連続scanのphaseはenqueue時ではなく処理時点のcurrent destinationで判定。
-- Repair.statusは変更しない。
-- Task198B + ScanSession + PhysicalTag regression: 42/42 PASS。
-- TypeScript PASS、`git diff --check` PASS、`npm run build` PASS。
-- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、StorageLocation resolve valid/malformed未認証=401、move valid/malformed未認証=401。
-- StorageLocationはproductionでまだ0件のため、実移動mutation smokeは未実施。
-- 詳細: `docs/ai-tasks/198b-storage-location-move-flow.md`
-
-### Task198C — StorageLocation visibility / initial zones
-
-Status: production complete
-
-- Application commit: `42281b9114b580443e89e192894d1b2b75b81170`
-- Railway deployment: `a78de541-a17a-4419-b05d-78b55fc3810d` — SUCCESS
-- Production tag: `production-task198c-20261002`
-- Supabase migration: `20261002005051 seed_initial_storage_locations`
-- 初期StorageLocation 9ゾーンをdata-only migrationで投入。
-- 既存shortCode / nameが正本定義と衝突する場合はfail closed。既存行のUPDATE / DELETEなし。
-- StorageLocation / StorageLocationAssignmentはRLS enabled、policyなし、anon/authenticated/service_roleへのtable権限なしを維持。
-- Repair詳細にactive StorageLocationAssignmentを現在保管場所として表示。未割当は「保管場所未登録」。
-- `/storage-locations` にactive Location一覧、active Repair件数、Location単位のRepair一覧を追加。
-- Sidebar導線とNextAuth middleware保護を追加。
-- LOCATION_AUDIT / 棚卸しscan、推奨zone判定、status自動変更は対象外。
-- StorageLocation / ScanSession regression: 20/20 PASS。
-- Prisma validate / TypeScript / `git diff --check` / production build PASS。
-- Production read-back: canonical 9 zones、StorageLocationAssignment 0件。
-- Production smoke: `/`=200、`/login`=200、`/storage-locations`未認証=307、`/repairs`未認証=307。
-- 詳細: `docs/ai-tasks/198c-storage-location-visibility.md`
-
-### Task198D — StorageLocation audit scan
-
-Status: production complete
-
-- Application commit: `af0555a3847275d4e17961d392f79cabb8f8109d`
-- Railway deployment: `2a99e732-a6db-4fad-93bc-f6cb5873e9d3` — SUCCESS
-- Production tag: `production-task198d-20261002`
-- schema / migration / production DB mutationなし。
-- ScanSessionへ `LOCATION_AUDIT` modeを追加。
-- 棚卸しLocationを先にscanし、その後PhysicalTag / Repairを最大100件まで連続scan。
-- 明示的な「棚卸し結果を確認」でread-only照合を実行。
-- Prisma Repeatable Read snapshot内でactive StorageLocationAssignmentと照合。
-- 結果分類: MATCH / OTHER_LOCATION / UNASSIGNED / MISSING。
-- 0件scanでも対象Locationのactive Repair全件をMISSINGとして確認可能。
-- audit中の追加scanをblockし、mode / Location変更時のrequest ID + generation guardでstale responseを破棄。
-- scan / auditだけではStorageLocationAssignmentを変更しない。
-- Repair.status / approvalStatus / RepairPlanningStateを変更しない。
-- recommended zone判定・不一致自動解消は対象外。
-- 独立レビューでtest-only TypeScript typing issueを1件検出し、Codex修正後に再検証。
-- Prisma validate / TypeScript / `git diff --check` / production build PASS。
-- StorageLocation / ScanSession regression: 26/26 PASS。
-- Production smoke: `/`=200、`/login`=200、`/storage-locations`未認証=307、`POST /api/storage-locations/audit`未認証=401。
-- 詳細: `docs/ai-tasks/198d-storage-location-audit.md`
-
-### Task198E — Storage zone recommendation / mismatch visibility
-
-Status: production complete
-
-- Application commit: `d5c6007b3405730104204973b98abff4e5a5dbdd`
-- Railway deployment: `d4209f14-c39c-4720-bceb-be2903475466` — SUCCESS
-- Production tag: `production-task198e-20261002`
-- schema / migration / production DB mutationなし。
-- Repair.status / approvalStatus / RepairPlanningState / canonical parts readinessからrecommended zone / allowed zones / 根拠 / attentionをread-onlyで導出。
-- `resolveRepairPartsReadiness()`を再利用し、部品準備判定を複製しない。
-- 見積中は「見積り待ち」を推奨し「見積り調査中」も許容。
-- 作業完了は「ランニングテスト中」を推奨し「発送・引渡し待ち」も許容。
-- 作業中は専用zoneがないため条件により未割当を許容。
-- StorageLocationがSHELF / BOX / TRAYでもparentを辿ってcanonical ZONEを判定。
-- cycle / missing parent / inactive node / canonical外ZONEはfail-safeでMISMATCH。
-- Repair詳細と `/storage-locations` に推奨 / 許容 / 判定 / 根拠 / attentionを表示。
-- StorageLocationAssignment自動移動、Repair.status変更、Shipment先取りなし。
-- 独立レビュー: blocking findingなし。
-- Prisma validate / TypeScript / `git diff --check` / production build PASS。
-- related StorageLocation / ScanSession / parts readiness tests: 43/43 PASS。
-- Railway build: static pages 56/56。
-- Production smoke: `/`=200、`/login`=200、`/storage-locations`未認証=307、`/repairs/1`未認証=307。
-- 詳細: `docs/ai-tasks/198e-storage-zone-recommendations.md`
-
-## Supabase security hardening — 2026-10-02
-
-Status: production complete
-
-- Security AdvisorのFunction Search Path Mutable WARN対象だった2つのtrigger functionだけに空の`search_path`を設定。function body、table/data、RLS、GRANTの変更なし。
-- 独立レビュー、production function signature確認、migration前backupを完了。Supabase migration `20261002013945 harden_trigger_function_search_paths`を適用。
-- 適用後、両functionの`proconfig`に`search_path=""`を確認し、`security_definer=false`を維持。Function Search Path Mutable WARNは0件。
-- Railway deployment `4df54bcf-ad0d-4ca6-9a4f-59f33edcf5d6`成功。Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307。
-- 詳細・backup・対象外follow-up: `docs/ai-tasks/supabase-security-hardening-20261002.md`
-
-## Next.js 15 security migration — 2026-10-02
-
-Status: production complete
-
-- Next.js 14.1.0 → 15.5.27、React / ReactDOM 19.3.0へ更新。Next 15 Async Request API、React-PDF互換、build設定を移行。
-- 独立read-onlyレビューでblocking findingなし。TypeScript、関連regression 20/20、local build、Railway build（static pages 56/56）がPASS。
-- Railway deployment `cfe7be54-9a60-4be2-ade9-083611482b23`成功。Production smoke: `/`、`/login`、`/cases/gallery`=200、`/repairs`と`/storage-locations`未認証=307、`/api/repairs/1/planning`未認証=401。対象リクエストのRailway HTTP logsにupstream errorなし。
-- `npm audit` production findingsは8件→5件。`next-auth` 4.24.13のcriticalを含む残存advisoryは未解消で、別follow-up対象。
-- 詳細: `docs/ai-tasks/next15-security-migration-20261002.md`
-
-## Scheduler / Feedback の現在地
-
-Stage AのTask182–184とTask188–195Eはproduction完了。Task185–187はdocs-only完了。Task195Eの納期・安全buffer feedbackのdata readinessは `docs/ai-tasks/195e-deadline-feedback-readiness.md` を参照する。
-
-## Stage C 現在地 — Task199 Shipment基盤
-
-### Task199A — Shipment schema foundation
-
-Status: production complete
-
-- Application commit: `2a2a4fe491675e6c67de87b784262226782d0fee`
-- Railway deployment: `83f71fb9-0a51-4a87-bc64-1066fa7bba89` — SUCCESS
-- Production tag: `production-task199a-20261002`
-- Supabase migration: `20261002074103 add_shipment_foundation`
-- Shipment / ShipmentRepairと3 enumを追加。
-- Repair ↔ Shipmentを明示join modelで多対多化。
-- 1 Shipment = 1個口、1 Shipmentに複数Repair、1 Repairに複数Shipmentを許容。
-- plannedShipDate / actualShippedAt / trackingNumber / carrier-independent destination snapshot等をShipmentへ配置。
-- Repair.status / DeliveryNote / StorageLocation / PhysicalTagとは独立。
-- 日本郵便 / ヤマト固有schemaは追加せず、carrierCode / serviceCodeを共通fieldとして保持。
-- server-only: RLS enabled、policyなし、anon/authenticated/service_roleへtable/sequence権限なし、GRANTなし。
-- 独立レビューでmigration順序とgenerated tsconfig.tsbuildinfo混入を検出し、production前に修正。
-- Prisma validate / TypeScript / `git diff --check` / production build PASS。
-- Production read-backでtable / enum / FK / index / RLS / privileges一致を確認。
-- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、`/storage-locations`未認証=307。
-- 詳細: `docs/ai-tasks/199a-shipment-schema-foundation.md`
-
-### Task199B — Shipment server-side create/read/update foundation
-
-Status: production complete
-
-- Application commit: `165530378a6713c188a33585142b2b1a96420529`
-- Railway deployment: `59a1a9c3-d9be-454b-9f34-49f31355890f` — SUCCESS
-- Production tag: `production-task199b-20261002`
-- schema / migration / RLS / GRANT変更なし。
-- `POST /api/shipments` でexplicit `confirmed: true` を要求し、repairIdsをserver-side再取得。
-- missing Repairは404、別customer混在・返送先snapshot欠損/不正/不一致は409でfail closed。
-- duplicate repairIdsはdeduplicate。
-- Customer.typeだけでは作成可否を決めず、individual / business共通でRepair return-address snapshotを正本として検証。
-- Customer current addressへのfallbackなし。
-- validな場合のみSerializable transactionでShipment + ShipmentRepairを作成。
-- `GET /api/shipments/[id]` で必要最小限のCustomer / Repair relationをread。
-- `PATCH /api/shipments/[id]` はDRAFTのplanning fieldだけ更新可能。
-- ShipmentStatus / trackingNumber / labelIssuedAt / actualShippedAt / deliveredAtはTask199Bでは変更不可。
-- Repair.status / StorageLocation / DeliveryNote / ScanSession / carrier adapter / LINEには接続していない。
-- 独立レビューでB2B一律拒否を検出し、complete + valid + identicalなRepair snapshotならbusinessも共通Shipmentを作成できるよう修正。
-- Prisma validate / TypeScript / focused tests 11/11 / staged diff check / production build PASS。
-- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、Shipment POST/GET/PATCH未認証=401。
-- 詳細: `docs/ai-tasks/199b-shipment-server-foundation.md`
-
-### Task199C — ScanSession SHIPMENT_SELECT connection
-
-Status: production complete
-
-- Application commit: `4fdcb074dfa6fb8a29074bcb3aa6dd40496720b0`
-- Railway deployment: `a692dd3a-9c06-45fb-98b9-0cb4dda80e0f` — SUCCESS
-- Production tag: `production-task199c-20261002`
-- schema / migration / production DB mutationなし。
-- SHIPMENT_SELECTはscanのみではShipmentを作成せず、selected Repairsを人間が確認して `このN件で発送を作成` を押した場合のみTask199BへPOST。
-- 最大100 Repair。同一顧客のclient-side guardに加えてserver-sideでRepair / customer / return-address snapshotを再検証。
-- 作成中はscan / mode変更 / 選択変更 / 二重confirmをblock。
-- transport failureまたは成功responseからShipment IDを確定できない場合は結果不明として同じ選択の再送をblock。
-- Repair.status / StorageLocation / PhysicalTag / DeliveryNoteは変更しない。
-- 独立レビューで結果不明時の重複Shipment作成リスクを検出し、typed uncertain error + client-side resend lockへ修正。
-- TypeScript / focused tests 23/23 / `git diff --check` / production build（56/56）PASS。
-- Production smoke: `/`=200、`/login`=200、`/repairs`未認証=307、`POST /api/shipments`未認証=401。Railway HTTP logsのupstreamErrorsなし。
-- 詳細: `docs/ai-tasks/199c-scan-session-shipment-connection.md`
-
-### Task200A — 発送予定一覧とDRAFT計画UI
-
-Status: production complete
-
-- Application commit: `61af74f99afd0ad3f1186366d45bbecd2f5a8aed`
-- Railway deployment: `7e22cbb0-fa30-4b49-bded-1ed14734d89e` — SUCCESS
-- Production tag: `production-task200a-20261002`
-- schema / migration / production DB mutationなし。
-- `/shipments` にOUTBOUND・未発送・未取消の予定一覧を追加。日本時間の今日 / 明日 / 今週 / 来週 / 遅延 / それ以降 / 未設定で表示。
-- Shipment単位のRepair件数・作業完了件数・納品書発行集計と、各Repairの問い合わせ番号・現在status・納品書IDを表示。
-- ランニングテスト完了の正本イベントは未実装のため判定不可と表示。`RepairStatusLog`や`runningTestDays`から推定しない。
-- DRAFTの6計画項目だけを既存PATCH APIで編集。401 / 409 / その他の失敗を画面に表示。
-- focused Shipment regression 17/17 PASS、TypeScript / `git diff --check` / production build（56/56）PASS。
-- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
-- Task200A詳細: `docs/ai-tasks/200a-shipment-schedule.md`。
-
-### Task200B — 発送準備情報と同一顧客の他個口
-
-Status: production complete
-
-- Application commit: `b368e5c9886ab44a7c0edc2e436d1022e5bf413a`
-- Railway deployment: `96ac3283-8014-4bab-821c-133b1382eb4f` — SUCCESS
-- Production tag: `production-task200b-20261002`
-- schema / migration / production DB mutationなし。
-- `/shipments` で各Repairのactive StorageLocation（name / shortCode / type）とactive PhysicalTag shortCodeをread-only表示。qrTokenは取得・表示しない。
-- 同じ一覧で取得済みの同一Customer・他の未発送OUTBOUND Shipmentを参考情報として表示。Shipment ID / status / plannedShipDate / 暦日差 / Repair問い合わせ番号を表示し、近接日数閾値・順位・統合可否判定は設けない。
-- `labelIssuedAt` の日本時間表示と配達希望時間帯未設定の明示を追加。ランニングテスト完了は引き続き「判定不可」。
-- Task200AのDRAFT計画編集を維持。Shipment / Repair / StorageLocation / PhysicalTagのmutation、Shipment merge、ScanSession、CSV、tracking、LINEは変更なし。
-- focused Shipment regression 20/20 PASS、TypeScript / `git diff --check` / production build（56/56）PASS。
-- 独立レビューで同一顧客候補Shipment内のRepair番号表示不足を検出し、修正後blocking findingなし。
-- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307。Railway HTTP logsの`upstreamErrors`なし。
-- 詳細: `docs/ai-tasks/200b-shipment-readiness-context.md`
-
-### Task200C — PhysicalTag連続scanによるShipment梱包照合
-
-Status: production complete
-
-- Application commit: `24565e8c5501507f2033dd12280ee80dd1911b91`
-- Railway deployment: `8a7729dc-2ed9-4845-80b3-7c11ad97e969` — SUCCESS
-- Production tag: `production-task200c-20261003`
-- schema / migration / production DB mutationなし。
-- ScanSessionへ `SHIPMENT_PACKING` modeを追加。既存ShipmentをGETでread-only取得し、ShipmentRepairの期待集合とPhysicalTag連続scan結果を照合。
-- Shipment外Repair、重複scan、未登録 / 廃止 / 未割当タグを明示し、全件一致かつ不一致0件の場合のみ最終確認可能。
-- confirm時にShipmentを再GETし、Repair集合 / status / direction / actualShippedAt変更を再確認。generation + request IDでstale responseを破棄。
-- scan / confirmのみではShipment / Repair / PhysicalTag / StorageLocationをmutationしない。PhysicalTag releaseはTask200Dへ分離。
-- focused + ScanSession regression 18/18 PASS、TypeScript / `git diff --check` PASS。Windows localの`npm run build`はPrisma DLL file lockのEPERMで停止したが、`next build` 56/56 PASS、Railway production buildはPrisma generateを含め完全PASS。
-- 独立レビュー: blocking findingなし。Shipment eligibilityはTask200AのOUTBOUND / actualShippedAt=null / status!=CANCELLED条件と整合確認済み。
-- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
-- 詳細: `docs/ai-tasks/200c-shipment-packing-verification.md`
-
-### Task200D — 発送前の再利用PhysicalTag release確認
-
-Status: production complete
-
-- Application commit: `df4753cc50e84ab8f692924fb78e4408359531c6`
-- Railway deployment: `174eaa26-0374-41c6-aa48-94a06ac9b2f7` — SUCCESS
-- Production tag: `production-task200d-20261003`
-- schema / migration / production DB変更なし。
-- Task200Cの`SHIPMENT_PACKING`を拡張し、梱包一致後にread-only release preview → 明示確認 → batch releaseを追加。新scan modeは増やしていない。
-- scan / 梱包確認 / previewではDB mutationなし。release対象を人間が確認し、明示POSTした場合のみPhysicalTagAssignmentの`releasedAt / releasedBy / releaseReason`を更新する。
-- release POSTはShipment / ShipmentRepair集合 / active PhysicalTagAssignment / PhysicalTag ACTIVEをserver-side再検証し、Serializable transaction内のguarded updateで全件atomic releaseする。
-- active assignmentなし・複数active・非ACTIVE tag・Shipment状態変化はfail closed。通信結果不明時は`uncertain`として同sessionからの盲目的再送を禁止。
-- PhysicalTag本体はACTIVEを維持し再利用可能。Shipment / Repair / StorageLocation / tracking / statusは変更しない。
-- 独立レビュー: blocking findingなし。active assignmentのpartial unique index、既存PhysicalTag lifecycle監査fieldとの整合を確認。
-- local validation: Task200D / ScanSession / PhysicalTag / Shipment regression 67/67 PASS、TypeScript / `git diff --check` / `npm run build` PASS。統括側core regression 32/32 PASS。
-- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、Shipment GET未認証=401、PhysicalTag release GET/POST未認証=401。Railway HTTP logsの`upstreamErrors`なし。
-- 詳細: `docs/ai-tasks/200d-shipment-physical-tag-release.md`
-
-### Task201 — ゆうプリR 標準フォーマットV3 CSV出力adapter
-
-Status: production complete
-
-- Application commit: `72c80913f2adf4bbec70af0f064ef341af7f31e5`
-- Railway deployment: `42baa5f7-3b3b-4462-bbc5-88772065e3ff` — SUCCESS
-- Production tag: `production-task201-20261003`
-- schema / migration / production DB mutationなし。
-- authenticated Admin専用 `GET /api/shipments/[id]/yupuri-v3` を追加し、Shipment destination snapshotからゆうプリR標準フォーマットV3 CSVをread-only生成。
-- CSVは100列、headerなし、CP932 / Shift_JIS、BOMなし、CRLF。管理番号は `SHP-{Shipment.id}` でTask202から機械照合可能。
-- 配送先はCustomer current addressへfallbackせずShipment snapshotのみ使用。配達希望日と公式時間帯codeをmappingし、未対応値やCP932非対応文字はfail closed。
-- OUTBOUNDかつ発送前のShipmentだけexport可能。CSV出力でShipment / Repair / tracking / status等をmutationしない。
-- PoCに合わせ内容品は「腕時計」、荷物サイズcodeは現時点で `060` 固定。60サイズ以外を扱う前にShipment側の荷物サイズ正本が必要。
-- `iconv-lite`をdirect dependencyとして追加。Task202の結果CSV取込、追跡番号保存、配送状態同期は対象外。
-- focused tests 9/9 PASS、TypeScript / `git diff --check` / `npm run build` PASS。rebase後も同結果を再確認、static pages 56/56。
-- 独立レビュー: blocking findingなし。実取込成功済みPoCと100列mapping / encoding / 配達時間帯codeを照合済み。
-- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、`GET /api/shipments/1`未認証=401、`GET /api/shipments/1/yupuri-v3`未認証=401。Railway HTTP logsの`upstreamErrors`なし。
-- 詳細: `docs/ai-tasks/201-yu-pri-v3-export.md`
-
-### Task202A — ゆうプリR発送履歴CSV read-only preview
-
-Status: production complete
-
-- Application commit: `332862857df3748c35626dfe31cea2d0d56e476e`
-- Railway deployment: `e589361d-1935-4b2d-a894-bee5b7882215` — SUCCESS
-- Production tag: `production-task202a-20261003`
-- schema / migration / production DB mutationなし。
-- authenticated Admin専用 `POST /api/shipments/yupuri-history/preview` を追加し、CP932 / BOMなし / CRLF / headerあり6列のゆうプリR発送履歴CSVをread-only解析する。
-- お客様側管理番号は `SHP-{Shipment.id}` のみ機械照合し、PoCの `POC003` は意図どおりrow error。tracking候補、日付候補、status codeはpreviewのみで保存しない。
-- 現時点で意味を確定している `10/0A = 引受予定` 以外は推定せずraw値とwarningを返す。重複・tracking競合・malformed CSVはfail closed。上限は256 KiB / 500行。
-- Shipment / Repair / trackingNumber / actualShippedAt / deliveredAt / statusは更新しない。
-- rebase後validation: focused 9/9 PASS、Task201 + Shipment regression 29/29 PASS、TypeScript / `git diff --check` / `npm run build` PASS、static pages 56/56。独立レビューblocking findingなし。
-- Production smoke: `/`=200、`/login`=200、`/shipments`未認証=307、`/repairs`未認証=307、Shipment GET未認証=401、ゆうプリR V3 GET未認証=401、history preview POST未認証=401。Railway HTTP logsの`upstreamErrors`なし。
-- 詳細: `docs/ai-tasks/202a-yupuri-history-import-preview.md`
-
-## 今回の並列production checkpoint
-
-### Task201B — ヤマトB2クラウド CSV出力adapter 調査
-
-Status: investigation complete / implementation pending
-
-- Investigation commit: `1d19e1d27b17d8d3543e17fe36352ae979fad91c`
-- Task199の共通Shipment契約を維持し、ヤマト固有列・code・validationをadapter境界へ閉じ込める方針を確認。
-- B2 Cloud取込CSVの一次資料・実ファイル evidenceが不足しているため、列定義やcodeを推測して実装していない。
-- schema / migration / production DB mutationなし。runtime behavior変更なし。
-- 詳細: `docs/ai-tasks/201b-yamato-b2-adapter-investigation.md`
-
-### Task196E — Brother QL-800 / DK-2205 62×75mm PhysicalTag修理袋ラベル
-
-Status: production complete
-
-- Application commit: `13fd1b0`
-- Production source snapshot: `1d19e1d27b17d8d3543e17fe36352ae979fad91c`
-- Railway deployment: `01bb8bca-82ca-4888-8d6e-e2590d2adb1b` — SUCCESS
-- Production tag: `production-task196e-20261003`
-- DK-2205 62mm連続紙を75mmでauto-cutする前提へ更新。QRは28mm、payloadは引き続きopaque `qrToken`のみ。
-- 受付番号 / 取引先管理番号 / 顧客・取引先 / エンドユーザー / ブランド / モデル / Ref. / シリアル / Cal. / 受付日 / shortCodeをB2C/B2B条件に応じて表示。
-- 長いB2B文字列でも62×75mmの1ページを維持する明示truncation + fixed layoutを実装し、実PDF renderで1 Page / expected MediaBoxを回帰確認。
-- 独立Codex review: blocking findingなし。schema / lifecycle変更なし。
-- Railway production build: compile / type check PASS、static pages 56/56。
-- production上の最終ラベル実機印刷は未実施。ソフトウェアproduction反映とは分離して確認する。
-- 詳細: `docs/ai-tasks/196e-dk2205-physical-tag-label.md`
-
-### Task203A — LINE作業完了連絡 backend foundation
-
-Status: production complete
-
-- Application commit: `c6c9971`
-- Production source snapshot: `1d19e1d27b17d8d3543e17fe36352ae979fad91c`
-- Railway deployment: `01bb8bca-82ca-4888-8d6e-e2590d2adb1b` — SUCCESS
-- Production tag: `production-task203a-20261003`
-- authenticated Adminの明示GET/POSTだけを追加し、RepairStatus変更だけでは自動送信しない。
-- B2C / `作業完了` / originating Inquiry promotion / verified LineManagerChatをserver-sideで再検証し、`Customer.lineId`へfallbackしない。
-- POSTは既存 `LineManagerSendOutbox` のAPPROVED intentを作るだけで、LINEへ直接送信しない。idempotency keyは `repair-completion-notice:{repairId}` 固定。
-- stale eligibility raceとdeadlock riskを独立reviewで検出後、Customer → Repairのlock順、linkage再確認、eligibility再読込、同transaction内outbox作成へ修正。
-- branch validation: Task203A + route + outbox regression 23/23 PASS、TypeScript / build / diff check PASS。最終独立Codex reviewでHigh / Medium / Low findingなし。
-- production smoke: completion-notice GET未認証=401。実LINE送信なし、Shipment / Repair status mutationなし。
-- 詳細: `docs/ai-tasks/203a-line-completion-notice-backend.md`
-
-Current checkpoint: Task196E / Task203A production complete. Task201B investigation complete. Task202B / Task204は実際の日本郵便引受・配達完了CSV evidence待ち。
+## 現在のcheckpoint — 2026-10-13
+
+このファイルは、現在のproduction到達点、未完了事項、次に着手する候補だけを管理する。
+過去Taskの詳細は `docs/ai-tasks/`、全体の優先順位は `docs/ai/02_PRODUCT_ROADMAP.md`、B2B通しテストは `docs/ai/06_B2B_E2E_RUN_LOG.md` を参照する。
+
+## Production current state
+
+- Runtime application source: `2052f218d2268b5fa02fea423020a2324242988d` — Task204E application commit。
+- Railway deployment: `fb00bade-aecb-44bf-a9a0-3e18a23baa01` — SUCCESS、region `sin`。
+- Railway build: Prisma Client generation PASS、Next.js 15.5.27 compile / lint / type validation PASS、static generation 59/59 PASS。
+- Runtime smoke: `/`=200、`/login`=200、未認証 `/repairs`=307、`/shipments`=307、invalid customer share token=404、Task204 internal routes未認証=401。
+- `origin/main` の最新production記録commitは `9fdaf664af5b5e73df1fe8357fd6ddd1c6353f5c`。これはTask204A-Eのproduction記録を追加したdocs commitで、runtime application sourceは上記 `2052f21` のまま。
+- production tags: `production-task204a-20261013` 〜 `production-task204e-20261013`。
+- Task204 rolloutではschema / migration / RLS / GRANT / environment variable変更なし。
+
+## B2C current state
+
+B2Cの「問い合わせ → 受付 → 共有 → 見積/承認 → 修理 → 発送判断 → 配達希望 → Shipment → ゆうプリクラウド → 追跡 → LINE発送通知 → 配達完了」は、software productionとして一連で接続済み。
+
+### Communication / intake
+
+- LINE webhook / Inquiry / InquiryMessage / R2画像保存 / Slack通知: production運用基盤あり。
+- Customer Communication Hub Task206B-E: production complete。
+- Task206G1 Communication AI Brief: production complete。`production-task206g1-20261012`。
+- AI briefはOpenClaw等のtrusted local agentから生成・保存する。Next.jsから従量課金AI APIへ直接接続しない。
+- LINE実送信の正本は `APPROVED LineManagerSendOutbox -> Windows sender -> lineoa -> reconciliation -> CONFIRMED`。
+
+### B2C customer journey
+
+- Task210A: 同一受付の複数Repairを1共有ページへgrouping — production complete。
+- Task210B: 受付完了後の共有ページURL LINE通常トーク案内 — production complete。
+- Task210C: 顧客単位の発送判断 — production complete。
+- Task210D: Shipment / 発送グループ単位の配達希望 — production complete。
+- Task210E: 配達希望からDRAFT Shipment自動作成 — production complete。
+- Task210F: DRAFT中の配達希望変更 / READY以降lock — production complete。
+
+### Shipping / delivery
+
+- Task201G-OPS: ゆうプリクラウド自動発行のproduction operational activation complete。
+- Workerは `NEC MultiWriter 5750C` 固定。送り状発行だけでは発送済みにしない。
+- Task204A-E: Japan Post tracking取得、Shipment同期、引受時LINE通知、共有ページ配送状況、配達完了からRepair納品済み — software production complete。
+- **残る確認:** 実際の荷物で「tracking取得 -> 引受 -> LINE発送通知 -> 輸送 -> 配達完了 -> Repair納品済み」まで通すreal-shipment E2E。
+- persistent `-AllowTrackingSync` は実発送E2E確認までOFFを維持する。
+
+## B2B current state
+
+### Production complete
+
+- Task205A: B2B一括受付。既存取引先を選び1〜30本をatomicに登録。
+- Task205B: ブランド -> モデル -> Ref / Cal のmaster drill-down。
+- Task205C: 自由入力 + 既存候補検索、movement maker / Cal、base maker / Cal、依頼内容入力。
+- Task205D: 一括PhysicalTag準備 + Brother QL-800 / DK-2205直接印刷経路。
+- Repair / 見積 / Scheduler / WorkTimeSession / PhysicalTag / StorageLocation / Shipment等の基幹機能はB2C/B2B共通基盤を利用する。
+
+### B2B remaining gaps
+
+- Task206F — Gmail channel foundation: **未実装**。B2BメールをCustomer Communication Hubへ統合する。
+- Task207系 — 帳票delivery channel / 5750C明示印刷 / 月次請求送付: **未実装**。
+  - 見積書 Gmail送信
+  - 納品書 `NEC MultiWriter 5750C` 明示印刷
+  - 請求書 LINE通常トーク / 郵送振り分け
+  - 郵送請求書の5750C一括印刷
+  - 月末締め翌月末支払期日の自動設定
+- B2B一括PhysicalTagのBrother QL-800実機複数枚連続印刷はsoftware経路はproduction済みだが、実機での複数枚連続出力確認は未完了。
+- B2B E2Eで確定済みの複数店舗請求集約は未実装。
+  - 同一会社の複数店舗識別
+  - 会社単位の請求集約先店舗指定
+  - 既存各店舗請求書を保持したまま集約請求へ束ねる
+  - 集約請求の明細は納品書単位
+  - 元請求書と集約先請求の紐付け保持
+- 入金確認は当面手動。銀行API連携は必須要件にしない。
+
+B2B通しテストの専用正本は `docs/ai/06_B2B_E2E_RUN_LOG.md`。実案件を受付から納品・請求まで通し、進行不能の不足だけ独立Task化する。
+
+## Other major completed foundations
+
+- Scheduler / WorkTimeSession / WorkCalendar / Scheduler v2関連 Stage A: production基盤あり。
+- PhysicalTag / NFC / QR / ScanSession / StorageLocation Stage B: production基盤あり。
+- Shipment / packing / PhysicalTag release / ゆうプリR fallback / ゆうプリクラウド Stage C: production基盤あり。
+- Task208A-E 前受金・Stripe・返金/照合: production complete。
+- Task209A-B route/token security hardening: production complete。
+
+## Hold / optional items
+
+- Task206H2: Personal Plugin / remote MCP / Supabase OAuth案 — 保留。
+- Task206H5B / H5C — 保留。B2C/B2Bの主要導線のblockerにしない。
+- ヤマトB2クラウドadapter — 一次資料 / 実利用の必要性が出るまで保留。
+- PublicCase / Instagram等の事例公開は、B2C/B2B本格運用導線より後順位。
+
+## Next recommended order
+
+1. **実発送E2E** — 実発送可能な案件がある時にTask204のlive end-to-endを確認し、問題なければtracking sync常時運用へ移す。
+2. **Task206F — Gmail channel foundation** — B2Bのメール連絡をCustomer Communication Hubへ統合する。
+3. **Task207系 — 帳票delivery / 5750C / 月次請求送付** — B2Bの見積・納品・請求の送付運用を完成させる。
+4. **B2B E2E継続** — `docs/ai/06_B2B_E2E_RUN_LOG.md` に沿って実案件を最後まで通す。
+5. **B2B複数店舗・請求集約** — E2Eで必要性と現行schema差分を確認してTask分割する。
+6. 本格運用後のScheduler / Communication Hub精度改善。
+7. 事例公開・その他後順位機能。
+
+## Task boundary
+
+- 一つのTaskが完了しても、ユーザー承認なしに次Taskを連続実装しない。
+- schema / migration / auth / 決済 / production DB / LINE実送信等の高リスク変更は、実装担当とレビュー担当を原則分離する。
+- production migration、deploy、破壊的・不可逆操作はユーザー明示承認前に行わない。
+- 作業開始時は必ず `git status` を確認し、既存の未commit / 未push差分を保護する。
