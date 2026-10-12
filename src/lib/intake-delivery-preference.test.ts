@@ -41,6 +41,11 @@ function fixture(choice: "SHIP_COMPLETED" | "WAIT_ALL" | null = null) {
       const preference = { ...data, repairs: data.repairs.create.map((r: any) => ({ ...r, repairIntakeInviteId: 7 })) };
       invite.deliveryPreferences.push(preference);
       return preference;
+    }, update: async ({ where, data }: any) => {
+      preferenceWrites++;
+      const preference = invite.deliveryPreferences.find((item: any) => item.id === where.id);
+      Object.assign(preference, data);
+      return preference;
     } },
     shipment: {
       create: async ({ data }: any) => {
@@ -84,7 +89,8 @@ test("SHIP_COMPLETED freezes only the request-time completed subset and creates 
 
 test("SHIP_COMPLETED saves a second disjoint group after remaining Repairs complete", async () => {
   const f = fixture("SHIP_COMPLETED");
-  await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "COMPLETED_AT_REQUEST", mode: "NONE" }, now);
+  await savePublicIntakeDeliveryPreference(f.db, tokenA,
+    { groupKind: "COMPLETED_AT_REQUEST", mode: "DATE", date: "2026-10-13" }, now);
   const waiting = await getPublicIntakeDeliveryPreference(f.db, tokenB);
   assert.equal(waiting.groupKind, "REMAINING");
   assert.deepEqual(waiting.repairs, [{ inquiryNumber: "T-11" }]);
@@ -96,12 +102,26 @@ test("SHIP_COMPLETED saves a second disjoint group after remaining Repairs compl
   assert.deepEqual(f.invite.deliveryPreferences.map((p: any) => [p.kind, p.repairs.map((r: any) => r.repairId)]),
     [["COMPLETED_AT_REQUEST", [10]], ["REMAINING", [11]]]);
   assert.equal(new Set(f.invite.deliveryPreferences.flatMap((p: any) => p.repairs.map((r: any) => r.repairId))).size, 2);
+  const firstShipment = f.repairs[0].shipmentRepairs[0].shipment;
+  const remainingShipment = f.repairs[1].shipmentRepairs[0].shipment;
+  assert.notEqual(firstShipment.id, remainingShipment.id);
+  assert.equal(firstShipment.requestedDeliveryDate.toISOString().slice(0, 10), "2026-10-13");
+  assert.equal(firstShipment.requestedDeliveryTimeSlot, "指定なし");
+  assert.equal(remainingShipment.requestedDeliveryDate, null);
+  assert.equal(remainingShipment.requestedDeliveryTimeSlot, "午前中");
   await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "REMAINING", mode: "TIME", timeSlot: "午前中" }, now);
-  await assert.rejects(savePublicIntakeDeliveryPreference(f.db, tokenB, { groupKind: "REMAINING", mode: "NONE" }, now),
-    (error: IntakeDeliveryPreferenceError) => error.status === 409);
-  assert.equal(f.preferenceWrites, 2);
+  await savePublicIntakeDeliveryPreference(f.db, tokenB,
+    { groupKind: "COMPLETED_AT_REQUEST", mode: "TIME", timeSlot: "19時～21時" }, now);
+  assert.equal(f.preferenceWrites, 3);
   assert.equal(f.shipmentWrites, 3);
-  assert.notEqual(f.repairs[0].shipmentRepairs[0].shipment.id, f.repairs[1].shipmentRepairs[0].shipment.id);
+  assert.equal(f.repairs[0].shipmentRepairs[0].shipment, firstShipment);
+  assert.equal(firstShipment.requestedDeliveryDate, null);
+  assert.equal(firstShipment.requestedDeliveryTimeSlot, "19時～21時");
+  assert.equal(f.repairs[1].shipmentRepairs[0].shipment, remainingShipment);
+  assert.equal(remainingShipment.requestedDeliveryDate, null);
+  assert.equal(remainingShipment.requestedDeliveryTimeSlot, "午前中");
+  assert.deepEqual(f.invite.deliveryPreferences.map((p: any) => [p.kind, p.requestedDeliveryTimeSlot]),
+    [["COMPLETED_AT_REQUEST", "19時～21時"], ["REMAINING", "午前中"]]);
 });
 
 test("first-group retry cannot answer already complete remaining group", async () => {
@@ -114,17 +134,19 @@ test("first-group retry cannot answer already complete remaining group", async (
   assert.equal(saved.groupKind, "COMPLETED_AT_REQUEST");
   assert.deepEqual(saved.repairs, [{ inquiryNumber: "T-10" }]);
   assert.equal((await getPublicIntakeDeliveryPreference(f.db, tokenA)).groupKind, "REMAINING");
+  const groups = (await getPublicIntakeDeliveryPreference(f.db, tokenA)).groups;
+  assert.deepEqual(groups.map(group => [group.groupKind, group.repairs.map(repair => repair.inquiryNumber), group.editable]),
+    [["COMPLETED_AT_REQUEST", ["T-10"], true], ["REMAINING", ["T-11"], true]]);
   const retried = await savePublicIntakeDeliveryPreference(f.db, tokenB, first, now);
   assert.equal(retried.groupKind, "COMPLETED_AT_REQUEST");
   assert.deepEqual(retried.repairs, [{ inquiryNumber: "T-10" }]);
   assert.equal(f.preferenceWrites, 1);
-  await assert.rejects(savePublicIntakeDeliveryPreference(f.db, tokenA,
-    { groupKind: "COMPLETED_AT_REQUEST", mode: "TIME", timeSlot: "午前中" }, now),
-    (error: IntakeDeliveryPreferenceError) => error.status === 409);
-  assert.equal(f.preferenceWrites, 1);
+  await savePublicIntakeDeliveryPreference(f.db, tokenA,
+    { groupKind: "COMPLETED_AT_REQUEST", mode: "TIME", timeSlot: "午前中" }, now);
+  assert.equal(f.preferenceWrites, 2);
   const second = await savePublicIntakeDeliveryPreference(f.db, tokenB, { groupKind: "REMAINING", mode: "NONE" }, now);
   assert.equal(second.groupKind, "REMAINING");
-  assert.equal(f.preferenceWrites, 2);
+  assert.equal(f.preferenceWrites, 3);
   assert.equal(f.shipmentWrites, 3);
 });
 
@@ -163,7 +185,7 @@ test("exact prior-group active Shipment permits remaining answer; mixed and mism
         (error: IntakeDeliveryPreferenceError) => error.status === 409);
       assert.equal(f.preferenceWrites, 1);
     }
-    assert.equal(f.shipmentWrites, shape === "exact" ? 2 : 1);
+  assert.equal(f.shipmentWrites, shape === "exact" ? 2 : 1);
   }
 });
 
@@ -209,13 +231,24 @@ test("all-complete group without Task210C decision uses one invite preference an
   assert.equal(await completionDeliveryPath(f.db, 10, tokenA), `/customer/delivery/${tokenA}`);
 });
 
-test("same answer is idempotent; different second answer is 409", async () => {
+test("same answer is idempotent; changed answer updates the exact DRAFT Shipment", async () => {
   const f = fixture();
   await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "DATE", date: "2026-10-13" }, now);
+  const parcel = f.repairs[0].shipmentRepairs[0].shipment;
+  parcel.requestedDeliveryTimeSlot = "午前中"; // admin DRAFT PATCH changes only the Shipment
   await savePublicIntakeDeliveryPreference(f.db, tokenB, { groupKind: "ALL", mode: "DATE", date: "2026-10-13" }, new Date("2026-10-15T10:00:00Z"));
   assert.equal(f.preferenceWrites, 1);
-  await assert.rejects(savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "NONE" }, now), (error: IntakeDeliveryPreferenceError) => error.status === 409);
-  assert.equal(f.preferenceWrites, 1);
+  assert.equal(f.shipmentWrites, 1);
+  assert.equal(parcel.requestedDeliveryTimeSlot, "午前中");
+  assert.equal(f.invite.deliveryPreferences[0].respondedAt, now);
+  const firstRespondedAt = f.invite.deliveryPreferences[0].respondedAt;
+  const changedAt = new Date("2026-10-12T11:00:00Z");
+  await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "NONE" }, changedAt);
+  assert.equal(f.preferenceWrites, 2);
+  assert.equal(f.invite.deliveryPreferences[0].respondedAt, changedAt);
+  assert.notEqual(firstRespondedAt, changedAt);
+  assert.equal(f.repairs[0].shipmentRepairs.length, 1);
+  assert.equal(f.repairs[0].shipmentRepairs[0].shipment.requestedDeliveryTimeSlot, "指定なし");
 });
 
 test("exact grouped retry recreates one missing Shipment without changing the first answer", async () => {
@@ -231,6 +264,37 @@ test("exact grouped retry recreates one missing Shipment without changing the fi
   assert.equal(f.repairs[0].shipmentRepairs[0].shipment.requestedDeliveryTimeSlot, "午前中");
   await savePublicIntakeDeliveryPreference(f.db, tokenA, answer, now);
   assert.equal(f.repairs[0].shipmentRepairs.length, 1);
+});
+
+test("a changed saved answer cannot create a missing Shipment", async () => {
+  const f = fixture();
+  await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "NONE" }, now);
+  for (const repair of f.repairs) repair.shipmentRepairs = [];
+  await assert.rejects(savePublicIntakeDeliveryPreference(f.db, tokenA,
+    { groupKind: "ALL", mode: "TIME", timeSlot: "午前中" }, now),
+    (error: IntakeDeliveryPreferenceError) => error.status === 409);
+  assert.equal(f.preferenceWrites, 1);
+  assert.equal(f.shipmentWrites, 1);
+});
+
+test("READY and LABEL_ISSUED groups stay visible and reject changed answers without writes", async () => {
+  for (const status of ["READY", "LABEL_ISSUED"]) {
+    const f = fixture("SHIP_COMPLETED");
+    await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "COMPLETED_AT_REQUEST", mode: "NONE" }, now);
+    const first = f.repairs[0].shipmentRepairs[0].shipment;
+    first.status = status;
+    const shown = await getPublicIntakeDeliveryPreference(f.db, tokenB);
+    assert.equal(shown.groups[0].groupKind, "COMPLETED_AT_REQUEST");
+    assert.equal(shown.groups[0].editable, false);
+    assert.equal(shown.groups[0].applicationStatus, "LOCKED");
+    assert.equal(shown.groups[0].preference?.mode, "NONE");
+    assert.equal(shown.groups[1].groupKind, "REMAINING");
+    await assert.rejects(savePublicIntakeDeliveryPreference(f.db, tokenB,
+      { groupKind: "COMPLETED_AT_REQUEST", mode: "TIME", timeSlot: "午前中" }, now),
+      (error: IntakeDeliveryPreferenceError) => error.status === 409);
+    assert.equal(f.preferenceWrites, 1);
+    assert.equal(f.shipmentWrites, 1);
+  }
 });
 
 test("a preexisting exact DRAFT Shipment is reused for the first grouped answer", async () => {
@@ -333,5 +397,5 @@ test("saved preference remains readable and duplicate-safe with an exact outboun
   assert.equal(f.preferenceWrites, 1);
   parcel.repairs.pop();
   await assert.rejects(getPublicIntakeDeliveryPreference(f.db, tokenA), (error: IntakeDeliveryPreferenceError) => error.status === 409);
-  assert.equal(f.shipmentWrites, 2);
+  assert.equal(f.shipmentWrites, 1);
 });

@@ -87,7 +87,7 @@ async function context(tx: Prisma.TransactionClient, token: string, validateShip
         candidate.ids.every(id => shipmentIds.includes(id)))?.kind ?? null;
   });
   if (validateShipments && (matchedKinds.some(kind => kind === null) || new Set(matchedKinds).size !== matchedKinds.length)) throw unavailable();
-  return { invite, anchor, groups, targetIds, kind: group.kind, available, prior };
+  return { invite, anchor, groups, targetIds, kind: group.kind, available, prior, activeShipments, matchedKinds };
 }
 
 export async function isGroupedDeliveryApplicable(db: Prisma.TransactionClient, token: string) {
@@ -107,10 +107,13 @@ function payload(result: Awaited<ReturnType<typeof context>>, submittedKind = re
   const targetIds = group.ids;
   const prior = invite.deliveryPreferences.find(preference => preference.kind === submittedKind) ?? null;
   const available = submittedKind === result.kind ? result.available : Boolean(prior);
+  const shipment = result.activeShipments.find((_, index) => result.matchedKinds[index] === submittedKind);
   return {
     groupKind: submittedKind,
     visible: Boolean(prior) || Boolean(invite.shippingDecision?.choice) || (!invite.shippingDecision && available),
     available,
+    editable: available && (shipment?.status === "DRAFT" || (!prior && !shipment)),
+    applicationStatus: shipment && shipment.status !== "DRAFT" ? "LOCKED" : prior ? (!shipment ? "PENDING_NO_SHIPMENT" : "APPLIED") : "UNANSWERED",
     repairs: invite.repairs.filter(r => targetIds.includes(r.id)).map(r => ({ inquiryNumber: r.inquiryNumber })),
     preference: prior ? {
       mode: deliveryPreferenceMode(prior),
@@ -122,7 +125,8 @@ function payload(result: Awaited<ReturnType<typeof context>>, submittedKind = re
 }
 
 export async function getPublicIntakeDeliveryPreference(db: PrismaClient, token: string) {
-  return payload(await context(db as Prisma.TransactionClient, token));
+  const current = await context(db as Prisma.TransactionClient, token);
+  return { ...payload(current), groups: current.groups.map(group => payload(current, group.kind)).filter(group => group.visible) };
 }
 
 export async function completionDeliveryPath(db: PrismaClient, repairId: number, token: string | null) {
@@ -169,10 +173,18 @@ export async function savePublicIntakeDeliveryPreference(db: PrismaClient, token
       if (!prior && (groupKind !== current.kind || !current.available)) throw unavailable();
       const normalized = parseDeliveryPreferenceInput(answer, prior?.respondedAt ?? now);
       if (prior) {
-        if (dateString(prior.requestedDeliveryDate) !== dateString(normalized.requestedDeliveryDate) ||
-            prior.requestedDeliveryTimeSlot !== normalized.requestedDeliveryTimeSlot) throw unavailable();
-        await applyDeliveryPreferenceToDraftShipment(tx, group.ids, customerId, normalized);
-        return payload(current, groupKind);
+        const changed = dateString(prior.requestedDeliveryDate) !== dateString(normalized.requestedDeliveryDate) ||
+          prior.requestedDeliveryTimeSlot !== normalized.requestedDeliveryTimeSlot;
+        const matchingShipment = current.activeShipments.find((_, index) => current.matchedKinds[index] === groupKind);
+        if (changed && matchingShipment?.status !== "DRAFT") throw unavailable();
+        if (!changed && matchingShipment) return payload(current, groupKind);
+        const updatedAnswer = changed ? parseDeliveryPreferenceInput(answer, now) : normalized;
+        await applyDeliveryPreferenceToDraftShipment(tx, group.ids, customerId, updatedAnswer);
+        if (changed) await tx.repairIntakeDeliveryPreference.update({ where: { id: prior.id }, data: {
+          requestedDeliveryDate: updatedAnswer.requestedDeliveryDate,
+          requestedDeliveryTimeSlot: updatedAnswer.requestedDeliveryTimeSlot, respondedAt: now,
+        } });
+        return payload(await context(tx, token), groupKind);
       }
       await applyDeliveryPreferenceToDraftShipment(tx, group.ids, customerId, normalized);
       await tx.repairIntakeDeliveryPreference.create({ data: {

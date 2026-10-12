@@ -190,6 +190,21 @@ test("exactly one DRAFT single-Repair Shipment receives the answer atomically", 
   assert.equal(result.applicationStatus, "APPLIED");
 });
 
+test("single-Repair customer can revise its exact DRAFT Shipment but READY locks it", async () => {
+  const target = shipment(10);
+  const instance = fakeDb({ shipments: [target] });
+  await savePublicRepairDeliveryPreference(instance.client, token, { mode: "NONE" }, now);
+  await savePublicRepairDeliveryPreference(instance.client, token, { mode: "TIME", timeSlot: "午前中" }, now);
+  assert.equal(instance.state.shipments.length, 1);
+  assert.equal(target.requestedDeliveryTimeSlot, "午前中");
+  assert.equal(instance.state.preference.requestedDeliveryTimeSlot, "午前中");
+  target.status = "READY";
+  await assert.rejects(savePublicRepairDeliveryPreference(instance.client, token, { mode: "NONE" }, now),
+    (error: RepairDeliveryPreferenceError) => error.status === 409);
+  assert.equal(instance.state.writes, 2);
+  assert.equal(instance.state.shipmentWrites, 2);
+});
+
 test("multiple or multi-Repair Shipments fail closed before saving the answer", async () => {
   for (const shipments of [[shipment(10), shipment(11)], [shipment(10, [1, 2])]]) {
     const instance = fakeDb({ shipments });

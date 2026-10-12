@@ -177,13 +177,14 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
         {prepaymentReturn === "cancel" && <p role="status" className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">前受金のお支払い画面から戻りました。お支払いを希望される場合は、下の前受金欄から再度お進みください。</p>}
 
         {shippingDecision && <ShippingDecisionForm token={token} initialChoice={shippingDecision.choice} repairs={shippingDecision.repairs} />}
-        {groupDelivery?.visible && <section className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm" aria-label="配達日時のご希望">
+        {groupDelivery?.groups.map(group => <section key={group.groupKind} className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm" aria-label="配達日時のご希望">
           <h2 className="text-lg font-bold">今回発送する時計の配達日時のご希望</h2>
+          {groupDelivery.groups.length > 1 && <p className="mt-2 text-sm font-semibold">{group.groupKind === "COMPLETED_AT_REQUEST" ? "先に発送する時計" : "残りの時計"}</p>}
           <p className="mt-2 text-sm">対象のお問合番号</p>
-          <ul className="mt-2 list-inside list-disc text-sm">{groupDelivery.repairs.map(repair => <li key={repair.inquiryNumber}>{repair.inquiryNumber}</li>)}</ul>
-          {groupDelivery.available || groupDelivery.preference ? <div className="mt-4"><DeliveryPreferenceForm token={token} endpoint={`/api/customer/intake-delivery/${encodeURIComponent(token)}`} groupKind={groupDelivery.groupKind} immutable initial={{ editable: groupDelivery.available && !groupDelivery.preference, applicationStatus: "PENDING_NO_SHIPMENT", preference: groupDelivery.preference }} timeOptions={YUPURI_DELIVERY_TIME_OPTIONS.filter(option => option.value !== "指定なし").map(option => ({ value: option.value, label: option.label }))} /></div>
+          <ul className="mt-2 list-inside list-disc text-sm">{group.repairs.map(repair => <li key={repair.inquiryNumber}>{repair.inquiryNumber}</li>)}</ul>
+          {group.available || group.preference ? <div className="mt-4"><DeliveryPreferenceForm token={token} endpoint={`/api/customer/intake-delivery/${encodeURIComponent(token)}`} groupKind={group.groupKind} initial={{ editable: group.editable, applicationStatus: group.applicationStatus, preference: group.preference }} timeOptions={YUPURI_DELIVERY_TIME_OPTIONS.filter(option => option.value !== "指定なし").map(option => ({ value: option.value, label: option.label }))} /></div>
             : <p className="mt-4 text-sm">対象の時計がすべて作業完了すると配達希望をご回答いただけます。</p>}
-        </section>}
+        </section>)}
 
         <CustomerRepairAccordionRoot initialOpenIndex={repairs[0]?.status === "作業中" ? -1 : 0}>
           {repairs.map((repair, index) => {

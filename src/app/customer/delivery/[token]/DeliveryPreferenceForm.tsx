@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Preference = {
   requestedDeliveryDate: string | null;
@@ -55,6 +56,7 @@ export function DeliveryPreferenceForm({
   groupKind?: GroupKind;
   immutable?: boolean;
 }) {
+  const router = useRouter();
   const initialMode = modeFromPreference(initial.preference);
   const [state, setState] = useState(initial);
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -106,6 +108,7 @@ export function DeliveryPreferenceForm({
       setState({ ...data, editable: !immutable && data.editable !== false } as State);
       setConfirming(false);
       setSaved(true);
+      if (groupKind) router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "回答を保存できませんでした。");
     } finally {
@@ -122,6 +125,7 @@ export function DeliveryPreferenceForm({
   }
   if (!state.editable) {
     return <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+      {state.preference && <p className="mb-2 font-semibold">保存済みのご回答: {summary(modeFromPreference(state.preference), state.preference.requestedDeliveryDate ?? "", state.preference.requestedDeliveryTimeSlot)}</p>}
       発送準備が進んでいるため、このページから配達希望を変更できません。変更をご希望の場合はLINEでご連絡ください。
     </div>;
   }
@@ -136,7 +140,7 @@ export function DeliveryPreferenceForm({
       <legend className="mb-2 text-base font-semibold">配達日時のご希望を選択してください</legend>
       {(Object.keys(modeLabels) as Exclude<Mode, "">[]).map(value => <label key={value}
         className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border p-4 ${mode === value ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white"}`}>
-        <input type="radio" name="delivery-mode" value={value} checked={mode === value}
+        <input type="radio" name={`delivery-mode-${groupKind ?? "single"}`} value={value} checked={mode === value}
           onChange={() => chooseMode(value)} className="h-5 w-5" />
         <span className="font-medium">{modeLabels[value]}</span>
       </label>)}
