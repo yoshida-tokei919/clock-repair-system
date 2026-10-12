@@ -662,6 +662,16 @@ Shipmentへ保存
 
 R-PS連携は有料fallback候補、ゆうパックプリントSkyは現事業規模では優先度を下げる。
 
+#### Task201G-OPS: ゆうプリクラウド自動発行の運用化
+
+Task201Gで確立した、ゆうプリクラウドへのCSV登録 → 送り状発行 → trackingNumber取得 → PDF取得 → `NEC MultiWriter 5750C`固定印刷のWorker経路を、日常運用で安全に使用できる状態へ切り替える。
+
+- 管理画面の `ゆうプリクラウド発行を依頼` を人間の明示承認として残す。
+- Scheduled Taskの永続的な `-AllowIssue` 有効化は、productionへ反映済みのreviewed runtimeとcanonical local runtimeが一致していることを確認してから行う。
+- 自動発行を有効化しても、送り状印刷だけでは発送済みにしない。
+- 永続的な実発行ONは外部サービスへの副作用を伴う運用変更なので、実施前にユーザーの明示承認を必須とする。
+- 二重発行防止の追加拡張は別論点とし、現行のfail-closed / reconciliation契約を維持する。
+
 #### B2C顧客導線・通知方針（2026-10-12）
 
 B2Cでは、**LINE = 会話と重要な節目の通知 / 共有ページ = 継続的な状況確認と確定情報 / 専用フォーム = 顧客の明示回答** と役割を分ける。
@@ -712,6 +722,29 @@ DRAFT Shipmentの間は配達希望の手動変更を許可し、顧客フォー
 shippingNoticeSentAt（発送連絡送信日時）等で二重送信を防止する。
 
 1Repairが複数Shipmentに紐づく場合、関連Shipmentすべてが配達完了した場合のみRepairを納品済みにする。
+
+#### Task210A-F: B2C顧客導線完成
+
+問い合わせから納品までを、LINE・共有ページ・顧客フォーム・Shipmentへ一貫して接続する。Task210系は以下の順で進める。
+
+- **Task210A — intake shared-page grouping**: 送付受付フォーム1回で作成された複数Repairを、1つの継続共有ページで確認できるようにする。同一Customerの無関係な別受付まで自動で束ねず、`RepairIntakeInvite`等の明示的な受付境界を使う。
+- **Task210B — intake completion shared-page LINE notice**: 受付フォーム送信 → Repair自動作成完了後に、Task210Aの共有URLをLINE通常トークで1回案内する。Next.jsからLINEへ直接送信せず、既存 `LineManagerSendOutbox → Windows sender → lineoa → CONFIRMED` を使う。
+- **Task210C — customer shipping decision**: 複数Repair時の発送判断をRepair単位から発送グループ単位へ移す。完成分を先に送る / 全件完成まで待つ、を基本選択肢とし、対象Repairを明示して無関係な別依頼を混ぜない。
+- **Task210D — shipment-level delivery preference**: 配達希望をRepair単位ではなく今回発送するRepairグループ / Shipment単位で1回取得する。希望なし / 日付 / 時間帯 / 日付+時間帯を扱う。
+- **Task210E — delivery preference to DRAFT Shipment**: 顧客の発送判断・配達希望確定後、対象RepairからDRAFT Shipmentを冪等に自動作成する。重複submitや通信結果不明でShipmentを重複作成しない。
+- **Task210F — delivery preference revision / issue lock**: DRAFT中は顧客再回答と管理画面変更を安全に反映し、READY以降は通常変更をlockする。LABEL_ISSUED後の訂正 / 再発行は必要性を確認して別Task化する。
+
+Task210C以降で新しいschema / migrationが必要になった場合は、実装前に既存構造で代替できないことを確認し、高リスク変更として独立レビュー・Data API / GRANT確認・production承認を行う。
+
+#### Task204A-E: 発送後の自動連携完成
+
+Task210系とTask201G-OPSで発送前導線を完成させた後、日本郵便の実配送イベントを正本として以下を段階実装する。
+
+- **Task204A — Japan Post tracking read-only poller**: `trackingNumber`から日本郵便Web追跡を取得し、引受 / 輸送中 / 持出中 / 配達完了 / 例外をread-onlyで判定する。
+- **Task204B — Shipment tracking state sync**: Task204Aの結果を冪等にShipmentへ同期し、引受時に `actualShippedAt` を保存する。
+- **Task204C — shipping LINE notice**: 日本郵便の「引受」を検知した時点で、追跡番号付き発送LINEを既存Outbox基盤から1回だけ送る。送り状発行・印刷時点では送らない。
+- **Task204D — shared-page tracking visibility**: 共有ページへ発送済み / trackingNumber / 現在配送状態を表示する。通常の輸送中状態変化ごとにLINEは送らない。
+- **Task204E — delivery completion to Repair delivered**: Shipment配達完了を反映し、1Repairに必要な関連Shipmentがすべて完了した場合のみRepairを納品済みにする。
 
 ### Stage D: Customer Communication Hub・B2B受付・運用自動化
 
@@ -767,11 +800,17 @@ OUTBOUND InquiryMessage確定
 - Task206G: AI post-intake classification、Repair要約、未対応事項、顧客指定、決定事項、返信案を整備する
 - 人間が確定した分類・Repair関連付けをAIが上書きしない
 
-#### Task206H1 / H2 / H3
+#### Task206H1-H5の現在地
 
-- **H1 reply bridgeは残す**。`context / approve / status`の3操作でstale送信、二重送信、APPROVEDとCONFIRMEDの混同を防ぐ
-- H2 Personal Plugin / remote MCP / Supabase OAuth 2.1 / Auth Hook案は本番化せず保留する
-- **Task206H3としてOpenClaw local agent integration PoCを優先する**
+B2C顧客導線の後続Taskは、H1-H5全完了を待たず、productionで利用中の既存LINE Outbox契約を前提に進める。
+
+- **H1**: reply bridge (`context / approve / status`) は本番運用可能な基盤として維持する。stale送信、二重approve、APPROVEDとCONFIRMEDの混同を防ぐ。
+- **H2**: Personal Plugin / remote MCP / Supabase OAuth案は保留。B2C導線のblockerにしない。
+- **H3 / H4**: OpenClaw local agent / Command BridgeのPoCは完了済みとして扱い、Customer / Repair / Inquiryの正本は引き続き時計修理業務アプリに置く。
+- **H5A**: Slack → n8n即時化は完了済みとして扱う。
+- **H5B / H5C**: read-only / Bridge API拡張は保留。Task210 / Task204の前提条件にはしない。
+
+LINE送信を伴うTask210B / Task204Cは、H1またはOpenClawから別送信経路を新設せず、既存の `APPROVED LineManagerSendOutbox → Windows sender → lineoa → reconciliation → CONFIRMED` に統一する。
 
 OpenClawの役割:
 
@@ -788,9 +827,6 @@ n8n
 カタリ + Playwright
 = ゆうプリクラウド等の決定的なブラウザ自動操作
 ```
-
-OpenClawはローカルWindows PC常駐を第一候補とし、Customer Communication HubのDBを置き換えない。
-OpenClaw → H1で最新文脈取得、返信案提示、ヨシダの明示承認後だけapprove、最後にCONFIRMED確認まで行うPoCを先に実施する。
 
 #### 1. B2B受付フローの完成
 
@@ -877,30 +913,37 @@ OpenClaw → H1で最新文脈取得、返信案提示、ヨシダの明示承�
 
 ### 実施順
 
-Stage A〜Cの主要基盤はproduction実装済みのため、今後は残っている手作業削減とCommunication Hub完成を優先する。
+B2Cの問い合わせ → 受付 → 共有 → 発送判断 → ゆうプリ → 配送追跡 → 納品を一つの顧客導線として完成させる。LINE関連の既存Taskとの競合を避けるため、まず進行中のTask206G1を安全に完了させ、その後Task210系へ進む。
 
-1. **Task206H3 OpenClaw local agent integration PoC**
-   - 既存OpenClaw環境確認
-   - OpenClaw → H1 `context / approve / status`
-   - secret非露出、明示承認、CONFIRMED確認
-2. **ゆうプリクラウド実サービスPoC**
-   - 利用条件 / ラベル / 既存A4プリンタ確認
-   - 手動でCSV登録 → PDF発行 → 印刷 → tracking確認を1件通す
-3. **ゆうプリクラウドadapter + Playwright PoC**
-   - Shipment → クラウド用CSV
-   - upload → PDF download → `SHP-{id}`照合 → tracking取得
-   - PDF指定プリンタ固定印刷
-4. **trackingNumber保存 + 日本郵便Web追跡同期**
-   - trackingNumberをShipmentへ安全に保存
-   - 引受 / 輸送中 / 持出中 / 配達完了 / 例外を定期同期
-5. **Task204 発送・配達自動連携の完成**
-   - 引受時actualShippedAt / Repair発送済み / LINE発送通知
-   - 配達完了時Repair納品済み
-6. **Task206F Gmail channel foundation**
-7. **Task206G AI post-intake classification / summaries**
-8. B2B受付・一括PhysicalTag / ラベル連続印刷等の残工程を、実運用上必要な差分だけ仕上げる
-9. 本格運用開始後、Scheduler・納期・リードタイム・Communication Hubの精度を運用実績で改善する
-10. 事例公開・その他未完機能
+1. **Task206G1 — Communication AI Briefを完了**
+   - 現在の未commit実装を独立レビューし、schema / migrationを含むため本番反映は明示承認後に行う
+   - Task210B / Task204Cと同じCommunication Hub / LINE周辺の競合を先に解消する
+2. **Task210A — intake shared-page grouping**
+   - 同一受付の複数Repairを1共有URLへまとめる
+3. **Task210B — intake completion shared-page LINE notice**
+   - 受付完了後に共有URLを既存通常トーク基盤で1回案内する
+4. **Task210C — customer shipping decision**
+   - 完成分を先に送る / 全件完成まで待つ、を発送グループ単位で扱う
+5. **Task210D — shipment-level delivery preference**
+   - 配達希望を今回発送するRepairグループ単位で1回取得する
+6. **Task210E — delivery preference → DRAFT Shipment auto-create**
+   - 顧客回答からShipmentを冪等に自動作成する
+7. **Task210F — delivery preference revision / issue lock**
+   - DRAFT中の変更とREADY以降のlockを完成させる
+8. **Task201G-OPS — ゆうプリクラウド自動発行の運用化**
+   - `ゆうプリクラウド発行を依頼` を人間承認として残す
+   - reviewed runtime整合確認後、別承認でScheduled Taskの実発行を有効化する
+9. **Task204A — Japan Post tracking read-only poller**
+10. **Task204B — Shipment tracking state sync**
+11. **Task204C — 引受時の追跡番号付きLINE発送通知**
+12. **Task204D — 共有ページ配送状況表示**
+13. **Task204E — 配達完了 → Repair納品済み**
+14. **Task206F Gmail channel foundation**
+15. B2B受付・一括PhysicalTag / ラベル連続印刷等の残工程を、実運用上必要な差分だけ仕上げる
+16. 本格運用開始後、Scheduler・納期・リードタイム・Communication Hubの精度を運用実績で改善する
+17. 事例公開・その他未完機能
+
+H2 / H5B / H5Cは保留のままでも上記B2C顧客導線を進められる。H3 / H4 / H5Aの既存PoC・即時化成果は必要箇所で再利用するが、新しい送信正本にはしない。
 
 Task番号・境界は各Task実装前の調査で必要に応じて再分割してよい。
 schema / migration / RLS / GRANT / LINE自動送信 / production DBを伴う高リスクTaskでは、実装担当と独立レビュー担当を分離し、本番変更前にユーザー承認を必須とする。

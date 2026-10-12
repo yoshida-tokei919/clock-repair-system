@@ -186,17 +186,45 @@ LINEは以下を中心にする。
 
 各Repairの内部ステータス変更だけを理由にLINEを送信しない。
 
-## 今後の実装優先順
+## 今後の実装Taskと順序
 
-1. 受付フォーム完了 → 同じ受付のRepairをまとめた共有ページURL → LINE通常トーク送信
-2. 複数Repairを1共有ページで安定して表示
-3. 顧客単位の複数Repair発送判断
-4. Shipment / 発送グループ単位の配達希望回答
-5. 配達希望確定後のDRAFT Shipment自動作成
-6. `ゆうプリクラウド発行を依頼` を明示承認として維持し、その後をWorkerで自動処理
-7. 日本郵便Web追跡同期
-8. 引受 → Shipment / Repair発送済み → 追跡番号付きLINE
-9. 配達完了 → Repair納品済み
+進行中のTask206G1を先に安全に完了させた後、以下を1 Task = 1 commitで順番に進める。
+
+1. **Task210A — intake shared-page grouping**
+   - 同じ送付受付で作成された複数Repairを1共有ページで表示する。
+   - 同じCustomerという理由だけで無関係な別受付を自動統合しない。
+2. **Task210B — intake completion shared-page LINE notice**
+   - 受付フォーム完了後、共有ページURLをLINE通常トークで1回案内する。
+   - 既存Outbox → Windows sender → lineoa → CONFIRMEDのみを使う。
+3. **Task210C — customer shipping decision**
+   - 複数Repairについて「完成分を先に発送 / 全件完成まで待つ」を発送グループ単位で確認する。
+4. **Task210D — shipment-level delivery preference**
+   - 配達希望をRepairごとではなく、今回発送するRepairグループ単位で1回取得する。
+5. **Task210E — delivery preference → DRAFT Shipment auto-create**
+   - 回答確定後にDRAFT Shipmentを冪等作成し、重複submitでも二重Shipmentを作らない。
+6. **Task210F — delivery preference revision / issue lock**
+   - DRAFT中は変更可、READY以降は通常変更不可とする。
+   - LABEL_ISSUED後の訂正 / 再発行は必要なら別Task化する。
+7. **Task201G-OPS — ゆうプリクラウド自動発行の運用化**
+   - `ゆうプリクラウド発行を依頼` を明示承認として残し、その後の発行・tracking取得・PDF取得・5750C印刷をWorkerへ任せる。
+   - Scheduled Taskの永続 `-AllowIssue` 有効化は別途明示承認を必須とする。
+8. **Task204A — Japan Post tracking read-only poller**
+9. **Task204B — Shipment tracking state sync**
+10. **Task204C — 引受時の追跡番号付きLINE発送通知**
+11. **Task204D — 共有ページ配送状況表示**
+12. **Task204E — 配達完了 → Repair納品済み**
+
+### LINE / OpenClaw系との依存関係
+
+- Task206G1はCommunication Hub / Repair画面 / AI Brief / schemaを変更中のため、Task210BやTask204Cより先に完了させる。
+- H1のreply bridgeと既存Outbox契約はそのまま利用する。
+- H3 / H4 / H5AのPoC・即時化成果は完了済みとして再利用できる。
+- H2 / H5B / H5Cは保留のままでTask210 / Task204を進められる。
+- OpenClawから別のLINE送信正本を作らず、実送信成功判定は引き続きCONFIRMEDのみとする。
+
+### 高リスク境界
+
+Task210C以降で新規schema / migrationが必要になった場合は、既存モデルで代替できるか先に確認する。新規table等が必要ならschema / migration / RLS / GRANT変更として独立レビューを必須とし、2026-10-30以降のSupabase Data API GRANTルールも用途別に確認する。production migration / deployはユーザー承認前に実行しない。
 
 ## 旧方針との優先関係
 
