@@ -11,6 +11,7 @@ import { assertAuthenticatedInvoices, assertToolboxAutomationWindowOpen, cdpEndp
 import { inspectCloudExportRows, inspectCloudTab } from "./yupuri-cloud-listing";
 import { resolvePdfPrint } from "./yupuri-cloud-print";
 import { guardedCloudCheck, guardedCloudClick, guardedCloudFiles } from "./yupuri-cloud-actions";
+import { downloadTrackingCsv } from "./yupuri-cloud-tracking-csv";
 
 const appData = process.env.LOCALAPPDATA;
 if (!appData) throw new Error("LOCALAPPDATA is required");
@@ -20,12 +21,14 @@ const journal = new JournalStore(join(localRoot, "journal"));
 
 function args() {
   const values = process.argv.slice(2);
-  if (values.some(value => !["--once", "--allow-issue", "--poll-seconds"].includes(value) &&
+  if (values.some(value => !["--once", "--allow-issue", "--tracking-preview", "--poll-seconds"].includes(value) &&
     !/^\d+$/.test(value))) throw new Error("Unknown worker option");
   const pollIndex = values.indexOf("--poll-seconds");
   const seconds = pollIndex < 0 ? 30 : Number(values[pollIndex + 1]);
   if (!Number.isInteger(seconds) || seconds < 5 || seconds > 3600) throw new Error("poll-seconds must be 5..3600");
-  return { once: values.includes("--once"), allowIssue: values.includes("--allow-issue"), seconds };
+  const trackingPreview = values.includes("--tracking-preview");
+  if (trackingPreview && !values.includes("--once")) throw new Error("--tracking-preview requires --once");
+  return { once: values.includes("--once"), allowIssue: values.includes("--allow-issue"), trackingPreview, seconds };
 }
 
 export function isCloudWorkflowUrl(value: string, page: "upload" | "export"): boolean {
@@ -68,6 +71,16 @@ class InternalApi implements CloudApi {
   }
   async complete(input: { shipmentId: number; managementNumber: string; trackingNumber: string }) {
     await this.call("/api/internal/yupuri-cloud/complete", input);
+  }
+  async previewTracking(csv: Buffer) {
+    assertToolboxAutomationWindowOpen();
+    const response = await fetch(`${this.origin}/api/internal/japan-post-tracking`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/octet-stream" },
+      body: new Uint8Array(csv), signal: AbortSignal.timeout(20000), cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Tracking preview returned ${response.status}`);
+    return response.json() as Promise<{ results: unknown[] }>;
   }
 }
 
@@ -134,6 +147,10 @@ export class PlaywrightCloudBrowser implements CloudBrowser {
     assertCloudPageTopology(this.page, popup);
   }
   assertOperationalPage(): void { this.assertTopology(); }
+  async trackingCsv(filterName: string): Promise<Buffer | null> {
+    await this.invoices();
+    return downloadTrackingCsv(this.page, filterName, () => this.beforeAction());
+  }
   async waitForPropagation(): Promise<void> {
     this.assertTopology();
     this.serviceGuard();
@@ -310,7 +327,7 @@ async function run() {
         continue;
       }
       try {
-        if (options.allowIssue && !livePage) {
+        if ((options.allowIssue || options.trackingPreview) && !livePage) {
           invoicesUrl = productionCloudInvoicesUrl(process.env.YUPURI_CLOUD_INVOICES_URL);
           const filter = process.env.YUPURI_CLOUD_FILTER_NAME ?? "\u6642\u8a08\u4fee\u7406\u30a2\u30d7\u30ea17\u5217";
           if (!filter || filter.trim() !== filter) throw new Error("Invalid Cloud filter name");
@@ -339,7 +356,7 @@ async function run() {
         if (job) {
           assertToolboxAutomationWindowOpen();
           console.log(`shipment=${job.shipmentId} stage=${options.allowIssue ? "processing" : "preview"}`);
-          if (browser instanceof PlaywrightCloudBrowser) {
+          if (browser instanceof PlaywrightCloudBrowser && options.allowIssue) {
             const operationalBrowser = browser;
             const printer = process.env.YUPURI_CLOUD_PRINTER_NAME;
             const printPdf = printer ? async (path: string) => {
@@ -353,6 +370,14 @@ async function run() {
               () => operationalBrowser.assertOperationalPage());
             console.log(`shipment=${result.shipmentId} stage=${result.status}`);
           }
+        }
+        if (options.trackingPreview && browser instanceof PlaywrightCloudBrowser) {
+          const filter = process.env.YUPURI_CLOUD_TRACKING_FILTER_NAME ?? "\u6642\u8a08\u4fee\u7406\u30a2\u30d7\u30ea\u914d\u9001\u72b6\u6cc16\u5217";
+          const csv = await browser.trackingCsv(filter);
+          if (csv) {
+            const preview = await api.previewTracking(csv);
+            console.log(`tracking-preview rows=${preview.results.length}`);
+          } else console.log("tracking-preview rows=0");
         }
       } catch (error) {
         if (!(error instanceof ToolboxServiceClosedError)) throw error;

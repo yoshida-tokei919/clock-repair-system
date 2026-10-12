@@ -1,29 +1,52 @@
-# Task204A - Japan Post tracking read-only poller
+# Task204A - Yu-Pri Cloud tracking CSV read-only poller
 
 Status: local implementation and validation. Production: pending.
 
-## Boundary
+## Decision
 
-- `GET /api/internal/japan-post-tracking` reads at most five existing Shipment rows. It requests official tracking sequentially, once per distinct tracking number, and returns only `shipmentId`, `trackingNumber`, and a read-only result or error.
-- Candidates must be OUTBOUND, have `carrierCode=JAPAN_POST`, a nonempty tracking number, and one of LABEL_ISSUED, AWAITING_ACCEPTANCE, SHIPPED, IN_TRANSIT, OUT_FOR_DELIVERY, or EXCEPTION. DRAFT, READY, DELIVERED, and CANCELLED are excluded. Only 12-digit numbers reach Japan Post.
-- No Shipment or Repair writes, timestamp conversion, schema changes, LINE, UI, PDF, payment, or Yu-Pri Cloud issuance worker changes. Task204B owns any later persistence.
+The initial production implementation at `f782eb49` queried Japan Post individual tracking and parsed HTML. Production smoke proved that approach brittle and it is superseded by this Task204A correction. Delivery state is no longer derived from Japan Post tracking-page DOM.
+
+The canonical source for Task204A is the CSV exported from Yu-Pri Cloud `発行後` data. Browser automation is used only to operate the authenticated Yu-Pri Cloud UI and download the CSV. Delivery state itself is derived exclusively from the official CSV status-code fields.
+
+The abandoned local HTML correction `290959f` is not part of this implementation.
 
 ## Official evidence
 
-- [Japan Post individual-number search](https://trackings.post.japanpost.jp/services/srv/search/input) uses `GET /services/srv/search` with `requestNo1` and `locale=ja`. The [tracking service](https://trackings.post.japanpost.jp/services/srv/search/) warns that tracking updates can be delayed.
-- An independent reviewer inspected a current official result with a GET-only request. The inquiry table has the verified delivery-status-detail summary, a header row for inquiry number and product type, then a separate data row with the echoed number and product type. The history table has the verified history-information summary. Its two-row header contains state date, delivery history, detail, handling office, and prefecture, then postal code. Each event likewise uses two rows: date/time, status, detail, office, and prefecture on the first row, with postal code on the second. Four cells span both event rows. The observed events were chronological. No real number or HTML was saved.
-- During the Task204A review, the reviewer checked the official Japan Post [Yu-Pri Cloud Operation Manual PDF](https://www.post.japanpost.jp/yu-pri-cloud/member/VariousContents/%E3%82%86%E3%81%86%E3%83%97%E3%83%AA%E3%82%AF%E3%83%A9%E3%82%A6%E3%83%89%E6%93%8D%E4%BD%9C%E8%AA%AC%E6%98%8E%E6%9B%B8.pdf) from the [member page](https://www.post.japanpost.jp/yu-pri-cloud/member/). The PDF identifies itself as Yu-Pri Cloud Operation Manual Ver3.1, dated 2026-04-15. Section III, Table 3.1 on page 38 establishes the delivery-status meanings. The issued-data tracking/delivery-status screen on page 40 links the tracking number to Japan Post individual-number search and displays delivery status.
-- The manual distinguishes origin-office acceptance, transit, delivery-office arrival, out for delivery, recipient delivery, recipient pickup at a post office, absence/hold/forwarding/investigation, and return to sender. Recipient pickup at a post-office counter is DELIVERED; return completion remains EXCEPTION. Label issuance or the manual's not-shipped state is not acceptance.
+- Japan Post `ゆうプリクラウド操作説明書 Ver3.1` (2026-04-15) documents issued-label management in `発行後`, the delivery-status categories, and CSV download through a registered output filter.
+- The manual's issued-data download flow is: select issued rows -> `ダウンロード` -> choose registered `出力フィルタ` -> download CSV.
+- The existing production `src/lib/yupuri-history.ts` transcribes the official Yu-Pri delivery status aggregate/detail code table from the Japan Post Yu-Pri interface specification. Task204A reuses that single code table rather than creating a Cloud-specific duplicate.
+- The Cloud output filter for this workflow is expected to export the same six fields already validated by the Yu-Pri history parser: お客様側管理番号, お問い合わせ番号, 仮引受確定作業年月日, 配送完了作業年月日, 配達ステータス集約コード, 配達ステータス明細コード.
 
-## Fail-closed contract
+## Browser boundary
 
-- HTTPS, exact official host, and `/services/srv/search` path family are required. Redirects are followed manually and the destination and final response URL are checked. The request has a ten-second timeout and a 512 KiB HTML limit.
-- Exactly one inquiry table must have the expected two-row header/value layout and echo the requested 12-digit number. Exactly one history table must have the verified two-row header. Every event must have the verified two-row rowspan layout. A mismatch, extra or missing row/cell, unexpected header, unknown latest status, or missing history yields an explicit error.
-- Raw date/time, status, detail, office, prefecture, and postal-code text is preserved. No timezone or `Date` is inferred. The final reconstructed event is treated as the current state.
-- The existing Yu-Pri status-description normalization is reused. Live-page aliases stay in the tracking adapter. Unknown or unavailable information never becomes a normal delivery state. No full HTML or customer PII is logged.
+- Existing dedicated Edge, existing Yu-Pri Cloud login/session handling, service-hours guard, and single-tab topology checks are reused.
+- The read-only `--tracking-preview --once` worker mode opens `発行後`, selects only rows containing one canonical `SHP-{Shipment.id}` token, verifies the next-500 pagination control is unambiguous and disabled, opens the CSV download dialog, selects exactly one configured output filter, and downloads the resulting CSV.
+- `YUPURI_CLOUD_TRACKING_FILTER_NAME` can name the registered output filter. The code default is `時計修理アプリ配送状況6列`; production configuration is not changed by this Task.
+- Shipment state, delivery status text, tracking state, or dates are not scraped from DOM. DOM is used only for the browser actions required to request the official CSV.
+- The download is capped at the existing 256 KiB / 500-row parser limits. Ambiguous rows, duplicate SHP numbers, pagination, filters, dialogs, or downloads fail closed.
 
-## Validation
+## App boundary
 
-- Synthetic, sanitized two-row fixtures cover acceptance, transit, out for delivery, recipient delivery, post-office pickup, return completion, other exception, not found, mismatch, unknown status, and malformed rowspan/header/event structures.
-- Focused tests also cover upstream 5xx and unsafe redirect behavior, URL restrictions, read-only candidate selection, request deduplication, internal token authentication, and existing Yu-Pri history regression.
-- Focused Task204A and Yu-Pri history tests: 20/20 PASS. TypeScript `--noEmit --incremental false`: PASS. `git diff --check`: PASS. `npm run build` was rerun after the parser corrections and PASSED, generating 59 static pages and including `/api/internal/japan-post-tracking`. Production remains pending.
+- `POST /api/internal/japan-post-tracking` accepts only an authenticated internal Cloud-worker request and raw `application/octet-stream` or `text/csv` bytes.
+- The existing strict BOM-free CP932 six-column parser is reused. `SHP-{id}` resolves the Shipment, and the CSV tracking number must exactly match the Shipment tracking number.
+- Active read-only candidates are OUTBOUND Japan Post Shipments in LABEL_ISSUED, AWAITING_ACCEPTANCE, SHIPPED, IN_TRANSIT, OUT_FOR_DELIVERY, or EXCEPTION.
+- DRAFT, READY, DELIVERED, CANCELLED, INBOUND, missing Shipment, tracking conflicts, unknown/undescribed codes, duplicate rows, and malformed CSV do not become synchronization candidates.
+- Task204A performs no Shipment, Repair, status, timestamp, LINE, shared-page, schema, migration, RLS, GRANT, or production DB mutation. Task204B owns persistence.
+
+## Status normalization
+
+The existing official code map remains canonical: `引受予定 -> AWAITING_ACCEPTANCE`, `引受 -> SHIPPED`, transport/arrival states -> `IN_TRANSIT`, `持出中 -> OUT_FOR_DELIVERY`, recipient delivery / post-office counter handoff -> `DELIVERED`, and hold/absence/transfer/return/investigation states -> `EXCEPTION`. Unknown pairs remain fail-closed.
+
+The two 14-byte date fields remain raw strings in Task204A. A real non-empty Cloud CSV sample has not yet been observed, so Task204A does not infer a timestamp format.
+
+## Local validation
+
+- App CSV preview + existing Yu-Pri history + browser safety regression: 39/39 PASS.
+- Browser helper synthetic test verifies that only canonical SHP rows are selected, the configured output filter is chosen, and downloaded bytes are returned without reading delivery state from DOM.
+- TypeScript `--noEmit --incremental false`: PASS.
+- `git diff --check`: PASS.
+- Real Yu-Pri Cloud CSV download cannot be exercised while the service is closed. Per the approved plan, live status and post-acceptance verification will be performed with the end-to-end real shipment after Task204E is implemented.
+
+## Review exception
+
+The user explicitly authorized Katari to implement and review Task204A through Task204E while Codex quota is limited. Independent Codex review is therefore intentionally omitted for this sequence. Production deployment and activation remain separate approval points.
