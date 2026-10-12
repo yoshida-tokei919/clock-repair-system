@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { RepairCompletionNoticePanel } from "./RepairCompletionNoticePanel";
+import { IntakeShippingDecisionPanel } from "./IntakeShippingDecisionPanel";
 import { RepairDeliveryRequestPanel } from "./RepairDeliveryRequestPanel";
 import { RepairAiBriefPanel } from "./RepairAiBriefPanel";
 
@@ -78,6 +79,7 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
     {error && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {notice && <p className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
     <RepairCompletionNoticePanel repairId={repairId} />
+    <IntakeShippingDecisionPanel repairId={repairId} />
     <RepairDeliveryRequestPanel repairId={repairId} />
     {loading && !payload && <p className="text-sm text-zinc-500">LINE履歴を読み込んでいます…</p>}
     {payload && !payload.available && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">この修理に関連付けられたLINEのやり取りはありません。</p>}

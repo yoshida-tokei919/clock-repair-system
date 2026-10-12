@@ -62,6 +62,7 @@ model Customer {
   lineUsers         LineUser[]
   inquiryMessagePostIntakeRoutings InquiryMessagePostIntakeRouting[]
   repairIntakeInvites RepairIntakeInvite[]
+  intakeShippingDecisions RepairIntakeShippingDecision[]
   communicationAiBriefs CommunicationAiBrief[]
 }
 
@@ -481,6 +482,7 @@ model LineManagerSendOutbox {
   sourceRepair            Repair?         @relation("LineManagerSendOutboxSourceRepair", fields: [sourceRepairId], references: [id], onDelete: Restrict)
   lineManagerChat         LineManagerChat @relation(fields: [lineManagerChatId], references: [id], onDelete: Restrict)
   confirmedInquiryMessage InquiryMessage? @relation("LineManagerSendOutboxConfirmedInquiryMessage", fields: [confirmedInquiryMessageId], references: [id], onDelete: Restrict)
+  intakeShippingDecision RepairIntakeShippingDecision?
 
   @@index([status, claimLeaseExpiresAt])
   @@index([status, reconciliationLeaseExpiresAt])
@@ -817,6 +819,7 @@ model RepairIntakeInvite {
   inquiry Inquiry? @relation(fields: [inquiryId], references: [id], onDelete: SetNull)
   repairs  Repair[]
   inquiryWatches RepairIntakeInviteWatch[]
+  shippingDecision RepairIntakeShippingDecision?
 
   @@index([customerId])
   @@index([lineUserId])
@@ -848,6 +851,7 @@ model Repair {
   customerId           Int
   watchId              Int
   repairIntakeInviteId Int?
+  shippingDecisionSnapshot RepairIntakeShippingDecisionRepair[]
   movementMakerId      Int?
   movementCaliberId    Int?
   baseMovementMakerId  Int?
@@ -936,6 +940,7 @@ model Repair {
 
   @@unique([id, customerId])
   @@index([repairIntakeInviteId])
+  @@unique([id, repairIntakeInviteId])
 }
 
 enum PhysicalTagStatus {
@@ -1107,6 +1112,38 @@ model RepairDeliveryPreference {
   updatedAt                  DateTime @updatedAt
 
   repair Repair @relation(fields: [repairId], references: [id], onDelete: Restrict)
+}
+
+enum RepairIntakeShippingChoice {
+  SHIP_COMPLETED
+  WAIT_ALL
+}
+
+model RepairIntakeShippingDecision {
+  repairIntakeInviteId Int @id
+  customerId Int
+  requestOutboxId Int @unique
+  choice RepairIntakeShippingChoice?
+  requestedAt DateTime @default(now())
+  respondedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  repairIntakeInvite RepairIntakeInvite @relation(fields: [repairIntakeInviteId], references: [id], onDelete: Restrict)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  requestOutbox LineManagerSendOutbox @relation(fields: [requestOutboxId], references: [id], onDelete: Restrict)
+  repairs RepairIntakeShippingDecisionRepair[]
+}
+
+model RepairIntakeShippingDecisionRepair {
+  repairIntakeInviteId Int
+  repairId Int @unique
+  completedAtRequest Boolean
+
+  decision RepairIntakeShippingDecision @relation(fields: [repairIntakeInviteId], references: [repairIntakeInviteId], onDelete: Restrict)
+  repair Repair @relation(fields: [repairId, repairIntakeInviteId], references: [id, repairIntakeInviteId], onDelete: Restrict, map: "RepairIntakeDecisionRepair_membership_fkey")
+
+  @@id([repairIntakeInviteId, repairId])
 }
 
 model WorkCalendar {

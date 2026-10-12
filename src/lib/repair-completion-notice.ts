@@ -4,7 +4,7 @@ import {
   type LineManagerSendOutboxDb,
 } from "./line-manager-send-outbox";
 
-export type RepairCompletionNoticeDb = LineManagerSendOutboxDb & Pick<PrismaClient, "lineManagerSendOutbox">;
+export type RepairCompletionNoticeDb = LineManagerSendOutboxDb & Pick<PrismaClient, "lineManagerSendOutbox" | "repairIntakeShippingDecision">;
 
 export class RepairCompletionNoticeInputError extends Error {}
 export class RepairCompletionNoticeNotFoundError extends Error {}
@@ -29,14 +29,31 @@ export function parseCompletionNotice(value: unknown) {
   return { text: body.text };
 }
 
-async function context(db: Pick<Prisma.TransactionClient, "repair">, repairId: number) {
+export async function suppressLegacyCompletionForIntake(
+  db: Pick<Prisma.TransactionClient, "repair" | "repairIntakeShippingDecision">,
+  repairIntakeInviteId: number | null,
+  customerId: number,
+) {
+  if (repairIntakeInviteId === null) return false;
+  const decision = await db.repairIntakeShippingDecision.findUnique({
+    where: { repairIntakeInviteId }, select: { repairIntakeInviteId: true },
+  });
+  if (decision) return true;
+  const siblings = await db.repair.findMany({
+    where: { repairIntakeInviteId, customerId }, select: { status: true },
+  });
+  return siblings.length >= 2 && siblings.some(r => r.status === "作業完了") &&
+    siblings.some(r => r.status !== "作業完了");
+}
+
+async function context(db: Pick<Prisma.TransactionClient, "repair" | "repairIntakeShippingDecision">, repairId: number) {
   if (!Number.isSafeInteger(repairId) || repairId <= 0) {
     throw new RepairCompletionNoticeInputError("Invalid Repair ID");
   }
   const repair = await db.repair.findUnique({
     where: { id: repairId },
     select: {
-      id: true, status: true, customer: { select: { type: true } },
+      id: true, status: true, customerId: true, repairIntakeInviteId: true, customer: { select: { type: true } },
       inquiryWatchPromotion: { select: {
         inquiryId: true, promotedRepairId: true,
         inquiry: { select: { lineUser: { select: {
@@ -50,8 +67,9 @@ async function context(db: Pick<Prisma.TransactionClient, "repair">, repairId: n
   const chat = promotion?.inquiry.lineUser.lineManagerChat;
   const hasOriginatingInquiry = Boolean(promotion && promotion.promotedRepairId === repair.id);
   const hasVerifiedLineDestination = Boolean(hasOriginatingInquiry && chat?.verifiedAt);
+  const suppressLegacy = await suppressLegacyCompletionForIntake(db, repair.repairIntakeInviteId, repair.customerId);
   const eligible = repair.customer.type === "individual" && repair.status === "作業完了" &&
-    hasOriginatingInquiry && hasVerifiedLineDestination;
+    hasOriginatingInquiry && hasVerifiedLineDestination && !suppressLegacy;
   return { repair, promotion, chat, hasOriginatingInquiry, hasVerifiedLineDestination, eligible };
 }
 

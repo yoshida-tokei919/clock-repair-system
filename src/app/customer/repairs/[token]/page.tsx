@@ -4,6 +4,8 @@ import type { PaymentStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { resolveCustomerRepairShareScope } from "@/lib/customer-repair-share";
+import { getPublicIntakeShippingDecision, IntakeShippingDecisionError } from "@/lib/intake-shipping-decision";
+import { ShippingDecisionForm } from "./ShippingDecisionForm";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { CustomerRepairAccordionItem, CustomerRepairAccordionRoot } from "./CustomerRepairAccordion";
 import {
@@ -156,7 +158,8 @@ function needsCustomerApproval(repair: any) {
   return repair.approvalStatus === "pending" && repair.status === "承認待ち";
 }
 
-function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn, documentTokenAccess }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null; prepaymentReturn?: string; documentTokenAccess: boolean }) {
+type ShippingDecisionView = { choice: "SHIP_COMPLETED" | "WAIT_ALL" | null; repairs: { inquiryNumber: string; completedAtRequest: boolean }[] };
+function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn, documentTokenAccess, shippingDecision }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null; prepaymentReturn?: string; documentTokenAccess: boolean; shippingDecision?: ShippingDecisionView }) {
   return (
     <main className="min-h-screen bg-[#f3f6fa] px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
       <div className="mx-auto max-w-2xl space-y-4">
@@ -168,6 +171,8 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
 
         {prepaymentReturn === "success" && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">前受金のお支払い結果を確認中です。反映まで少し時間がかかる場合があります。</p>}
         {prepaymentReturn === "cancel" && <p role="status" className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">前受金のお支払い画面から戻りました。お支払いを希望される場合は、下の前受金欄から再度お進みください。</p>}
+
+        {shippingDecision && <ShippingDecisionForm token={token} initialChoice={shippingDecision.choice} repairs={shippingDecision.repairs} />}
 
         <CustomerRepairAccordionRoot initialOpenIndex={repairs[0]?.status === "作業中" ? -1 : 0}>
           {repairs.map((repair, index) => {
@@ -255,6 +260,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
 
   let repairs: any[] = [];
   let documentMeta: { id: number; estimateNumber: string; issuedDate: Date } | null = null;
+  let shippingDecision: ShippingDecisionView | undefined;
 
   if (documentTokenRow) {
     const estimateDocument = await prisma.estimateDocument.findUnique({
@@ -293,6 +299,10 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
 
     if (repairs.length !== scope.repairIds.length) return notFound();
     documentMeta = repairs.length === 1 ? repairs[0].estimateDocument : null;
+    if (scope.grouped) {
+      try { shippingDecision = await getPublicIntakeShippingDecision(prisma, token); }
+      catch (error) { if (!(error instanceof IntakeShippingDecisionError)) throw error; }
+    }
   }
 
   const primaryRepair = repairs[0];
@@ -506,7 +516,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
   }
 
   const prepaymentReturn = (await searchParams).prepayment;
-  return <CustomerRepairB2CPage token={token} repairs={repairs} documentMeta={documentMeta} prepaymentReturn={typeof prepaymentReturn === "string" ? prepaymentReturn : undefined} documentTokenAccess={Boolean(documentTokenRow)} />;
+  return <CustomerRepairB2CPage token={token} repairs={repairs} documentMeta={documentMeta} prepaymentReturn={typeof prepaymentReturn === "string" ? prepaymentReturn : undefined} documentTokenAccess={Boolean(documentTokenRow)} shippingDecision={shippingDecision} />;
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">

@@ -23,6 +23,8 @@ type FakeOptions = {
   shipments?: ReturnType<typeof shipment>[];
   completionIntent?: boolean;
   customerType?: "individual" | "business";
+  intakeStatuses?: string[];
+  intakeDecision?: boolean;
 };
 function fakeDb(options: FakeOptions = {}) {
   const state: any = {
@@ -33,6 +35,8 @@ function fakeDb(options: FakeOptions = {}) {
   };
   const repairRow = () => ({
     id: 1,
+    customerId: 3,
+    repairIntakeInviteId: options.intakeStatuses ? 7 : null,
     customer: { type: options.customerType ?? "individual" },
     deliveryPreference: state.preference,
     lineManagerSendOutboxes: options.completionIntent === false ? [] : [
@@ -44,7 +48,9 @@ function fakeDb(options: FakeOptions = {}) {
     repair: {
       findUnique: async ({ where }: any) => where.publicToken === token || where.id === 1 ? repairRow() : null,
       findUniqueOrThrow: async () => repairRow(),
+      findMany: async () => (options.intakeStatuses ?? []).map(status => ({ status })),
     },
+    repairIntakeShippingDecision: { findUnique: async () => options.intakeDecision ? { repairIntakeInviteId: 7 } : null },
     repairDeliveryPreference: {
       upsert: async ({ create, update }: any) => {
         state.writes++;
@@ -99,6 +105,25 @@ test("public page is gated by B2C and a completion notice intent", async () => {
   ]) {
     await assert.rejects(getPublicRepairDeliveryPreference(instance.client, token),
       (error: RepairDeliveryPreferenceError) => error.status === 404);
+  }
+});
+
+test("legacy delivery form follows mixed intake and existing decision guard", async () => {
+  for (const scenario of [
+    { intakeStatuses: ["作業完了", "部品待ち(注文済み)"], intakeDecision: false, allowed: false },
+    { intakeStatuses: ["作業完了", "作業完了"], intakeDecision: false, allowed: true },
+    { intakeStatuses: ["作業完了", "作業完了"], intakeDecision: true, allowed: false },
+  ]) {
+    const { client, state } = fakeDb(scenario);
+    if (scenario.allowed) {
+      await getPublicRepairDeliveryPreference(client, token);
+      await savePublicRepairDeliveryPreference(client, token, { mode: "NONE" }, now);
+      assert.equal(state.writes, 1);
+    } else {
+      await assert.rejects(getPublicRepairDeliveryPreference(client, token), RepairDeliveryPreferenceError);
+      await assert.rejects(savePublicRepairDeliveryPreference(client, token, { mode: "NONE" }, now), RepairDeliveryPreferenceError);
+      assert.equal(state.writes, 0);
+    }
   }
 });
 

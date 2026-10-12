@@ -9,7 +9,7 @@ import { LineManagerSendOutboxError } from "./line-manager-send-outbox";
 
 const approvedAt = new Date("2026-10-03T01:00:00Z");
 const repair = (overrides: Record<string, unknown> = {}) => ({
-  id: 10, status: "作業完了", customer: { type: "individual", lineId: "untrusted" },
+  id: 10, customerId: 1, repairIntakeInviteId: null, status: "作業完了", customer: { type: "individual", lineId: "untrusted" },
   inquiryWatchPromotion: {
     inquiryId: 7, promotedRepairId: 10,
     inquiry: { lineUser: { lineManagerChat: { id: 30, verifiedAt: approvedAt } } },
@@ -50,6 +50,47 @@ test("GET is read-only, reports eligibility, destination and exact-key outbox ev
     eligible: false, hasVerifiedLineDestination: false,
     notice: { id: 2, status: "CONFIRMED", approvedAt, confirmedAt: approvedAt },
   });
+});
+
+test("legacy completion notice is suppressed only for mixed intake or an existing decision", async () => {
+  for (const scenario of [
+    { statuses: ["作業完了", "部品待ち(注文済み)"], decision: false, eligible: false },
+    { statuses: ["作業完了", "作業完了"], decision: false, eligible: true },
+    { statuses: ["作業完了", "作業完了"], decision: true, eligible: false },
+  ]) {
+    const db: any = {
+      repair: { findUnique: async () => repair({ repairIntakeInviteId: 44 }),
+        findMany: async () => scenario.statuses.map(status => ({ status })) },
+      repairIntakeShippingDecision: { findUnique: async () => scenario.decision ? { repairIntakeInviteId: 44 } : null },
+      lineManagerSendOutbox: { findUnique: async () => null },
+    };
+    assert.equal((await getRepairCompletionNotice(db, 10)).eligible, scenario.eligible);
+  }
+});
+
+test("legacy completion POST follows the same mixed and decision boundary", async () => {
+  for (const scenario of [
+    { statuses: ["作業完了", "作業中"], decision: false, allowed: false },
+    { statuses: ["作業完了", "作業完了"], decision: false, allowed: true },
+    { statuses: ["作業完了", "作業完了"], decision: true, allowed: false },
+  ]) {
+    let writes = 0;
+    let query = 0;
+    const tx: any = {
+      $queryRaw: async () => (++query === 2 ? [{ id: 1 }] : [{ customerId: 1 }]),
+      repair: { findUnique: async () => repair({ repairIntakeInviteId: 44 }),
+        findMany: async () => scenario.statuses.map(status => ({ status })) },
+      repairIntakeShippingDecision: { findUnique: async () => scenario.decision ? { repairIntakeInviteId: 44 } : null },
+    };
+    const action = createRepairCompletionNotice(transactionDb(tx) as any, 10,
+      { confirmed: true, text: "完了しました" }, async () => {
+        writes++;
+        return { id: 2, status: "APPROVED", approvedAt, confirmedAt: null } as any;
+      });
+    if (scenario.allowed) await action;
+    else await assert.rejects(action, RepairCompletionNoticeUnavailableError);
+    assert.equal(writes, scenario.allowed ? 1 : 0);
+  }
 });
 
 test("POST rejects missing Repair, B2B, status mismatch, missing or mismatched promotion and mapping", async () => {
