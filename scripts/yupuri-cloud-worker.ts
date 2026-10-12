@@ -21,14 +21,16 @@ const journal = new JournalStore(join(localRoot, "journal"));
 
 function args() {
   const values = process.argv.slice(2);
-  if (values.some(value => !["--once", "--allow-issue", "--tracking-preview", "--poll-seconds"].includes(value) &&
+  if (values.some(value => !["--once", "--allow-issue", "--tracking-preview", "--tracking-sync", "--poll-seconds"].includes(value) &&
     !/^\d+$/.test(value))) throw new Error("Unknown worker option");
   const pollIndex = values.indexOf("--poll-seconds");
   const seconds = pollIndex < 0 ? 30 : Number(values[pollIndex + 1]);
   if (!Number.isInteger(seconds) || seconds < 5 || seconds > 3600) throw new Error("poll-seconds must be 5..3600");
   const trackingPreview = values.includes("--tracking-preview");
+  const trackingSync = values.includes("--tracking-sync");
+  if (trackingPreview && trackingSync) throw new Error("Choose either --tracking-preview or --tracking-sync");
   if (trackingPreview && !values.includes("--once")) throw new Error("--tracking-preview requires --once");
-  return { once: values.includes("--once"), allowIssue: values.includes("--allow-issue"), trackingPreview, seconds };
+  return { once: values.includes("--once"), allowIssue: values.includes("--allow-issue"), trackingPreview, trackingSync, seconds };
 }
 
 export function isCloudWorkflowUrl(value: string, page: "upload" | "export"): boolean {
@@ -72,16 +74,18 @@ class InternalApi implements CloudApi {
   async complete(input: { shipmentId: number; managementNumber: string; trackingNumber: string }) {
     await this.call("/api/internal/yupuri-cloud/complete", input);
   }
-  async previewTracking(csv: Buffer) {
+  private async trackingRequest(path: string, csv: Buffer) {
     assertToolboxAutomationWindowOpen();
-    const response = await fetch(`${this.origin}/api/internal/japan-post-tracking`, {
+    const response = await fetch(`${this.origin}${path}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/octet-stream" },
       body: new Uint8Array(csv), signal: AbortSignal.timeout(20000), cache: "no-store",
     });
-    if (!response.ok) throw new Error(`Tracking preview returned ${response.status}`);
+    if (!response.ok) throw new Error(`Tracking request ${path} returned ${response.status}`);
     return response.json() as Promise<{ results: unknown[] }>;
   }
+  async previewTracking(csv: Buffer) { return this.trackingRequest("/api/internal/japan-post-tracking", csv); }
+  async syncTracking(csv: Buffer) { return this.trackingRequest("/api/internal/japan-post-tracking/sync", csv); }
 }
 
 function exactManagement(text: string, managementNumber: string) {
@@ -327,7 +331,7 @@ async function run() {
         continue;
       }
       try {
-        if ((options.allowIssue || options.trackingPreview) && !livePage) {
+        if ((options.allowIssue || options.trackingPreview || options.trackingSync) && !livePage) {
           invoicesUrl = productionCloudInvoicesUrl(process.env.YUPURI_CLOUD_INVOICES_URL);
           const filter = process.env.YUPURI_CLOUD_FILTER_NAME ?? "\u6642\u8a08\u4fee\u7406\u30a2\u30d7\u30ea17\u5217";
           if (!filter || filter.trim() !== filter) throw new Error("Invalid Cloud filter name");
@@ -371,13 +375,13 @@ async function run() {
             console.log(`shipment=${result.shipmentId} stage=${result.status}`);
           }
         }
-        if (options.trackingPreview && browser instanceof PlaywrightCloudBrowser) {
+        if ((options.trackingPreview || options.trackingSync) && browser instanceof PlaywrightCloudBrowser) {
           const filter = process.env.YUPURI_CLOUD_TRACKING_FILTER_NAME ?? "\u6642\u8a08\u4fee\u7406\u30a2\u30d7\u30ea\u914d\u9001\u72b6\u6cc16\u5217";
           const csv = await browser.trackingCsv(filter);
           if (csv) {
-            const preview = await api.previewTracking(csv);
-            console.log(`tracking-preview rows=${preview.results.length}`);
-          } else console.log("tracking-preview rows=0");
+            const result = options.trackingSync ? await api.syncTracking(csv) : await api.previewTracking(csv);
+            console.log(`tracking-${options.trackingSync ? "sync" : "preview"} rows=${result.results.length}`);
+          } else console.log(`tracking-${options.trackingSync ? "sync" : "preview"} rows=0`);
         }
       } catch (error) {
         if (!(error instanceof ToolboxServiceClosedError)) throw error;

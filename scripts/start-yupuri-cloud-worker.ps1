@@ -1,6 +1,7 @@
 param(
     [switch]$Once,
     [switch]$AllowIssue,
+    [switch]$AllowTrackingSync,
     [int]$PollSeconds = 30
 )
 $ErrorActionPreference = 'Stop'
@@ -19,13 +20,14 @@ if (-not (Test-Path -LiteralPath $tsx -PathType Leaf)) { throw 'Run npm ci befor
 $token = [Environment]::GetEnvironmentVariable('N8N_INTERNAL_TOKEN', 'User')
 if ([string]::IsNullOrWhiteSpace($token)) { throw 'User N8N_INTERNAL_TOKEN is unavailable' }
 $env:N8N_INTERNAL_TOKEN = $token
-foreach ($name in @('YUPURI_APP_ORIGIN', 'YUPURI_CLOUD_INVOICES_URL', 'YUPURI_CLOUD_FILTER_NAME', 'YUPURI_CLOUD_PRINTER_NAME', 'YUPURI_CLOUD_CDP_URL')) {
+foreach ($name in @('YUPURI_APP_ORIGIN', 'YUPURI_CLOUD_INVOICES_URL', 'YUPURI_CLOUD_FILTER_NAME', 'YUPURI_CLOUD_TRACKING_FILTER_NAME', 'YUPURI_CLOUD_PRINTER_NAME', 'YUPURI_CLOUD_CDP_URL')) {
     $value = [Environment]::GetEnvironmentVariable($name, 'User')
     if ($value) { [Environment]::SetEnvironmentVariable($name, $value, 'Process') }
 }
 $workerArgs = @($worker, '--poll-seconds', "$PollSeconds")
 if ($Once) { $workerArgs += '--once' }
 if ($AllowIssue) { $workerArgs += '--allow-issue' }
+if ($AllowTrackingSync) { $workerArgs += '--tracking-sync' }
 Push-Location $repo
 try { & $tsx @workerArgs; exit $LASTEXITCODE }
 finally { Pop-Location }
