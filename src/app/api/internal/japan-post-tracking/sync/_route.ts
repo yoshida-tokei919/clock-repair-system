@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { JAPAN_POST_TRACKING_CSV_MAX_BYTES } from "@/lib/japan-post-tracking";
-import { syncJapanPostTrackingCsv } from "@/lib/japan-post-tracking-sync";
+import { syncJapanPostTrackingCsvWithNotices } from "@/lib/japan-post-shipping-notice";
 import { YupuriHistoryError } from "@/lib/yupuri-history";
 import { cloudWorkerAuthorized } from "../../yupuri-cloud/_auth";
 
 export async function japanPostTrackingSyncRoute(
   request: NextRequest,
-  sync: typeof syncJapanPostTrackingCsv = syncJapanPostTrackingCsv,
+  sync: typeof syncJapanPostTrackingCsvWithNotices = syncJapanPostTrackingCsvWithNotices,
 ) {
   const headers = { "Cache-Control": "no-store" };
   const authorized = cloudWorkerAuthorized(request);
@@ -26,7 +26,8 @@ export async function japanPostTrackingSyncRoute(
     if (bytes.length > JAPAN_POST_TRACKING_CSV_MAX_BYTES) {
       return NextResponse.json({ error: "csv_too_large" }, { status: 413, headers });
     }
-    return NextResponse.json({ results: await sync(prisma, bytes) }, { headers });
+    const result = await sync(prisma, bytes);
+    return NextResponse.json({ results: result.tracking, notices: result.notices }, { headers });
   } catch (error) {
     if (error instanceof YupuriHistoryError) {
       return NextResponse.json({ error: "invalid_csv" }, { status: 400, headers });
