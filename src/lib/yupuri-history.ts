@@ -94,7 +94,7 @@ const normalizedStatusByDescription: Readonly<Record<string, ShipmentStatusCandi
   "引受予定": "AWAITING_ACCEPTANCE", "引受": "SHIPPED",
   "通過": "IN_TRANSIT", "最寄局送付": "IN_TRANSIT", "ＣＶＳ等引渡": "IN_TRANSIT",
   "はこぽす等入庫": "IN_TRANSIT", "発送": "IN_TRANSIT", "車船輸送": "IN_TRANSIT", "到着": "IN_TRANSIT",
-  "持出中": "OUT_FOR_DELIVERY", "配達完了": "DELIVERED",
+  "持出中": "OUT_FOR_DELIVERY", "配達完了": "DELIVERED", "窓口渡し": "DELIVERED",
   "不在持戻": "EXCEPTION", "最寄局保管": "EXCEPTION", "返還完了": "EXCEPTION",
   "局内保管": "EXCEPTION", "私書箱保管": "EXCEPTION", "配達希望": "EXCEPTION",
   "保管中": "EXCEPTION", "保管": "EXCEPTION", "転送": "EXCEPTION",
@@ -102,6 +102,10 @@ const normalizedStatusByDescription: Readonly<Record<string, ShipmentStatusCandi
   "返還不能": "EXCEPTION", "保管延長": "EXCEPTION", "休日保管": "EXCEPTION",
   "調査中": "EXCEPTION",
 };
+
+export function normalizeJapanPostStatus(description: string): ShipmentStatusCandidate | null {
+  return normalizedStatusByDescription[description] ?? null;
+}
 
 // A dash in the official table is a listed pair without a description.
 const officiallyUndescribedPairs = new Set([
@@ -204,7 +208,7 @@ export function parseYupuriHistory(bytes: Buffer): HistoryRow[] {
       ? "Official delivery status table lists this pair without a description"
       : "Unverified delivery status codes");
     const statusCandidate = confirmedDescriptionOrNull === null ? null :
-      normalizedStatusByDescription[confirmedDescriptionOrNull] ?? null;
+      normalizeJapanPostStatus(confirmedDescriptionOrNull);
     if (confirmedDescriptionOrNull !== null && statusCandidate === null)
       warnings.push("Official description has no normalized Shipment status candidate");
     return { rowNumber, managementNumber, resolvedShipmentId, shipmentFound: false,

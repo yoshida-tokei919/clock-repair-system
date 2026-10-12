@@ -109,7 +109,7 @@ test("official descriptions map only to explicit Shipment status candidates", ()
     ["12", "14", "IN_TRANSIT"], ["12", "15", "IN_TRANSIT"], ["12", "16", "IN_TRANSIT"],
     ["12", "17", "IN_TRANSIT"], ["13", "19", "IN_TRANSIT"], ["14", "83", "IN_TRANSIT"],
     ["30", "00", "IN_TRANSIT"], ["50", "01", "OUT_FOR_DELIVERY"],
-    ["52", "01", "DELIVERED"], ["51", "30", "EXCEPTION"],
+    ["52", "01", "DELIVERED"], ["53", "37", "DELIVERED"], ["51", "30", "EXCEPTION"],
     ["51", "33", "EXCEPTION"], ["52", "34", "EXCEPTION"],
     ["60", "48", "EXCEPTION"], ["60", "49", "EXCEPTION"], ["60", "77", "EXCEPTION"],
     ["60", "99", "EXCEPTION"], ["61", "51", "EXCEPTION"], ["61", "79", "EXCEPTION"],
@@ -124,10 +124,8 @@ test("official descriptions map only to explicit Shipment status candidates", ()
   }
   const counterHandoff = preview(`${header}\n${row("SHP-42", "123", "53", "37")}\n`)[0];
   assert.equal(counterHandoff.confirmedDescriptionOrNull, "窓口渡し");
-  assert.equal(counterHandoff.statusCandidate, null);
-  assert.equal(counterHandoff.statusChange, "NONE");
-  assert.equal(counterHandoff.importableLater, false);
-  assert.ok(counterHandoff.warnings.includes("Official description has no normalized Shipment status candidate"));
+  assert.equal(counterHandoff.statusCandidate, "DELIVERED");
+  assert.equal(counterHandoff.importableLater, true);
 });
 
 test("same status and tracking are no-op; raw date fields and current dates remain distinct", () => {
