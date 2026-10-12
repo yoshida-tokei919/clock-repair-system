@@ -67,5 +67,5 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
         shippingFee: note.repairs[0]?.estimate?.shipping || 0
     };
 
-    return <DeliveryPDFClientLoader data={pdfData} />;
+    return <DeliveryPDFClientLoader data={pdfData} allowFixedPrint={note.customer.type === "business"} />;
 }

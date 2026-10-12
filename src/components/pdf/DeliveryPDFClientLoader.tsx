@@ -11,6 +11,6 @@ const DeliveryPDFClient = dynamic(
   }
 );
 
-export function DeliveryPDFClientLoader(props: DeliveryDocumentProps) {
+export function DeliveryPDFClientLoader(props: DeliveryDocumentProps & { allowFixedPrint?: boolean }) {
   return <DeliveryPDFClient {...props} />;
 }
