@@ -10,6 +10,7 @@ import { validateInquiryWatchPromotionEligibility } from "@/lib/inquiry-promotio
 export const REPAIR_INTAKE_STATUS = "送付待ち";
 export const REPAIR_INTAKE_INVITE_TTL_DAYS = 7;
 const INTAKE_TOKEN_BYTES = 32;
+const REPAIR_PUBLIC_TOKEN_BYTES = 24;
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -221,6 +222,10 @@ function assertInquiryInviteState(invite: { revokedAt: Date | null }) {
 
 export function generateRepairIntakeToken() {
   return crypto.randomBytes(INTAKE_TOKEN_BYTES).toString("base64url");
+}
+
+function generateRepairPublicToken() {
+  return crypto.randomBytes(REPAIR_PUBLIC_TOKEN_BYTES).toString("base64url");
 }
 
 export async function createRepairIntakeInvite(
@@ -573,6 +578,8 @@ export async function submitRepairIntake(
           inquiryNumber,
           customerId: customer.id,
           watchId: watch.id,
+          publicToken: generateRepairPublicToken(),
+          publicTokenCreatedAt: now,
           repairIntakeInviteId: invite.id,
           status: REPAIR_INTAKE_STATUS,
           // This intake path is Task166F-aware, so it opts into allocation.

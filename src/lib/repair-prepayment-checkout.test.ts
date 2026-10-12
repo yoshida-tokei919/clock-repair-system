@@ -98,6 +98,15 @@ test("repair token is the return URL fallback when the document has no token", a
   assert.equal(setup.creates[0].params.cancel_url, "https://example.test/customer/repairs/repair-token?prepayment=cancel");
 });
 
+test("tokenless Repair accepts only its own EstimateDocument token for checkout", async () => {
+  const setup = mockSetup({ payment: { repair: { id: 5, customerId: 7, publicToken: null,
+    estimateDocument: { publicToken: "doc-token" }, customer: { type: "individual" } } } });
+  await assert.rejects(startRepairPrepaymentCheckout(setup.db, setup.stripe, 10, "sibling-repair-token", "https://example.test"), { status: 404 });
+  assert.equal(setup.creates.length, 0);
+  await startRepairPrepaymentCheckout(setup.db, setup.stripe, 10, "doc-token", "https://example.test");
+  assert.equal(setup.creates[0].params.success_url, "https://example.test/customer/repairs/doc-token?prepayment=success");
+});
+
 test("uncertain no-session state reuses the same attempt and idempotency key", async () => {
   const { db, stripe, creates, attempts } = mockSetup({ createError: true });
   await assert.rejects(startRepairPrepaymentCheckout(db, stripe, 10, "repair-token", "https://example.test"), { status: 502 });

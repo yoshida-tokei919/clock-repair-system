@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { PaymentStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { resolveCustomerRepairShareScope } from "@/lib/customer-repair-share";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { CustomerRepairAccordionItem, CustomerRepairAccordionRoot } from "./CustomerRepairAccordion";
 import {
@@ -155,7 +156,7 @@ function needsCustomerApproval(repair: any) {
   return repair.approvalStatus === "pending" && repair.status === "承認待ち";
 }
 
-function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null; prepaymentReturn?: string }) {
+function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn, documentTokenAccess }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null; prepaymentReturn?: string; documentTokenAccess: boolean }) {
   return (
     <main className="min-h-screen bg-[#f3f6fa] px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
       <div className="mx-auto max-w-2xl space-y-4">
@@ -174,7 +175,10 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn 
             const { subtotal, taxAmount, total } = getEstimateAmounts(repair);
             const receptionPhotos = receptionPhotosForWatchCard(repair);
             const customerPhotos = photosForCustomerProgress(repair);
-            const primaryPhotoUrl = getRepairPhotoUrl(receptionPhotos[0], token);
+            const repairToken = typeof repair.publicToken === "string" && repair.publicToken.trim() ? repair.publicToken : null;
+            const readToken = repairToken ?? (documentTokenAccess ? token : null);
+            const prepaymentToken = repairToken ?? (documentTokenAccess ? token : null);
+            const primaryPhotoUrl = getRepairPhotoUrl(receptionPhotos[0], readToken ?? undefined);
             const status = getCustomerStatus(repair.status);
             const watchName = getWatchBrandModelLine(repair);
             const identifiers = [
@@ -200,7 +204,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn 
                 }
               >
                 <section className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">見積内容</h2>{repair.estimateDocument && <PdfLinkButton href={`/customer/repairs/${token}/estimate.pdf`} />}</div>
+                  <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">見積内容</h2>{repair.estimateDocument && readToken && <PdfLinkButton href={`/customer/repairs/${readToken}/estimate.pdf`} />}</div>
                   <div className="mt-3 divide-y divide-slate-100">{estimateItems.length === 0 ? <p className="py-3 text-sm text-slate-500">見積明細はまだありません。</p> : estimateItems.map((item: any) => <div key={item.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div className="min-w-0 font-medium">{item.type === "part" ? formatPartDisplay({ name: item.itemName, grade: item.partsMaster?.grade, note2: item.partsMaster?.notes2 }) : item.itemName}{item.quantity > 1 && <span className="ml-2 text-slate-500">数量 {item.quantity}</span>}</div><span className="shrink-0 font-mono font-bold">¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}</span></div>)}</div>
                   <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm"><div className="flex justify-between text-slate-600"><span>税抜小計</span><span className="font-mono">¥{subtotal.toLocaleString()}</span></div><div className="flex justify-between text-slate-600"><span>消費税（10%）</span><span className="font-mono">¥{taxAmount.toLocaleString()}</span></div><div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2"><span className="font-bold">税込合計</span><span className="font-mono text-xl font-bold text-blue-700">¥{total.toLocaleString()}</span></div></div>
                 </section>
@@ -217,7 +221,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn 
                             <span className="font-mono font-bold">¥{payment.amount.toLocaleString()}</span>
                           </div>
                           <p className="mt-1 text-sm text-slate-600">{PREPAYMENT_STATUS_LABELS[payment.status]}{payment.status === "SUCCEEDED" && payment.paidAt && ` · 入金日: ${payment.paidAt.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}`}</p>
-                          {payment.status === "PENDING" && <RepairPrepaymentCheckoutButton token={token} paymentId={payment.id} />}
+                          {payment.status === "PENDING" && prepaymentToken && <RepairPrepaymentCheckoutButton token={prepaymentToken} paymentId={payment.id} />}
                         </li>
                       ))}
                     </ul>
@@ -226,9 +230,9 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn 
 
                 {explanationText && <section className="rounded-xl border border-slate-200 bg-slate-50 p-4"><h2 className="text-lg font-bold">ご案内</h2><div className="mt-3 min-h-32 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-sm leading-7 text-slate-800">{explanationText}</div></section>}
 
-                {customerPhotos.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{customerPhotos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo, token); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
+                {customerPhotos.length > 0 && readToken && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{customerPhotos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo, readToken); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
 
-                <CustomerB2CApprovalPanel token={repair.publicToken || token} isApproved={repair.approvalStatus === "approved"} showApproval={needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} photoPostingOptOut={repair.photoPostingOptOut} address={{ recipientName: repair.returnRecipientName || "", postalCode: repair.returnPostalCode || "", prefecture: repair.returnPrefecture || "", city: repair.returnCity || "", street: repair.returnStreet || "", building: repair.returnBuilding || "", phone: repair.returnPhone || "" }} />
+                {repairToken && <CustomerB2CApprovalPanel token={repairToken} isApproved={repair.approvalStatus === "approved"} showApproval={needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} photoPostingOptOut={repair.photoPostingOptOut} address={{ recipientName: repair.returnRecipientName || "", postalCode: repair.returnPostalCode || "", prefecture: repair.returnPrefecture || "", city: repair.returnCity || "", street: repair.returnStreet || "", building: repair.returnBuilding || "", phone: repair.returnPhone || "" }} />}
               </CustomerRepairAccordionItem>
             );
           })}
@@ -272,23 +276,23 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
       issuedDate: estimateDocument.issuedDate,
     };
   } else {
-    const [tokenRow] = await prisma.$queryRaw<{ id: number }[]>`
-      SELECT "id"
-      FROM "Repair"
-      WHERE "publicToken" = ${token}
-      LIMIT 1
-    `;
+    const scope = await resolveCustomerRepairShareScope(prisma, token);
+    if (!scope) return notFound();
 
-    if (!tokenRow) return notFound();
-
-    const repair = await prisma.repair.findUnique({
-      where: { id: tokenRow.id },
+    repairs = await prisma.repair.findMany({
+      where: scope.grouped
+        ? {
+            id: { in: scope.repairIds },
+            customerId: scope.customerId,
+            repairIntakeInviteId: scope.repairIntakeInviteId,
+          }
+        : { id: { in: scope.repairIds } },
+      orderBy: { id: "asc" },
       include: repairInclude,
     });
 
-    if (!repair) return notFound();
-    repairs = [repair];
-    documentMeta = repair.estimateDocument;
+    if (repairs.length !== scope.repairIds.length) return notFound();
+    documentMeta = repairs.length === 1 ? repairs[0].estimateDocument : null;
   }
 
   const primaryRepair = repairs[0];
@@ -502,7 +506,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
   }
 
   const prepaymentReturn = (await searchParams).prepayment;
-  return <CustomerRepairB2CPage token={token} repairs={repairs} documentMeta={documentMeta} prepaymentReturn={typeof prepaymentReturn === "string" ? prepaymentReturn : undefined} />;
+  return <CustomerRepairB2CPage token={token} repairs={repairs} documentMeta={documentMeta} prepaymentReturn={typeof prepaymentReturn === "string" ? prepaymentReturn : undefined} documentTokenAccess={Boolean(documentTokenRow)} />;
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">

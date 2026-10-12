@@ -426,7 +426,7 @@ function inquirySubmitDb(
   const updatedInquiries: unknown[] = [];
   const claimQueries: unknown[] = [];
   const invite = {
-    id: 90, token: "bound-token", expiresAt: new Date("2026-10-01T00:00:00Z"), usedAt: null as Date | null, revokedAt: null as Date | null,
+    id: 90, token: "bound-token", expiresAt: new Date("2099-10-01T00:00:00Z"), usedAt: null as Date | null, revokedAt: null as Date | null,
     inquiryId: 70, customerId: null, lineUserId: 7, lineUser: { id: 7, linkedCustomerId: null }, inquiryWatches: [{ inquiryWatch: watch }],
   };
   const tx = {
@@ -480,7 +480,10 @@ test("submits an Inquiry-bound invite without customer watch fields and promotes
 
   assert.deepEqual(result.repairs, [{ id: 300, inquiryNumber: "C-001" }]);
   assert.deepEqual(fixture.createdWatches, [{ data: { customerId: 12, brandId: 10, modelId: 20, referenceId: 30, caseReferenceId: 31, caliberId: 40, baseCaliberId: 41 } }]);
-  assert.equal((fixture.createdRepairs[0] as { data: { status: string } }).data.status, REPAIR_INTAKE_STATUS);
+  const createdRepairData = (fixture.createdRepairs[0] as { data: { status: string; publicToken: string; publicTokenCreatedAt: Date } }).data;
+  assert.equal(createdRepairData.status, REPAIR_INTAKE_STATUS);
+  assert.match(createdRepairData.publicToken, /^[A-Za-z0-9_-]{32}$/);
+  assert.ok(createdRepairData.publicTokenCreatedAt instanceof Date);
   assert.equal((fixture.updatedInquiryWatches[0] as { where: { id: number } }).where.id, 1);
   assert.deepEqual(fixture.updatedInquiries, [{ where: { id: 70 }, data: { status: "CLOSED" } }]);
 });
