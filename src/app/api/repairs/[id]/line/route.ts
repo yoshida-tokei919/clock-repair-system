@@ -1,8 +1,9 @@
 import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
+import { getLatestCommunicationAiBrief, getRepairCommunicationAiContext } from "@/lib/communication-ai-brief";
 import { InquiryLineChatInputError, InquiryLineChatNotFoundError, InquiryLineChatUnavailableError } from "@/lib/inquiry-line-chat";
 import { LineManagerSendOutboxError } from "@/lib/line-manager-send-outbox";
-import { createRepairLineReply, getRepairLineChat } from "@/lib/repair-line-chat";
+import { createRepairLineReply, getRepairLineChat, toBrowserRepairLineChat } from "@/lib/repair-line-chat";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const id = repairId((await params).id);
   if (!id) return NextResponse.json({ error: "Invalid Repair ID" }, { status: 400 });
   try {
-    return NextResponse.json({ ok: true, ...await getRepairLineChat(prisma, id) });
+    const chat = await getRepairLineChat(prisma, id);
+    const aiContext = await getRepairCommunicationAiContext(prisma, id, chat);
+    const aiBrief = await getLatestCommunicationAiBrief(prisma, { targetType: "REPAIR", targetId: id }, aiContext);
+    return NextResponse.json({ ok: true, ...toBrowserRepairLineChat(chat), aiBrief });
   } catch (error) {
     if (error instanceof InquiryLineChatNotFoundError) return NextResponse.json({ error: "Repairが見つかりません。" }, { status: 404 });
     console.error("Repair LINE history error", error);
@@ -34,7 +38,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "LINE返信内容が不正です。" }, { status: 400 }); }
   try {
-    return NextResponse.json({ ok: true, item: await createRepairLineReply(prisma, id, body) });
+    const item = await createRepairLineReply(prisma, id, body);
+    return NextResponse.json({ ok: true, item: {
+      status: item.status,
+      approvedAt: item.approvedAt,
+      createdAt: item.createdAt,
+    } });
   } catch (error) {
     if (error instanceof InquiryLineChatInputError) return NextResponse.json({ error: "LINE返信内容が不正です。" }, { status: 400 });
     if (error instanceof InquiryLineChatNotFoundError) return NextResponse.json({ error: "Repairが見つかりません。" }, { status: 404 });

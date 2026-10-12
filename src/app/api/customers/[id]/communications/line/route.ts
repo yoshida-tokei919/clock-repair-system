@@ -5,8 +5,32 @@ import { createCustomerLineReply, CustomerLineReplyNotFoundError, CustomerLineRe
 import { InquiryLineChatInputError } from "@/lib/inquiry-line-chat";
 import { LineManagerSendOutboxError } from "@/lib/line-manager-send-outbox";
 import { prisma } from "@/lib/prisma";
+import { getCustomerCommunicationHub } from "@/lib/customer-communication-hub";
+import { getLatestCommunicationAiBrief, resolveCustomerCommunicationAiContext } from "@/lib/communication-ai-brief";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
+  const rawCustomerId = (await params).id;
+  const customerId = Number(rawCustomerId);
+  if (!/^[1-9]\d*$/.test(rawCustomerId) || !Number.isSafeInteger(customerId)) {
+    return NextResponse.json({ error: "顧客IDが不正です。" }, { status: 400 });
+  }
+  try {
+    const hub = await getCustomerCommunicationHub(prisma, customerId);
+    if (!hub) return NextResponse.json({ error: "顧客が見つかりません。" }, { status: 404 });
+    const context = resolveCustomerCommunicationAiContext(customerId, hub);
+    const aiBrief = await getLatestCommunicationAiBrief(prisma, { targetType: "CUSTOMER", targetId: customerId }, context);
+    return NextResponse.json({ ok: true, aiBrief: aiBrief ? {
+      id: aiBrief.id, replyDraft: aiBrief.replyDraft, stale: aiBrief.stale,
+    } : null, replyDraftAllowed: context.replyDraftAllowed });
+  } catch (error) {
+    console.error("Customer LINE AI freshness error", error);
+    return NextResponse.json({ error: "AI返信案の最新状態を確認できませんでした。" }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const unauthorized = await requireAdminApi();

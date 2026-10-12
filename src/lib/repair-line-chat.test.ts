@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRepairLineReply, getRepairLineChat } from "./repair-line-chat";
+import { createRepairLineReply, getRepairLineChat, toBrowserRepairLineChat } from "./repair-line-chat";
 import { InquiryLineChatInputError, InquiryLineChatNotFoundError, InquiryLineChatUnavailableError } from "./inquiry-line-chat";
 
 const uuid = "123e4567-e89b-42d3-a456-426614174000";
 const now = new Date("2026-09-24T01:00:00Z");
-const origin = { id: 5, inquiryId: 7, promotedRepairId: 10, promotedAt: now, inquiry: { lineUser: { linkedCustomerId: 1, lineManagerChat: { id: 30, verifiedAt: now, managerBotId: "secret-bot" } } } };
+const origin = { id: 5, inquiryId: 7, promotedRepairId: 10, promotedAt: now, inquiry: { status: "CLOSED", conversationSummary: "Origin inquiry summary", firstReceivedAt: new Date("2026-09-20T01:00:00Z"), lastReceivedAt: now, analyses: [{ completedAt: new Date("2026-09-23T12:00:00Z"), createdAt: new Date("2026-09-23T11:59:00Z") }], lineUser: { linkedCustomerId: 1, lineManagerChat: { id: 30, verifiedAt: now, managerBotId: "secret-bot" } } } };
 
 function message(id: number, inquiryId: number, oldRepairIds: number[], directRepairIds: number[], options: { lineUserId?: number; inquiryLineUserId?: number; routingCustomerId?: number } = {}) {
   return {
@@ -59,8 +59,15 @@ test("Repair projection combines old and cross-Inquiry direct links with custome
   assert.equal(payload.messages[2].files[0].id, 71);
   assert.equal(payload.messages[2].classification, null);
   assert.equal(payload.customerId, 1);
+  assert.deepEqual(payload.originAiSummary, { inquiryId: 7, status: "CLOSED", summary: "Origin inquiry summary", firstReceivedAt: new Date("2026-09-20T01:00:00Z"), lastReceivedAt: now, analysisCompletedAt: new Date("2026-09-23T12:00:00Z") });
   assert.deepEqual(queries.outboxes.where, { inquiryId: 7, sourceRepairId: 10, status: { notIn: ["CONFIRMED", "CANCELLED"] } });
   assert.deepEqual(payload.pendingOutboxes.map((item) => item.id), [1]);
+  const browserPayload = toBrowserRepairLineChat(payload);
+  assert.equal("id" in browserPayload.pendingOutboxes[0], false);
+  assert.deepEqual(browserPayload.pendingOutboxes[0], {
+    text: "pending", status: "APPROVED", approvedAt: now, createdAt: now,
+    relatedToCurrentRepair: true, relatedRepairIds: [10],
+  });
   const serialized = JSON.stringify(payload);
   for (const forbidden of ["secret-external", "secret-object", "secret-send", "secret-bot", "externalMessageId", "managerBotId", "sendId", "objectKey", "sourceRepairId", "signedUrl", "token"]) assert.equal(serialized.includes(forbidden), false, forbidden);
 });
@@ -78,6 +85,7 @@ test("direct post-intake links remain readable without an origin, but sending re
   assert.equal(payload.available, true);
   assert.equal(payload.sendAvailable, false);
   assert.equal(payload.sourceInquiryId, null);
+  assert.equal(payload.originAiSummary, null);
   assert.deepEqual(payload.messages.map((item) => item.inquiryId), [8]);
   assert.deepEqual(payload.pendingOutboxes, []);
   assert.equal(queries.outboxes, undefined);
@@ -92,11 +100,12 @@ test("a direct link stays read-only even when the same message has an old link i
 });
 
 test("stale origin for another Customer cannot expose origin data or create a reply", async () => {
-  const staleOrigin = { ...origin, inquiry: { lineUser: { ...origin.inquiry.lineUser, linkedCustomerId: 3 } } };
+  const staleOrigin = { ...origin, inquiry: { ...origin.inquiry, lineUser: { ...origin.inquiry.lineUser, linkedCustomerId: 3 } } };
   const { db, queries } = fakeDb([message(9, 8, [], [10]), message(4, 7, [10], [])], staleOrigin);
   const payload = await getRepairLineChat(db, 10);
   assert.equal(payload.sourceInquiryId, null);
   assert.equal(payload.promotedAt, null);
+  assert.equal(payload.originAiSummary, null);
   assert.equal(payload.sendAvailable, false);
   assert.deepEqual(payload.messages.map((item) => item.id), [9]);
   assert.deepEqual(payload.pendingOutboxes, []);

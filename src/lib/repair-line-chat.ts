@@ -10,7 +10,7 @@ async function origin(db: RepairLineChatDb, repairId: number) {
   if (!Number.isSafeInteger(repairId) || repairId <= 0) throw new InquiryLineChatInputError("Invalid Repair ID");
   const repair = await db.repair.findUnique({
     where: { id: repairId },
-    select: { id: true, customerId: true, inquiryWatchPromotion: { select: { id: true, inquiryId: true, promotedRepairId: true, promotedAt: true, inquiry: { select: { lineUser: { select: { linkedCustomerId: true, lineManagerChat: { select: { id: true, verifiedAt: true } } } } } } } } },
+    select: { id: true, customerId: true, inquiryWatchPromotion: { select: { id: true, inquiryId: true, promotedRepairId: true, promotedAt: true, inquiry: { select: { status: true, conversationSummary: true, firstReceivedAt: true, lastReceivedAt: true, analyses: { where: { status: { not: "FAILED" }, conversationSummary: { not: null } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, select: { completedAt: true, createdAt: true } }, lineUser: { select: { linkedCustomerId: true, lineManagerChat: { select: { id: true, verifiedAt: true } } } } } } } } },
   });
   if (!repair) throw new InquiryLineChatNotFoundError("Repair not found");
   const promotion = repair.inquiryWatchPromotion;
@@ -70,13 +70,37 @@ export async function getRepairLineChat(db: RepairLineChatDb, repairId: number) 
   });
   return {
     available: Boolean(promotion || messages.length), customerId, sourceInquiryId: inquiryId, promotedAt: promotion?.promotedAt ?? null,
+    originAiSummary: promotion?.inquiry.conversationSummary?.trim() ? {
+      inquiryId: promotion.inquiryId,
+      status: promotion.inquiry.status,
+      summary: promotion.inquiry.conversationSummary.trim(),
+      firstReceivedAt: promotion.inquiry.firstReceivedAt,
+      lastReceivedAt: promotion.inquiry.lastReceivedAt,
+      analysisCompletedAt: promotion.inquiry.analyses[0]?.completedAt ?? promotion.inquiry.analyses[0]?.createdAt ?? null,
+    } : null,
     sendAvailable: Boolean(promotion?.inquiry.lineUser.lineManagerChat),
     mappingVerifiedAt: promotion?.inquiry.lineUser.lineManagerChat?.verifiedAt ?? null,
     messages,
-    pendingOutboxes: outboxes.filter((row) => row.sourceRepairId === repairId).map((row) => ({ id: row.id, text: row.text, status: row.status, approvedAt: row.approvedAt, createdAt: row.createdAt, relatedToCurrentRepair: true, relatedRepairIds: [repairId] })).sort((a, b) => a.approvedAt.getTime() - b.approvedAt.getTime() || a.id - b.id),
+    pendingOutboxes: outboxes.filter((row) => row.sourceRepairId === repairId)
+      .sort((a, b) => a.approvedAt.getTime() - b.approvedAt.getTime() || a.id - b.id)
+      .map((row) => ({ id: row.id, text: row.text, status: row.status, approvedAt: row.approvedAt, createdAt: row.createdAt, relatedToCurrentRepair: true, relatedRepairIds: [repairId] })),
     siblingRepairs: watches.filter((watch) => watch.promotedRepairId !== null).map((watch) => ({ repairId: watch.promotedRepairId!, position: watch.position, label: watch.label, inquiryNumber: watch.promotedRepair?.inquiryNumber ?? null })),
     watchOptions: watches.map((watch) => ({ id: watch.id, position: watch.position, label: watch.label })),
     hasEarlierMessages: eligibleRows.length > MESSAGE_LIMIT,
+  };
+}
+
+export function toBrowserRepairLineChat(chat: Awaited<ReturnType<typeof getRepairLineChat>>) {
+  return {
+    ...chat,
+    pendingOutboxes: chat.pendingOutboxes.map((outbox) => ({
+      text: outbox.text,
+      status: outbox.status,
+      approvedAt: outbox.approvedAt,
+      createdAt: outbox.createdAt,
+      relatedToCurrentRepair: outbox.relatedToCurrentRepair,
+      relatedRepairIds: outbox.relatedRepairIds,
+    })),
   };
 }
 

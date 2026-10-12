@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { CustomerLineReply } from "@/components/customers/CustomerLineReply";
 import { getCustomerCommunicationHub } from "@/lib/customer-communication-hub";
+import { getLatestCommunicationAiBrief, resolveCustomerCommunicationAiContext } from "@/lib/communication-ai-brief";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,10 @@ function formatDate(date: Date) {
   }).format(date);
 }
 
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())) : [];
+}
+
 export default async function CustomerCommunicationsPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login");
@@ -23,6 +28,8 @@ export default async function CustomerCommunicationsPage({ params }: { params: P
   if (!Number.isSafeInteger(customerId) || customerId <= 0) notFound();
   const hub = await getCustomerCommunicationHub(prisma, customerId);
   if (!hub) notFound();
+  const aiContext = resolveCustomerCommunicationAiContext(customerId, hub);
+  const aiBrief = await getLatestCommunicationAiBrief(prisma, { targetType: "CUSTOMER", targetId: customerId }, aiContext);
 
   const displayName = hub.customer.type === "business"
     ? hub.customer.companyName || hub.customer.name
@@ -37,7 +44,39 @@ export default async function CustomerCommunicationsPage({ params }: { params: P
         <p className="mt-1 text-sm text-zinc-600">確認済みLINE履歴・{hub.messages.length}件</p>
       </div>
 
-      <CustomerLineReply customerId={customerId} destinations={hub.destinations} />
+      {hub.inquirySummaries.length > 0 && <section className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div>
+          <h2 className="font-semibold text-blue-950">既存InquiryのAI要約</h2>
+          <p className="mt-1 text-xs text-blue-800">各要約は、そのInquiryを最後にAI解析した時点の内容です。Customer全体の最新要約ではありません。</p>
+          {hub.hasEarlierInquirySummaries && <p className="mt-1 text-xs text-blue-800">直近の要約のみ表示しています。これ以前のInquiry要約もあります。</p>}
+        </div>
+        <div className="space-y-2">
+          {hub.inquirySummaries.map((item) => <article key={item.inquiryId} className="rounded border border-blue-100 bg-white p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-600">
+              <Link className="font-medium text-blue-700 underline" href={`/inquiries/${item.inquiryId}/review`}>Inquiry #{item.inquiryId}</Link>
+              <span>{item.status}{item.analysisCompletedAt ? ` · AI解析 ${formatDate(item.analysisCompletedAt)}` : ""} · 最終受信 {formatDate(item.lastReceivedAt)}</span>
+            </div>
+            <p className="mt-2 whitespace-pre-wrap text-zinc-800">{item.summary}</p>
+          </article>)}
+        </div>
+      </section>}
+
+      {aiBrief && <section className={`space-y-3 rounded-lg border p-4 ${aiBrief.stale ? "border-amber-300 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+        <div>
+          <h2 className="font-semibold">Customer AIブリーフ</h2>
+          <p className="mt-1 text-xs text-zinc-600">{formatDate(aiBrief.createdAt)} 生成 · {aiBrief.modelProvider}/{aiBrief.modelName}{aiBrief.stale ? " · 新着または文脈変更あり（再生成が必要）" : " · 現在の表示文脈と一致"}</p>
+        </div>
+        {aiBrief.summary && <div><h3 className="text-sm font-medium">要約</h3><p className="mt-1 whitespace-pre-wrap text-sm">{aiBrief.summary}</p></div>}
+        {stringArray(aiBrief.unresolvedItems).length > 0 && <div><h3 className="text-sm font-medium">未対応事項</h3><ul className="mt-1 list-disc space-y-1 pl-5 text-sm">{stringArray(aiBrief.unresolvedItems).map((item) => <li key={item}>{item}</li>)}</ul></div>}
+        {stringArray(aiBrief.customerRequirements).length > 0 && <div><h3 className="text-sm font-medium">顧客指定</h3><ul className="mt-1 list-disc space-y-1 pl-5 text-sm">{stringArray(aiBrief.customerRequirements).map((item) => <li key={item}>{item}</li>)}</ul></div>}
+        {stringArray(aiBrief.decisions).length > 0 && <div><h3 className="text-sm font-medium">決定事項</h3><ul className="mt-1 list-disc space-y-1 pl-5 text-sm">{stringArray(aiBrief.decisions).map((item) => <li key={item}>{item}</li>)}</ul></div>}
+      </section>}
+
+      <CustomerLineReply
+        customerId={customerId}
+        destinations={hub.destinations}
+        aiDraft={aiBrief?.replyDraft ? { id: aiBrief.id, text: aiBrief.replyDraft, stale: aiBrief.stale, createdAt: aiBrief.createdAt.toISOString() } : null}
+      />
 
       {hub.pendingOutboxes.length > 0 && <section className="space-y-3">
         <h2 className="font-semibold">LINE送信待ち・結果確認中</h2>

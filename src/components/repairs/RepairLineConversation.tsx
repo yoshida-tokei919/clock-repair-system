@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { RepairCompletionNoticePanel } from "./RepairCompletionNoticePanel";
 import { RepairDeliveryRequestPanel } from "./RepairDeliveryRequestPanel";
+import { RepairAiBriefPanel } from "./RepairAiBriefPanel";
 
 type Classification = { scope: "WATCHES" | "COMMON" | "UNASSIGNED"; source: "AI" | "MANUAL"; confidence: string | null; confirmedAt: string | null; watchIds: number[] } | null;
 type Message = { id: number; inquiryId: number; editable: boolean; direction: "INBOUND" | "OUTBOUND"; messageType: "TEXT" | "IMAGE" | "FILE" | "OTHER"; body: string | null; receivedAt: string | null; sentAt: string | null; createdAt: string; status: string; classification: Classification; relatedRepairIds: number[]; relatedToCurrentRepair: boolean; files: { id: number; mimeType: string | null; width: number | null; height: number | null; uploadStatus: string }[] };
-type Pending = { id: number; text: string; status: "APPROVED" | "CLAIMED" | "PRE_SEND_FAILED" | "POST_UNCONFIRMED"; approvedAt: string; createdAt: string; relatedRepairIds: number[]; relatedToCurrentRepair: boolean };
-type Payload = { available: boolean; customerId: number; sourceInquiryId: number | null; promotedAt: string | null; sendAvailable: boolean; mappingVerifiedAt: string | null; messages: Message[]; pendingOutboxes: Pending[]; siblingRepairs: { repairId: number; position: number; label: string | null; inquiryNumber: string | null }[]; watchOptions: { id: number; position: number; label: string | null }[]; hasEarlierMessages: boolean };
-type Item = { kind: "message"; id: number; at: string; relatedToCurrentRepair: boolean; message: Message } | { kind: "outbox"; id: number; at: string; relatedToCurrentRepair: boolean; outbox: Pending };
+type Pending = { text: string; status: "APPROVED" | "CLAIMED" | "PRE_SEND_FAILED" | "POST_UNCONFIRMED"; approvedAt: string; createdAt: string; relatedRepairIds: number[]; relatedToCurrentRepair: boolean };
+type Payload = { available: boolean; customerId: number; sourceInquiryId: number | null; promotedAt: string | null; originAiSummary: { inquiryId: number; status: string; summary: string; firstReceivedAt: string; lastReceivedAt: string; analysisCompletedAt: string | null } | null; aiBrief: { id: number; modelProvider: string; modelName: string; promptVersion: string; summary: string | null; unresolvedItems: unknown; customerRequirements: unknown; decisions: unknown; replyDraft: string | null; createdAt: string; stale: boolean } | null; sendAvailable: boolean; mappingVerifiedAt: string | null; messages: Message[]; pendingOutboxes: Pending[]; siblingRepairs: { repairId: number; position: number; label: string | null; inquiryNumber: string | null }[]; watchOptions: { id: number; position: number; label: string | null }[]; hasEarlierMessages: boolean };
+type Item = { kind: "message"; key: string; sortTie: number; at: string; relatedToCurrentRepair: boolean; message: Message } | { kind: "outbox"; key: string; sortTie: number; at: string; relatedToCurrentRepair: boolean; outbox: Pending };
 
 const statusLabels: Record<Pending["status"], string> = { APPROVED: "送信待ち", CLAIMED: "送信処理中", PRE_SEND_FAILED: "送信前エラー", POST_UNCONFIRMED: "送信確認中" };
 const displayTime = (value: string) => new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
@@ -39,9 +40,14 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const timeline: Item[] = payload ? [
-    ...payload.messages.map((message) => ({ kind: "message" as const, id: message.id, at: message.receivedAt ?? message.sentAt ?? message.createdAt, relatedToCurrentRepair: message.relatedToCurrentRepair, message })),
-    ...payload.pendingOutboxes.map((outbox) => ({ kind: "outbox" as const, id: outbox.id, at: outbox.approvedAt, relatedToCurrentRepair: outbox.relatedToCurrentRepair, outbox })),
-  ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime() || a.id - b.id) : [];
+    ...payload.messages.map((message) => ({ kind: "message" as const, key: `message-${message.id}`, sortTie: message.id, at: message.receivedAt ?? message.sentAt ?? message.createdAt, relatedToCurrentRepair: message.relatedToCurrentRepair, message })),
+    ...payload.pendingOutboxes.map((outbox, index) => ({ kind: "outbox" as const, key: `outbox-${outbox.approvedAt}-${index}`, sortTie: index, at: outbox.approvedAt, relatedToCurrentRepair: outbox.relatedToCurrentRepair, outbox })),
+  ].sort((a, b) => {
+    const time = new Date(a.at).getTime() - new Date(b.at).getTime();
+    if (time !== 0) return time;
+    if (a.kind !== b.kind) return a.kind === "message" ? -1 : 1;
+    return a.sortTie - b.sortTie;
+  }) : [];
 
   async function send() {
     if (!payload?.sendAvailable || !replyText.trim() || replyText.length > 5000 || sending) return;
@@ -76,6 +82,7 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
     {loading && !payload && <p className="text-sm text-zinc-500">LINE履歴を読み込んでいます…</p>}
     {payload && !payload.available && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">この修理に関連付けられたLINEのやり取りはありません。</p>}
     {payload && <Link className="text-sm text-blue-700 underline" href={`/customers/${payload.customerId}/communications`}>このお客様とのLINE履歴全体を見る</Link>}
+    {payload && <RepairAiBriefPanel key={payload.aiBrief?.id ?? "none"} repairId={repairId} originSummary={payload.originAiSummary} aiBrief={payload.aiBrief} canReply={payload.sendAvailable} onApplyReplyDraft={(text) => { setReplyText(text); intentRef.current = null; }} />}
     {payload?.available && <>
       <div className="flex flex-wrap items-center gap-3">
         {payload.sourceInquiryId && <Link className="text-xs text-blue-700 underline" href={`/inquiries/${payload.sourceInquiryId}/review`}>元のInquiryを開く</Link>}
@@ -89,7 +96,7 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
           const links = item.kind === "message" ? item.message.relatedRepairIds : item.outbox.relatedRepairIds;
           const classification = item.kind === "message" ? item.message.classification : null;
           const outgoing = item.kind === "outbox" || item.message.direction === "OUTBOUND";
-          return <div key={`${item.kind}-${item.id}`}>
+          return <div key={item.key}>
             {payload.promotedAt !== null && (index === 0 || (after && !previous)) && <div className="border-b py-2 text-center text-xs font-semibold text-zinc-600">{after ? "受付後" : "受付前"}</div>}
             <div className={`flex ${outgoing ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-lg border p-3 text-sm ${item.kind === "outbox" ? "border-blue-200 bg-blue-50" : outgoing ? "border-emerald-200 bg-emerald-50" : "bg-white"}`}>
               <div className="mb-1 flex flex-wrap gap-1 text-xs">
@@ -103,7 +110,7 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
               {item.kind === "message" && item.message.messageType === "FILE" && <p className="text-zinc-500">ファイルメッセージ</p>}
               {item.kind === "message" && item.message.messageType === "OTHER" && <p className="text-zinc-500">その他のLINEメッセージ</p>}
               <div className="mt-2 text-right text-xs text-zinc-500">{item.kind === "outbox" ? statusLabels[item.outbox.status] : outgoing ? "送信済み" : "受信"} · {displayTime(item.at)}</div>
-              {item.kind === "message" && item.message.editable && <ClassificationEditor key={`${item.id}-${classification?.confirmedAt ?? "none"}`} inquiryId={item.message.inquiryId} message={item.message} watchOptions={payload.watchOptions} onSaved={refresh} />}
+              {item.kind === "message" && item.message.editable && <ClassificationEditor key={`${item.message.id}-${classification?.confirmedAt ?? "none"}`} inquiryId={item.message.inquiryId} message={item.message} watchOptions={payload.watchOptions} onSaved={refresh} />}
             </div></div>
           </div>;
         })}

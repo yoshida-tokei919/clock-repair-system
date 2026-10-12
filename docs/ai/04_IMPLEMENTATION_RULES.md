@@ -61,6 +61,14 @@ Task指示で指定されたschema（DB定義）、seed（初期データ）、d
 - login失敗の調査では、まずDB接続・runtimeの問題と認証情報の不一致を切り分ける。復旧目的でseed/setup/resetを実行しない。
 - 空DBの初回bootstrapは環境変数のみを使い、Adminが既に存在する場合は必ず失敗させる。
 
+## AI利用・課金ルール
+
+- このプロジェクトでは、OpenAI APIおよび従量課金のAI APIを使用しない。
+- AI要約・返信案生成などのAI処理は、原則としてOpenClaw経由でChatGPT Plus枠のGPT-5.6 Solを利用する。
+- `OPENAI_API_KEY` 等のAPIキーを新規追加・要求・参照する実装を行わない。
+- ChatGPT Plus枠が利用できない場合でも、OpenAI APIや別の従量課金AI APIへ自動・手動を問わずフォールバックしない。処理を停止し、利用不可として扱う。
+- API課金が発生する構成、別の有料AI API、または上記方針の変更は、ユーザーの明示承認なしに導入しない。
+
 ## Supabase Data API / GRANT
 
 2026年10月30日以降、Supabaseでは `public` schema（publicスキーマ）に新規作成したテーブルへData API用の権限が自動付与されない。
