@@ -101,9 +101,11 @@ try {
         }
         throw "Expected gate rejection: $expected"
     }
-    function Assert-Accepted([string]$reviewed) {
-        $result = & $gateScript -Enable -RepoRoot $fixture -ReviewedCommit $reviewed
-        if ($result -notmatch 'status=enabled' -or $global:registrationCalls -ne 1 -or $global:enableCalls -ne 1) {
+    function Assert-Accepted([string]$reviewed, [switch]$allowIssue) {
+        $result = & $gateScript -Enable -AllowIssue:$allowIssue -RepoRoot $fixture -ReviewedCommit $reviewed
+        if ($result -notmatch 'status=enabled' -or
+            $result -notmatch "allowIssue=$([bool]$allowIssue)" -or
+            $global:registrationCalls -ne 1 -or $global:enableCalls -ne 1) {
             throw 'Valid reviewed Task201G baseline did not pass all source gates'
         }
         Reset-RegistrationCounters
@@ -112,7 +114,7 @@ try {
     Assert-Rejected '' 'requires -ReviewedCommit'
     Assert-Rejected 'not-a-commit' 'requires -ReviewedCommit'
     Assert-Rejected $nonAncestor 'not an ancestor of canonical HEAD'
-    Assert-Rejected $preTaskAncestor 'does not contain the Task201G correction files'
+    Assert-Rejected $preTaskAncestor 'does not contain the Task201G task record and protected runtime correction'
     Assert-Accepted $reviewedCommit
 
     [System.IO.File]::WriteAllText($sessionFile, $sessionSource.Replace('CLOUD_LOGIN_PROTOCOL = 3;', 'CLOUD_LOGIN_PROTOCOL = 4;'), $utf8)
@@ -126,8 +128,21 @@ try {
     $global:allowDirtyProtocolFixture = $false
     [System.IO.File]::WriteAllText($sessionFile, $sessionSource, $utf8)
 
+    # An incremental Task201G correction changes protected runtime and the task
+    # record, without repeating every file from the initial reviewed commit.
+    Add-Content -LiteralPath (Join-Path $fixture 'scripts\yupuri-cloud-worker.ts') -Value '// incremental reviewed correction'
+    Add-Content -LiteralPath (Join-Path $fixture 'docs\ai-tasks\201g-yu-pri-cloud-operational-hardening.md') -Value 'Incremental reviewed correction fixture.'
+    & git.exe -C $fixture add scripts/yupuri-cloud-worker.ts docs/ai-tasks/201g-yu-pri-cloud-operational-hardening.md
+    & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'incremental reviewed Task201G correction' 1>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Incremental reviewed fixture commit failed' }
+    $incrementalReviewedCommit = (& git.exe -C $fixture rev-parse HEAD).Trim()
+    $global:remoteMainHead = $incrementalReviewedCommit
+    & git.exe -C $fixture update-ref refs/remotes/origin/main $global:remoteMainHead
+    Assert-Accepted $incrementalReviewedCommit
+    Assert-Rejected $reviewedCommit 'Protected Task201G source changed after reviewed commit'
+
     # Later unrelated main commits are allowed when protected Task201G runtime
-    # sources remain unchanged. The reviewed baseline remains the Task201G commit.
+    # sources remain unchanged from the incremental reviewed correction.
     Set-Content -LiteralPath (Join-Path $fixture 'unrelated.txt') -Value 'later unrelated change' -Encoding utf8
     & git.exe -C $fixture add unrelated.txt
     & git.exe -C $fixture -c user.name=Task201G -c user.email=task201g@example.invalid commit -m 'later unrelated main change' 1>$null
@@ -135,8 +150,8 @@ try {
     $unrelatedHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
     $global:remoteMainHead = $unrelatedHead
     & git.exe -C $fixture update-ref refs/remotes/origin/main $global:remoteMainHead
-    Assert-Accepted $reviewedCommit
-    Assert-Rejected $unrelatedHead 'does not contain the Task201G correction files'
+    Assert-Accepted $incrementalReviewedCommit -allowIssue
+    Assert-Rejected $unrelatedHead 'does not contain the Task201G task record and protected runtime correction'
 
     # A later change to any protected Task201G runtime source must fail closed.
     Add-Content -LiteralPath (Join-Path $fixture 'scripts\yupuri-cloud-worker.ts') -Value '// protected drift fixture'
@@ -145,7 +160,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Protected-drift fixture commit failed' }
     $global:remoteMainHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
     & git.exe -C $fixture update-ref refs/remotes/origin/main $global:remoteMainHead
-    Assert-Rejected $reviewedCommit 'Protected Task201G source changed after reviewed commit'
+    Assert-Rejected $incrementalReviewedCommit 'Protected Task201G source changed after reviewed commit'
 
     & git.exe -C $fixture reset --hard $unrelatedHead 1>$null
     if ($LASTEXITCODE -ne 0) { throw 'Fixture reset after protected drift failed' }
@@ -160,9 +175,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Missing-installer fixture commit failed' }
     $global:remoteMainHead = (& git.exe -C $fixture rev-parse HEAD).Trim()
     & git.exe -C $fixture update-ref refs/remotes/origin/main $global:remoteMainHead
-    Assert-Rejected $reviewedCommit 'Reviewed worker source files are missing'
+    Assert-Rejected $incrementalReviewedCommit 'Reviewed worker source files are missing'
 
-    'Installer reviewed-baseline gates PASS (missing/invalid SHA, non-ancestor, pre-Task baseline, CRLF protocol, unrelated later main, protected source drift, dirty tree, missing required source)'
+    'Installer reviewed-baseline gates PASS (missing/invalid SHA, non-ancestor, pre-Task baseline, CRLF protocol, incremental reviewed correction, unrelated later main, protected source drift, dirty tree, missing required source)'
 } finally {
     $resolved = [System.IO.Path]::GetFullPath($fixture)
     $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())

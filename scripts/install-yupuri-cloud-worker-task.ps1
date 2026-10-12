@@ -54,14 +54,20 @@ $reviewedType = & git -C $repo cat-file -t $ReviewedCommit 2>$null
 if ($LASTEXITCODE -ne 0 -or $reviewedType -cne 'commit') { throw 'Reviewed commit does not resolve to a commit' }
 & git -C $repo merge-base --is-ancestor $ReviewedCommit $head 2>$null
 if ($LASTEXITCODE -ne 0) { throw 'Reviewed commit is not an ancestor of canonical HEAD' }
+$protectedRuntime = @(
+    'scripts/start-yupuri-cloud-worker.ps1',
+    'scripts/open-yupuri-cloud-login.ps1',
+    'scripts/await-yupuri-cloud-login.ts',
+    'scripts/yupuri-cloud-live-session.ts',
+    'scripts/yupuri-cloud-actions.ts',
+    'scripts/yupuri-cloud-listing.ts',
+    'scripts/yupuri-cloud-worker-core.ts',
+    'scripts/yupuri-cloud-worker.ts')
 $reviewedFiles = @(& git -C $repo diff-tree --no-commit-id --name-only -r $ReviewedCommit 2>$null)
 if ($LASTEXITCODE -ne 0 -or
-    $reviewedFiles -cnotcontains 'scripts/yupuri-cloud-live-session.ts' -or
-    $reviewedFiles -cnotcontains 'scripts/open-yupuri-cloud-login.ps1' -or
-    $reviewedFiles -cnotcontains 'scripts/yupuri-cloud-actions.ts' -or
-    $reviewedFiles -cnotcontains 'scripts/yupuri-cloud-worker.ts' -or
-    $reviewedFiles -cnotcontains 'docs/ai-tasks/201g-yu-pri-cloud-operational-hardening.md') {
-    throw 'Reviewed commit does not contain the Task201G correction files'
+    $reviewedFiles -cnotcontains 'docs/ai-tasks/201g-yu-pri-cloud-operational-hardening.md' -or
+    @($reviewedFiles | Where-Object { $protectedRuntime -ccontains $_ }).Count -eq 0) {
+    throw 'Reviewed commit does not contain the Task201G task record and protected runtime correction'
 }
 $reviewedSession = & git -C $repo show "${ReviewedCommit}:scripts/yupuri-cloud-live-session.ts" 2>$null
 if ($LASTEXITCODE -ne 0 -or ($reviewedSession -join "`n") -cnotmatch '(?m)^export const CLOUD_LOGIN_PROTOCOL = 3;$') {
@@ -78,15 +84,6 @@ $required = @('docs/ai-tasks/201g-yu-pri-cloud-operational-hardening.md',
     'scripts/yupuri-cloud-worker-core.ts', 'scripts/yupuri-cloud-worker.ts')
 & git -C $repo ls-files --error-unmatch -- $required 1>$null 2>$null
 if ($LASTEXITCODE -ne 0) { throw 'Reviewed worker source files are missing' }
-$protectedRuntime = @(
-    'scripts/start-yupuri-cloud-worker.ps1',
-    'scripts/open-yupuri-cloud-login.ps1',
-    'scripts/await-yupuri-cloud-login.ts',
-    'scripts/yupuri-cloud-live-session.ts',
-    'scripts/yupuri-cloud-actions.ts',
-    'scripts/yupuri-cloud-listing.ts',
-    'scripts/yupuri-cloud-worker-core.ts',
-    'scripts/yupuri-cloud-worker.ts')
 $diffArgs = @('-C', $repo, 'diff', '--quiet', $ReviewedCommit, $head, '--') + $protectedRuntime
 & git @diffArgs
 if ($LASTEXITCODE -eq 1) { throw 'Protected Task201G source changed after reviewed commit' }
