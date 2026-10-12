@@ -14,6 +14,7 @@ type State = {
 };
 type Mode = "" | "NONE" | "DATE" | "TIME" | "DATE_TIME";
 type TimeOption = { value: string; label: string };
+type GroupKind = "COMPLETED_AT_REQUEST" | "REMAINING" | "ALL";
 
 function modeFromPreference(preference: Preference | null): Mode {
   if (!preference) return "";
@@ -43,10 +44,16 @@ export function DeliveryPreferenceForm({
   token,
   initial,
   timeOptions,
+  endpoint,
+  groupKind,
+  immutable = false,
 }: {
   token: string;
   initial: State;
   timeOptions: TimeOption[];
+  endpoint?: string;
+  groupKind?: GroupKind;
+  immutable?: boolean;
 }) {
   const initialMode = modeFromPreference(initial.preference);
   const [state, setState] = useState(initial);
@@ -82,10 +89,11 @@ export function DeliveryPreferenceForm({
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/customer/delivery/${encodeURIComponent(token)}`, {
+      const response = await fetch(endpoint ?? `/api/customer/delivery/${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...(groupKind ? { groupKind } : {}),
           mode,
           date: mode === "DATE" || mode === "DATE_TIME" ? date : "",
           timeSlot: mode === "TIME" || mode === "DATE_TIME" ? timeSlot : "",
@@ -95,7 +103,7 @@ export function DeliveryPreferenceForm({
       if (!response.ok || data?.ok !== true) {
         throw new Error(data?.error || "回答を保存できませんでした。");
       }
-      setState(data as State);
+      setState({ ...data, editable: !immutable && data.editable !== false } as State);
       setConfirming(false);
       setSaved(true);
     } catch (cause) {
@@ -106,6 +114,12 @@ export function DeliveryPreferenceForm({
     }
   }
 
+  if (immutable && saved) {
+    const preference = state.preference;
+    return <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+      配達希望を受け付けました。{preference && summary(modeFromPreference(preference), preference.requestedDeliveryDate ?? "", preference.requestedDeliveryTimeSlot)}
+    </div>;
+  }
   if (!state.editable) {
     return <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
       発送準備が進んでいるため、このページから配達希望を変更できません。変更をご希望の場合はLINEでご連絡ください。

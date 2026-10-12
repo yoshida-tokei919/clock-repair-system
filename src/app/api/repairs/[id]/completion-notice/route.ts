@@ -19,6 +19,7 @@ import {
   RepairPublicTokenNotFoundError,
 } from "@/lib/repair-public-token";
 import { prisma } from "@/lib/prisma";
+import { completionDeliveryPath, IntakeDeliveryPreferenceError } from "@/lib/intake-delivery-preference";
 
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ id: string }> };
@@ -43,6 +44,7 @@ function failure(error: unknown) {
   if (error instanceof RepairCompletionNoticeUnavailableError || error instanceof LineManagerSendOutboxError) {
     return NextResponse.json({ error: error.message }, { status: 409 });
   }
+  if (error instanceof IntakeDeliveryPreferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
   console.error("Repair completion notice error", error);
   return NextResponse.json({ error: "Completion notice could not be processed" }, { status: 500 });
 }
@@ -78,7 +80,9 @@ export async function POST(request: Request, { params }: Context) {
     }
     const token = await getRepairPublicToken(prisma, id);
     if (!token) throw new RepairCompletionNoticeUnavailableError("配達希望回答URLを準備し直してください。");
-    const deliveryUrl = buildCustomerShareUrl(`/customer/delivery/${token}`, request.url);
+    const path = await completionDeliveryPath(prisma, id, token);
+    if (!path) throw new RepairCompletionNoticeUnavailableError("配達希望回答URLを準備できません。");
+    const deliveryUrl = buildCustomerShareUrl(path, request.url);
     const text = buildRepairCompletionNoticeText(submission.introText, deliveryUrl);
     if (text !== submission.reviewedText) {
       throw new RepairCompletionNoticeUnavailableError("送信内容が確認時から変わりました。もう一度送信内容を確認してください。");

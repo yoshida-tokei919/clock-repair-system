@@ -5,6 +5,9 @@ import type { PaymentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resolveCustomerRepairShareScope } from "@/lib/customer-repair-share";
 import { getPublicIntakeShippingDecision, IntakeShippingDecisionError } from "@/lib/intake-shipping-decision";
+import { getPublicIntakeDeliveryPreference, IntakeDeliveryPreferenceError } from "@/lib/intake-delivery-preference";
+import { YUPURI_DELIVERY_TIME_OPTIONS } from "@/lib/yupuri-v3";
+import { DeliveryPreferenceForm } from "../../delivery/[token]/DeliveryPreferenceForm";
 import { ShippingDecisionForm } from "./ShippingDecisionForm";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { CustomerRepairAccordionItem, CustomerRepairAccordionRoot } from "./CustomerRepairAccordion";
@@ -159,7 +162,8 @@ function needsCustomerApproval(repair: any) {
 }
 
 type ShippingDecisionView = { choice: "SHIP_COMPLETED" | "WAIT_ALL" | null; repairs: { inquiryNumber: string; completedAtRequest: boolean }[] };
-function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn, documentTokenAccess, shippingDecision }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null; prepaymentReturn?: string; documentTokenAccess: boolean; shippingDecision?: ShippingDecisionView }) {
+type GroupDeliveryView = Awaited<ReturnType<typeof getPublicIntakeDeliveryPreference>>;
+function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn, documentTokenAccess, shippingDecision, groupDelivery }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null; prepaymentReturn?: string; documentTokenAccess: boolean; shippingDecision?: ShippingDecisionView; groupDelivery?: GroupDeliveryView }) {
   return (
     <main className="min-h-screen bg-[#f3f6fa] px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
       <div className="mx-auto max-w-2xl space-y-4">
@@ -173,6 +177,13 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
         {prepaymentReturn === "cancel" && <p role="status" className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">前受金のお支払い画面から戻りました。お支払いを希望される場合は、下の前受金欄から再度お進みください。</p>}
 
         {shippingDecision && <ShippingDecisionForm token={token} initialChoice={shippingDecision.choice} repairs={shippingDecision.repairs} />}
+        {groupDelivery?.visible && <section className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm" aria-label="配達日時のご希望">
+          <h2 className="text-lg font-bold">今回発送する時計の配達日時のご希望</h2>
+          <p className="mt-2 text-sm">対象のお問合番号</p>
+          <ul className="mt-2 list-inside list-disc text-sm">{groupDelivery.repairs.map(repair => <li key={repair.inquiryNumber}>{repair.inquiryNumber}</li>)}</ul>
+          {groupDelivery.available || groupDelivery.preference ? <div className="mt-4"><DeliveryPreferenceForm token={token} endpoint={`/api/customer/intake-delivery/${encodeURIComponent(token)}`} groupKind={groupDelivery.groupKind} immutable initial={{ editable: groupDelivery.available && !groupDelivery.preference, applicationStatus: "PENDING_NO_SHIPMENT", preference: groupDelivery.preference }} timeOptions={YUPURI_DELIVERY_TIME_OPTIONS.filter(option => option.value !== "指定なし").map(option => ({ value: option.value, label: option.label }))} /></div>
+            : <p className="mt-4 text-sm">対象の時計がすべて作業完了すると配達希望をご回答いただけます。</p>}
+        </section>}
 
         <CustomerRepairAccordionRoot initialOpenIndex={repairs[0]?.status === "作業中" ? -1 : 0}>
           {repairs.map((repair, index) => {
@@ -261,6 +272,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
   let repairs: any[] = [];
   let documentMeta: { id: number; estimateNumber: string; issuedDate: Date } | null = null;
   let shippingDecision: ShippingDecisionView | undefined;
+  let groupDelivery: GroupDeliveryView | undefined;
 
   if (documentTokenRow) {
     const estimateDocument = await prisma.estimateDocument.findUnique({
@@ -301,7 +313,12 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
     documentMeta = repairs.length === 1 ? repairs[0].estimateDocument : null;
     if (scope.grouped) {
       try { shippingDecision = await getPublicIntakeShippingDecision(prisma, token); }
-      catch (error) { if (!(error instanceof IntakeShippingDecisionError)) throw error; }
+      catch (error) { if (!(error instanceof IntakeShippingDecisionError)) { console.error("Public intake shipping page failed"); return notFound(); } }
+      try { groupDelivery = await getPublicIntakeDeliveryPreference(prisma, token); }
+      catch (error) {
+        if (error instanceof IntakeDeliveryPreferenceError) { if (error.status !== 409) return notFound(); }
+        else { console.error("Public grouped delivery page failed"); return notFound(); }
+      }
     }
   }
 
@@ -516,7 +533,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
   }
 
   const prepaymentReturn = (await searchParams).prepayment;
-  return <CustomerRepairB2CPage token={token} repairs={repairs} documentMeta={documentMeta} prepaymentReturn={typeof prepaymentReturn === "string" ? prepaymentReturn : undefined} documentTokenAccess={Boolean(documentTokenRow)} shippingDecision={shippingDecision} />;
+  return <CustomerRepairB2CPage token={token} repairs={repairs} documentMeta={documentMeta} prepaymentReturn={typeof prepaymentReturn === "string" ? prepaymentReturn : undefined} documentTokenAccess={Boolean(documentTokenRow)} shippingDecision={shippingDecision} groupDelivery={groupDelivery} />;
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">

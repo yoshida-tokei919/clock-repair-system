@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Choice = "SHIP_COMPLETED" | "WAIT_ALL";
 type SnapshotRepair = { inquiryNumber: string; completedAtRequest: boolean };
 export function ShippingDecisionForm({ token, initialChoice, repairs }: { token: string; initialChoice: Choice | null; repairs: SnapshotRepair[] }) {
+  const router = useRouter();
   const [choice, setChoice] = useState<Choice | null>(initialChoice);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -16,6 +18,7 @@ export function ShippingDecisionForm({ token, initialChoice, repairs }: { token:
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "回答を保存できませんでした。");
       setChoice(data.decision.choice);
+      router.refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "回答を保存できませんでした。"); }
     finally { setBusy(false); }
   }

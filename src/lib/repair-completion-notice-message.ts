@@ -48,7 +48,7 @@ export function buildRepairCompletionNoticeText(introText: string, deliveryUrl: 
   let url: URL;
   try { url = new URL(deliveryUrl); }
   catch { throw new Error("配達希望回答URLが不正です。"); }
-  if (!/^https?:$/.test(url.protocol) || !url.pathname.startsWith("/customer/delivery/")) {
+  if (!/^https?:$/.test(url.protocol) || !/^\/customer\/(delivery|repairs)\/[A-Za-z0-9_-]{20,128}$/.test(url.pathname)) {
     throw new Error("配達希望回答URLが不正です。");
   }
   return [

@@ -15,6 +15,7 @@ test("delivery preference link preparation is authenticated, explicit, and eligi
     "next/server": { NextResponse: { json: (body: unknown, options?: { status?: number }) => ({ body, status: options?.status ?? 200 }) } },
     "@/lib/auth": { authOptions: {} },
     "@/lib/customer-share-url": { buildCustomerShareUrl: (path: string) => `https://app.test${path}` },
+    "@/lib/intake-delivery-preference": { IntakeDeliveryPreferenceError: class extends Error {}, completionDeliveryPath: async (_db: unknown, _id: number, token: string) => `/customer/delivery/${token}` },
     "@/lib/prisma": { prisma: { admin: { findUnique: async () => state.admin } } },
     "@/lib/repair-completion-notice": {
       RepairCompletionNoticeNotFoundError: CompletionNotFound,
@@ -22,6 +23,7 @@ test("delivery preference link preparation is authenticated, explicit, and eligi
     },
     "@/lib/repair-public-token": {
       RepairPublicTokenNotFoundError: TokenNotFound,
+      getRepairPublicToken: async () => null,
       ensureRepairPublicToken: async () => { state.tokenWrites++; return "token_12345678901234567890"; },
     },
   };

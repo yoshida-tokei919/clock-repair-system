@@ -17,6 +17,7 @@ test("completion notice preview adds the required delivery answer URL and no-pre
   assert.match(text, /配達日時のご希望/);
   assert.match(text, /希望なし/);
   assert.match(text, /https:\/\/example\.test\/customer\/delivery\//);
+  assert.match(buildRepairCompletionNoticeText(intro, "https://example.test/customer/repairs/token-12345678901234567890"), /\/customer\/repairs\//);
   assert.doesNotMatch(text, /発送しました|追跡|配達完了/);
 });
 

@@ -51,6 +51,7 @@ function fakeDb(options: FakeOptions = {}) {
       findMany: async () => (options.intakeStatuses ?? []).map(status => ({ status })),
     },
     repairIntakeShippingDecision: { findUnique: async () => options.intakeDecision ? { repairIntakeInviteId: 7 } : null },
+    repairIntakeInvite: { findUnique: async () => null },
     repairDeliveryPreference: {
       upsert: async ({ create, update }: any) => {
         state.writes++;
@@ -108,11 +109,11 @@ test("public page is gated by B2C and a completion notice intent", async () => {
   }
 });
 
-test("legacy delivery form follows mixed intake and existing decision guard", async () => {
+test("historical unsupported multi-intakes retain the Task203 delivery form", async () => {
   for (const scenario of [
-    { intakeStatuses: ["作業完了", "部品待ち(注文済み)"], intakeDecision: false, allowed: false },
+    { intakeStatuses: ["作業完了", "部品待ち(注文済み)"], intakeDecision: false, allowed: true },
     { intakeStatuses: ["作業完了", "作業完了"], intakeDecision: false, allowed: true },
-    { intakeStatuses: ["作業完了", "作業完了"], intakeDecision: true, allowed: false },
+    { intakeStatuses: ["作業完了", "作業完了"], intakeDecision: true, allowed: true },
   ]) {
     const { client, state } = fakeDb(scenario);
     if (scenario.allowed) {

@@ -20,6 +20,7 @@ test("completion notice API keeps Admin auth and server-rebuilds the reviewed de
     "@/lib/auth": { authOptions: {} },
     "@/lib/prisma": { prisma: { admin: { findUnique: async () => { state.adminReads++; return state.admin; } } } },
     "@/lib/customer-share-url": { buildCustomerShareUrl: (path: string) => `https://example.test${path}` },
+    "@/lib/intake-delivery-preference": { IntakeDeliveryPreferenceError: class extends Error {}, completionDeliveryPath: async (_db: unknown, _id: number, token: string) => `/customer/delivery/${token}` },
     "@/lib/line-manager-send-outbox": { LineManagerSendOutboxError: OutboxError },
     "@/lib/repair-public-token": {
       RepairPublicTokenNotFoundError: TokenNotFoundError,

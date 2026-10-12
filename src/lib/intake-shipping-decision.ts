@@ -96,6 +96,7 @@ export async function requestIntakeShippingDecision(db: PrismaClient, repairId: 
             !validSnapshot(invite.id, invite.repairs.map(r => r.id), prior.repairs)) throw unavailable();
         return { choice: prior.choice, requestedAt: prior.requestedAt, status: prior.requestOutbox.status };
       }
+      if (await tx.repairIntakeDeliveryPreference.findFirst({ where: { repairIntakeInviteId: invite.id }, select: { repairIntakeInviteId: true } })) throw unavailable();
       if (!invite.lineUser?.lineManagerChat?.verifiedAt || !completed.length || completed.length === invite.repairs.length) throw unavailable();
       if (!appUrl || !/^https:\/\//i.test(appUrl)) throw unavailable();
       const url = buildCustomerShareUrl(`/customer/repairs/${invite.repairs[0].publicToken}`, appUrl, appUrl);

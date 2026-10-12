@@ -32,6 +32,7 @@ function fixture() {
       },
       update: async ({ data }: any) => { decision = { ...decision, ...data }; return decision; },
     },
+    repairIntakeDeliveryPreference: { findFirst: async () => null },
     inquiry: { findUnique: async () => ({ id: 5, lineUserId: 4 }) },
     lineManagerChat: { findUnique: async () => ({ id: 6, lineUserId: 4, managerBotId: "bot", managerChatId: "chat" }) },
     lineManagerSendOutbox: { upsert: async ({ create }: any) => {
@@ -123,4 +124,12 @@ test("public access stays within the B2C intake and a non-cancelled request", as
   f.repairs[0].customer.type = "individual";
   f.outbox.status = "CANCELLED";
   await assert.rejects(respondIntakeShippingDecision(f.db, "opaque-11", "WAIT_ALL"), IntakeShippingDecisionError);
+});
+
+test("a persisted grouped delivery answer prevents a later incompatible shipping request", async () => {
+  const f = fixture();
+  f.db.repairIntakeDeliveryPreference.findFirst = async () => ({ repairIntakeInviteId: 7 });
+  await assert.rejects(requestIntakeShippingDecision(f.db, 10, "https://example.test"),
+    (error: IntakeShippingDecisionError) => error.status === 409);
+  assert.equal(f.outboxWrites, 0);
 });

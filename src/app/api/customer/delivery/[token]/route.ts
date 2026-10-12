@@ -13,7 +13,7 @@ function failure(error: unknown) {
   if (error instanceof RepairDeliveryPreferenceError) {
     return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
   }
-  console.error("Public delivery preference error", error);
+  console.error("Public delivery preference error");
   return NextResponse.json({ ok: false, error: "回答を処理できませんでした。" }, { status: 500 });
 }
 

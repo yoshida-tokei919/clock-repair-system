@@ -3,12 +3,14 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { buildCustomerShareUrl } from "@/lib/customer-share-url";
 import { prisma } from "@/lib/prisma";
+import { completionDeliveryPath, IntakeDeliveryPreferenceError } from "@/lib/intake-delivery-preference";
 import {
   getRepairCompletionNotice,
   RepairCompletionNoticeNotFoundError,
 } from "@/lib/repair-completion-notice";
 import {
   ensureRepairPublicToken,
+  getRepairPublicToken,
   RepairPublicTokenNotFoundError,
 } from "@/lib/repair-public-token";
 
@@ -41,13 +43,18 @@ export async function POST(request: Request, { params }: Context) {
     if (completion.notice) {
       return NextResponse.json({ error: "作業完了LINE連絡はすでに送信待ちへ登録されています。" }, { status: 409 });
     }
-    const token = await ensureRepairPublicToken(prisma, repairId);
-    const url = buildCustomerShareUrl(`/customer/delivery/${token}`, request.url);
+    const existingToken = await getRepairPublicToken(prisma, repairId);
+    if (!existingToken) await completionDeliveryPath(prisma, repairId, null);
+    const token = existingToken ?? await ensureRepairPublicToken(prisma, repairId);
+    const path = await completionDeliveryPath(prisma, repairId, token);
+    if (!path) throw new IntakeDeliveryPreferenceError(409, "配達希望回答URLを準備できません。" );
+    const url = buildCustomerShareUrl(path, request.url);
     return NextResponse.json({ ok: true, url });
   } catch (error) {
     if (error instanceof RepairPublicTokenNotFoundError || error instanceof RepairCompletionNoticeNotFoundError) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
+    if (error instanceof IntakeDeliveryPreferenceError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("Delivery preference link error", error);
     return NextResponse.json({ error: "配達希望回答URLを作成できませんでした。" }, { status: 500 });
   }

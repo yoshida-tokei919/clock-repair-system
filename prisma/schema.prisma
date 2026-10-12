@@ -63,6 +63,7 @@ model Customer {
   inquiryMessagePostIntakeRoutings InquiryMessagePostIntakeRouting[]
   repairIntakeInvites RepairIntakeInvite[]
   intakeShippingDecisions RepairIntakeShippingDecision[]
+  intakeDeliveryPreferences RepairIntakeDeliveryPreference[]
   communicationAiBriefs CommunicationAiBrief[]
 }
 
@@ -820,6 +821,7 @@ model RepairIntakeInvite {
   repairs  Repair[]
   inquiryWatches RepairIntakeInviteWatch[]
   shippingDecision RepairIntakeShippingDecision?
+  deliveryPreferences RepairIntakeDeliveryPreference[]
 
   @@index([customerId])
   @@index([lineUserId])
@@ -852,6 +854,7 @@ model Repair {
   watchId              Int
   repairIntakeInviteId Int?
   shippingDecisionSnapshot RepairIntakeShippingDecisionRepair[]
+  intakeDeliveryPreferenceTargets RepairIntakeDeliveryPreferenceRepair[]
   movementMakerId      Int?
   movementCaliberId    Int?
   baseMovementMakerId  Int?
@@ -941,6 +944,7 @@ model Repair {
   @@unique([id, customerId])
   @@index([repairIntakeInviteId])
   @@unique([id, repairIntakeInviteId])
+  @@unique([id, repairIntakeInviteId, customerId])
 }
 
 enum PhysicalTagStatus {
@@ -1144,6 +1148,42 @@ model RepairIntakeShippingDecisionRepair {
   repair Repair @relation(fields: [repairId, repairIntakeInviteId], references: [id, repairIntakeInviteId], onDelete: Restrict, map: "RepairIntakeDecisionRepair_membership_fkey")
 
   @@id([repairIntakeInviteId, repairId])
+}
+
+model RepairIntakeDeliveryPreference {
+  id String @id
+  repairIntakeInviteId Int
+  customerId Int
+  kind RepairIntakeDeliveryGroupKind
+  requestedDeliveryDate DateTime? @db.Date
+  requestedDeliveryTimeSlot String
+  respondedAt DateTime
+  createdAt DateTime @default(now())
+
+  invite RepairIntakeInvite @relation(fields: [repairIntakeInviteId], references: [id], onDelete: Restrict)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  repairs RepairIntakeDeliveryPreferenceRepair[]
+
+  @@unique([repairIntakeInviteId, kind])
+  @@unique([id, repairIntakeInviteId, customerId])
+}
+
+enum RepairIntakeDeliveryGroupKind {
+  COMPLETED_AT_REQUEST
+  REMAINING
+  ALL
+}
+
+model RepairIntakeDeliveryPreferenceRepair {
+  preferenceId String
+  repairIntakeInviteId Int
+  customerId Int
+  repairId Int @unique
+
+  preference RepairIntakeDeliveryPreference @relation(fields: [preferenceId, repairIntakeInviteId, customerId], references: [id, repairIntakeInviteId, customerId], onDelete: Restrict, map: "RepairIntakeDeliveryPreferenceRepair_preference_fkey")
+  repair Repair @relation(fields: [repairId, repairIntakeInviteId, customerId], references: [id, repairIntakeInviteId, customerId], onDelete: Restrict, map: "RepairIntakeDeliveryPreferenceRepair_membership_fkey")
+
+  @@id([preferenceId, repairId])
 }
 
 model WorkCalendar {

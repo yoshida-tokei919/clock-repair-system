@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { completionNoticeKey, suppressLegacyCompletionForIntake } from "./repair-completion-notice";
+import { completionNoticeKey, suppressLegacyDeliveryForIntake } from "./repair-completion-notice";
 import { YUPURI_DELIVERY_TIME_OPTIONS } from "./yupuri-v3";
 
 export const NO_DELIVERY_TIME_PREFERENCE = "指定なし";
@@ -184,7 +184,7 @@ export async function getPublicRepairDeliveryPreference(db: PrismaClient, token:
     select: publicRepairSelect,
   });
   if (!repair) throw new RepairDeliveryPreferenceError(404, "回答ページが見つかりません。");
-  if (await suppressLegacyCompletionForIntake(db, repair.repairIntakeInviteId, repair.customerId)) {
+  if (await suppressLegacyDeliveryForIntake(db as Prisma.TransactionClient, repair.repairIntakeInviteId, token)) {
     throw new RepairDeliveryPreferenceError(404, "回答ページが見つかりません。");
   }
   return publicPayload(repair);
@@ -208,7 +208,7 @@ export async function savePublicRepairDeliveryPreference(
       if (!repair || repair.customer.type !== "individual" || !hasCompletionNoticeIntent(repair)) {
         throw new RepairDeliveryPreferenceError(404, "回答ページが見つかりません。");
       }
-      if (await suppressLegacyCompletionForIntake(tx, repair.repairIntakeInviteId, repair.customerId)) {
+      if (await suppressLegacyDeliveryForIntake(tx, repair.repairIntakeInviteId, safeToken)) {
         throw new RepairDeliveryPreferenceError(409, "複数の修理をまとめて発送確認する受付です。修理状況ページをご確認ください。");
       }
       const shipments = activeOutboundShipments(repair);

@@ -46,6 +46,16 @@ export async function suppressLegacyCompletionForIntake(
     siblings.some(r => r.status !== "作業完了");
 }
 
+export async function suppressLegacyDeliveryForIntake(
+  db: Prisma.TransactionClient,
+  repairIntakeInviteId: number | null,
+  token: string,
+) {
+  if (repairIntakeInviteId === null) return false;
+  const { isGroupedDeliveryApplicable } = await import("./intake-delivery-preference");
+  return isGroupedDeliveryApplicable(db, token);
+}
+
 async function context(db: Pick<Prisma.TransactionClient, "repair" | "repairIntakeShippingDecision">, repairId: number) {
   if (!Number.isSafeInteger(repairId) || repairId <= 0) {
     throw new RepairCompletionNoticeInputError("Invalid Repair ID");
