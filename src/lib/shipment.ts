@@ -56,6 +56,68 @@ function japanDateString(now: Date) {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+function shipmentDestination(repairs: Parameters<typeof parseRepairReturnAddress>[0][]) {
+  let addresses;
+  try {
+    addresses = repairs.map(parseRepairReturnAddress);
+  } catch {
+    throw new ShipmentError(409, "返送先の必須項目が不足または不正です。");
+  }
+  const address = addresses[0];
+  if (addresses.some(other => JSON.stringify(other) !== JSON.stringify(address)))
+    throw new ShipmentError(409, "修理案件の返送先が一致しません。");
+  return {
+    destinationRecipientName: address.recipientName,
+    destinationPostalCode: address.postalCode,
+    destinationPrefecture: address.prefecture,
+    destinationCity: address.city,
+    destinationStreet: address.street,
+    destinationBuilding: address.building,
+    destinationPhone: address.phone,
+  };
+}
+
+/** Caller owns the Serializable transaction and locks the target Repairs first. */
+export async function applyDeliveryPreferenceToDraftShipment(
+  tx: Prisma.TransactionClient,
+  repairIds: number[],
+  customerId: number,
+  preference: { requestedDeliveryDate: Date | null; requestedDeliveryTimeSlot: string },
+) {
+  if (!repairIds.length || new Set(repairIds).size !== repairIds.length) throw new ShipmentError(409, "発送対象が不正です。");
+  const repairs = await tx.repair.findMany({ where: { id: { in: repairIds } }, select: {
+    id: true, customerId: true,
+    returnRecipientName: true, returnPostalCode: true, returnPrefecture: true, returnCity: true,
+    returnStreet: true, returnBuilding: true, returnPhone: true,
+    shipmentRepairs: { select: { shipment: { select: {
+      id: true, customerId: true, direction: true, status: true, actualShippedAt: true,
+      repairs: { select: { repairId: true } },
+    } } } },
+  } });
+  if (repairs.length !== repairIds.length || repairs.some(repair => repair.customerId !== customerId))
+    throw new ShipmentError(409, "発送対象の修理案件が一致しません。");
+  const destination = shipmentDestination(repairs);
+  const active = [...new Map(repairs.flatMap(repair => repair.shipmentRepairs)
+    .map(link => link.shipment)
+    .filter(shipment => shipment.direction === "OUTBOUND" && shipment.status !== "CANCELLED" && shipment.actualShippedAt === null)
+    .map(shipment => [shipment.id, shipment] as const)).values()];
+  if (active.length > 1 || (active.length === 1 && (active[0].customerId !== customerId ||
+      active[0].repairs.length !== repairIds.length ||
+      new Set(active[0].repairs.map(link => link.repairId)).size !== repairIds.length ||
+      active[0].repairs.some(link => !repairIds.includes(link.repairId)))))
+    throw new ShipmentError(409, "発送対象が既存の発送と一致しません。");
+  if (active.length) {
+    if (active[0].status !== "DRAFT") throw new ShipmentError(409, "発送準備が進んでいるため、配達希望を変更できません。");
+    const updated = await tx.shipment.updateMany({ where: { id: active[0].id, customerId, status: "DRAFT", actualShippedAt: null }, data: preference });
+    if (updated.count !== 1) throw new ShipmentError(409, "発送の状態が変更されました。");
+    return;
+  }
+  await tx.shipment.create({ data: {
+    customerId, direction: "OUTBOUND", status: "DRAFT", ...destination, ...preference,
+    repairs: { create: repairIds.map(repairId => ({ repair: { connect: { id: repairId } } })) },
+  } });
+}
+
 function optionalText(value: unknown): string | null {
   if (value === null) return null;
   if (typeof value !== "string" || !value.trim() || value.trim().length > 100)
@@ -108,6 +170,7 @@ export async function createShipment(db: PrismaClient, input: { repairIds: numbe
   // Guard the domain entry point too: callers other than the HTTP route must confirm.
   const { repairIds } = parseShipmentCreate(input);
   return db.$transaction(async tx => {
+    await tx.$queryRaw`SELECT "id" FROM "Repair" WHERE "id" IN (${Prisma.join([...repairIds].sort((a, b) => a - b))}) ORDER BY "id" FOR UPDATE`;
     const repairs = await tx.repair.findMany({
       where: { id: { in: repairIds } },
       select: { id: true, customerId: true,
@@ -122,21 +185,11 @@ export async function createShipment(db: PrismaClient, input: { repairIds: numbe
     const customerId = repairs[0].customerId;
     if (repairs.some(repair => repair.customerId !== customerId))
       throw new ShipmentError(409, "異なる顧客の修理案件は同じ発送にできません。");
-    let destinations;
-    try {
-      destinations = repairs.map(parseRepairReturnAddress);
-    } catch {
-      throw new ShipmentError(409, "返送先の必須項目が不足または不正です。");
-    }
-    const destination = destinations[0];
-    if (destinations.some(address => JSON.stringify(address) !== JSON.stringify(destination)))
-      throw new ShipmentError(409, "修理案件の返送先が一致しません。");
-    const hasExistingActiveOutboundShipment = repairs.length === 1 && repairs[0].shipmentRepairs.some(({ shipment }) =>
-      shipment.direction === "OUTBOUND" && shipment.status !== "CANCELLED" && shipment.actualShippedAt === null,
-    );
-    const storedDeliveryPreference = repairs.length === 1 && !hasExistingActiveOutboundShipment
-      ? repairs[0].deliveryPreference
-      : null;
+    if (repairs.some(repair => repair.shipmentRepairs.some(({ shipment }) =>
+      shipment.direction === "OUTBOUND" && shipment.status !== "CANCELLED" && shipment.actualShippedAt === null)))
+      throw new ShipmentError(409, "対象の修理案件には処理中の発送があります。");
+    const destination = shipmentDestination(repairs);
+    const storedDeliveryPreference = repairs.length === 1 ? repairs[0].deliveryPreference : null;
     const storedDeliveryDate = storedDeliveryPreference?.requestedDeliveryDate;
     const deliveryPreference = storedDeliveryDate && storedDeliveryDate.toISOString().slice(0, 10) < japanDateString(now)
       ? null
@@ -146,13 +199,7 @@ export async function createShipment(db: PrismaClient, input: { repairIds: numbe
         customerId, direction: "OUTBOUND", status: "DRAFT",
         requestedDeliveryDate: deliveryPreference?.requestedDeliveryDate ?? null,
         requestedDeliveryTimeSlot: deliveryPreference?.requestedDeliveryTimeSlot ?? null,
-        destinationRecipientName: destination.recipientName,
-        destinationPostalCode: destination.postalCode,
-        destinationPrefecture: destination.prefecture,
-        destinationCity: destination.city,
-        destinationStreet: destination.street,
-        destinationBuilding: destination.building,
-        destinationPhone: destination.phone,
+        ...destination,
         repairs: { create: repairIds.map(repairId => ({ repair: { connect: { id: repairId } } })) },
       },
       include: detail,

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, RepairIntakeDeliveryGroupKind, type PrismaClient } from "@prisma/client";
 import { deliveryPreferenceMode, parseDeliveryPreferenceInput, RepairDeliveryPreferenceError } from "./repair-delivery-preference";
+import { applyDeliveryPreferenceToDraftShipment, ShipmentError } from "./shipment";
 
 export class IntakeDeliveryPreferenceError extends Error {
   constructor(public status: 404 | 409, message: string) { super(message); }
@@ -80,9 +81,10 @@ async function context(tx: Prisma.TransactionClient, token: string, validateShip
   const matchedKinds = activeShipments.map(shipment => {
     const shipmentIds = shipment.repairs.map(r => r.repairId);
     if (shipment.customerId !== anchor.customerId) return null;
-    return preferences.find(p => p.repairs.length === shipmentIds.length &&
+    return groups.find(candidate => (preferences.some(preference => preference.kind === candidate.kind) ||
+        (candidate.kind === group.kind && available)) && candidate.ids.length === shipmentIds.length &&
         new Set(shipmentIds).size === shipmentIds.length &&
-        p.repairs.every(r => shipmentIds.includes(r.repairId)))?.kind ?? null;
+        candidate.ids.every(id => shipmentIds.includes(id)))?.kind ?? null;
   });
   if (validateShipments && (matchedKinds.some(kind => kind === null) || new Set(matchedKinds).size !== matchedKinds.length)) throw unavailable();
   return { invite, anchor, groups, targetIds, kind: group.kind, available, prior };
@@ -169,8 +171,10 @@ export async function savePublicIntakeDeliveryPreference(db: PrismaClient, token
       if (prior) {
         if (dateString(prior.requestedDeliveryDate) !== dateString(normalized.requestedDeliveryDate) ||
             prior.requestedDeliveryTimeSlot !== normalized.requestedDeliveryTimeSlot) throw unavailable();
+        await applyDeliveryPreferenceToDraftShipment(tx, group.ids, customerId, normalized);
         return payload(current, groupKind);
       }
+      await applyDeliveryPreferenceToDraftShipment(tx, group.ids, customerId, normalized);
       await tx.repairIntakeDeliveryPreference.create({ data: {
         id: randomUUID(), repairIntakeInviteId: inviteId, customerId, kind: groupKind,
         requestedDeliveryDate: normalized.requestedDeliveryDate,
@@ -180,6 +184,7 @@ export async function savePublicIntakeDeliveryPreference(db: PrismaClient, token
       return payload(await context(tx, token), groupKind);
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
+    if (error instanceof ShipmentError) throw unavailable();
     if (error instanceof Prisma.PrismaClientKnownRequestError && ["P2002", "P2034"].includes(error.code)) throw unavailable();
     throw error;
   }

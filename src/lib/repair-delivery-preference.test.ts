@@ -13,7 +13,7 @@ const now = new Date("2026-10-03T07:00:00.000Z");
 
 function shipment(id: number, repairIds = [1], extra: Record<string, unknown> = {}) {
   return {
-    id, direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null,
+    id, customerId: 3, direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null,
     requestedDeliveryDate: null as Date | null, requestedDeliveryTimeSlot: null as string | null,
     repairs: repairIds.map(repairId => ({ repairId })), ...extra,
   };
@@ -25,6 +25,7 @@ type FakeOptions = {
   customerType?: "individual" | "business";
   intakeStatuses?: string[];
   intakeDecision?: boolean;
+  customerChangedAfterLock?: boolean;
 };
 function fakeDb(options: FakeOptions = {}) {
   const state: any = {
@@ -32,10 +33,12 @@ function fakeDb(options: FakeOptions = {}) {
     writes: 0,
     shipmentWrites: 0,
     shipments: options.shipments ?? [],
+    customerId: 3,
+    lockCount: 0,
   };
   const repairRow = () => ({
     id: 1,
-    customerId: 3,
+    customerId: state.customerId,
     repairIntakeInviteId: options.intakeStatuses ? 7 : null,
     customer: { type: options.customerType ?? "individual" },
     deliveryPreference: state.preference,
@@ -43,12 +46,14 @@ function fakeDb(options: FakeOptions = {}) {
       { idempotencyKey: "repair-completion-notice:1", status: "APPROVED" },
     ],
     shipmentRepairs: state.shipments.map((item: any) => ({ shipment: item })),
+    returnRecipientName: "山田 太郎", returnPostalCode: "1000001", returnPrefecture: "東京都",
+    returnCity: "千代田区", returnStreet: "千代田1-1", returnBuilding: null, returnPhone: "0312345678",
   });
   const client: any = {
     repair: {
       findUnique: async ({ where }: any) => where.publicToken === token || where.id === 1 ? repairRow() : null,
       findUniqueOrThrow: async () => repairRow(),
-      findMany: async () => (options.intakeStatuses ?? []).map(status => ({ status })),
+      findMany: async ({ where }: any) => where?.id?.in ? [repairRow()] : (options.intakeStatuses ?? []).map(status => ({ status })),
     },
     repairIntakeShippingDecision: { findUnique: async () => options.intakeDecision ? { repairIntakeInviteId: 7 } : null },
     repairIntakeInvite: { findUnique: async () => null },
@@ -65,6 +70,15 @@ function fakeDb(options: FakeOptions = {}) {
       },
     },
     shipment: {
+      create: async ({ data }: any) => {
+        const item = shipment(10, data.repairs.create.map((link: any) => link.repair.connect.id), {
+          customerId: data.customerId, requestedDeliveryDate: data.requestedDeliveryDate,
+          requestedDeliveryTimeSlot: data.requestedDeliveryTimeSlot,
+        });
+        state.shipments.push(item);
+        state.shipmentWrites++;
+        return item;
+      },
       updateMany: async ({ where, data }: any) => {
         const target = state.shipments.find((item: any) =>
           item.id === where.id && item.status === "DRAFT" && item.actualShippedAt === null);
@@ -73,6 +87,11 @@ function fakeDb(options: FakeOptions = {}) {
         Object.assign(target, data);
         return { count: 1 };
       },
+    },
+    $queryRaw: async () => {
+      state.lockCount++;
+      if (options.customerChangedAfterLock && state.lockCount === 2) state.customerId = 4;
+      return [{ id: 1 }];
     },
   };
   client.$transaction = async (fn: (tx: any) => Promise<unknown>) => fn(client);
@@ -128,14 +147,37 @@ test("historical unsupported multi-intakes retain the Task203 delivery form", as
   }
 });
 
-test("response is retained without a Shipment and reports pending", async () => {
+test("answer creates one DRAFT Shipment and is applied", async () => {
   const instance = fakeDb();
   const result = await savePublicRepairDeliveryPreference(instance.client, token,
     { mode: "DATE", date: "2026-10-04", timeSlot: "" }, now);
   assert.equal(instance.state.writes, 1);
-  assert.equal(instance.state.shipmentWrites, 0);
-  assert.equal(result.applicationStatus, "PENDING_NO_SHIPMENT");
+  assert.equal(instance.state.shipmentWrites, 1);
+  assert.equal(instance.state.shipments.length, 1);
+  assert.equal(result.applicationStatus, "APPLIED");
   assert.equal(result.preference?.requestedDeliveryDate, "2026-10-04");
+  await savePublicRepairDeliveryPreference(instance.client, token, { mode: "DATE", date: "2026-10-04", timeSlot: "" }, now);
+  assert.equal(instance.state.shipments.length, 1);
+});
+
+test("single-Repair answer rejects an invalid return snapshot before persistence", async () => {
+  const instance = fakeDb();
+  const original = instance.client.repair.findMany;
+  instance.client.repair.findMany = (async (args: any) =>
+    (await (original as any)(args)).map((repair: any) => ({ ...repair, returnPhone: null }))) as any;
+  await assert.rejects(savePublicRepairDeliveryPreference(instance.client, token, { mode: "NONE" }, now),
+    (error: RepairDeliveryPreferenceError) => error.status === 409);
+  assert.equal(instance.state.writes, 0);
+  assert.equal(instance.state.shipmentWrites, 0);
+});
+
+test("single-Repair POST re-reads after locks and rejects changed Customer", async () => {
+  const instance = fakeDb({ customerChangedAfterLock: true });
+  await assert.rejects(savePublicRepairDeliveryPreference(instance.client, token, { mode: "NONE" }, now),
+    (error: RepairDeliveryPreferenceError) => error.status === 409);
+  assert.equal(instance.state.lockCount, 2);
+  assert.equal(instance.state.writes, 0);
+  assert.equal(instance.state.shipmentWrites, 0);
 });
 
 test("exactly one DRAFT single-Repair Shipment receives the answer atomically", async () => {
@@ -148,14 +190,13 @@ test("exactly one DRAFT single-Repair Shipment receives the answer atomically", 
   assert.equal(result.applicationStatus, "APPLIED");
 });
 
-test("multiple or multi-Repair Shipments never auto-select a parcel", async () => {
+test("multiple or multi-Repair Shipments fail closed before saving the answer", async () => {
   for (const shipments of [[shipment(10), shipment(11)], [shipment(10, [1, 2])]]) {
     const instance = fakeDb({ shipments });
-    const result = await savePublicRepairDeliveryPreference(instance.client, token,
-      { mode: "NONE", date: "", timeSlot: "" }, now);
-    assert.equal(instance.state.writes, 1);
+    await assert.rejects(savePublicRepairDeliveryPreference(instance.client, token,
+      { mode: "NONE", date: "", timeSlot: "" }, now), (error: RepairDeliveryPreferenceError) => error.status === 409);
+    assert.equal(instance.state.writes, 0);
     assert.equal(instance.state.shipmentWrites, 0);
-    assert.match(result.applicationStatus, /^PENDING_/);
   }
 });
 

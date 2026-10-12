@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { completionNoticeKey, suppressLegacyDeliveryForIntake } from "./repair-completion-notice";
 import { YUPURI_DELIVERY_TIME_OPTIONS } from "./yupuri-v3";
+import { applyDeliveryPreferenceToDraftShipment, ShipmentError } from "./shipment";
 
 export const NO_DELIVERY_TIME_PREFERENCE = "指定なし";
 export const DELIVERY_PREFERENCE_MODES = ["NONE", "DATE", "TIME", "DATE_TIME"] as const;
@@ -201,36 +202,34 @@ export async function savePublicRepairDeliveryPreference(
 
   try {
     return await db.$transaction(async tx => {
-      const repair = await tx.repair.findUnique({
+      const anchor = await tx.repair.findUnique({
         where: { publicToken: safeToken },
-        select: publicRepairSelect,
+        select: { id: true, customerId: true },
       });
-      if (!repair || repair.customer.type !== "individual" || !hasCompletionNoticeIntent(repair)) {
+      if (!anchor) {
         throw new RepairDeliveryPreferenceError(404, "回答ページが見つかりません。");
+      }
+      await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${anchor.customerId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "Repair" WHERE "id" = ${anchor.id} FOR UPDATE`;
+      const repair = await tx.repair.findUnique({ where: { publicToken: safeToken }, select: publicRepairSelect });
+      if (!repair || repair.id !== anchor.id || repair.customerId !== anchor.customerId ||
+          repair.customer.type !== "individual" || !hasCompletionNoticeIntent(repair)) {
+        throw new RepairDeliveryPreferenceError(409, "回答ページの状態が変更されました。再確認してください。");
       }
       if (await suppressLegacyDeliveryForIntake(tx, repair.repairIntakeInviteId, safeToken)) {
         throw new RepairDeliveryPreferenceError(409, "複数の修理をまとめて発送確認する受付です。修理状況ページをご確認ください。");
       }
       const shipments = activeOutboundShipments(repair);
-      if (shipments.some(shipment => shipment.actualShippedAt || shipment.status !== "DRAFT")) {
-        throw new RepairDeliveryPreferenceError(409, "発送準備が進んでいるため、配達希望を変更できません。LINEでご連絡ください。");
-      }
+      if (shipments.length > 1 || shipments.some(shipment => shipment.repairs.length !== 1 || shipment.repairs[0].repairId !== repair.id || shipment.status !== "DRAFT"))
+        throw new RepairDeliveryPreferenceError(409, "発送対象または発送状態が変更されました。LINEでご連絡ください。");
+
+      await applyDeliveryPreferenceToDraftShipment(tx, [repair.id], repair.customerId, normalized);
 
       await tx.repairDeliveryPreference.upsert({
         where: { repairId: repair.id },
         create: { repairId: repair.id, ...normalized, respondedAt: now },
         update: { ...normalized, respondedAt: now },
       });
-
-      if (shipments.length === 1 && shipments[0].repairs.length === 1) {
-        const updated = await tx.shipment.updateMany({
-          where: { id: shipments[0].id, status: "DRAFT", actualShippedAt: null },
-          data: normalized,
-        });
-        if (updated.count !== 1) {
-          throw new RepairDeliveryPreferenceError(409, "発送の状態が変わりました。画面を更新してもう一度お試しください。");
-        }
-      }
 
       const refreshed = await tx.repair.findUniqueOrThrow({
         where: { id: repair.id },
@@ -240,7 +239,8 @@ export async function savePublicRepairDeliveryPreference(
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
     if (error instanceof RepairDeliveryPreferenceError) throw error;
-    if (error && typeof error === "object" && "code" in error && error.code === "P2034") {
+    if (error instanceof ShipmentError) throw new RepairDeliveryPreferenceError(409, error.message);
+    if (error && typeof error === "object" && "code" in error && (error.code === "P2034" || error.code === "P2002")) {
       throw new RepairDeliveryPreferenceError(409, "状態が変わりました。画面を更新してもう一度お試しください。");
     }
     throw error;

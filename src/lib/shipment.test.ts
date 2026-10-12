@@ -13,7 +13,12 @@ const repair = (id: number, extra = {}) => ({
 
 function fakeDb(rows = [repair(1), repair(2)]) {
   const writes: unknown[] = [];
+  const locks: { sql: string; values: unknown[] }[] = [];
   const client = {
+    $queryRaw: async (parts: TemplateStringsArray, ...values: unknown[]) => {
+      locks.push({ sql: parts.join("?"), values });
+      return rows.map(row => ({ id: row.id }));
+    },
     repair: { findMany: async () => rows },
     shipment: {
       create: async (args: unknown) => { writes.push(args); return { id: 10 }; },
@@ -23,7 +28,7 @@ function fakeDb(rows = [repair(1), repair(2)]) {
     },
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(client),
   };
-  return { client: client as unknown as PrismaClient, writes };
+  return { client: client as unknown as PrismaClient, writes, locks };
 }
 
 test("create input requires explicit confirmation and never accepts customer or status", () => {
@@ -88,6 +93,26 @@ test("create saves one OUTBOUND DRAFT parcel and both joins in one transaction",
   ]);
 });
 
+test("manual create locks validated Repair IDs in deterministic order before reading", async () => {
+  const instance = fakeDb();
+  const events: string[] = [];
+  const raw = instance.client.$queryRaw.bind(instance.client);
+  instance.client.$queryRaw = (async (...args: Parameters<typeof raw>) => {
+    events.push("lock");
+    return raw(...args);
+  }) as typeof instance.client.$queryRaw;
+  const read = instance.client.repair.findMany.bind(instance.client.repair);
+  instance.client.repair.findMany = (async (...args: Parameters<typeof read>) => {
+    events.push("read");
+    return read(...args);
+  }) as typeof instance.client.repair.findMany;
+  await createShipment(instance.client, parseShipmentCreate({ repairIds: [2, 1, 2], confirmed: true }));
+  assert.deepEqual(events, ["lock", "read"]);
+  assert.match(instance.locks[0].sql, /FROM "Repair" WHERE "id" IN .* ORDER BY "id" FOR UPDATE/);
+  const lockIds = instance.locks[0].values[0] as { values: number[] };
+  assert.deepEqual(lockIds.values, [1, 2]);
+});
+
 test("single-Repair Shipment inherits a stored customer delivery preference", async () => {
   const preference = {
     requestedDeliveryDate: new Date("2026-10-06T00:00:00.000Z"),
@@ -112,7 +137,7 @@ test("single-Repair Shipment does not inherit an expired stored delivery date", 
   assert.equal(created.data.requestedDeliveryTimeSlot, null);
 });
 
-test("single-Repair Shipment does not inherit a preference when another active outbound parcel already exists", async () => {
+test("single-Repair manual create rejects an existing active outbound parcel without writing", async () => {
   const preference = {
     requestedDeliveryDate: new Date("2026-10-06T00:00:00.000Z"),
     requestedDeliveryTimeSlot: "午前中",
@@ -121,10 +146,19 @@ test("single-Repair Shipment does not inherit a preference when another active o
     deliveryPreference: preference,
     shipmentRepairs: [{ shipment: { direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null } }],
   })]);
-  await createShipment(instance.client, parseShipmentCreate({ repairIds: [1], confirmed: true }));
-  const created = instance.writes[0] as { data: Record<string, any> };
-  assert.equal(created.data.requestedDeliveryDate, null);
-  assert.equal(created.data.requestedDeliveryTimeSlot, null);
+  await assert.rejects(createShipment(instance.client, parseShipmentCreate({ repairIds: [1], confirmed: true })),
+    (error: ShipmentError) => error.status === 409);
+  assert.equal(instance.writes.length, 0);
+});
+
+test("multi-Repair manual create rejects partial overlap with an active outbound parcel", async () => {
+  const instance = fakeDb([
+    repair(1, { shipmentRepairs: [{ shipment: { direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null } }] }),
+    repair(2),
+  ]);
+  await assert.rejects(createShipment(instance.client, parseShipmentCreate({ repairIds: [1, 2], confirmed: true })),
+    (error: ShipmentError) => error.status === 409);
+  assert.equal(instance.writes.length, 0);
 });
 
 test("cancelled or already-shipped historical parcels do not block a later single-Repair preference", async () => {

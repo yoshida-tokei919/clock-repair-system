@@ -11,6 +11,10 @@ function fixture(choice: "SHIP_COMPLETED" | "WAIT_ALL" | null = null) {
     { id: 10, customerId: 3, inquiryNumber: "T-10", status: "作業完了", publicToken: tokenA, publicTokenCreatedAt: now, customer: { type: "individual" }, shipmentRepairs: [] },
     { id: 11, customerId: 3, inquiryNumber: "T-11", status: choice ? "部品待ち(注文済み)" : "作業完了", publicToken: tokenB, publicTokenCreatedAt: now, customer: { type: "individual" }, shipmentRepairs: [] },
   ];
+  for (const repair of repairs) Object.assign(repair, {
+    returnRecipientName: "山田 太郎", returnPostalCode: "1000001", returnPrefecture: "東京都",
+    returnCity: "千代田区", returnStreet: "千代田1-1", returnBuilding: null, returnPhone: "0312345678",
+  });
   const decision: any = choice ? {
     customerId: 3, choice, requestOutbox: { status: "APPROVED", idempotencyKey: "intake-shipping-decision-request:7", inquiryId: 5, sourceRepairId: null },
     repairs: [{ repairId: 10, repairIntakeInviteId: 7, completedAtRequest: true }, { repairId: 11, repairIntakeInviteId: 7, completedAtRequest: false }],
@@ -29,7 +33,7 @@ function fixture(choice: "SHIP_COMPLETED" | "WAIT_ALL" | null = null) {
         const r = repairs.find(r => r.id === where.id || r.publicToken === where.publicToken);
         return r ? { ...r, repairIntakeInviteId: 7 } : null;
       },
-      findMany: async () => repairs.map(r => ({ id: r.id })),
+      findMany: async ({ where }: any) => where?.id?.in ? repairs.filter(r => where.id.in.includes(r.id)) : repairs,
     },
     repairIntakeInvite: { findUnique: async () => invite },
     repairIntakeDeliveryPreference: { create: async ({ data }: any) => {
@@ -38,7 +42,25 @@ function fixture(choice: "SHIP_COMPLETED" | "WAIT_ALL" | null = null) {
       invite.deliveryPreferences.push(preference);
       return preference;
     } },
-    shipment: { create: async () => { shipmentWrites++; }, update: async () => { shipmentWrites++; }, updateMany: async () => { shipmentWrites++; } },
+    shipment: {
+      create: async ({ data }: any) => {
+        shipmentWrites++;
+        const parcel = { id: 20 + shipmentWrites, customerId: data.customerId, direction: data.direction,
+          status: data.status, actualShippedAt: null, requestedDeliveryDate: data.requestedDeliveryDate,
+          requestedDeliveryTimeSlot: data.requestedDeliveryTimeSlot,
+          repairs: data.repairs.create.map((link: any) => ({ repairId: link.repair.connect.id })) };
+        for (const link of parcel.repairs) repairs.find(r => r.id === link.repairId).shipmentRepairs.push({ shipment: parcel });
+        return parcel;
+      },
+      updateMany: async ({ where, data }: any) => {
+        const parcel = repairs.flatMap(r => r.shipmentRepairs).map((link: any) => link.shipment)
+          .find((item: any) => item.id === where.id && item.status === "DRAFT" && item.actualShippedAt === null);
+        if (!parcel) return { count: 0 };
+        shipmentWrites++;
+        Object.assign(parcel, data);
+        return { count: 1 };
+      },
+    },
     shipmentRepair: { create: async () => { shipmentWrites++; }, update: async () => { shipmentWrites++; } },
     $queryRaw: async () => [{ id: 3 }],
     $transaction: async (fn: any) => fn(db),
@@ -46,7 +68,7 @@ function fixture(choice: "SHIP_COMPLETED" | "WAIT_ALL" | null = null) {
   return { db, invite, repairs, decision, get preferenceWrites() { return preferenceWrites; }, get shipmentWrites() { return shipmentWrites; } };
 }
 
-test("SHIP_COMPLETED freezes only the request-time completed subset and does not write Shipment", async () => {
+test("SHIP_COMPLETED freezes only the request-time completed subset and creates its Shipment", async () => {
   const f = fixture("SHIP_COMPLETED");
   const shown = await getPublicIntakeDeliveryPreference(f.db, tokenB);
   assert.equal(shown.groupKind, "COMPLETED_AT_REQUEST");
@@ -56,7 +78,8 @@ test("SHIP_COMPLETED freezes only the request-time completed subset and does not
   assert.deepEqual(result.repairs, [{ inquiryNumber: "T-10" }]);
   assert.deepEqual(f.invite.deliveryPreferences[0].repairs.map((r: any) => r.repairId), [10]);
   assert.equal(f.preferenceWrites, 1);
-  assert.equal(f.shipmentWrites, 0);
+  assert.equal(f.shipmentWrites, 1);
+  assert.deepEqual(f.repairs[0].shipmentRepairs[0].shipment.repairs.map((r: any) => r.repairId), [10]);
 });
 
 test("SHIP_COMPLETED saves a second disjoint group after remaining Repairs complete", async () => {
@@ -77,7 +100,8 @@ test("SHIP_COMPLETED saves a second disjoint group after remaining Repairs compl
   await assert.rejects(savePublicIntakeDeliveryPreference(f.db, tokenB, { groupKind: "REMAINING", mode: "NONE" }, now),
     (error: IntakeDeliveryPreferenceError) => error.status === 409);
   assert.equal(f.preferenceWrites, 2);
-  assert.equal(f.shipmentWrites, 0);
+  assert.equal(f.shipmentWrites, 3);
+  assert.notEqual(f.repairs[0].shipmentRepairs[0].shipment.id, f.repairs[1].shipmentRepairs[0].shipment.id);
 });
 
 test("first-group retry cannot answer already complete remaining group", async () => {
@@ -101,7 +125,7 @@ test("first-group retry cannot answer already complete remaining group", async (
   const second = await savePublicIntakeDeliveryPreference(f.db, tokenB, { groupKind: "REMAINING", mode: "NONE" }, now);
   assert.equal(second.groupKind, "REMAINING");
   assert.equal(f.preferenceWrites, 2);
-  assert.equal(f.shipmentWrites, 0);
+  assert.equal(f.shipmentWrites, 3);
 });
 
 test("grouped POST requires a valid group selector and strict body", async () => {
@@ -122,12 +146,12 @@ test("exact prior-group active Shipment permits remaining answer; mixed and mism
     await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "COMPLETED_AT_REQUEST", mode: "NONE" }, now);
     f.repairs[1].status = "作業完了";
     const ids = shape === "mixed" ? [10, 11] : shape === "unrelated" ? [10, 99] : [10];
-    const parcel = { id: 20, customerId: shape === "wrongCustomer" ? 99 : 3,
+    const parcel = { id: 100, customerId: shape === "wrongCustomer" ? 99 : 3,
       direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null, repairs: ids.map(repairId => ({ repairId })) };
-    f.repairs[0].shipmentRepairs.push({ shipment: parcel });
+    if (shape !== "exact") f.repairs[0].shipmentRepairs.push({ shipment: parcel });
     if (shape === "mixed") f.repairs[1].shipmentRepairs.push({ shipment: parcel });
     if (shape === "overlap") {
-      const overlapping = { ...parcel, id: 21, repairs: [{ repairId: 11 }] };
+      const overlapping = { ...parcel, id: 101, repairs: [{ repairId: 11 }] };
       f.repairs[1].shipmentRepairs.push({ shipment: overlapping });
     }
     if (shape === "exact") {
@@ -139,7 +163,7 @@ test("exact prior-group active Shipment permits remaining answer; mixed and mism
         (error: IntakeDeliveryPreferenceError) => error.status === 409);
       assert.equal(f.preferenceWrites, 1);
     }
-    assert.equal(f.shipmentWrites, 0);
+    assert.equal(f.shipmentWrites, shape === "exact" ? 2 : 1);
   }
 });
 
@@ -169,7 +193,7 @@ test("WAIT_ALL waits for every frozen member then records one full-group answer"
   assert.equal(after.available, true);
   assert.deepEqual(after.repairs.map(r => r.inquiryNumber), ["T-10", "T-11"]);
   assert.equal(f.invite.deliveryPreferences[0].repairs.length, 2);
-  assert.equal(f.shipmentWrites, 0);
+  assert.equal(f.shipmentWrites, 1);
 });
 
 test("all-complete group without Task210C decision uses one invite preference and grouped notice URL", async () => {
@@ -179,7 +203,7 @@ test("all-complete group without Task210C decision uses one invite preference an
   await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "DATE_TIME", date: "2026-10-13", timeSlot: "19時～21時" }, now);
   assert.deepEqual(f.invite.deliveryPreferences[0].repairs.map((r: any) => r.repairId), [10, 11]);
   assert.equal(f.preferenceWrites, 1);
-  assert.equal(f.shipmentWrites, 0);
+  assert.equal(f.shipmentWrites, 1);
   assert.equal((await completionDeliveryPath(f.db, 10, tokenA))?.startsWith("/customer/repairs/"), true);
   f.repairs.splice(1, 1);
   assert.equal(await completionDeliveryPath(f.db, 10, tokenA), `/customer/delivery/${tokenA}`);
@@ -192,6 +216,60 @@ test("same answer is idempotent; different second answer is 409", async () => {
   assert.equal(f.preferenceWrites, 1);
   await assert.rejects(savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "NONE" }, now), (error: IntakeDeliveryPreferenceError) => error.status === 409);
   assert.equal(f.preferenceWrites, 1);
+});
+
+test("exact grouped retry recreates one missing Shipment without changing the first answer", async () => {
+  const f = fixture();
+  const answer = { groupKind: "ALL", mode: "DATE_TIME", date: "2026-10-13", timeSlot: "午前中" };
+  await savePublicIntakeDeliveryPreference(f.db, tokenA, answer, now);
+  for (const repair of f.repairs) repair.shipmentRepairs = [];
+  const saved = f.invite.deliveryPreferences[0];
+  await savePublicIntakeDeliveryPreference(f.db, tokenB, answer, now);
+  assert.equal(f.preferenceWrites, 1);
+  assert.equal(f.invite.deliveryPreferences[0], saved);
+  assert.equal(f.shipmentWrites, 2);
+  assert.equal(f.repairs[0].shipmentRepairs[0].shipment.requestedDeliveryTimeSlot, "午前中");
+  await savePublicIntakeDeliveryPreference(f.db, tokenA, answer, now);
+  assert.equal(f.repairs[0].shipmentRepairs.length, 1);
+});
+
+test("a preexisting exact DRAFT Shipment is reused for the first grouped answer", async () => {
+  const f = fixture();
+  const parcel = { id: 90, customerId: 3, direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null,
+    requestedDeliveryDate: null, requestedDeliveryTimeSlot: null,
+    repairs: [{ repairId: 10 }, { repairId: 11 }] };
+  for (const repair of f.repairs) repair.shipmentRepairs.push({ shipment: parcel });
+  await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "TIME", timeSlot: "午前中" }, now);
+  assert.equal(f.shipmentWrites, 1);
+  assert.equal(f.repairs[0].shipmentRepairs.length, 1);
+  assert.equal(parcel.requestedDeliveryTimeSlot, "午前中");
+});
+
+test("SHIP_COMPLETED rejects a future REMAINING Shipment before the first answer", async () => {
+  const f = fixture("SHIP_COMPLETED");
+  const future = { id: 90, customerId: 3, direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null,
+    repairs: [{ repairId: 11 }] };
+  f.repairs[1].shipmentRepairs.push({ shipment: future });
+  await assert.rejects(getPublicIntakeDeliveryPreference(f.db, tokenA),
+    (error: IntakeDeliveryPreferenceError) => error.status === 409);
+  await assert.rejects(savePublicIntakeDeliveryPreference(f.db, tokenA,
+    { groupKind: "COMPLETED_AT_REQUEST", mode: "NONE" }, now),
+    (error: IntakeDeliveryPreferenceError) => error.status === 409);
+  assert.equal(f.preferenceWrites, 0);
+  assert.equal(f.shipmentWrites, 0);
+});
+
+test("grouped answer rejects missing or conflicting return snapshots", async () => {
+  for (const mutate of [
+    (f: ReturnType<typeof fixture>) => { f.repairs[0].returnPhone = null; },
+    (f: ReturnType<typeof fixture>) => { f.repairs[1].returnStreet = "別住所"; },
+  ]) {
+    const f = fixture(); mutate(f);
+    await assert.rejects(savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "NONE" }, now),
+      (error: IntakeDeliveryPreferenceError) => error.status === 409);
+    assert.equal(f.preferenceWrites, 0);
+    assert.equal(f.shipmentWrites, 0);
+  }
 });
 
 test("group uses Task203 modes and rejects invalid or Tokyo-past values", async () => {
@@ -249,13 +327,11 @@ test("active outbound Shipment and cancelled Repair block grouped answer", async
 test("saved preference remains readable and duplicate-safe with an exact outbound Shipment", async () => {
   const f = fixture();
   await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "NONE" }, now);
-  const parcel = { id: 20, customerId: 3, direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null, repairs: [{ repairId: 10 }, { repairId: 11 }] };
-  f.repairs[0].shipmentRepairs.push({ shipment: parcel });
-  f.repairs[1].shipmentRepairs.push({ shipment: parcel });
+  const parcel = f.repairs[0].shipmentRepairs[0].shipment;
   assert.deepEqual((await getPublicIntakeDeliveryPreference(f.db, tokenB)).repairs.map(r => r.inquiryNumber), ["T-10", "T-11"]);
   await savePublicIntakeDeliveryPreference(f.db, tokenB, { groupKind: "ALL", mode: "NONE" }, now);
   assert.equal(f.preferenceWrites, 1);
   parcel.repairs.pop();
   await assert.rejects(getPublicIntakeDeliveryPreference(f.db, tokenA), (error: IntakeDeliveryPreferenceError) => error.status === 409);
-  assert.equal(f.shipmentWrites, 0);
+  assert.equal(f.shipmentWrites, 2);
 });
