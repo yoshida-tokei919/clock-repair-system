@@ -38,7 +38,7 @@
 22. [Shipment作成・発送予定一覧](22_shipment.md)
 23. [PhysicalTag連続scanによる梱包照合](23_shipment-packing.md)
 24. [発送前PhysicalTag release](24_physical-tag-release.md)
-25. [ゆうプリR CSV出力・発送履歴プレビュー](25_yupuri.md)
+25. [ゆうプリクラウド発行・ゆうプリR CSV](25_yupuri.md)
 26. [発送・追跡・配達完了 — 現行運用と制限](26_shipping-tracking-delivery.md)
 
 ## 第VI部 外部連携と内部ロジック

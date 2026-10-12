@@ -18,9 +18,9 @@
 | 現物の保管場所 | activeな`StorageLocationAssignment`と参照先`StorageLocation`。推奨zoneはread-onlyの案内で、実移動記録ではない |
 | タグ本体が使用可能か／案件に付いているか | `PhysicalTag.status`とactiveな`PhysicalTagAssignment`を別々に確認。割当をreleaseしてもタグ本体は`ACTIVE`のまま再利用できる |
 | 1個口の宛先 | `Shipment`作成時のdestination snapshot。Customerの現住所が後で変わっても、既存Shipmentの宛先をそこから補わない |
-| 発送計画・実発送・追跡 | `Shipment.status`、`actualShippedAt`、`trackingNumber`等を各々確認。`Repair.status`との同一視や、status名だけによる配送会社の引受判定をしない |
+| 発送計画・実発送・追跡 | `Shipment.status`、`actualShippedAt`、`trackingNumber`等を各々確認。送り状発行時の追跡番号保存と、日本郵便引受に基づく実発送は別。永続追跡同期は現時点でOFF |
 | LINE送信の確認 | `LineManagerSendOutbox`の`CONFIRMED`とManager履歴の照合。`APPROVED`はintent、`POST_UNCONFIRMED`は結果未確定。確認後に`OUTBOUND InquiryMessage`を作る |
-| カード入金の確定 | 署名付きStripe Webhookでpaid Sessionと登録済みAttempt等を照合した後の`Payment.status=SUCCEEDED`。success画面やWebhook到着だけでは確定しない |
+| カード入金・前受金の確定 | 署名付きStripe Webhookでpaid Sessionと登録済みAttempt等を照合した後の`Payment.status=SUCCEEDED`。前受金充当と返金は別の記録で確認する |
 
 ### 問い合わせとSlack
 
@@ -32,7 +32,7 @@ LINE Webhookの成功応答は`LineWebhookInbox`への受信保存を表す。�
 
 ### Shipmentと外部配送
 
-Shipmentは1個口の記録で、Repairとは別に作成する。作成・梱包一致・タグrelease・ゆうプリR向けCSV出力のいずれも、それだけで実発送にならない。現行のゆうプリR発送履歴APIは**read-only preview**で、tracking候補、raw日付値・status codeを保存しない。Task202Bで公式配送status codeの組の説明を表示できるが、説明はShipment状態の確定ではない。`10/0A`も「引受予定」であり実引受ではない。14バイトの日付値のparseと、追跡番号・発送／配達状態の書戻しは未実装である。詳細は[第22章](22_shipment.md)、[第23章](23_shipment-packing.md)、[第25章](25_yupuri.md)。
+Shipmentは1個口の記録で、作成・梱包一致・タグrelease・送り状発行だけでは実発送にならない。ゆうプリクラウド発行で追跡番号を保存する。発行後CSVの「引受」から配送状態を同期し、全個口の配達完了後にRepairを納品済みにするコードはproduction反映済みだが、2026-10-13時点で永続同期はOFF・実発送E2E前。ゆうプリR履歴APIの**read-only preview**はShipment状態を保存しない。`10/0A`は「引受予定」であり実引受ではない。詳細は[第22章](22_shipment.md)、[第25章](25_yupuri.md)、[第26章](26_shipping-tracking-delivery.md)。
 
 ### 送信と決済
 

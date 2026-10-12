@@ -17,6 +17,8 @@ AI暫定分析 → 人が受付レビュー
         ↓
 Watch / Repair作成（送付待ち）
         ↓
+同じ受付の共有ページURLをLINE通常トークで1回案内
+        ↓
 顧客が時計を発送 → 工房へ現物到着
         ↓
 Repairを「受付」へ変更
@@ -35,26 +37,26 @@ PhysicalTag scan → タイマー → 修理作業
         ↓
 ランニングテスト・作業完了
         ↓
-管理者がLINE作業完了連絡を確認・送信
+管理者が作業完了連絡／複数Repairの発送判断を明示案内
         ↓
-顧客が配達希望日時を回答
+顧客が今回発送するRepairグループの配達希望を回答
         ↓
-Shipment作成・発送予定
+郵送回答でDRAFT Shipment作成・再利用、発送予定確認
         ↓
 PhysicalTag連続scanで梱包照合
         ↓
-ゆうプリR CSV → 送り状発行・現物引渡し
+ゆうプリクラウド発行依頼 → Workerが発行・印刷 → 現物引渡し
         ↓
-発送履歴CSVをread-only preview
+ゆうプリR CSVは代替、発送履歴previewは読取専用
         ↓
-[後続実装] 日本郵便の実引受を確定・追跡番号を保存
+[実装済み・同期OFF] 発行後CSVで日本郵便の実引受を同期
         ↓
-[後続実装] LINE発送通知
+[実装済み・同期OFF] 追跡番号付きLINE発送通知
         ↓
-[後続実装] 配達完了を確定 → Repair納品済み連携
+[実装済み・同期OFF] 配達完了 → 全個口確認後Repair納品済み
 ```
 
-現行のゆうプリR連携は、V3 CSV出力と発送履歴CSVのread-only previewまでである。Task202Bでpreviewに公式配送status codeの組の説明表示が加わったが、追跡番号・実発送日時・配達完了日時・Shipment / Repair statusは書き戻さない。上図の`[後続実装]`部分はTask204等の範囲であり、現在使える操作として扱わない。
+ゆうプリクラウドの送り状発行Workerは実運用中。Task204の追跡・通知・納品反映はproduction実装済みだが、2026-10-13時点で永続追跡同期はOFF、実発送E2E前である。ゆうプリR履歴preview自体は読取専用で、状態を書き戻さない。
 
 ## 2.2 「送付待ち」と「受付」の違い
 
@@ -127,7 +129,7 @@ n8nはローカル自動化基盤として利用する。アプリの正本デ�
 
 2026-10-04確認時点ではDockerではなく、Windowsローカルのn8n 2.19.5を使用している。Windowsタスクスケジューラ `YoshidaClockRepair-n8n` がログオン時に `C:\Users\yoshi\n8n-service\start-n8n.ps1` を起動する。
 
-active workflowは現在2本である。
+定期処理の中心は次の2本であり、初回LINE Manager送信先mappingのn8n接続も追加されている。
 
 1. `LINE Inquiry Inbox Processor` — 1分ごとにLINE Webhook Inboxの後処理APIを呼ぶ。
 2. `Slack Notification Outbox Processor` — 1分ごとにSlack通知Outboxをclaimし、Slack投稿後にsent / failedをアプリへ返す。
@@ -185,7 +187,7 @@ OUTBOUND InquiryMessageを作成
 - lineoa: 現行LINE Manager通常トーク送信系で使用するローカルライブラリ
 - n8n: Windowsローカルの定期処理・Slack連携
 - inquiry-ai-bridge / カタリ: Inquiry AI暫定分析の明示実行
-- ゆうプリR: 日本郵便送り状作成と発送履歴連携
+- ゆうプリクラウド: 送り状発行・印刷。ゆうプリR: CSV代替経路と履歴preview
 - Brother QL-800: PhysicalTag修理袋ラベル印刷
 
 ## 2.9 全体図
@@ -193,5 +195,7 @@ OUTBOUND InquiryMessageを作成
 システム全体の役割分担は次の図で確認する。
 
 ![システム全体構成](../assets/diagrams/system-architecture.svg)
+
+この既存図に未反映のゆうプリクラウドWorker・追跡同期の運用境界は上記本文と第25〜26章で補う。
 
 受付・LINE・AI・発送準備・外部サービスの責任境界は第3章「システム構成とデータの流れ」で詳しく説明する。

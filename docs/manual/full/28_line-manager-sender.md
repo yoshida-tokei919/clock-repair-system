@@ -4,7 +4,7 @@
 
 管理画面で返信を送信待ちへ追加すると`LineManagerSendOutbox`に送信intentを保存する。実際の送信確認までは`OUTBOUND InquiryMessage`を作らない。会話の正本は[第6章](06_inquiry-line-storage.md)、作業完了連絡の画面操作は[第20章](20_completion-line.md)を参照する。本章は送信の内部状態と障害対応を扱う。
 
-Task203Eに関する本章の実行時仕様は、2026-10-05に確認されたremote main / sender runtime `3ac7067dad80d4463f9e897167cad46d270fb4ab`を基準とする。作業ツリー内の古い実装断面や[Inquiry AI Runbook](../../ai/05_INQUIRY_AI_RUNBOOK.md)の過去checkpointだけで、この版のguard・backoff・起動状態を判断しない。
+本章の送信状態は2026-10-13の現行Outbox / Windows sender経路を基準とする。過去の[Inquiry AI Runbook](../../ai/05_INQUIRY_AI_RUNBOOK.md)のcheckpointだけで現在の起動状態を判断しない。
 
 ![LINE Manager送信intentから履歴確認まで](../assets/diagrams/line-manager-sender-flow.svg)
 
@@ -14,9 +14,11 @@ Task203Eに関する本章の実行時仕様は、2026-10-05に確認されたre
 
 確認済み`LineManagerChat`がInquiryのLineUserに対応しなければ、UIは送信intentを作れない。送信時にもInquiry、mapping、固定した送信先の整合を再検証する。
 
+初回mappingの照合は、n8nのInbox処理後と定期health経路からWindows workerが自動実行する。exactな受信message IDが一致した場合だけverifyする。未一致・曖昧・Manager読取失敗時は送信先未確認として止め、必要なら安全な状態通知を確認する。mapping workerはLINEを送信しない。
+
 ## 28.3 承認から送信確認まで
 
-UIの明示操作はLINEを直接送らず、`APPROVED`のoutbox intentを作る。作成時に`sendId`、Manager bot/chat送信先のsnapshot、文面を固定する。Inquiry返信とRepairの作業完了連絡は同じ送信基盤を使う。
+UIの明示操作はLINEを直接送らず、`APPROVED`のoutbox intentを作る。作成時に`sendId`、Manager bot/chat送信先のsnapshot、文面を固定する。Inquiry返信、Customer全体履歴からの返信、Repair返信、受付共有URL、作業完了・発送判断・発送通知は同じ送信基盤を使う。
 
 | 状態・段階 | 意味 |
 | --- | --- |
@@ -50,7 +52,7 @@ reconciliationは`POST_UNCONFIRMED`をclaimし、ローカル証拠とManager履
 
 ## 28.6 実環境の稼働確認と障害時の順序
 
-Task203Eのコードがproductionへdeployされていることと、Windows Scheduled Taskが現在正常稼働していることは別に確認する。2026-10-05のマニュアル監査では`ClockRepair-LineManagerSender`が**登録済み・Enabled**で、actionは`powershell.exe -File "C:\Users\yoshi\line-manager-sender-service\start-line-manager-sender.ps1" -AllowSend`、WorkingDirectoryは`C:\Users\yoshi\line-manager-sender-service\runtime`だった。一方、監査時点のTask stateは`Ready`、直近実行結果は`1`であり、deploy済みという事実だけからlocal senderの現在稼働や送信成功を断定しない。`runtime\VERSION.txt`、`C:\Users\yoshi\line-manager-sender-service\logs`、Scheduled Taskのstate / LastTaskResult、Outbox状態をその都度確認する。launcherはUser環境変数の内部API認証tokenをchildへ渡すが、値は表示しない。
+アプリのproduction deployと、Windows Scheduled Task `ClockRepair-LineManagerSender` の現在稼働は別に確認する。10月5日の古いTask state / LastTaskResultを現在値として使わない。`runtime\VERSION.txt`、`C:\Users\yoshi\line-manager-sender-service\logs`、Scheduled Taskのstate / LastTaskResult、Outbox状態をその都度確認する。lineoa認証の自動復旧が失敗してログインが必要な場合は人が専用profileで復旧する。launcherが渡す内部API認証tokenの値は表示しない。
 
 停止・滞留を疑うときは次の順に確認する。
 

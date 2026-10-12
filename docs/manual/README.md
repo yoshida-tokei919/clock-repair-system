@@ -9,7 +9,7 @@
    - 受付から納品までの操作
    - 各画面の役割
    - 業務ロジック
-   - LINE / LINE Manager sender / n8n / Supabase / Railway / R2 / ゆうプリR等の連携
+   - LINE / LINE Manager sender / n8n / Supabase / Railway / R2 / ゆうプリクラウド・ゆうプリR等の連携
    - Scheduler / WorkTimeSession / PhysicalTag / ScanSession / StorageLocation / Shipment等の内部ロジック
    - 障害時の切り分けと運用上の注意
 2. `quick/` — 簡易版
@@ -50,7 +50,9 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 初期確認時のrepository HEAD: `2e28c8f586c0ccc783893ba901578953bab90d9c`
 
-今後は機能のproduction反映状況に合わせて継続更新する。
+更新日: 2026-10-13。Task205、206、208、210、201G-OPS、204のproduction反映と現在の運用制限を本文に反映した。既存スクリーンショットは維持し、画面差分は本文で補足する。今後もproduction反映状況に合わせて継続更新する。
+
+照合した最新アプリdeploy source: `2052f218d2268b5fa02fea423020a2324242988d`（Task204Eまで）。取説本文の「現在」は2026-10-13の記録に限る。
 
 ## 第I部 システム概要・共通操作
 
@@ -58,10 +60,10 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 
 ## 発送・配達希望の章
 
-- 詳細版: [21 配達希望](full/21_delivery-preference.md) → [22 Shipment](full/22_shipment.md) → [23 梱包照合](full/23_shipment-packing.md) → [24 タグ解放](full/24_physical-tag-release.md) → [25 ゆうプリR](full/25_yupuri.md) → [26 発送・追跡・配達完了（現行運用と制限）](full/26_shipping-tracking-delivery.md)
-- 簡易版: [18 配達希望](quick/18_delivery-preference.md) → [19 Shipment](quick/19_shipment.md) → [20 梱包](quick/20_packing.md) → [21 タグ解放](quick/21_tag-release.md) → [22 ゆうプリR](quick/22_yupuri.md)
+- 詳細版: [21 配達希望](full/21_delivery-preference.md) → [22 Shipment](full/22_shipment.md) → [23 梱包照合](full/23_shipment-packing.md) → [24 タグ解放](full/24_physical-tag-release.md) → [25 ゆうプリクラウド・ゆうプリR](full/25_yupuri.md) → [26 発送・追跡・配達完了（現行運用と制限）](full/26_shipping-tracking-delivery.md)
+- 簡易版: [18 配達希望](quick/18_delivery-preference.md) → [19 Shipment](quick/19_shipment.md) → [20 梱包](quick/20_packing.md) → [21 タグ解放](quick/21_tag-release.md) → [22 ゆうプリクラウド・ゆうプリR](quick/22_yupuri.md)
 
-これらの章は現行実装と未実装範囲を明示する。発送・追跡・配達完了の自動処理はまだ完成していないため、実装済みの発送準備と未実装の自動連携を分けて記載する。
+これらの章は現行実装と運用制限を明示する。送り状発行は運用中。発送後の追跡・通知・納品反映はproduction実装済みだが、2026-10-13時点では永続追跡同期OFF・実発送E2E前として記載する。
 
 ## LINE内部構造の章
 
@@ -96,7 +98,7 @@ PDFだけを正本にはしない。画面変更やロジック変更時はMarkd
 - 見積・承認見本: `previews/03_estimate-approval-parts-preview.md` — 見積入力 → LINE共有 → 顧客承認 → 部品発注
 - タイマー・Scheduler見本: `previews/04_timer-scheduler-preview.md` — WorkTimeSession → Scheduler設定 → WorkCalendar → Scheduler v2 → 今日の作業
 - 修理作業・完了連絡見本: `previews/05_repair-work-completion-preview.md` — PhysicalTag scan → 実修理 → 作業完了 → ランニングテスト → LINE完了連絡
-- 配達希望・発送見本: `previews/06_shipping-yupuri-preview.md` — 配達希望回答 → Shipment → 梱包照合 → PhysicalTag release → ゆうプリR
+- 配達希望・発送見本: `previews/06_shipping-yupuri-preview.md` — 10月5日版の配達希望回答 → Shipment → 梱包照合 → PhysicalTag release → ゆうプリR。現行のゆうプリクラウド発行・追跡同期制限は第25〜26章の本文を参照
 - LINE内部構造見本: [previews/07_line-internals-preview.md](previews/07_line-internals-preview.md)
 - データ保存・実行環境見本: [previews/08_data-runtime-preview.md](previews/08_data-runtime-preview.md)
 - 外部配送・決済等の接続見本: [previews/09_external-services-preview.md](previews/09_external-services-preview.md)

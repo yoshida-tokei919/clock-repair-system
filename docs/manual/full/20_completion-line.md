@@ -14,7 +14,7 @@
 4. StorageLocationの推奨zoneを確認し、blocked等の優先条件がない通常ケースでは現物を `ランニングテスト中` へ移す。
 5. 必要日数のランニングテスト・最終確認を行う。
 6. 問題がなければ `発送・引渡し待ち` へ現物を移す。
-7. B2Cでは「作業完了のLINE連絡」を明示操作する。
+7. B2Cでは同じ受付のRepairの完了状況を確認し、必要な発送判断・配達希望のLINE案内を明示操作する。
 
 ## 20.2 タイマーを先に停止する
 
@@ -35,7 +35,7 @@ status変更時にはRepairStatusLogが追加される。
 statusを `作業完了` にしただけでは、次の処理は自動実行されない。
 
 - LINE送信
-- Shipment作成
+- Shipment作成（顧客の郵送・配達希望回答後に別途作成される）
 - PhysicalTag release
 - StorageLocation移動
 - ランニングテスト完了記録
@@ -85,6 +85,8 @@ StorageLocationも現物の実際の置き場所と一致させる。
 
 B2C案件では、Repairの「LINE」タブ内に `作業完了のLINE連絡` パネルがある。
 
+同じ受付に複数Repairがあり、完成品と未完了品が混在するときは、個別の配達希望URLを送らず、LINEタブから「完成分を先に発送する／全件完成まで待つ」の確認を1回依頼する。全件完了の複数Repairは共有ページで今回発送するグループの配達希望を回答してもらう。
+
 Repair.statusを `作業完了` にしただけではLINEは送られない。
 
 作業者が最終確認後に、送信内容を確認して明示的に送信待ちへ追加する。
@@ -93,7 +95,7 @@ Repair.statusを `作業完了` にしただけではLINEは送られない。
 
 ## 20.8 作業完了LINEの対象条件
 
-作業完了連絡はserver側でも再検証する。
+単一Repairの作業完了連絡はserver側でも再検証する。
 
 主な条件:
 
@@ -102,6 +104,8 @@ Repair.statusを `作業完了` にしただけではLINEは送られない。
 - 元のInquiryからpromotionされたRepairである
 - LINE Manager上の確認済み送信先が存在する
 - 同じRepairの作業完了通知intentが既に存在しない
+
+複数Repairの発送判断依頼は同じ受付と顧客の組を境界にし、現在の完成・未完了の構成や既存Shipmentを別途検証する。
 
 `Customer.lineId` だけを見て送信先へfallbackしない。
 
@@ -119,7 +123,7 @@ Repair.statusを `作業完了` にしただけではLINEは送られない。
 
 - 配達日時の回答依頼
 - 希望がない場合も `希望なし` を選択する案内
-- `/customer/delivery/{token}` の回答URL
+- 単一Repairでは `/customer/delivery/{token}`、複数Repairの対象では `/customer/repairs/{token}` の回答URL
 
 最終文面を画面で確認してから `この内容で送信待ちに追加` を押す。
 
@@ -178,7 +182,7 @@ Outboxの `CONFIRMED` は、Repair.statusとは別の送信実績である。
 
 ## 20.13 配達希望回答は別データ
 
-作業完了LINEに含まれる配達希望URLからの回答は、RepairDeliveryPreferenceとして構造化保存される。
+単一Repairの回答はRepairDeliveryPreference、同じ受付の複数Repairの回答は今回発送するグループのRepairIntakeDeliveryPreferenceとして保存される。郵送回答後はDRAFT Shipmentにも反映される。
 
 希望日・希望時間帯・Shipmentへの反映条件等は第21章で扱う。
 

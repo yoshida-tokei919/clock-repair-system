@@ -2,23 +2,23 @@
 
 ## 34.1 接続先と正本の一覧
 
-この章は、外部サービスとの**現在の接続境界**を示す。CSVの出力、外部画面での操作、戻り値のプレビュー、DBへの確定は別の段階である。「連携あり」を自動更新や外部API接続の意味で読まない。図中の実線は現行経路、点線は調査・未実装の境界を表す。
+この章は、外部サービスとの**現在の接続境界**を示す。CSVの出力、外部画面での操作、戻り値のプレビュー、DBへの確定は別の段階である。既存図はゆうプリクラウドWorker・追跡同期・前受金を含まない10月5日以前の構成であり、現行差分は本文で補う。
 
 ![外部サービスとアプリの接続境界](../assets/diagrams/external-services-boundary.svg)
 
 | サービス | 接続方式 | アプリ側の正本 | 状態変更・確認の責任者 | 現在の状態 |
 | --- | --- | --- | --- | --- |
-| 日本郵便／ゆうプリR | Shipmentから取込用CSVを出力、発送履歴CSVを読取プレビュー。配送会社APIとの直接接続なし | Shipmentの宛先snapshot。履歴側はCSVのraw値・照合候補・公式code pair説明 | 送り状と現物の引渡しは担当者が外部で確認。プレビューはDBを更新しない | **実装済み：CSV出力・公式説明付き読取プレビュー**。引受・追跡・配達の書戻しは未実装 |
+| 日本郵便／ゆうプリクラウド・ゆうプリR | クラウドWorkerで発行・追跡番号保存。R用CSV出力と履歴previewも利用可能 | Shipmentの宛先snapshot・発行結果・配送状態 | 発行は人が依頼。現物引渡しは担当者が確認 | **発行Worker運用中**。追跡同期コードはdeploy済み、永続同期OFF・実発送E2E前 |
 | ヤマトB2クラウド | CSV adapterを調査中。現行アプリにB2出力UI・API・CSV生成はない | 配送会社非依存のShipment。B2固有の確定値は未設定 | 契約固有値と受理済み実ファイルの確認が先決 | **調査完了／実装保留** |
-| Stripe | 顧客のカードCheckout用にHTTPSでSessionを作成し、署名付きWebhookを受信 | Invoice、Payment、PaymentAllocation、PaymentAttempt | Stripeの決済結果をWebhookで検証し、アプリが決済レコードを確定 | **実装済み：B2C請求書のカードCheckout** |
+| Stripe | 請求書・Repair前受金のカードCheckout、返金 | Invoice、Payment、PaymentAllocation、PaymentRefund等 | 決済は署名付きWebhook、返金は結果照合で確定 | **実装済み：B2C前受金・最終請求充当・返金照合** |
 | 銀行振込 | 振込そのものはアプリ外。管理者の手動入金登録API | Invoiceと`MANUAL`／`BANK_TRANSFER`のPayment | 入金を確認した管理者が明示登録。銀行APIや取引明細feedは使わない | **実装済み：手動確認・登録** |
 | PayPay／KOMOJU | 現行の実行可能な決済経路には接続しない | PayPayはenum・表示ラベルのみ。KOMOJUは本Taskで確認したrepo証拠に実装参照なし | 決済確定者・連携経路は未定義 | **未実装**。将来の採用可否をここで決めない |
 | LINE Webhook／LINE Manager sender | Webhook受信と、別のWindows local senderによる送信・履歴照合 | InquiryMessage等の保存済み記録、送信Outbox | Webhook processorと履歴照合。送信intentだけでは送信済みとしない | **個別に実装**。詳細は第27・28章 |
 | n8n／Slack | n8nが処理を定期起動し、Slackへ通知 | 問い合わせはSupabaseのInquiry等。Slack投稿は正本でない | n8nはorchestration、Slackはnotification | **個別に実装**。詳細は第29・30章 |
 
-## 34.2 日本郵便／ゆうプリRのファイル境界
+## 34.2 日本郵便／ゆうプリクラウドとゆうプリRの境界
 
-現行アプリは配送会社APIへ送り状作成や追跡照会を直接要求しない。Admin認証が必要な`GET /api/shipments/[id]/yupuri-v3`が、OUTBOUND・発送前のShipmentの宛先snapshotから、ゆうプリR標準フォーマットV3を**読取専用で生成**する。共通`/shipments`画面にこのCSVの出力ボタンはない。出力APIの運用と、ゆうプリR側への取込・発行・印刷は分けて扱う。
+通常の発行は `/shipments` から人が依頼し、WindowsのゆうプリクラウドWorkerがCSV登録、発行、追跡番号保存、PDF取得、固定プリンタ印刷を行う。郵便局の引受は別の事実。Admin認証が必要な`GET /api/shipments/[id]/yupuri-v3`は、代替のゆうプリR標準フォーマットV3を**読取専用で生成**する。共通画面にこのCSVの出力ボタンはない。
 
 | V3出力契約 | 内容 |
 | --- | --- |
@@ -31,7 +31,7 @@
 
 Admin認証が必要な`POST /api/shipments/yupuri-history/preview`は、ゆうプリR発送履歴CSVを解析して照合候補とエラーを返す。対象はCP932・BOMなし・CRLF・headerあり6列のファイルで、`SHP-{Shipment.id}`により候補を照合する。Task202Bで公式配送status code pairの説明表示を追加した。追跡番号・日付は候補またはraw値にとどめ、**追跡番号、Shipment／Repair status、実発送日時、配達完了日時を保存しない**。重複や追跡番号競合、形式不正も自動解決しない。
 
-`10/0A = 引受予定`を含む公式表のcode pairに説明を表示するが、**説明は実際の郵便局引受やShipment状態更新を証明しない**。公式表の「-」は説明なし、表にない組は未確認として警告する。14バイトの日付値はparseせず、非空の実CSVによる形式確認を待つ。`importableLater`も将来取込候補であり書込承認ではない。Task204の追跡保存、配送状態更新、LINE発送通知をCSV出力やpreviewの結果から先取りしない。業務上の詳細は[第25章](25_yupuri.md)を参照する。
+`10/0A = 引受予定`を含む公式表のcode pairに説明を表示するが、**説明は実際の郵便局引受やShipment状態更新を証明しない**。このpreviewでは14バイトの日付値をparseせず、`importableLater`も書込承認ではない。別の発行後CSV同期経路で配送状態を保存するコードはproduction反映済みだが、永続同期はOFFで実発送E2E前。業務上の詳細は[第25章](25_yupuri.md)・[第26章](26_shipping-tracking-delivery.md)を参照する。
 
 ## 34.3 ヤマトB2クラウドの調査境界
 
@@ -41,15 +41,17 @@ Task201Bは**調査完了／実装保留**である。公式資料で取込レ�
 
 ## 34.4 Stripe CheckoutからWebhook確定まで
 
-現行の顧客Checkout APIは`POST /api/customer/invoices/[token]/checkout`。請求書の公開tokenから対象を取得し、`customer.type === individual`、`invoice.status === issued`、税込総額が正、未入金残高が正であることを確認する。共通の支払作成helperは、処理中のPaymentや部分入金済み請求書を拒否する。したがって画面上に未入金残高が見えても、部分入金後の追加Checkoutはこの経路では扱わない。顧客が金額やproviderを指定してPaymentを作る契約ではない。
+顧客向けCheckoutはB2C請求書と、Repair共有ページの前受金・部品代先払いを扱う。請求書では前受金充当後の残高を支払対象とし、処理中の決済・返金や結果不明のCheckoutを照合せずに新規決済を重ねない。画面へ戻っただけで入金確定にせず、保存されたPayment状態を確認する。
 
-新規開始時はInvoiceとの単一`PaymentAllocation`を伴う`Payment(provider=STRIPE, method=CARD, status=PENDING)`を作り、`PaymentAttempt`にidempotency keyを保持する。そのkeyでStripe Checkout Sessionを作る。Sessionは`mode=payment`、通貨`jpy`、`payment_method_types: ["card"]`、請求総額の1明細である。Session IDをAttemptに記録して顧客をCheckout URLへ移す。顧客請求画面にはApple Pay／Google Payの案内があるが、この章で保証する統合契約は**Stripeのcard Checkout**までであり、walletの利用可能性は約束しない。
+Checkout Sessionの重複防止には保存済みの決済試行と同じidempotency keyを使う。請求書・前受金ともcard Checkoutで、顧客が画面から金額やproviderを任意指定する契約ではない。顧客請求画面のwallet案内だけで利用可能性を保証しない。
 
-同じ請求の`PENDING`なStripe Paymentがあるときは、保存済みSessionをStripeへ照会する。`open`なら既存URLを再利用し、`complete`だがWebhook未確定なら409で結果確認中とする。closed／expiredなら古いPaymentとAttemptを`CANCELED`にしてから作り直す。Session作成失敗は`FAILED`として扱う。URLへ戻ったことや`checkout=success`表示だけで入金済みにしない。
+保存済みSessionが開いていれば既存URLを再利用し、完了してもWebhook未確定なら結果確認中とする。Session作成・ID保存の結果が不明なときは保存済み試行と同じ条件で照合し、別のSessionを推測で作らない。URLへ戻ったことや`checkout=success`表示だけで入金済みにしない。
 
 Stripeからの`POST /api/stripe/webhook`はraw bodyと`stripe-signature`を`STRIPE_WEBHOOK_SECRET`で検証する。署名不正や設定欠落を受け入れない。確定対象は`checkout.session.completed`で、かつ`payment_status === paid`のイベントだけである。それ以外は支払確定を行わない。
 
-確定処理は登録済みCheckout Session IDからAttemptを探し、transaction内でPayment行をlockして再取得する。providerと状態、Session ID、金額、通貨、**単一のallocation**、PaymentとInvoiceの顧客・金額の一致、metadataのinvoice ID・請求番号・Payment ID・Attempt ID、既に記録されたPaymentIntent IDを照合する。一致した`PENDING`のAttemptとPaymentを`SUCCEEDED`へ更新し`paidAt`を保存する。両方が既に`SUCCEEDED`ならidempotentに終了する。不整合時は支払済みを推測して保存しない。請求画面の入金済額・未入金残高は`SUCCEEDED`なPaymentのallocationから計算する。
+確定処理は登録済みCheckout Session IDからAttemptとPaymentを再取得し、支払種別、対象、金額、通貨、metadata等を照合する。前受金はRepairへの受領として、請求入金は前受金充当後の請求残高への支払いとして区別する。条件が一致した場合だけ`SUCCEEDED`へ進め、重複Webhookは冪等に扱う。請求残高は有効な前受金充当、請求入金、成功した返金を反映する。不整合時は入金済みと推測しない。
+
+管理画面では未決済の前受金依頼の取消、未充当前受金のStripe返金、請求入金のStripe返金・外部で実施済みの銀行返金記録、結果不明の返金照合を扱う。銀行返金記録は送金しない。請求書取消は有効な前受金充当を解放するが、自動返金しない。返金が`PENDING`の間は新規返金や請求決済を重ねず照合する。詳細な操作は[第10章](10_customer-approval.md)を参照する。
 
 ## 34.5 銀行振込は管理者の手動確認
 

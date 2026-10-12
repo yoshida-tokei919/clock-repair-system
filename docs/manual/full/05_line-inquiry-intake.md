@@ -124,5 +124,7 @@ Inbox処理に失敗した場合、`LineWebhookInbox` はFAILEDとなり、後�
 3. 対象Inquiryの「時計情報の確認」画面を開く。
 4. LINE本文・画像・AI分析を確認する。
 
+初回のLINE Manager送信先は、Inbox処理後と定期実行の照合で自動mappingする。Manager受信message IDと保存済みLINE受信message IDが完全一致した場合だけ確認済みとする。候補なし・曖昧・外部閲覧エラーなら送信先未確認のまま止まるため、表示名や本文から手動推測して返信しない。
+
 
 ![LINE conversation](../assets/screenshots/inquiry-review-line.png)
