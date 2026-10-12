@@ -65,6 +65,31 @@ model Customer {
   intakeShippingDecisions RepairIntakeShippingDecision[]
   intakeDeliveryPreferences RepairIntakeDeliveryPreference[]
   communicationAiBriefs CommunicationAiBrief[]
+  b2bCompanyMembership B2BCompanyMembership?
+}
+
+// Explicit B2B billing group. Repair, DeliveryNote, Invoice and Shipment keep their store Customer.
+model B2BCompany {
+  id                Int      @id @default(autoincrement())
+  name              String
+  billingCustomerId Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  members           B2BCompanyMembership[] @relation("CompanyMembers")
+  billingMembership B2BCompanyMembership?  @relation("CompanyBillingMembership", fields: [id, billingCustomerId], references: [companyId, customerId], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model B2BCompanyMembership {
+  companyId  Int
+  customerId Int      @unique
+  createdAt  DateTime @default(now())
+
+  company    B2BCompany @relation("CompanyMembers", fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  billingFor B2BCompany[] @relation("CompanyBillingMembership")
+
+  @@id([companyId, customerId])
 }
 
 // LINE webhook users are retained before, and independently from, any Customer UI link.

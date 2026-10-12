@@ -10,6 +10,7 @@ import { ArrowLeft, Save, Building2, User, Star, MessageCircle } from "lucide-re
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "@/components/ui/use-toast";
+import { B2BCompanySettings } from "@/components/customers/B2BCompanySettings";
 
 export default function CustomerEditPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = React.use(params);
@@ -255,6 +256,8 @@ export default function CustomerEditPage({ params }: { params: Promise<{ id: str
           </Button>
         </div>
       </form>
+
+      {data.type === "business" && <B2BCompanySettings customerId={id} />}
 
       <div className="pt-12 border-t">
         <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">関連する修理履歴</h3>
