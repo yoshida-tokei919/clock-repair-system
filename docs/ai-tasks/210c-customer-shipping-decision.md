@@ -1,6 +1,6 @@
 # Task210C — customer shipping decision
 
-Production: pending. Production migration, deploy, production DB mutation, real LINE send, push and tag require a later explicit approval.
+Production: complete.
 
 ## Scope and behavior
 
@@ -14,7 +14,7 @@ Production: pending. Production migration, deploy, production DB mutation, real 
 
 ## Storage and security
 
-- Migration: `20261012_z_add_intake_shipping_decision`.
+- Migration source: `prisma/migrations/20261012_z_add_intake_shipping_decision/migration.sql`.
 - Migration adds `Repair(id, repairIntakeInviteId)` uniqueness as the composite FK target, without changing the `Repair.id` primary key.
 - Both new tables are server-only, RLS enabled with no policies. `PUBLIC`, `anon`, `authenticated` and `service_role` table privileges are explicitly revoked; there is no Data API GRANT and no sequence.
 - The request and response paths use serializable transactions. The request locks LineUser, Customer, invite and member Repairs; rechecks eligibility before creating the snapshot and outbox. Client IDs and choice scope are never trusted.
@@ -25,9 +25,9 @@ Production: pending. Production migration, deploy, production DB mutation, real 
 - Codex implemented Task210C. Katari performed the independent schema / migration / security / boundary review.
 - Initial review found three blocking issues: completion status drift incorrectly invalidated the request-time snapshot, the customer UI did not identify the frozen completed subset, and the Task203 compatibility guard suppressed every multi-Repair intake rather than only a mixed intake or an intake with an existing Task210C decision.
 - Codex corrected those findings. The follow-up review also strengthened snapshot membership with a composite foreign key from `(repairId, repairIntakeInviteId)` to `Repair(id, repairIntakeInviteId)`.
-- Follow-up review found no remaining blocking issue within Task210C. No production DB or migration operation was performed during review.
+- Follow-up review found no remaining blocking issue within Task210C before production approval.
 
-## Validation
+## Validation before production
 
 - Focused Task210C and adjacent regression: 34/34 PASS.
 - `npx prisma validate`: PASS.
@@ -35,11 +35,34 @@ Production: pending. Production migration, deploy, production DB mutation, real 
 - `npx tsc --noEmit --incremental false`: PASS.
 - `npx next build`: PASS — Next.js 15.5.27, compile / lint / type check PASS, static pages 59/59.
 - `git diff --check`: PASS.
-- No schema migration was applied to local or production DB during validation.
-- No real customer token, LINE send, Shipment mutation, Stripe action, or production data mutation was performed.
 
-## Remaining production gate
+## Production
 
-- This Task contains a schema/migration change and therefore remains high risk until production approval.
-- Before applying the production migration: confirm clean source/target state, take the required production DB backup, review the exact migration SQL again, and obtain explicit user approval.
-- Production remains at the recorded Task210B source until that later approved migration/deploy.
+- User explicitly approved the Task210C production migration and deployment on 2026-10-12.
+- Application commit: `6b743d23b60e5678ceaa53ca850cc6857d4381f0` (`feat: add B2C intake shipping decision`).
+- GitHub `main` was fast-forwarded from `9145e4702604b44ff295087452c8f746f4da414c` to the application commit; no unrelated application change was mixed into Task210C.
+- Pre-migration production backup: `C:\Users\yoshi\clock-repair-backups\task210c-20261012-203219`.
+  - Read-only `RepeatableRead` logical snapshot using Railway production environment credentials without displaying secret values.
+  - 82 public base tables, 1,436 rows, 85 backup files.
+  - Manifest contained 84 payload entries and all SHA256 checks passed with 0 mismatches.
+- Supabase production migration: `20261012113346 add_intake_shipping_decision` — applied successfully to project `vpyjonjfpkpbvvjufbiu`.
+- Post-migration read-back:
+  - `RepairIntakeShippingDecision` exists, row count 0 before smoke, RLS enabled.
+  - `RepairIntakeShippingDecisionRepair` exists, row count 0 before smoke, RLS enabled.
+  - `RepairIntakeShippingChoice` contains `SHIP_COMPLETED` and `WAIT_ALL`.
+  - `Repair_id_repairIntakeInviteId_key` and `RepairIntakeDecisionRepair_membership_fkey` exist with the intended composite boundary.
+  - `PUBLIC`, `anon`, `authenticated`, and `service_role` have no table privileges on either new table.
+- Supabase Security Advisor baseline changed from 21 to 23 INFO entries only because the two new server-only tables intentionally have RLS enabled and no policies. No Data API grant or public policy was added.
+- Railway application deployment: `38234190-73c1-4bde-80c1-1a462e8ac76f` — SUCCESS, source `main@6b743d2`, region `sin`.
+- Railway build: Prisma Client generation PASS, Next.js compile / lint / type check PASS, static pages 59/59, image export/push PASS.
+- Runtime: Next.js 15.5.27, Ready in 323ms.
+- Production smoke:
+  - `/` = 200.
+  - `/login` = 200.
+  - `/repairs` unauthenticated = 307 to sign-in.
+  - invalid `/customer/repairs/task210c-smoke-invalid-token` = 404.
+  - invalid `GET /api/customer/intake-shipping/task210c-smoke-invalid-token` = 404.
+  - unauthenticated `GET /api/repairs/1/shipping-decision` = 401.
+- Railway HTTP logs for the smoke window showed the expected statuses and empty `upstreamErrors` for all smoke requests. Existing n8n / LINE sender periodic endpoints remained 200 during the same window.
+- Post-smoke read-back kept both new Task210C tables at 0 rows. No real customer token was used, and no LINE send/outbox creation, Shipment mutation, Stripe action, or customer-data mutation was performed during smoke.
+- Production tag: `production-task210c-20261012`.
