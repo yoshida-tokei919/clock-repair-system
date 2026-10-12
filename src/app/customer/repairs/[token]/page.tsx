@@ -21,6 +21,7 @@ import { CustomerExportTools, CustomerGuideAmountInput } from "./CustomerExportT
 import { CustomerB2CApprovalPanel } from "./CustomerB2CApprovalPanel";
 import { RepairPrepaymentCheckoutButton } from "@/components/customer/RepairPrepaymentCheckoutButton";
 import { PREPAYMENT_STATUS_LABELS } from "@/lib/repair-prepayment-display";
+import { publicShipmentViews } from "@/lib/customer-shipment-status";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,12 @@ const repairInclude = {
   customerMessages: {
     orderBy: { createdAt: "desc" as const },
     select: { id: true, body: true, createdAt: true, readAt: true, senderType: true },
+  },
+  shipmentRepairs: {
+    select: { shipment: { select: {
+      id: true, direction: true, status: true, carrierCode: true, trackingNumber: true,
+      actualShippedAt: true, deliveredAt: true,
+    } } },
   },
 };
 
@@ -161,9 +168,45 @@ function needsCustomerApproval(repair: any) {
   return repair.approvalStatus === "pending" && repair.status === "承認待ち";
 }
 
+function publicShipmentTime(value: Date | null) {
+  if (!value) return null;
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
+    timeZone: "Asia/Tokyo",
+  }).format(value);
+}
+
+function CustomerShipmentStatusSection({ shipments }: { shipments: ReturnType<typeof publicShipmentViews> }) {
+  if (!shipments.length) return null;
+  return (
+    <section className="rounded-2xl border border-sky-200 bg-white p-5 shadow-sm" aria-label="配送状況">
+      <h2 className="text-lg font-bold">配送状況</h2>
+      <div className="mt-3 space-y-3">
+        {shipments.map(shipment => {
+          const shippedAt = publicShipmentTime(shipment.actualShippedAt);
+          const deliveredAt = publicShipmentTime(shipment.deliveredAt);
+          return <div key={shipment.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-bold text-sky-800">{shipment.label}</span>
+              {shipment.inquiryNumbers.length > 0 && <span className="text-xs text-slate-500">対象: {shipment.inquiryNumbers.join(" / ")}</span>}
+            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{shipment.detail}</p>
+            {shipment.trackingNumber && <p className="mt-2 text-sm"><span className="font-semibold">日本郵便 追跡番号:</span> <span className="font-mono">{shipment.trackingNumber}</span></p>}
+            {(shippedAt || deliveredAt) && <div className="mt-2 space-y-1 text-xs text-slate-500">
+              {shippedAt && <p>引受: {shippedAt}</p>}
+              {deliveredAt && <p>配達完了: {deliveredAt}</p>}
+            </div>}
+          </div>;
+        })}
+      </div>
+    </section>
+  );
+}
+
 type ShippingDecisionView = { choice: "SHIP_COMPLETED" | "WAIT_ALL" | null; repairs: { inquiryNumber: string; completedAtRequest: boolean }[] };
 type GroupDeliveryView = Awaited<ReturnType<typeof getPublicIntakeDeliveryPreference>>;
 function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn, documentTokenAccess, shippingDecision, groupDelivery }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null; prepaymentReturn?: string; documentTokenAccess: boolean; shippingDecision?: ShippingDecisionView; groupDelivery?: GroupDeliveryView }) {
+  const shipments = publicShipmentViews(repairs);
   return (
     <main className="min-h-screen bg-[#f3f6fa] px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
       <div className="mx-auto max-w-2xl space-y-4">
@@ -175,6 +218,8 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
 
         {prepaymentReturn === "success" && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">前受金のお支払い結果を確認中です。反映まで少し時間がかかる場合があります。</p>}
         {prepaymentReturn === "cancel" && <p role="status" className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">前受金のお支払い画面から戻りました。お支払いを希望される場合は、下の前受金欄から再度お進みください。</p>}
+
+        <CustomerShipmentStatusSection shipments={shipments} />
 
         {shippingDecision && <ShippingDecisionForm token={token} initialChoice={shippingDecision.choice} repairs={shippingDecision.repairs} />}
         {groupDelivery?.groups.map(group => <section key={group.groupKind} className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm" aria-label="配達日時のご希望">
@@ -391,6 +436,8 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
               </div>
             </div>
           </header>
+
+          <CustomerShipmentStatusSection shipments={publicShipmentViews(repairs)} />
 
           <CustomerRepairAccordionRoot>
             {repairs.map((repair, index) => {
