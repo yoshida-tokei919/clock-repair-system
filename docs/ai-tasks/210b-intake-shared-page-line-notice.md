@@ -1,6 +1,6 @@
 # Task210B — intake shared-page LINE notice
 
-Production: pending.
+Production: complete.
 
 ## Scope
 
@@ -18,4 +18,16 @@ Production: pending.
 - `git diff --check`: PASS.
 - `npx next build`: PASS outside the Codex sandbox. The earlier Codex-sandbox attempt was blocked by `spawn EPERM` before assertions/build compilation could complete.
 - No schema, migration, RLS, GRANT, or env change.
-- Production remains pending. No push, deploy, migration application, or production action has been performed.
+
+## Production
+
+- Application commit: `b696e46f1e4cc0bd8826dc467dc8458ff19e1347` (`feat: queue B2C intake shared page notice`).
+- GitHub `main` was fast-forwarded from `ed5f6c9` to the application commit; no unrelated code change was mixed into Task210B.
+- Schema / migration / RLS / GRANT / env change: none. Production DB backup was therefore not required.
+- Railway application deployment: `aa9954d4-f861-44b1-89c0-efa0b53478ac` - SUCCESS, source `main@b696e46`, region `sin`.
+- Railway build: Prisma Client generation PASS, Next.js compile / lint / type check PASS, static pages 59/59.
+- Runtime: Next.js 15.5.27, Ready in 326ms.
+- Production smoke: `/`=200, `/login`=200, `/repairs` unauthenticated=307, invalid `/customer/repairs/task210b-smoke-invalid-token`=404, unauthenticated `POST /api/internal/line-manager-mapping/verify`=401.
+- Railway HTTP logs for the smoke window had no 5xx responses and `upstreamErrors` was empty.
+- No real customer token was used. No LINE send, outbox creation, customer-data mutation, Stripe action, or other production data mutation was performed during smoke.
+- Production tag: production-task210b-20261012.
