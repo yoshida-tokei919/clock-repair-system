@@ -1,6 +1,6 @@
-# Task201G ? Yu-Pri Cloud operational hardening
+# Task201G — Yu-Pri Cloud operational hardening
 
-Status: production application/rollout gate deployed; Windows Worker registered in non-issuing mode; approved production E2E completed successfully. Live-service compatibility corrections are validated locally and pending a new production approval.
+Status: production operational. Task201G-OPS enabled the canonical Windows Worker for persistent real issuance on 2026-10-13 after reviewed-runtime alignment, rollout-gate correction, explicit user approval, and production verification.
 
 ## Boundary
 
@@ -21,7 +21,7 @@ This task changes only the local dedicated Edge login/session helper, Yu-Pri Clo
 - JP Business ToolBox official availability is **06:00?24:00 JST**. The separate automation operational window remains **06:00 inclusive to 23:55 exclusive JST** to leave a five-minute safety buffer.
 - Browser side effects have fresh service-window guards. Click/check/file actions use bounded Playwright actionability checks and recheck the window immediately before dispatch. PDF HTTP retrieval and printing also recheck the window.
 - Worker operation requires exactly one browser context and one worker page. Only the attributable PDF popup may temporarily add one page; unrelated or extra tabs/contexts fail closed.
-- The Scheduled Task remains registered against canonical `C:\Users\yoshi\clock-repair-system` with **no `-AllowIssue`**. Automatic real issuance is therefore still disabled even though one approved manual E2E used `-Once -AllowIssue`.
+- At the pre-OPS checkpoint, the Scheduled Task was registered against canonical `C:\Users\yoshi\clock-repair-system` with **no `-AllowIssue`**. Task201G-OPS later enabled persistent issuance as recorded below.
 
 ## Live Cloud URL and propagation behavior
 
@@ -63,7 +63,7 @@ The user explicitly approved creating test data and issuing/printing one real te
 - Label PDF exists at `%LOCALAPPDATA%\clock-repair-system\yupuri-cloud\pdf\shipment-2.pdf` (77,737 bytes in this run).
 - Local journal for Shipment 2 reached `stage=completed`, with `printAttempted=true` and `printCompleted=true`. `NEC MultiWriter 5750C` was `Normal` before execution and the print command returned successfully. Physical paper output itself remains an external/manual confirmation item.
 - TEST Customer/Shipment records and the issued Cloud label are intentionally retained for audit. They were not deleted after the test. Cleanup, if desired, is a separate destructive operation and was not performed.
-- Scheduled Task configuration was not changed by the manual E2E; it remains non-issuing (`-AllowIssue` absent).
+- Scheduled Task configuration was not changed by the manual E2E; at the end of that E2E checkpoint it was still non-issuing (`-AllowIssue` absent).
 
 ## Local verification of live-service correction
 
@@ -82,4 +82,17 @@ In the isolated Task201G worktree, after separating all concurrent Task206G1 cha
 - No temporary `.task201g-*` debug runner is retained.
 - Codex independent review is unavailable during the current usage-limit window. The correction was implemented and reviewed by Katari under the user's explicit instruction; independent review remains unperformed.
 
-Production for the **new live-service correction**: pending. Do not push/deploy or enable automatic issuance without a new explicit production approval.
+Production for the live-service correction and Task201G-OPS activation is complete. Shipping acceptance and downstream shipment state remain explicitly deferred to Task204.
+
+## Task201G-OPS production activation — 2026-10-13
+
+- User explicitly approved the production activation and, after the rollout gate exposed an incompatibility with incremental reviewed corrections, explicitly approved the minimal gate fix, production deployment, and activation.
+- Rollout-gate correction commit: `6b95af5be86528cec6aebb8c31469e927a3a0f52` (`fix: allow incremental Yu-Pri rollout review`). The gate now accepts a reviewed Task201G commit that changes the Task201G record plus at least one protected runtime file, while still rejecting unrelated commits and any protected runtime drift after the reviewed commit.
+- Focused installer regression fixture: PASS. `git diff --check`: PASS. `cd74ce5427c92dd3e9be4bd971c184f5847f9ff1` remains an ancestor of canonical main and all eight protected runtime files are unchanged from that reviewed live-handoff correction.
+- Railway deployment `d2ae95ce-4d89-43e6-b4f9-9522ad24d84c` for `6b95af5` completed with `SUCCESS`; production build compiled, type/lint validation completed, and static generation reached 59/59. Production smoke after deploy: `/` 200, `/login` 200, `/shipments` unauthenticated 307, `/repairs` unauthenticated 307.
+- Immediately before activation, production had **zero** `READY + JAPAN_POST + YU_PACK + trackingNumber null + labelIssuedAt null` Shipments, so enabling the persistent worker did not expose an already-queued label to automatic issuance at the next service-window opening.
+- Canonical `ClockRepair-YuPriCloudWorker` now points to `C:\Users\yoshi\clock-repair-system`, is enabled with persistent `-AllowIssue`, and was started in the current Windows session. The worker process is running with `--allow-issue`. The legacy `ClockRepair-YuPriCloudSession` remains Disabled.
+- `YUPURI_CLOUD_PRINTER_NAME` remains `NEC MultiWriter 5750C`; the printer reported `Normal` at activation. Brother QL-800 is not used by this flow.
+- Activation occurred outside the 06:00–23:55 JST automation window. A fresh live remembered-login navigation was therefore intentionally not attempted. The prior approved production E2E remains the live login/issuance evidence, and its protected runtime is unchanged.
+- No new test Shipment or label was issued during Task201G-OPS because the full issuance → tracking → PDF → NEC print → `LABEL_ISSUED` path had already passed production E2E and no new runtime change required another paid/side-effecting label.
+- Persistent real issuance changes only the label issuance path. It does **not** set `actualShippedAt`, does not mark Shipment/Repair as shipped, and does not send LINE shipping notifications. Japan Post Web tracking `引受` remains the future source of truth in Task204.

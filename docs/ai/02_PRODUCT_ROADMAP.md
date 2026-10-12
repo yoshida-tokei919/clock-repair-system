@@ -664,12 +664,14 @@ R-PS連携は有料fallback候補、ゆうパックプリントSkyは現事業�
 
 #### Task201G-OPS: ゆうプリクラウド自動発行の運用化
 
-Task201Gで確立した、ゆうプリクラウドへのCSV登録 → 送り状発行 → trackingNumber取得 → PDF取得 → `NEC MultiWriter 5750C`固定印刷のWorker経路を、日常運用で安全に使用できる状態へ切り替える。
+Status: **production operational activation complete（2026-10-13）**。
+
+Task201Gで確立した、ゆうプリクラウドへのCSV登録 → 送り状発行 → trackingNumber取得 → PDF取得 → `NEC MultiWriter 5750C`固定印刷のWorker経路を、日常運用で使用できる状態へ切り替え済み。
 
 - 管理画面の `ゆうプリクラウド発行を依頼` を人間の明示承認として残す。
-- Scheduled Taskの永続的な `-AllowIssue` 有効化は、productionへ反映済みのreviewed runtimeとcanonical local runtimeが一致していることを確認してから行う。
-- 自動発行を有効化しても、送り状印刷だけでは発送済みにしない。
-- 永続的な実発行ONは外部サービスへの副作用を伴う運用変更なので、実施前にユーザーの明示承認を必須とする。
+- reviewed `cd74ce5` runtimeとcanonical runtimeの一致を確認し、rollout gateを増分review commit対応へ最小修正したうえで、canonical `ClockRepair-YuPriCloudWorker` のpersistent `-AllowIssue` を明示承認後に有効化した。
+- Workerはcanonical repoを参照し、`NEC MultiWriter 5750C`固定。旧 `ClockRepair-YuPriCloudSession` はDisabledを維持する。
+- 自動発行を有効化しても、送り状印刷だけでは発送済みにしない。`actualShippedAt`、Repair発送済み化、LINE発送通知はTask204で日本郵便Web追跡の「引受」を正本として扱う。
 - 二重発行防止の追加拡張は別論点とし、現行のfail-closed / reconciliation契約を維持する。
 
 #### B2C顧客導線・通知方針（2026-10-12）
@@ -930,10 +932,10 @@ B2Cの問い合わせ → 受付 → 共有 → 発送判断 → ゆうプリ �
    - 顧客回答からShipmentを冪等に自動作成する
 7. **Task210F — delivery preference revision / issue lock**
    - DRAFT中の変更とREADY以降のlockを完成させる
-8. **Task201G-OPS — ゆうプリクラウド自動発行の運用化**
-   - `ゆうプリクラウド発行を依頼` を人間承認として残す
-   - reviewed runtime整合確認後、別承認でScheduled Taskの実発行を有効化する
-9. **Task204A — Japan Post tracking read-only poller**
+8. **Task201G-OPS — ゆうプリクラウド自動発行の運用化** ✅ production運用化完了（2026-10-13）
+   - reviewed runtime整合確認・rollout gate修正・persistent `-AllowIssue` 有効化まで完了
+   - 送り状発行は実発送扱いにせず、旧Session Disabled / NEC固定印刷を維持
+9. **Task204A — Japan Post tracking read-only poller** ← 次Task
 10. **Task204B — Shipment tracking state sync**
 11. **Task204C — 引受時の追跡番号付きLINE発送通知**
 12. **Task204D — 共有ページ配送状況表示**
