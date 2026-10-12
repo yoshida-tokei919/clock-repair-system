@@ -1,6 +1,6 @@
 # Task204B - Shipment tracking state sync
 
-Status: local implementation and validation. Production: pending.
+Status: production complete. Persistent tracking sync and real-shipment E2E remain pending.
 
 ## Scope
 
@@ -43,3 +43,15 @@ This format must be confirmed in the approved real-shipment E2E before tracking 
 ## Review exception
 
 The user explicitly authorized Katari to implement and review Task204A through Task204E while Codex quota is limited. Independent Codex review is intentionally omitted for this sequence. Production deployment, persistent `-AllowTrackingSync`, and real delivery mutation remain separate approval points.
+
+## Production completion ? 2026-10-13
+
+- Application commit: `658b913361f67bbf9d8dccdaa8ca6699fb6ceae3`.
+- Deployed source: GitHub `main` at `2052f218d2268b5fa02fea423020a2324242988d`.
+- Railway deployment: `fb00bade-aecb-44bf-a9a0-3e18a23baa01` ? `SUCCESS`, region `sin`.
+- Railway build: Prisma Client generation PASS; Next.js 15.5.27 compile / lint / type validation PASS; static generation 59/59 PASS.
+- Production runtime: Next.js Ready in 382ms.
+- Non-destructive smoke: `/`=200, `/login`=200, unauthenticated `/repairs`=307, `/shipments`=307, invalid `/customer/repairs/...` token=404, unauthenticated `POST /api/internal/japan-post-tracking`=401, unauthenticated `POST /api/internal/japan-post-tracking/sync`=401. Railway HTTP logs showed empty `upstreamErrors` for these smoke requests.
+- No schema / migration / RLS / GRANT / environment-variable change was required. Smoke testing made no Shipment / Repair delivery-state mutation and sent no LINE message.
+- Persistent `-AllowTrackingSync` remains OFF. The approved real-shipment E2E will confirm the live Cloud CSV, 14-digit timestamp format, acceptance -> LINE -> transport -> out-for-delivery -> delivered -> Repair delivery completion before operational activation.
+- Review exception: the user explicitly authorized Katari implementation and review for Task204A-E while Codex quota was limited; independent Codex review was intentionally omitted for this sequence.
