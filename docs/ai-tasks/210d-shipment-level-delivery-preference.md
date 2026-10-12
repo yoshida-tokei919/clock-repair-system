@@ -1,6 +1,6 @@
 # Task210D — shipment-level delivery preference
 
-Production: pending.
+Production: complete.
 
 ## Scope
 
@@ -33,4 +33,17 @@ Production: pending.
 ## Remaining boundary
 
 - Shipment creation and applying this preference to DRAFT Shipments remain Task210E. Re-answer and later issue state handling remain Task210F.
-- Migration has not been applied. No production data, main merge, push, deployment, or tag was changed.
+- Production completion is recorded below. Task210E has not been started.
+
+## Production
+
+- User approval: 2026-10-12.
+- Application commit: `359098056395eedd3d529b5b842a71e4f68247a3` (`feat: add grouped delivery preference`).
+- Pre-migration logical backup: `C:\Users\yoshi\clock-repair-backups\task210d-20261012-230647` using Railway production `DATABASE_URL` in a Repeatable Read / Read Only transaction. Snapshot: 84 public tables, 1,436 rows, 87 files; manifest covered 86 payload files with 0 SHA256 mismatches.
+- Supabase production migration: `20261012140757 add_intake_delivery_preference` applied successfully.
+- Production read-back: enum values `COMPLETED_AT_REQUEST`, `REMAINING`, `ALL`; both new tables present with RLS enabled; expected unique/composite FKs present; no table privileges for `PUBLIC`, `anon`, `authenticated`, or `service_role`; both new tables remained at 0 rows through smoke verification.
+- Supabase Security Advisor: INFO-only baseline changed from 23 to 25 findings. The two added findings are the intentional `rls_enabled_no_policy` notices for the new server-only tables; no Task210D WARN/ERROR was introduced.
+- Railway application deployment: `065a3670-919c-4b49-844e-1351dfd8be14`, source `main@3590980`, region `sin`, status `SUCCESS`. Production build passed compile, lint/type validation, and static generation 59/59; Next.js 15.5.27 runtime reached Ready in 584ms.
+- Non-destructive production smoke: `/` 200, `/login` 200, unauthenticated `/repairs` 307, invalid shared-page token 404, invalid Task210D public API token 404, and unauthenticated delivery-preference-link POST 401. Railway HTTP logs had no upstream errors in the smoke window.
+- No real customer token, LINE send, outbox creation, Shipment/ShipmentRepair mutation, Stripe action, or customer data mutation was used for smoke testing. No new environment variables were required.
+- Production tag: `production-task210d-20261012` (created after the final docs-only deployment succeeds).
