@@ -1,6 +1,6 @@
 # Task210A — intake shared-page grouping
 
-Production: pending.
+Production: complete.
 
 ## Goal
 
@@ -37,10 +37,24 @@ B2Cの1回の送付受付で作成された複数Repairを、1つの継続共有
 
 - Rebased cleanly onto `origin/main` commit `60a016f` (B2C roadmap update).
 - Focused `customer-repair-share` + `repair-intake` + customer Repair token-only regression: 41/41 PASS after the post-rebase safety tightening.
+- Focused prepayment regression after the compatibility fix: 16/16 PASS.
 - `npx tsc --noEmit --incremental false`: PASS.
 - `git diff --check`: PASS.
 - `npx next build`: PASS — Next.js 15.5.27, compile / lint / type check PASS, static pages 59/59.
 
-## Review / rollout boundary
+## Review
 
-Katari implemented the initial Task210A change while Codex usage was unavailable. After rebase, Katari tightened the final grouped page read to re-apply the resolved Customer + intake boundary. A later Codex read-only review found one Medium backward-compatibility regression: a legacy EstimateDocument-token page could no longer start prepayment checkout for a Repair without its own public token. Codex implemented only that finding, preserving Repair-token isolation while restoring the server-validated EstimateDocument-token checkout path. Focused checkout regression: 16/16 PASS; TypeScript and `git diff --check` PASS. Katari then reviewed the Codex fix and direct authorization impact with no remaining blocking finding. Production deploy remains pending explicit approval.
+Katari implemented the initial Task210A change while Codex usage was unavailable. After rebase, Katari tightened the final grouped page read to re-apply the resolved Customer + intake boundary. A Codex read-only review found one Medium backward-compatibility regression: a legacy EstimateDocument-token page could no longer start prepayment checkout for a Repair without its own public token. Codex implemented only that finding, preserving Repair-token isolation while restoring the server-validated EstimateDocument-token checkout path. Katari then reviewed the Codex fix and direct authorization impact with no remaining blocking finding.
+
+## Production
+
+- Application commit: `d002a1d1d340373fe62d09574248e6d05378d00d` (`feat: group B2C intake repair share page`).
+- GitHub `main` was fast-forwarded from `60a016f` to the application commit; no unrelated code change was mixed into Task210A.
+- Schema / migration / RLS / GRANT / env change: none. Production DB backup was therefore not required.
+- Railway application deployment: `d7950a03-a1c7-41dc-9190-2cdce277b0f9` — SUCCESS, source `main@d002a1d`, region `sin`.
+- Railway build: Prisma Client generation PASS, Next.js compile / lint / type check PASS, static pages 59/59.
+- Runtime: Next.js 15.5.27, Ready in 471ms.
+- Production smoke: `/`=200, `/login`=200, `/repairs` unauthenticated=307, invalid `/customer/repairs/task210a-smoke-invalid-token`=404.
+- Railway HTTP logs for the smoke window had no 5xx and `upstreamErrors` was empty.
+- No real customer token was used. No Stripe checkout, LINE send, or customer data mutation was performed during smoke.
+- Production tag: `production-task210a-20261012`.
