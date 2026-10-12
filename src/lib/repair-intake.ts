@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
 import { hasSameInquiryWatchIdSet, reconcileInquiryClosure, reconcileInquiryRepairIntakeInvites } from "@/lib/inquiry-lifecycle";
 import { validateInquiryWatchPromotionEligibility } from "@/lib/inquiry-promotion";
+import { queueIntakeSharedPageNotice } from "@/lib/intake-shared-page-notice";
 
 export const REPAIR_INTAKE_STATUS = "送付待ち";
 export const REPAIR_INTAKE_INVITE_TTL_DAYS = 7;
@@ -598,6 +599,7 @@ export async function submitRepairIntake(
     if (inquiryBound) {
       await reconcileInquiryClosure(tx, invite.inquiryId!);
       await reconcileInquiryRepairIntakeInvites(tx, invite.inquiryId!, now);
+      await queueIntakeSharedPageNotice(tx, invite.id);
     }
 
     return { customerId: customer.id, repairs: repairs.map((repair) => ({ id: repair.id, inquiryNumber: repair.inquiryNumber })) };

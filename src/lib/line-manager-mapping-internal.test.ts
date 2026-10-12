@@ -48,6 +48,11 @@ test("verification delegates only exact parsed evidence to the verified mapping 
   const body = { lineUserId: 2, evidenceInquiryMessageId: 3, evidenceManagerMessageId: "m", managerBotId: "b", managerChatId: "c" };
   let received: any;
   const create: any = async (_db: unknown, input: unknown) => { received = input; return { id: 9, lineUserId: 2, verifiedAt: new Date("2026-09-23T00:00:00Z"), managerBotId: "b", managerChatId: "c" }; };
-  assert.deepEqual(await verifyLineManagerMapping({} as any, body, create), { id: 9, lineUserId: 2, verifiedAt: new Date("2026-09-23T00:00:00Z") });
+  const tx: any = {
+    $executeRaw: async () => undefined,
+    repairIntakeInvite: { findMany: async () => [] },
+  };
+  const db: any = { $transaction: async (callback: (client: any) => Promise<unknown>) => callback(tx) };
+  assert.deepEqual(await verifyLineManagerMapping(db, body, create), { id: 9, lineUserId: 2, verifiedAt: new Date("2026-09-23T00:00:00Z") });
   assert.deepEqual(received, body);
 });

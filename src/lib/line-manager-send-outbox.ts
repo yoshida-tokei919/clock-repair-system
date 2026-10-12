@@ -30,7 +30,7 @@ export function createLineManagerSendId(managerChatId: string, timestampMs = Dat
 
 /** Registers only a destination demonstrated by an immutable inbound LINE message. */
 export async function createVerifiedLineManagerChat(
-  db: LineManagerSendOutboxDb,
+  db: Pick<LineManagerSendOutboxDb, "inquiryMessage" | "lineManagerChat">,
   input: { lineUserId: number; managerBotId: string; managerChatId: string; evidenceInquiryMessageId: number; evidenceManagerMessageId: string; verifiedAt?: Date },
 ) {
   if (!input.managerBotId.trim() || !input.managerChatId.trim() || !input.evidenceManagerMessageId.trim()) {

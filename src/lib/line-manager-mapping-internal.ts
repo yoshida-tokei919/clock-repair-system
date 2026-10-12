@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { createVerifiedLineManagerChat, type LineManagerSendOutboxDb } from "./line-manager-send-outbox";
+import { lockLineUserInquiryTransaction } from "./inquiry-transaction-lock";
+import { queueIntakeSharedPageNotice } from "./intake-shared-page-notice";
 
 const CANDIDATE_LIMIT = 20;
 const EVIDENCE_LIMIT = 5;
@@ -65,8 +67,17 @@ export async function verifyLineManagerMapping(
   create: typeof createVerifiedLineManagerChat = createVerifiedLineManagerChat,
 ) {
   const input = parseLineManagerMappingVerification(body);
-  const row = await create(db, input);
-  return { id: row.id, lineUserId: row.lineUserId, verifiedAt: row.verifiedAt };
+  return db.$transaction(async (tx) => {
+    await lockLineUserInquiryTransaction(tx, input.lineUserId);
+    const row = await create(tx, input);
+    const invites = await tx.repairIntakeInvite.findMany({
+      where: { lineUserId: input.lineUserId, inquiryId: { not: null }, usedAt: { not: null } },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    for (const invite of invites) await queueIntakeSharedPageNotice(tx, invite.id);
+    return { id: row.id, lineUserId: row.lineUserId, verifiedAt: row.verifiedAt };
+  }, { timeout: 20_000 });
 }
 
 export const LINE_MANAGER_MAPPING_INTERNAL_LIMITS = { CANDIDATE_LIMIT, EVIDENCE_LIMIT };
