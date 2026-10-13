@@ -836,6 +836,8 @@ n8n
 
 Status: **Task205A-C production complete**。一括受付、master drill-down、自由入力＋候補検索、movement / base Cal、依頼内容入力まで本番反映済み。
 
+Future: **Task205E — B2B intake document / image AI assist**。依頼書・メモ・時計画像を任意で取り込み、AI入力候補を人間確認後に案件化する。ScanSnap iX1300と既存Webカメラを入力源とし、AIはOpenClaw経由のChatGPT Plus枠を使う。従量課金AI APIは使用せず、依頼書なしの従来入力を維持する。
+
 - 取引先起点で複数本をまとめて受け付けられるようにする
 - 時計情報は既存Repairと同じマスタdrill-downを再利用し、自由入力と既存候補の絞り込みを両立する
 - 依頼内容を受付時に入力できるようにする

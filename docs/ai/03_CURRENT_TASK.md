@@ -62,6 +62,9 @@ B2Cの「問い合わせ → 受付 → 共有 → 見積/承認 → 修理 → 
 
 ### B2B remaining gaps
 
+- Task205E — B2B依頼書・画像AI入力候補: **future**。ScanSnap iX1300 / 既存Webカメラから任意で資料を取り込み、OpenClaw + ChatGPT Plus枠でbrand / model / Ref / serial / Cal / 依頼内容等の候補を作り、人間確認後に案件化する。現行E2Eのblockerにはしない。
+- B2B取引先LINE紐付けUX: **future UX改善**。現行機能では公式LINE受信後に /line-users から既存/新規Customerへ安全に紐付け可能だが、新規取引先登録画面のLINE ID欄だけでは正しい手順が分かりにくい。
+
 - Task206F — Gmail channel foundation: **未実装**。現時点ではメール送受信が必要な取引先案件がないため、優先度を下げる。必要案件が発生した時にCustomer Communication Hubへ統合し、見積書Gmail送信も同時に扱う。
 - B2B一括PhysicalTagのBrother QL-800実機複数枚連続印刷はsoftware経路はproduction済みだが、実機での複数枚連続出力確認は未完了。
 - B2B帳票の `NEC MultiWriter 5750C` 固定印刷経路はproduction済み。納品書・郵送請求書とも紙の実出力確認は実案件時に行う。

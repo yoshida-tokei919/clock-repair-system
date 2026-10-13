@@ -96,6 +96,8 @@ B2B案件を1件、以下の流れで実運用に近い形で通して確認す�
 | B2B-E2E-003 | 既存請求書を指定店舗へ集約できる | production complete / Task207C | 解消済み | 元請求書を保持したままbundle化 |
 | B2B-E2E-004 | 集約請求の明細を納品書単位にする | production complete / Task207C | 解消済み | DeliveryNote単位snapshotを保持 |
 | B2B-E2E-005 | 元請求書と集約先請求の紐付けを保持する | production complete / Task207C | 解消済み | 元Invoiceとのlinkを保持 |
+| B2B-E2E-006 | 依頼書・時計画像からAI入力候補を作成し、確認後に案件化する | future / Task205E | いいえ | ScanSnap iX1300 + 既存Webカメラ。依頼書なしは従来入力。AIはOpenClaw + ChatGPT Plus枠 |
+| B2B-E2E-007 | B2B取引先登録時のLINE紐付け導線を分かりやすくする | future UX | いいえ | 現行は相手から公式LINEへ1通受信 → /line-users で既存/新規Customerへ明示紐付け可能。手入力LINE ID欄は誤解を招く |
 
 ## その場修正記録
 
