@@ -1,7 +1,14 @@
 # Task211D — Repair手入力内装部品の区分整合
 
 Status: local implementation complete / Katari independent review complete  
-Production: pending
+Production: complete — 2026-10-14 JST
+
+- Application commit: `5e67a35bdb187da6a2fe97ad0b0170ea5ca0aea6`。
+- Railway application deployment: `74ac3185-d76d-44a4-a3ab-d8d700920fdb` — SUCCESS。
+- User explicitly approved push / deploy。schema / migration / env / production DB変更なし。
+- Production smoke: `/`=200、未認証 `/api/invoices/postal-print-targets`=401。
+- Production tag: `production-task211d-20261014`。
+- K-002の認証済み実画面での保存再試行は未確認。
 
 ## E2E blocker
 
@@ -21,5 +28,5 @@ B2B実案件K-002の保存時、手入力の内装交換部品が `partType=inte
 
 カタリ独立差分レビュー: 新規行作成に分類関数が接続され、保存payloadでもcategory / partTypeが保持されること、技術料・マスタ選択経路・サーバー検証を維持することを確認。blocking findingなし。
 
-Production deploy・認証済み実案件の再保存は未実施。ユーザー承認後にmain push / Railway deploy / production smokeを行う。本番DBへの直接変更は不要。
+ユーザー承認後にmain push / Railway deploy / production smokeまで完了。本番DBへの直接変更は実行していない。認証済み実案件の再保存は未確認。
 既に開いている画面内の未保存の矛盾行は自動補正しないため、反映後に内容を控えて再読込し、該当部品行を正しい区分で追加し直す必要がある。
