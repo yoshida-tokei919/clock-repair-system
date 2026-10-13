@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { createEstimateItemFromPart } from "@/lib/estimate-item";
+import { getNewItemClassification, type AddItemCategory } from "@/lib/repair-entry-item-classification";
 import { canApplyPartsOrderStatus, getRepairStatusFromActiveOrderStatuses } from "@/lib/repair-parts-status";
 import { getRepairStatusForSave } from "@/lib/repair-status-transition";
 import {
@@ -98,12 +99,6 @@ type WorkTargetPartOption = {
     sortOrder?: number | null;
     categoryName?: string | null;
 };
-type AddItemCategory = 'internal' | 'external_labor' | 'part_external';
-
-const toLineItemPartType = (partInputType: PartInputType): "interior" | "exterior" =>
-    partInputType === "part_internal" ? "interior" : "exterior";
-
-
 function FormRow({
     label,
     children,
@@ -3448,9 +3443,8 @@ ${shopName}
                                             }
                                             const baseItem: LineItem = {
                                                 id: `auto-${Date.now()}`,
-                                                category: addItemCategory,
+                                                ...getNewItemClassification(addItemCategory, selectedPartInputType),
                                                 ...(isAddingPartItem ? {
-                                                    partType: toLineItemPartType(selectedPartInputType),
                                                     partNameEn: selectedPartNameOption?.displayEn ?? selectedPartNameOption?.nameEn,
                                                     standardPartNameId: selectedPartNameMaster?.id ?? null,
                                                 } : {}),

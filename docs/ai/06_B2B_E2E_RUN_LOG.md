@@ -101,7 +101,7 @@ B2B案件を1件、以下の流れで実運用に近い形で通して確認す�
 
 ## その場修正記録
 
-まだなし。
+- Task211D（実装中、production pending）: K-002の修理明細保存時、手入力した内装交換部品行が `category=part_external` / `partType=interior` となりサーバーで拒否された。見積・承認工程を続けるためのblocker。新規行分類のみを修正し、サーバーの矛盾拒否は維持。対象: `src/components/repairs/RepairEntryForm.tsx`、`src/lib/repair-entry-item-classification.ts` と同test、Task文書。カタリ独立差分レビュー完了、blocking findingなし。本番反映は承認待ち。反映後はK-002の明細保存からE2Eを再開する。
 
 修正した場合は以下を残す。
 
@@ -128,7 +128,7 @@ B2B案件を1件、以下の流れで実運用に近い形で通して確認す�
 
 **K-002〜K-005の一括受付・PhysicalTag準備と、NFC UID登録 / R65 HID読取 / 対象Repair解決の実機確認後。**
 
-次は対象案件の案件情報を確認し、見積・承認工程へ進む。詳細は末尾の2026-10-13実案件確認記録を参照する。
+次はTask211Dの独立レビュー・本番反映後、K-002の明細保存を再試行し、見積・承認工程へ進む。詳細は末尾の実案件確認記録を参照する。
 
 ## チャット切替時の運用
 
@@ -205,3 +205,9 @@ Hardware follow-up（通しテストblockerではない）:
 
 再開位置: **受付・PhysicalTag準備・NFC実機確認後 → 案件情報確認 / 見積・承認工程**。
 見積・承認 → 作業 → 納品書 → Shipment → 請求 → 手動入金確認は、この記録では完了扱いにしない。
+
+### 2026-10-14 — K-002明細保存blocker / Task211D
+
+- K-002の手入力した内装交換部品行で保存時に区分矛盾エラーが発生。新規行が `category=part_external` / `partType=interior` となることをコード上で確認した。PartsMasterに一致しない手入力経路で表面化する。
+- Task211Dで新規行の分類を修正。サーバー側の矛盾拒否は維持。ローカル対象test 29件、型チェック、`git diff --check` はPASS。カタリ独立差分レビュー完了、blocking findingなし。production反映と認証済み画面での保存再試行は未実施。
+- 再開位置: **Task211Dの本番反映後、K-002の明細保存から再試行 → 見積・承認工程**。後続工程は未確認。
