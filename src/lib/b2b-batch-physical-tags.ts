@@ -18,7 +18,7 @@ export function parseB2bBatchTagInput(body: unknown): number[] {
   return ids;
 }
 
-type PreparedLabel = { repairId: number; physicalTagId: number; shortCode: string; reused: boolean; label: PhysicalTagLabel };
+type PreparedLabel = { repairId: number; physicalTagId: number; shortCode: string; nfcUid: string | null; reused: boolean; label: PhysicalTagLabel };
 
 export async function prepareB2bBatchPhysicalTags(db: PrismaClient, repairIds: number[], adminId: number): Promise<PreparedLabel[]> {
   const repairs = await db.repair.findMany({
@@ -46,7 +46,7 @@ export async function prepareB2bBatchPhysicalTags(db: PrismaClient, repairIds: n
     let reused = true;
     const readActive = () => db.physicalTagAssignment.findFirst({
       where: { repairId, releasedAt: null },
-      select: { physicalTag: { select: { id: true, shortCode: true, qrToken: true, status: true } } },
+      select: { physicalTag: { select: { id: true, shortCode: true, qrToken: true, status: true, nfcUid: true } } },
     });
     let assignment = await readActive();
     if (!assignment) {
@@ -55,7 +55,7 @@ export async function prepareB2bBatchPhysicalTags(db: PrismaClient, repairIds: n
           const tag = await db.$transaction(async tx => {
             const active = await tx.physicalTagAssignment.findFirst({
               where: { repairId, releasedAt: null },
-              select: { physicalTag: { select: { id: true, shortCode: true, qrToken: true, status: true } } },
+              select: { physicalTag: { select: { id: true, shortCode: true, qrToken: true, status: true, nfcUid: true } } },
             });
             if (active) return { tag: active.physicalTag, created: false };
             const created = await tx.physicalTag.create({
@@ -65,7 +65,7 @@ export async function prepareB2bBatchPhysicalTags(db: PrismaClient, repairIds: n
             });
             const issued = await tx.physicalTag.update({
               where: { id: created.id }, data: { shortCode: `PT-${String(created.id).padStart(6, "0")}` },
-              select: { id: true, shortCode: true, qrToken: true, status: true },
+              select: { id: true, shortCode: true, qrToken: true, status: true, nfcUid: true },
             });
             await tx.physicalTagAssignment.create({
               data: { physicalTagId: issued.id, repairId, assignedBy: adminId, assignReason: "B2B一括受付タグ発行" },
@@ -86,7 +86,7 @@ export async function prepareB2bBatchPhysicalTags(db: PrismaClient, repairIds: n
       throw new B2bBatchTagError(409, "有効な管理タグを確認できません。案件を確認してください。");
     }
     const tag = assignment.physicalTag;
-    prepared.push({ repairId, physicalTagId: tag.id, shortCode: tag.shortCode, reused,
+    prepared.push({ repairId, physicalTagId: tag.id, shortCode: tag.shortCode, nfcUid: tag.nfcUid, reused,
       label: physicalTagLabel({
         shortCode: tag.shortCode, qrToken: tag.qrToken, inquiryNumber: repair.inquiryNumber,
         customerType: "business", customerName: repair.customer.name, companyName: repair.customer.companyName,

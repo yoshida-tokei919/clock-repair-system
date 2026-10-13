@@ -1,6 +1,6 @@
 import type { PhysicalTagLabel } from "./physical-tag-label";
 
-export type BatchPrintItem = { repairId: number; physicalTagId: number; shortCode: string; reused: boolean; label: PhysicalTagLabel };
+export type BatchPrintItem = { repairId: number; physicalTagId: number; shortCode: string; nfcUid: string | null; reused: boolean; label: PhysicalTagLabel };
 
 export class BatchPrintStopped extends Error {
   constructor(public readonly failedIndex: number, cause: unknown) {

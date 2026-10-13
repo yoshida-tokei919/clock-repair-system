@@ -9,6 +9,7 @@ import { physicalTagLabel } from "@/lib/physical-tag-label";
 import { printPhysicalTagLabel } from "@/lib/bpac-physical-tag-print";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PhysicalTagNfcBinding } from "./PhysicalTagNfcBinding";
 
 type Tag = { physicalTagId: number; shortCode: string; qrToken: string; nfcUid: string | null };
 type Props = {
@@ -121,7 +122,9 @@ export function PhysicalTagPanel(props: Props) {
         {tag ? (
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="font-mono font-semibold">{tag.shortCode}</span>
-            {tag.nfcUid && <span className="text-zinc-600">NFC UID: {tag.nfcUid}</span>}
+            <PhysicalTagNfcBinding key={tag.physicalTagId} physicalTagId={tag.physicalTagId}
+              repairId={props.repairId} shortCode={tag.shortCode} inquiryNumber={props.inquiryNumber}
+              initialNfcUid={tag.nfcUid} onBound={uid => setTag(current => current ? { ...current, nfcUid: uid } : current)} />
             <Button type="button" size="sm" disabled={printing} onClick={() => void directPrint()}>
               {printing ? "印刷中..." : "ラベル印刷"}
             </Button>
@@ -139,7 +142,7 @@ export function PhysicalTagPanel(props: Props) {
             <Button type="button" size="sm" disabled={issuing} onClick={() => void issue()}>
               {issuing ? "発行中..." : "管理タグを発行"}
             </Button>
-            <p className="w-full text-xs text-zinc-500">R65リーダーのUID出力形式は未確認です。UIDは後から確認できます。</p>
+            <p className="w-full text-xs text-zinc-500">R65で読み取ったUIDは発行後にも登録できます。</p>
           </div>
         )}
         {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}

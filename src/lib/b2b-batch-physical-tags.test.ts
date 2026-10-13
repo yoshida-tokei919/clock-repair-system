@@ -12,8 +12,8 @@ function repair(id: number, customerId = 7, type = "business") {
 }
 
 function fixture(rows = [repair(10), repair(11)]) {
-  const assignments = new Map<number, { physicalTag: { id: number; shortCode: string; qrToken: string; status: "ACTIVE" } }>();
-  assignments.set(11, { physicalTag: { id: 3, shortCode: "PT-000003", qrToken: "existing-token", status: "ACTIVE" } });
+  const assignments = new Map<number, { physicalTag: { id: number; shortCode: string; qrToken: string; status: "ACTIVE"; nfcUid: string | null } }>();
+  assignments.set(11, { physicalTag: { id: 3, shortCode: "PT-000003", qrToken: "existing-token", status: "ACTIVE", nfcUid: "04333F" } });
   let creates = 0;
   let race = false;
   const findFirst = async ({ where }: { where: { repairId: number } }) => assignments.get(where.repairId) ?? null;
@@ -22,7 +22,7 @@ function fixture(rows = [repair(10), repair(11)]) {
     physicalTagAssignment: { findFirst },
     $transaction: async (run: (tx: any) => Promise<unknown>, options: unknown) => {
       assert.deepEqual(options, { isolationLevel: "Serializable" });
-      let pending: { physicalTag: { id: number; shortCode: string; qrToken: string; status: "ACTIVE" }; repairId: number } | null = null;
+      let pending: { physicalTag: { id: number; shortCode: string; qrToken: string; status: "ACTIVE"; nfcUid: string | null }; repairId: number } | null = null;
       const tx = {
         physicalTagAssignment: {
           findFirst,
@@ -30,7 +30,7 @@ function fixture(rows = [repair(10), repair(11)]) {
             assert.equal(data.assignedBy, 42);
             if (race) {
               race = false;
-              assignments.set(data.repairId, { physicalTag: { id: 99, shortCode: "PT-000099", qrToken: "race-token", status: "ACTIVE" } });
+              assignments.set(data.repairId, { physicalTag: { id: 99, shortCode: "PT-000099", qrToken: "race-token", status: "ACTIVE", nfcUid: null } });
               throw Object.assign(new Error("race"), { code: "P2002" });
             }
             assert.equal(pending?.repairId, data.repairId);
@@ -40,14 +40,14 @@ function fixture(rows = [repair(10), repair(11)]) {
           create: async () => { creates += 1; return { id: 3 + creates }; },
           update: async ({ where }: { where: { id: number } }) => {
             const tag = { id: where.id, shortCode: `PT-${String(where.id).padStart(6, "0")}`,
-              qrToken: `new-token-${where.id}`, status: "ACTIVE" as const };
+              qrToken: `new-token-${where.id}`, status: "ACTIVE" as const, nfcUid: null };
             pending = { physicalTag: tag, repairId: rows[0].id };
             return tag;
           },
         },
       };
       const result = await run(tx);
-      const staged = pending as { physicalTag: { id: number; shortCode: string; qrToken: string; status: "ACTIVE" }; repairId: number } | null;
+      const staged = pending as { physicalTag: { id: number; shortCode: string; qrToken: string; status: "ACTIVE"; nfcUid: string | null }; repairId: number } | null;
       if (staged) assignments.set(staged.repairId, { physicalTag: staged.physicalTag });
       return result;
     },
@@ -74,10 +74,14 @@ test("missing, B2C, and mixed-customer repairs fail before issuance", async () =
 
 test("reuses active tag, issues only missing, preserves order and canonical private QR", async () => {
   const f = fixture();
+  const existingAssignment = f.assignments.get(11);
   const first = await prepareB2bBatchPhysicalTags(f.db, [11, 10], 42);
   assert.deepEqual(first.map(item => [item.repairId, item.shortCode, item.reused]),
     [[11, "PT-000003", true], [10, "PT-000004", false]]);
   assert.equal(first[0].label.qrPayload, "existing-token");
+  assert.equal(first[0].nfcUid, "04333F");
+  assert.equal(first[1].nfcUid, null);
+  assert.equal(f.assignments.get(11), existingAssignment);
   assert.equal(first[1].label.qrPayload, "new-token-4");
   assert.equal(first[1].label.customerName, "Partner Co");
   assert.equal(first[1].label.brand, "ロレックス");
@@ -87,6 +91,10 @@ test("reuses active tag, issues only missing, preserves order and canonical priv
   assert.equal(f.creates, 1);
   const second = await prepareB2bBatchPhysicalTags(f.db, [11, 10], 42);
   assert.ok(second.every(item => item.reused));
+  assert.equal(second[0].nfcUid, "04333F");
+  assert.equal(second[0].shortCode, "PT-000003");
+  assert.equal(second[0].label.qrPayload, "existing-token");
+  assert.equal(f.assignments.get(11), existingAssignment);
   assert.equal(f.creates, 1);
 });
 

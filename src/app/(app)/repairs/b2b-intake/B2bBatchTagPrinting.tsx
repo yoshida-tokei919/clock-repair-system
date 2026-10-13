@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { printPhysicalTagLabel } from "@/lib/bpac-physical-tag-print";
 import { BatchPrintStopped, printBatchFrom, type BatchPrintItem } from "@/lib/b2b-batch-print-progress";
+import { PhysicalTagNfcBinding } from "@/components/repairs/PhysicalTagNfcBinding";
 
 type IntakeResult = { partnerId: number; repairs: Array<{ id: number; inquiryNumber: string }> };
 
@@ -57,6 +58,7 @@ export function B2bBatchTagPrinting({ result, onReset }: { result: IntakeResult;
             item.label?.inquiryNumber !== result.repairs[index].inquiryNumber ||
             item.label?.customerType !== "business" || item.label?.shortCode !== item.shortCode ||
             !Number.isSafeInteger(item.physicalTagId) || item.physicalTagId < 1 ||
+            (item.nfcUid !== null && typeof item.nfcUid !== "string") ||
             !/^PT-\d{6,}$/.test(item.shortCode) || typeof item.label?.qrPayload !== "string" ||
             !item.label.qrPayload ||
             prepared.some((other, otherIndex) => otherIndex < index &&
@@ -104,6 +106,9 @@ export function B2bBatchTagPrinting({ result, onReset }: { result: IntakeResult;
       <p role="status" className="mt-2">印刷完了を確認: {completed.length}/{labels.length}枚。既存タグ再利用: {labels.filter(item => item.reused).length}件。</p>
       <ol className="mt-2 space-y-1">{labels.map((item, index) => <li key={item.repairId}>
         {index + 1}. {item.label.inquiryNumber} / {item.shortCode} — {completed.includes(index) ? "印刷完了" : failedIndex === index ? "印刷結果不明" : index >= nextIndex ? "未試行" : "要確認"}
+        <div className="ml-4"><PhysicalTagNfcBinding physicalTagId={item.physicalTagId} repairId={item.repairId}
+          shortCode={item.shortCode} inquiryNumber={item.label.inquiryNumber} initialNfcUid={item.nfcUid}
+          onBound={uid => setLabels(current => current?.map(row => row.repairId === item.repairId ? { ...row, nfcUid: uid } : row) ?? null)} /></div>
       </li>)}</ol>
     </>}
     {busy && <p role="status" className="mt-2">{labels ? "印刷中..." : "管理タグ準備中..."}</p>}
