@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConsolidatedInvoicePanel } from "@/components/invoices/ConsolidatedInvoicePanel";
+import { PostalInvoiceBatchPrint } from "@/components/invoices/PostalInvoiceBatchPrint";
 import { b2bPaymentDueDate, parseBillingMonth } from "@/lib/b2b-billing-month";
 
 type Partner = {
@@ -389,6 +390,7 @@ export default function InvoicesPage() {
                         )}
                     </div>
                 </div>
+                <PostalInvoiceBatchPrint />
                 <ConsolidatedInvoicePanel />
             </div>
         </div>
