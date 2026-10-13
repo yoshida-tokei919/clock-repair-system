@@ -64,7 +64,7 @@ B2Cの「問い合わせ → 受付 → 共有 → 見積/承認 → 修理 → 
 ### B2B remaining gaps
 
 - Task205E — B2B依頼書・画像AI入力候補: **future**。ScanSnap iX1300 / 既存Webカメラから任意で資料を取り込み、OpenClaw + ChatGPT Plus枠でbrand / model / Ref / serial / Cal / 依頼内容等の候補を作り、人間確認後に案件化する。現行E2Eのblockerにはしない。
-- Task211A — Repair photo capture reliability / quality: **future**。B2B E2EのRepair #4で、スマホQR撮影のアップロード失敗、保存済み写真の解像度表示欠落、PC撮影画像の画質不足を確認。PC/スマホの撮影・圧縮・保存経路、実解像度表示、重複カメラ実装をRepair共通基盤として整理する。現行E2Eのblockerにはしない。
+- Task211A — Repair photo capture reliability / quality: **future**。B2B E2Eで、スマホQR撮影のアップロード失敗と、4K対応済みの既存撮影機材が現在1920×1080で取得される画質退行を確認。撮影時の解像度診断表示は現存するため追加不要。camera device選択 / capabilities / 4K negotiation、保存品質、PC/スマホ撮影経路の重複をRepair共通基盤として整理する。現行E2Eのblockerにはしない。
 - B2B取引先LINE紐付けUX: **future UX改善**。現行機能では公式LINE受信後に /line-users から既存/新規Customerへ安全に紐付け可能だが、新規取引先登録画面のLINE ID欄だけでは正しい手順が分かりにくい。
 
 - Task206F — Gmail channel foundation: **未実装**。現時点ではメール送受信が必要な取引先案件がないため、優先度を下げる。必要案件が発生した時にCustomer Communication Hubへ統合し、見積書Gmail送信も同時に扱う。
