@@ -7,13 +7,14 @@
 
 ## Production current state
 
-- Runtime application source: `2052f218d2268b5fa02fea423020a2324242988d` — Task204E application commit。
-- Railway deployment: `fb00bade-aecb-44bf-a9a0-3e18a23baa01` — SUCCESS、region `sin`。
+- Runtime application source: `cf991c0ec27257ff9e3ec5b04710531f6e2a78a3` — Task207C application commit。Task207A-Cを含む。
+- Railway runtime deployment: `db417b3b-2220-4a03-80b2-bf41d413cd54` — SUCCESS、region `sin`。
 - Railway build: Prisma Client generation PASS、Next.js 15.5.27 compile / lint / type validation PASS、static generation 59/59 PASS。
-- Runtime smoke: `/`=200、`/login`=200、未認証 `/repairs`=307、`/shipments`=307、invalid customer share token=404、Task204 internal routes未認証=401。
-- `origin/main` の最新production記録commitは `9fdaf664af5b5e73df1fe8357fd6ddd1c6353f5c`。これはTask204A-Eのproduction記録を追加したdocs commitで、runtime application sourceは上記 `2052f21` のまま。
-- production tags: `production-task204a-20261013` 〜 `production-task204e-20261013`。
-- Task204 rolloutではschema / migration / RLS / GRANT / environment variable変更なし。
+- Runtime smoke: `/`=200、`/login`=200、未認証 `/invoices`=307、`GET /api/customers/1/company`=401、`GET/POST /api/invoices/consolidated`=401。
+- `origin/main` の最新production記録commitは `5552c025bfd75aa1c590b127b78ebc4c68636ce9`。docs-only再deployment `3251594c-0eee-4c15-953c-f338df050441` もSUCCESS。
+- production tags: `production-task207a-20261013`、`production-task207b-20261013`、`production-task207c-20261013`。
+- Task207B/C production migrations: `20261013021135 add_b2b_company_billing_foundation` / `20261013021204 add_consolidated_invoice`。
+- Task207A-C rollout前backup: `C:\Users\yoshi\clock-repair-backups\task207abc-20261013T020650Z`。
 
 ## B2C current state
 
@@ -52,27 +53,22 @@ B2Cの「問い合わせ → 受付 → 共有 → 見積/承認 → 修理 → 
 - Task205B: ブランド -> モデル -> Ref / Cal のmaster drill-down。
 - Task205C: 自由入力 + 既存候補検索、movement maker / Cal、base maker / Cal、依頼内容入力。
 - Task205D: 一括PhysicalTag準備 + Brother QL-800 / DK-2205直接印刷経路。
+- Task207A: B2B納品書を `NEC MultiWriter 5750C` へ固定印刷するlocal helper / UI — production complete。紙の実出力確認のみ未完了。
+- Task207B: B2B company / 複数店舗 / 指定請求先店舗の基盤 — production complete。
+- Task207C: 既存各店舗Invoiceを保持したまま指定請求先へ集約し、DeliveryNote単位snapshotを保持する集約基盤 — production complete。
 - Repair / 見積 / Scheduler / WorkTimeSession / PhysicalTag / StorageLocation / Shipment等の基幹機能はB2C/B2B共通基盤を利用する。
 
 ### B2B remaining gaps
 
-- Task206F — Gmail channel foundation: **未実装**。B2BメールをCustomer Communication Hubへ統合する。
-- Task207系 — 帳票delivery channel / 5750C明示印刷 / 月次請求送付: **未実装**。
-  - 見積書 Gmail送信
-  - 納品書 `NEC MultiWriter 5750C` 明示印刷
-  - 請求書 LINE通常トーク / 郵送振り分け
-  - 郵送請求書の5750C一括印刷
-  - 月末締め翌月末支払期日の自動設定
+- Task206F — Gmail channel foundation: **未実装**。現時点ではメール送受信が必要な取引先案件がないため、優先度を下げる。必要案件が発生した時にCustomer Communication Hubへ統合する。
+- Task207後続 — B2B請求・帳票運用の残工程: **未実装 / 未Task化部分あり**。
+  - 月末締め・翌月末支払期日の自動設定
+  - 請求書のLINE通常トーク / 郵送振り分け
+  - 郵送請求書の `NEC MultiWriter 5750C` 一括印刷
+  - 見積書Gmail送信はTask206F導入時に扱う
 - B2B一括PhysicalTagのBrother QL-800実機複数枚連続印刷はsoftware経路はproduction済みだが、実機での複数枚連続出力確認は未完了。
-- B2B E2Eで確定済みの複数店舗請求集約は未実装。
-  - 同一会社の複数店舗識別
-  - 会社単位の請求集約先店舗指定
-  - 既存各店舗請求書を保持したまま集約請求へ束ねる
-  - 集約請求の明細は納品書単位
-  - 元請求書と集約先請求の紐付け保持
-- 入金確認は当面手動。銀行API連携は必須要件にしない。
-
-B2B通しテストの専用正本は `docs/ai/06_B2B_E2E_RUN_LOG.md`。実案件を受付から納品・請求まで通し、進行不能の不足だけ独立Task化する。
+- B2B E2Eは実案件の受付登録開始前。`docs/ai/06_B2B_E2E_RUN_LOG.md` を正本に、受付から納品・請求・手動入金確認まで通す。
+- 入金確認は手動を正式運用とし、銀行口座API連携・自動消込は実装対象にしない。
 
 ## Other major completed foundations
 
@@ -81,23 +77,30 @@ B2B通しテストの専用正本は `docs/ai/06_B2B_E2E_RUN_LOG.md`。実案件
 - Shipment / packing / PhysicalTag release / ゆうプリR fallback / ゆうプリクラウド Stage C: production基盤あり。
 - Task208A-E 前受金・Stripe・返金/照合: production complete。
 - Task209A-B route/token security hardening: production complete。
+- PublicCase / Web事例公開: 既存production機能あり。現在の主要残Taskには含めない。
 
-## Hold / optional items
+## Closed / deferred items
 
-- Task206H2: Personal Plugin / remote MCP / Supabase OAuth案 — 保留。
-- Task206H5B / H5C — 保留。B2C/B2Bの主要導線のblockerにしない。
-- ヤマトB2クラウドadapter — 一次資料 / 実利用の必要性が出るまで保留。
-- PublicCase / Instagram等の事例公開は、B2C/B2B本格運用導線より後順位。
+- Task206H2 — Personal Plugin / remote MCP / Supabase OAuth案: **廃止**。OpenClawからChatGPT Plus枠を利用でき、主要用途を既存LINE Outbox / Customer Communication Hub / OpenClaw連携で満たせるため追加実装しない。OpenAI API等の従量課金AI APIへはフォールバックしない。
+- Task206H3 / H4 — OpenClaw local agent / Command Bridge PoC: **完了**。必要箇所で成果を再利用する。
+- Task206H5A — Slack -> n8n即時化: **完了**。
+- Task206H5B — Repair等のread-only実業務PoC: **PoC完了**。OpenClawを恒久的な構造化データreadの正本にはせず、固定取得はAPI / DB / n8nを優先する。
+- Task206H5C — Bridge API拡張: **未実装のまま終了**。H5Bまでで目的を確認できたため自動着手しない。具体的な業務上の不足が出た場合のみ新Taskとして再評価する。
+- Instagram連携・投稿自動化: 現時点では実施予定なし。残Taskに含めない。
+- ヤマトB2クラウドadapter: ヤマトとの契約後、実利用が必要になった時点で検討する。現時点では残Taskに含めない。
+- 銀行口座連携・自動消込: 実装しない。入金確認は手動運用を維持する。
+- PublicCaseの追加拡張: 事例公開自体は利用可能。新しい要件が出た場合のみ別Task化する。
 
 ## Next recommended order
 
-1. **実発送E2E** — 実発送可能な案件がある時にTask204のlive end-to-endを確認し、問題なければtracking sync常時運用へ移す。
-2. **Task206F — Gmail channel foundation** — B2Bのメール連絡をCustomer Communication Hubへ統合する。
-3. **Task207系 — 帳票delivery / 5750C / 月次請求送付** — B2Bの見積・納品・請求の送付運用を完成させる。
-4. **B2B E2E継続** — `docs/ai/06_B2B_E2E_RUN_LOG.md` に沿って実案件を最後まで通す。
-5. **B2B複数店舗・請求集約** — E2Eで必要性と現行schema差分を確認してTask分割する。
-6. 本格運用後のScheduler / Communication Hub精度改善。
-7. 事例公開・その他後順位機能。
+1. **Task207後続 — B2B月次請求・送付運用**
+   - 月末締め / 翌月末支払期日
+   - LINE利用先 / 郵送先の送付経路
+   - 郵送請求書の5750C一括印刷
+2. **B2B E2E継続** — `docs/ai/06_B2B_E2E_RUN_LOG.md` に沿って実案件を受付 → 案件化 → 見積 → 作業 → 納品 → Shipment → 請求 → 手動入金確認まで通す。
+3. **実発送E2E** — 実発送可能な案件が出た時にTask204のlive end-to-endを確認し、問題なければtracking sync常時運用へ移す。
+4. **Task206F — Gmail channel foundation** — メール対応が必要なB2B取引先が発生した時点で着手する。
+5. 本格運用後のScheduler / Communication Hub精度改善。
 
 ## Task boundary
 
