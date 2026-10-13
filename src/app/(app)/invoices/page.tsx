@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ConsolidatedInvoicePanel } from "@/components/invoices/ConsolidatedInvoicePanel";
 
 type Partner = {
     id: number;
@@ -393,6 +394,7 @@ export default function InvoicesPage() {
                         )}
                     </div>
                 </div>
+                <ConsolidatedInvoicePanel />
             </div>
         </div>
     );

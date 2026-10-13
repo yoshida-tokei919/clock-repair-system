@@ -66,6 +66,7 @@ model Customer {
   intakeDeliveryPreferences RepairIntakeDeliveryPreference[]
   communicationAiBriefs CommunicationAiBrief[]
   b2bCompanyMembership B2BCompanyMembership?
+  consolidatedBillingDestinations ConsolidatedInvoice[] @relation("ConsolidatedBillingDestination")
 }
 
 // Explicit B2B billing group. Repair, DeliveryNote, Invoice and Shipment keep their store Customer.
@@ -1820,6 +1821,7 @@ model Invoice {
   paymentAllocations PaymentAllocation[]
   pdfFiles      InvoicePdfFile[] @relation("InvoicePdfFiles")
   currentPdfFile InvoicePdfFile? @relation("CurrentInvoicePdfFile", fields: [currentPdfFileId], references: [id], onDelete: SetNull)
+  consolidatedSource ConsolidatedInvoiceSource?
   
   totalAmount   Int      @default(0) // Issued pre-tax subtotal, integer JPY (existing meaning)
   taxAmount     Int      @default(0) // Issued tax, integer JPY
@@ -1827,6 +1829,62 @@ model Invoice {
   status        String   @default("issued") // issued, paid
   paymentDueDate DateTime?
   sentAt        DateTime?
+}
+
+// Historical billing bundle; original store invoices remain the financial source records.
+model ConsolidatedInvoice {
+  id Int @id @default(autoincrement())
+  companyId Int
+  billingCustomerId Int
+  companyName String
+  billingName String
+  billingCompanyName String?
+  billingZipCode String?
+  billingPrefecture String?
+  billingCity String?
+  billingStreet String?
+  billingBuilding String?
+  billingAddress String?
+  billingPhone String?
+  billingEmail String?
+  grossTotalAmount Int
+  createdAt DateTime @default(now())
+
+  billingCustomer Customer @relation("ConsolidatedBillingDestination", fields: [billingCustomerId], references: [id], onDelete: Restrict)
+  sources ConsolidatedInvoiceSource[]
+
+  @@index([companyId, createdAt])
+}
+
+model ConsolidatedInvoiceSource {
+  id Int @id @default(autoincrement())
+  consolidatedInvoiceId Int
+  invoiceId Int @unique
+  invoiceNumber String
+  sourceCustomerId Int
+  sourceCustomerName String
+  sourceCompanyName String?
+  totalAmount Int
+  taxAmount Int
+  grossTotalAmount Int
+  issuedDate DateTime
+  deliveryNotes ConsolidatedInvoiceDeliveryNote[]
+
+  consolidatedInvoice ConsolidatedInvoice @relation(fields: [consolidatedInvoiceId], references: [id], onDelete: Restrict)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+}
+
+model ConsolidatedInvoiceDeliveryNote {
+  id Int @id @default(autoincrement())
+  sourceId Int
+  deliveryNoteId Int?
+  slipNumber String?
+  issuedDate DateTime?
+  repairCount Int
+  subtotalAmount Int?
+
+  source ConsolidatedInvoiceSource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  @@index([sourceId])
 }
 
 // Immutable per-repair amounts and delivery details captured when an Invoice is issued.
