@@ -17,11 +17,21 @@ B2B E2Eの見積・作業入力で、既存の `repair`（修理）とは別に�
 - lintは設定がなく対話setupで停止したため未確認。設定を新規作成してTaskを拡大していない。
 - カタリ独立差分レビュー: 内装だけへの追加、既存repair維持、共有候補 / Scheduler適用判定への接続、schema変更なしを確認。
 - 初回表示名の誤りを指摘し、表示名・正本・Task内SQLを「動作修理」に修正。4コードポイントと定義一致を限定再確認、git diff --check PASS。
-- 本番DB書込み、実画面確認、deployは未実施。
+- 承認前の検証時点では本番DB書込み・deploy未実施。承認後の実施結果は次節に記録。
 
-## Production: pending
+## Production: complete — 2026-10-14 JST
 
-本Taskではproduction DBへ書き込まない。独立レビュー、ユーザー承認、対象環境と直前の行確認後、`RepairWorkAction` に**1行だけ**追加する。Task142の全foundation importer、通常seed、DB resetは実行しない。
+- User approved production master addition and push/deploy.
+- Application commit: `2a26cfc7aa63f5627d57cc7922a73ec8bfa9022b`。
+- Railway deployment: `5c2bca8b-b784-41c9-b91a-60cefd8571c8` — SUCCESS、region `sin`。
+- Production master: `RepairWorkAction.id=25`、`name=movement_repair`、`displayName=動作修理`、`sortOrder=25`、`isActive=true`。既存repair / adjustを事前事後で確認、追加は1行のみ。
+- Runtime smoke: `/`=200、`/login`=200、未認証 `/api/invoices/postal-print-targets`=401。
+- 認証済み本番画面での候補表示は未確認。共有選択条件は対象testで内装許可 / 外装拒否を確認済み。
+- Production tag: `production-task211c-20261014`。
+
+### Reviewed production procedure (executed)
+
+独立レビュー、ユーザー承認、対象環境と直前の行確認後、以下の手順で `RepairWorkAction` に**1行だけ**追加した。Task142の全foundation importer、通常seed、DB resetは実行していない。
 
 事前read-only確認:
 

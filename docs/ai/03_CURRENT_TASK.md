@@ -1,17 +1,18 @@
 # CURRENT TASK
 
-## 現在のcheckpoint — 2026-10-13
+## 現在のcheckpoint — 2026-10-14
 
 このファイルは、現在のproduction到達点、未完了事項、次に着手する候補だけを管理する。
 過去Taskの詳細は `docs/ai-tasks/`、全体の優先順位は `docs/ai/02_PRODUCT_ROADMAP.md`、B2B通しテストは `docs/ai/06_B2B_E2E_RUN_LOG.md` を参照する。
 
 ## Production current state
 
-- Runtime application source: `cea7fcc753e177623d619cb87d57391111f9f51b` — Task207F application commit。Task207A-Fを含む。
-- Railway runtime deployment: `13ab5c66-fbbc-4604-9c7a-2303e8de6326` — SUCCESS、region `sin`。
-- Railway build: Prisma Client generation PASS、Next.js 15.5.27 compile / lint / type validation PASS、static generation 59/59 PASS。
-- Runtime smoke: `/`=200、`/login`=200、未認証 `/invoices`=307（loginへ）、`GET /api/invoices/postal-print-targets`=401、`GET /api/invoices/preview?...`=401。
-- production tags: `production-task207a-20261013` 〜 `production-task207f-20261013`。
+- Latest application change: `2a26cfc7aa63f5627d57cc7922a73ec8bfa9022b` — Task211C内装「動作修理」追加。Task196G / Task205C-FIX1 / Task207A-Fを祖先に含む。後続docs-only commitでもこのapplication到達点を維持する。
+- Application rollout deployment: `5c2bca8b-b784-41c9-b91a-60cefd8571c8` — SUCCESS、region `sin`。後続docs-only rolloutのlatest deploymentはRailwayで確認する。
+- Railway production build SUCCESS。Local対象test 7件 / TypeScript PASS。Local lintは対話setupが必要なため未確認。
+- Runtime smoke: `/`=200、`/login`=200、未認証 `GET /api/invoices/postal-print-targets`=401。認証済み本番画面の候補表示は未確認。
+- production tag: `production-task211c-20261014`。既存Task207A-F等のtagsも維持。
+- Task211C production master追加: `RepairWorkAction.id=25` / `movement_repair` / 動作修理 / sortOrder 25 / active。既存repair / adjust維持、1行だけ追加。schema / migration / env変更なし。
 - Task207B/C production migrations: `20261013021135 add_b2b_company_billing_foundation` / `20261013021204 add_consolidated_invoice`。Task207D-Fはschema / migration / env / production DB変更なし。
 - Task207A-C rollout前backup: `C:\Users\yoshi\clock-repair-backups\task207abc-20261013T020650Z`。Task207D-Fはmigrationなしのため追加backup不要。
 
