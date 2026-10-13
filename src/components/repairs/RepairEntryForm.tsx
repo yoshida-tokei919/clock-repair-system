@@ -2989,7 +2989,7 @@ ${shopName}
                                             ) : (
                                                 <div className="space-y-1">
                                                     <FormRow label="メーカー">
-                                                        <AdvancedCombobox value={movementMaker} onChange={handleMovementMakerChange} options={movementMakerOpts} placeholder="OMEGA / ETA..." requireSelection />
+                                                        <AdvancedCombobox value={movementMaker} onChange={handleMovementMakerChange} options={movementMakerOpts} placeholder="OMEGA / ETA..." />
                                                     </FormRow>
                                                     <FormRow label="Cal">
                                                         <AdvancedCombobox value={movementCaliber} onChange={setMovementCaliber} options={filteredMovementCalOpts} placeholder="1120..." />
@@ -3016,7 +3016,7 @@ ${shopName}
                                             ) : (
                                                 <div className="space-y-1">
                                                     <FormRow label="メーカー">
-                                                        <AdvancedCombobox value={baseMovementMaker} onChange={handleBaseMovementMakerChange} options={movementMakerOpts} placeholder="ETA..." requireSelection />
+                                                        <AdvancedCombobox value={baseMovementMaker} onChange={handleBaseMovementMakerChange} options={movementMakerOpts} placeholder="ETA..." />
                                                     </FormRow>
                                                     <FormRow label="Cal">
                                                         <AdvancedCombobox value={baseMovementCaliber} onChange={setBaseMovementCaliber} options={filteredBaseMovementCalOpts} placeholder="2892.A2..." />
