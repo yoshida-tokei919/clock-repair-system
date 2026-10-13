@@ -17,4 +17,11 @@
 
 ## Production
 
-Pending. No push, deployment, production migration, or production DB operation in this task.
+Complete on 2026-10-13.
+
+- Application commit: `d14b521`.
+- Railway production deployment: `13ab5c66-fbbc-4604-9c7a-2303e8de6326` — SUCCESS (`sin`).
+- Production build: Prisma Client generation, Next.js compile / lint / type validation, static generation 59/59 — PASS.
+- Production smoke: `/`=200, `/login`=200, unauthenticated `/invoices`=307 to login, `/api/invoices/preview?...`=401 — PASS.
+- No schema, migration, environment-variable, or production DB change; no production backup required.
+- Production tag: `production-task207d-20261013`.

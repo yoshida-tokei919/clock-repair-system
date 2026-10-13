@@ -91,11 +91,11 @@ B2B案件を1件、以下の流れで実運用に近い形で通して確認す�
 
 | ID | 要件 | 状態 | 通しテスト阻害 | 備考 |
 | --- | --- | --- | --- | --- |
-| B2B-E2E-001 | 同一会社に複数店舗を登録・識別できる | 要件確定 / 実装状況要確認 | 未判定 | Repairは依頼元店舗へ紐づける |
-| B2B-E2E-002 | 会社単位で請求集約先店舗を指定できる | 要件確定 / 未実装想定 | 未判定 | 現行schema・請求ロジックを調査してTask化 |
-| B2B-E2E-003 | 既存請求書を指定店舗へ集約できる | 要件確定 / 未実装想定 | 未判定 | 元請求書は保持 |
-| B2B-E2E-004 | 集約請求の明細を納品書単位にする | 要件確定 / 未実装想定 | 未判定 | Repair単位にはしない |
-| B2B-E2E-005 | 元請求書と集約先請求の紐付けを保持する | 要件確定 / 未実装想定 | 未判定 | 監査・再確認用 |
+| B2B-E2E-001 | 同一会社に複数店舗を登録・識別できる | production complete / Task207B | 解消済み | Repairは依頼元店舗へ紐づける |
+| B2B-E2E-002 | 会社単位で請求集約先店舗を指定できる | production complete / Task207B | 解消済み | 指定請求先店舗 + standalone fallback |
+| B2B-E2E-003 | 既存請求書を指定店舗へ集約できる | production complete / Task207C | 解消済み | 元請求書を保持したままbundle化 |
+| B2B-E2E-004 | 集約請求の明細を納品書単位にする | production complete / Task207C | 解消済み | DeliveryNote単位snapshotを保持 |
+| B2B-E2E-005 | 元請求書と集約先請求の紐付けを保持する | production complete / Task207C | 解消済み | 元Invoiceとのlinkを保持 |
 
 ## その場修正記録
 
@@ -161,3 +161,23 @@ Follow-up（通しテストblockerではない）:
 - 今回新規FKのcovering index候補はPerformance Advisor INFOとして残る。実データ量・query実績を見て別途判断する。
 
 B2B E2Eの再開位置は引き続き **実案件のB2B受付登録開始前**。Task207A-Cは先行完了済みとして扱う。
+
+### 2026-10-13 — Task207D-F 先行実装・本番反映
+
+Task207A-Cに続き、メールを必要としないB2B月次請求・送付運用を先行してproductionへ反映した。
+
+- Task207D — 月末締め / 翌月末支払期日: production complete (`d14b521`)。`billingMonth`を保存し、B2B支払期限を対象月の翌月末へサーバー計算する。schema / migrationなし。
+- Task207E — 請求書LINE通常トーク / 郵送振り分け: production complete (`7715bec`)。旧Messaging API Push経路を請求書から外し、既存 `LineManagerSendOutbox -> Windows sender -> lineoa -> reconciliation -> CONFIRMED` へ統一。未確定Outbox中は請求書取消・PDF差替えをfail-closedで防止する。独立レビューの初回指摘2件を修正後、限定再レビューでblocking findingなし。
+- Task207F — 郵送請求書 `NEC MultiWriter 5750C` 一括印刷: production complete (`cea7fcc`)。admin-only候補API、印刷直前再判定、順次投入、最初の失敗で停止、自動再試行なし。実プリンタの紙出力は未確認。
+- Railway deployment: `13ab5c66-fbbc-4604-9c7a-2303e8de6326` — SUCCESS、region `sin`。
+- Production build: Prisma Client generation、Next.js compile / lint / type validation、static generation 59/59 — PASS。
+- Production smoke: `/`=200、`/login`=200、未認証 `/invoices`=307、`/api/invoices/postal-print-targets`=401、`/api/invoices/preview?...`=401 — PASS。
+- Task207D-Fはschema / migration / env / production DB変更なし。追加backup不要。実LINE送信・実プリンタ出力はrollout中に実施していない。
+- Production tags: `production-task207d-20261013`、`production-task207e-20261013`、`production-task207f-20261013`。
+
+Hardware follow-up（通しテストblockerではない）:
+
+- `NEC MultiWriter 5750C`で納品書・郵送請求書が実際に紙出力されることを実案件の該当工程で確認する。
+- Brother QL-800のB2B複数ラベル連続印刷を実案件で確認する。
+
+B2B E2Eの再開位置は変わらず **実案件のB2B受付登録開始前**。Task207A-Fは先行完了済みとして扱う。

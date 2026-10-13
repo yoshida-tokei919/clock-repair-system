@@ -921,27 +921,20 @@ Status: **Task205D production complete**。software上の一括準備・直接�
 
 ### 実施順
 
-B2Cの主要顧客導線は、Task206G1、Task210A-F、Task201G-OPS、Task204A-Eまでsoftware production反映済み。今後は実発送E2EとB2B残工程へ軸足を移す。
+B2Cの主要顧客導線は、Task206G1、Task210A-F、Task201G-OPS、Task204A-Eまでsoftware production反映済み。B2BもTask205A-DとTask207A-Fまでproduction反映済みで、複数店舗・請求集約・月末締め・LINE通常トーク/郵送振り分け・5750C郵送請求書一括印刷まで接続済み。見積書Gmail送信だけはTask206Fへ統合し、メール対応が必要な取引先が発生するまで保留する。
 
-1. **実発送E2E — Task204 live validation**
+1. **B2B E2E継続**
+   - `docs/ai/06_B2B_E2E_RUN_LOG.md` を正本に、実案件を受付 → 案件化 → 見積 → 作業 → 納品 → Shipment → 請求 → 手動入金確認まで通す
+   - 通しテストを止める不足だけ独立Taskとして最小実装する
+   - QL-800複数枚連続印刷と5750C帳票の紙出力は、実案件の該当工程で確認する
+2. **実発送E2E — Task204 live validation**
    - 実発送可能な案件で、trackingNumber回収 → 日本郵便「引受」 → LINE発送通知 → 輸送 → 配達完了 → Repair納品済みを通す
    - E2E確認前はpersistent tracking syncをOFFのまま維持する
-2. **Task206F — Gmail channel foundation**
-   - B2B向けメールをCustomer / Repair単位のCommunication Hubへ統合する
-   - Gmailのmessage/thread identity、OAuth、同期、返信thread、添付、送信確認をLINE senderと分離して実装する
-3. **Task207系 — 帳票delivery channel / 5750C印刷 / 月次請求送付**
-   - 見積書Gmail送信
-   - 納品書 `NEC MultiWriter 5750C` 明示印刷
-   - 請求書LINE通常トーク / 郵送振り分け
-   - 郵送請求書の5750C一括印刷
-   - 月末締め翌月末支払期日の自動設定
-4. **B2B E2E継続**
-   - `docs/ai/06_B2B_E2E_RUN_LOG.md` を正本に、実案件を受付 → 案件化 → 見積 → 作業 → 納品 → Shipment → 請求まで通す
-   - 通しテストを止める不足だけ独立Taskとして最小実装する
-5. **B2B複数店舗・請求集約**
-   - 同一会社の複数店舗、指定請求先店舗、既存請求書の集約、納品書単位明細、元請求書との紐付けをTask分割して実装する
-6. 本格運用開始後、Scheduler・納期・リードタイム・Communication Hubの精度を運用実績で改善する
-7. 事例公開・その他未完機能
+3. **Task206F — Gmail channel foundation**
+   - メール対応が必要なB2B取引先が発生した時点で、Customer / Repair単位のCommunication Hubへ統合する
+   - Gmailのmessage/thread identity、OAuth、同期、返信thread、添付、送信確認と見積書Gmail送信をLINE senderと分離して実装する
+4. 本格運用開始後、Scheduler・納期・リードタイム・Communication Hubの精度を運用実績で改善する
+5. 事例公開・その他の新規要件は必要性が出た時点でTask化する
 
 H2 / H5B / H5Cは保留のままでも上記B2C顧客導線を進められる。H3 / H4 / H5Aの既存PoC・即時化成果は必要箇所で再利用するが、新しい送信正本にはしない。
 

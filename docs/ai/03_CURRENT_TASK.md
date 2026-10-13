@@ -7,14 +7,13 @@
 
 ## Production current state
 
-- Runtime application source: `cf991c0ec27257ff9e3ec5b04710531f6e2a78a3` — Task207C application commit。Task207A-Cを含む。
-- Railway runtime deployment: `db417b3b-2220-4a03-80b2-bf41d413cd54` — SUCCESS、region `sin`。
+- Runtime application source: `cea7fcc753e177623d619cb87d57391111f9f51b` — Task207F application commit。Task207A-Fを含む。
+- Railway runtime deployment: `13ab5c66-fbbc-4604-9c7a-2303e8de6326` — SUCCESS、region `sin`。
 - Railway build: Prisma Client generation PASS、Next.js 15.5.27 compile / lint / type validation PASS、static generation 59/59 PASS。
-- Runtime smoke: `/`=200、`/login`=200、未認証 `/invoices`=307、`GET /api/customers/1/company`=401、`GET/POST /api/invoices/consolidated`=401。
-- `origin/main` の最新production記録commitは `5552c025bfd75aa1c590b127b78ebc4c68636ce9`。docs-only再deployment `3251594c-0eee-4c15-953c-f338df050441` もSUCCESS。
-- production tags: `production-task207a-20261013`、`production-task207b-20261013`、`production-task207c-20261013`。
-- Task207B/C production migrations: `20261013021135 add_b2b_company_billing_foundation` / `20261013021204 add_consolidated_invoice`。
-- Task207A-C rollout前backup: `C:\Users\yoshi\clock-repair-backups\task207abc-20261013T020650Z`。
+- Runtime smoke: `/`=200、`/login`=200、未認証 `/invoices`=307（loginへ）、`GET /api/invoices/postal-print-targets`=401、`GET /api/invoices/preview?...`=401。
+- production tags: `production-task207a-20261013` 〜 `production-task207f-20261013`。
+- Task207B/C production migrations: `20261013021135 add_b2b_company_billing_foundation` / `20261013021204 add_consolidated_invoice`。Task207D-Fはschema / migration / env / production DB変更なし。
+- Task207A-C rollout前backup: `C:\Users\yoshi\clock-repair-backups\task207abc-20261013T020650Z`。Task207D-Fはmigrationなしのため追加backup不要。
 
 ## B2C current state
 
@@ -56,17 +55,16 @@ B2Cの「問い合わせ → 受付 → 共有 → 見積/承認 → 修理 → 
 - Task207A: B2B納品書を `NEC MultiWriter 5750C` へ固定印刷するlocal helper / UI — production complete。紙の実出力確認のみ未完了。
 - Task207B: B2B company / 複数店舗 / 指定請求先店舗の基盤 — production complete。
 - Task207C: 既存各店舗Invoiceを保持したまま指定請求先へ集約し、DeliveryNote単位snapshotを保持する集約基盤 — production complete。
+- Task207D: 月次請求の対象月保存、月末締め、翌月末支払期日自動設定 — production complete。
+- Task207E: B2B請求書のLINE通常トーク / 郵送振り分け。LINEは既存Outbox経路へ統一し、未確定送信中の取消・PDF差替えをfail-closedで防止 — production complete。独立レビューblocking findingなし。
+- Task207F: 郵送請求書を選択し `NEC MultiWriter 5750C` 固定helperへ順次投入する一括印刷 — production complete。紙の実出力のみ未確認。
 - Repair / 見積 / Scheduler / WorkTimeSession / PhysicalTag / StorageLocation / Shipment等の基幹機能はB2C/B2B共通基盤を利用する。
 
 ### B2B remaining gaps
 
-- Task206F — Gmail channel foundation: **未実装**。現時点ではメール送受信が必要な取引先案件がないため、優先度を下げる。必要案件が発生した時にCustomer Communication Hubへ統合する。
-- Task207後続 — B2B請求・帳票運用の残工程: **未実装 / 未Task化部分あり**。
-  - 月末締め・翌月末支払期日の自動設定
-  - 請求書のLINE通常トーク / 郵送振り分け
-  - 郵送請求書の `NEC MultiWriter 5750C` 一括印刷
-  - 見積書Gmail送信はTask206F導入時に扱う
+- Task206F — Gmail channel foundation: **未実装**。現時点ではメール送受信が必要な取引先案件がないため、優先度を下げる。必要案件が発生した時にCustomer Communication Hubへ統合し、見積書Gmail送信も同時に扱う。
 - B2B一括PhysicalTagのBrother QL-800実機複数枚連続印刷はsoftware経路はproduction済みだが、実機での複数枚連続出力確認は未完了。
+- B2B帳票の `NEC MultiWriter 5750C` 固定印刷経路はproduction済み。納品書・郵送請求書とも紙の実出力確認は実案件時に行う。
 - B2B E2Eは実案件の受付登録開始前。`docs/ai/06_B2B_E2E_RUN_LOG.md` を正本に、受付から納品・請求・手動入金確認まで通す。
 - 入金確認は手動を正式運用とし、銀行口座API連携・自動消込は実装対象にしない。
 
@@ -93,14 +91,11 @@ B2Cの「問い合わせ → 受付 → 共有 → 見積/承認 → 修理 → 
 
 ## Next recommended order
 
-1. **Task207後続 — B2B月次請求・送付運用**
-   - 月末締め / 翌月末支払期日
-   - LINE利用先 / 郵送先の送付経路
-   - 郵送請求書の5750C一括印刷
-2. **B2B E2E継続** — `docs/ai/06_B2B_E2E_RUN_LOG.md` に沿って実案件を受付 → 案件化 → 見積 → 作業 → 納品 → Shipment → 請求 → 手動入金確認まで通す。
-3. **実発送E2E** — 実発送可能な案件が出た時にTask204のlive end-to-endを確認し、問題なければtracking sync常時運用へ移す。
-4. **Task206F — Gmail channel foundation** — メール対応が必要なB2B取引先が発生した時点で着手する。
-5. 本格運用後のScheduler / Communication Hub精度改善。
+1. **B2B E2E継続** — `docs/ai/06_B2B_E2E_RUN_LOG.md` に沿って実案件を受付 → 案件化 → 見積 → 作業 → 納品 → Shipment → 請求 → 手動入金確認まで通す。
+2. **実発送E2E** — 実発送可能な案件が出た時にTask204のlive end-to-endを確認し、問題なければtracking sync常時運用へ移す。
+3. **Task206F — Gmail channel foundation** — メール対応が必要なB2B取引先が発生した時点で着手し、見積書Gmail送信も同時に扱う。
+4. 本格運用後のScheduler / Communication Hub精度改善。
+5. 事例公開・その他の新規要件は必要性が出た時点でTask化する。
 
 ## Task boundary
 

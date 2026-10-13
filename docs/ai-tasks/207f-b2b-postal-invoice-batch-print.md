@@ -17,4 +17,12 @@
 
 ## Production
 
-Pending. No push, deployment, production DB operation, or printer call in Task207F.
+Complete on 2026-10-13.
+
+- Application commit: `cea7fcc`.
+- Railway production deployment: `13ab5c66-fbbc-4604-9c7a-2303e8de6326` — SUCCESS (`sin`).
+- Production build includes `/api/invoices/postal-print-targets`; compile / type validation / static generation 59/59 — PASS.
+- Production smoke: unauthenticated `/api/invoices/postal-print-targets`=401 — PASS.
+- No schema, migration, environment-variable, or production DB change; no production backup required.
+- No real printer call was made during rollout. Actual paper output from `NEC MultiWriter 5750C` remains a hardware follow-up.
+- Production tag: `production-task207f-20261013`.

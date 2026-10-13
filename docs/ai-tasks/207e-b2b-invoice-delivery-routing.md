@@ -20,4 +20,12 @@
 
 ## Production
 
-Pending. No push, deployment, production DB operation, or migration in Task207E.
+Complete on 2026-10-13.
+
+- Application commit: `7715bec`.
+- Independent review after the mutation-fence fix: no findings; production rollout blocked: no.
+- Railway production deployment: `13ab5c66-fbbc-4604-9c7a-2303e8de6326` — SUCCESS (`sin`).
+- Production smoke: unauthenticated `/invoices`=307 to login and invoice admin APIs remain protected — PASS.
+- No schema, migration, environment-variable, or production DB change; no production backup required.
+- No real LINE send was performed during rollout.
+- Production tag: `production-task207e-20261013`.
