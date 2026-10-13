@@ -1,6 +1,6 @@
 # Task207B — B2B company and billing destination foundation
 
-Production: pending. Task207B is committed separately from Task207A and Task207C; no production migration, push, or deployment is part of this Task.
+Production: complete. Task207BはTask207A/207Cと同一rolloutで本番反映済み。
 
 ## Scope and contract
 
@@ -30,4 +30,12 @@ The two new tables are used only through authenticated Next.js routes and Prisma
 - `git diff --check`: passed.
 - Independent read-only review found no blocking issue in the schema, migration, API, resolver, or UI.
 
-Production rollout remains pending with Task207C per the approved sequence. A production backup and explicit approval are required before applying this migration.
+## Production rollout — 2026-10-13
+
+- Application commit: `4ce5d27` (`feat: add B2B company billing foundation`).
+- Production backup: `C:\Users\yoshi\clock-repair-backups\task207abc-20261013T020650Z` (`roles.sql` / `schema.sql` / `data.sql` + SHA256 manifest)。
+- Supabase migration: `20261013021135 add_b2b_company_billing_foundation` — applied successfully。
+- Production verification: 2 tables exist、RLS enabled、`anon` / `authenticated` / `service_role` にData API table SELECTなし、sequence usageなし、business-only / Customer type guard triggers存在、初期0件。
+- Independent read-only review: blocking findingなし。Low follow-upとして、Customer type未保存切替時のcompany設定UI表示ずれのみ。DB/APIはfail closed。
+- Railway deployment: `db417b3b-2220-4a03-80b2-bf41d413cd54` — SUCCESS。
+- Production smoke: 未認証 `GET /api/customers/1/company` = 401。

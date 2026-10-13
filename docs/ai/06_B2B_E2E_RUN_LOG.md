@@ -140,3 +140,24 @@ B2B通しテストを新しいチャットへ移す際は、引き継ぎプロ�
 - 実装中TaskがあればそのTaskとGit状態
 
 通しテスト中に重要な決定・追加要件・修正が発生したら、チャット終了前にこのファイルを更新する。
+
+### 2026-10-13 — Task207A-C 先行実装・本番反映
+
+B2B E2Eを開始する前に、既知の未実装分のうちメール以外を先行して実装した。
+
+- Task207A — B2B納品書 `NEC MultiWriter 5750C` 固定印刷: production complete (`0802bd1`)。ローカルhelperは固定プリンタ指定、loopback/origin/PDF検証あり。実機の紙排出のみ実案件時に確認する。
+- Task207B — 複数店舗 / 請求先基盤: production complete (`4ce5d27`)。同一会社の複数business Customer、指定請求先店舗、standalone fallbackを実装。
+- Task207C — 既存請求書の集約: production complete (`cf991c0`)。元Invoiceを保持し、指定請求先へimmutableな集約bundleとして束ねる。DeliveryNote単位のsnapshot breakdownを保持する。
+- Production backup: `C:\Users\yoshi\clock-repair-backups\task207abc-20261013T020650Z`。
+- Supabase migration: `20261013021135 add_b2b_company_billing_foundation` / `20261013021204 add_consolidated_invoice`。
+- Railway deployment: `db417b3b-2220-4a03-80b2-bf41d413cd54` — SUCCESS。
+- Production smoke / security validation: PASS。新規5テーブルはserver-onlyでRLS有効、Data API rolesへ権限付与なし。
+- 独立レビュー: 207B/Cともblocking findingなし。
+
+Follow-up（通しテストblockerではない）:
+
+- Customer typeを保存前に切り替えた瞬間だけcompany設定UI表示がpersisted typeとずれる場合がある。DB/APIはfail closed。
+- 集約候補invoiceは現状300件、過去bundleは100件取得上限。規模拡大時はpaginationを別Task化する。
+- 今回新規FKのcovering index候補はPerformance Advisor INFOとして残る。実データ量・query実績を見て別途判断する。
+
+B2B E2Eの再開位置は引き続き **実案件のB2B受付登録開始前**。Task207A-Cは先行完了済みとして扱う。

@@ -1,6 +1,6 @@
 # Task207C — Existing B2B invoice consolidation
 
-Production: pending. Task207C is committed locally only; migration, push, deploy, and production smoke remain pending the separately approved rollout.
+Production: complete. Task207CはTask207A/207Bと同一rolloutで本番反映済み。
 
 ## Contract
 
@@ -22,7 +22,7 @@ Production: pending. Task207C is committed locally only; migration, push, deploy
 
 - Migration: `20261013_z_add_consolidated_invoice`.
 - All three new tables are accessed only by server-side Next.js/Prisma. Data API access is unnecessary. RLS is enabled with no policy; `PUBLIC`, `anon`, `authenticated`, and `service_role` table/sequence privileges are explicitly revoked, with no `GRANT`.
-- Production migration has **not** been applied. A production backup is required before applying it during rollout.
+- Production migrationは2026-10-13にbackup取得後適用済み。server-only / no Data API grant方針をproductionで検証済み。
 
 ## Validation
 
@@ -36,3 +36,15 @@ Production: pending. Task207C is committed locally only; migration, push, deploy
 ## Follow-up
 
 The current snapshots allocate tax at the invoice level, so the delivery-note breakdown displays a pre-tax subtotal only when provable. Exact tax-inclusive delivery-note amounts require a separate financial allocation contract. A consolidated PDF, printing/mailing, payment matching, and any cancel/void lifecycle are intentionally deferred.
+
+## Production rollout — 2026-10-13
+
+- Application commit: `cf991c0` (`feat: add B2B invoice consolidation`).
+- Production backup: `C:\Users\yoshi\clock-repair-backups\task207abc-20261013T020650Z`。
+- Supabase migration: `20261013021204 add_consolidated_invoice` — applied successfully。
+- Production verification: 3 tables exist、RLS enabled、Data API rolesのtable/sequence privilegesなし、audit immutability / deferred total validation triggers存在、初期0件。
+- Post-migration Security Advisor: WARN/ERRORなし。`rls_enabled_no_policy` INFOはserver-only 5テーブル分増加したが、明示REVOKE済みの意図した構成。
+- Independent read-only review: blocking findingなし。P2 follow-upとして候補invoice 300件 / bundle 100件上限のpagination改善余地あり。
+- Performance Advisor: 今回新規FKのindex候補はINFOのみ。現運用規模ではrollout blockerにしない。
+- Railway deployment: `db417b3b-2220-4a03-80b2-bf41d413cd54` — SUCCESS, region `sin`。
+- Production smoke: 未認証 `GET /api/invoices/consolidated` = 401、`POST /api/invoices/consolidated` = 401。
