@@ -25,18 +25,14 @@ test("invoice Checkout recovery persists and reuses one locked attempt with iden
   assert.match(migration, /ADD COLUMN "checkoutOrigin" TEXT/);
 });
 
-test("LINE send reserves a durable retry key before calling the provider outside transactions", () => {
+test("invoice LINE delivery uses only the approved Manager outbox", () => {
   const line = source("src/app/api/invoices/[id]/line/route.ts");
-  const send = source("src/lib/invoice-line-send.ts");
+  const routing = source("src/lib/invoice-delivery-routing.ts");
   const schema = source("prisma/schema.prisma");
   const migration = source("prisma/migrations/20261009_add_payment_refund_release/migration.sql");
-  assert.match(line, /sendInvoiceLine\(prisma/);
-  assert.match(send, /FOR UPDATE OF i/);
-  assert.match(send, /"lineSendRetryKey" = \$\{key\}/);
-  assert.match(send, /const key = input\.operationKey/);
-  assert.match(send, /"X-Line-Retry-Key": reservation.key/);
-  assert.match(send, /x-line-accepted-request-id/);
-  assert.match(send, /23 \* 60 \* 60 \* 1000/);
+  assert.match(line, /queueInvoiceLineDelivery\(prisma/);
+  assert.match(routing, /createApprovedLineManagerSendOutbox/);
+  assert.doesNotMatch(line + routing, /api\.line\.me|LINE_CHANNEL_ACCESS_TOKEN|sentAt: new Date\(/);
   assert.match(schema, /lineSendRetryKey String\? @unique/);
   assert.match(migration, /Invoice_line_send_reservation_check/);
   assert.match(migration, /"lineSendRetryKey" IS NOT NULL AND "sentAt" IS NOT NULL AND "lineSendStartedAt" IS NULL/);

@@ -3,11 +3,18 @@ import test from "node:test";
 import { voidInvoice } from "./invoice-void";
 import { releaseAllocation } from "./allocation-release";
 
-function fixture(rows: any[], lineSendStartedAt: Date | null = null, lineSendRetryKey: string | null = null) {
+function fixture(rows: any[], lineSendStartedAt: Date | null = null, lineSendRetryKey: string | null = null,
+  outboxStatus: string | null = null) {
   const releases: any[] = [];
+  const queries: { sql: string; values: unknown[] }[] = [];
   let status = "issued";
   const tx: any = {
-    $queryRaw: async () => [{ id: 1, lineSendStartedAt, lineSendRetryKey }],
+    $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = strings.join("?");
+      queries.push({ sql, values });
+      if (sql.includes('FROM "LineManagerSendOutbox"')) return outboxStatus ? [{ status: outboxStatus }] : [];
+      return [{ id: 1, lineSendStartedAt, lineSendRetryKey }];
+    },
     invoice: { findUnique: async () => ({ status, paymentAllocations: rows }),
       update: async ({ data }: any) => { status = data.status; return { id: 1, invoiceNumber: "TI-1", status }; } },
     paymentAllocation: { findMany: async () => rows,
@@ -18,7 +25,7 @@ function fixture(rows: any[], lineSendStartedAt: Date | null = null, lineSendRet
       rows.find(r => r.id === data.allocationId).releases.push({ amount: data.amount }); return data; } },
     repair: { updateMany: async () => ({ count: 1 }) },
   };
-  return { db: { $transaction: async (fn: any) => fn(tx) } as any, tx, releases, getStatus: () => status };
+  return { db: { $transaction: async (fn: any) => fn(tx) } as any, tx, releases, queries, getStatus: () => status };
 }
 
 function row(kind: "INVOICE" | "REPAIR_PREPAYMENT", amount: number, refunds: any[] = []): any {
@@ -47,6 +54,30 @@ test("retained completed LINE identity does not block invoice void", async () =>
   const state = fixture([row("REPAIR_PREPAYMENT", 5000)], null, "completed-key");
   await voidInvoice(state.db, 1, 9);
   assert.equal(state.getStatus(), "void");
+});
+
+test("unresolved invoice outbox statuses block void before payment locks", async () => {
+  for (const outboxStatus of ["APPROVED", "CLAIMED", "PRE_SEND_FAILED", "POST_UNCONFIRMED"]) {
+    const state = fixture([row("REPAIR_PREPAYMENT", 5000)], null, null, outboxStatus);
+    await assert.rejects(voidInvoice(state.db, 1, 9), /Invoice LINE delivery is unresolved/);
+    assert.equal(state.getStatus(), "issued", outboxStatus);
+    assert.equal(state.releases.length, 0, outboxStatus);
+    const outboxQuery = state.queries.find(query => query.sql.includes('FROM "LineManagerSendOutbox"'));
+    assert.ok(outboxQuery, outboxStatus);
+    assert.match(outboxQuery.sql, /FOR UPDATE/);
+    assert.match(outboxQuery.sql, /"idempotencyKey" = \?/);
+    assert.deepEqual(outboxQuery.values, ["b2b-invoice-line:1"]);
+    assert.equal(state.queries.some(query => query.sql.includes('FROM "Payment"')), false, outboxStatus);
+  }
+});
+
+test("settled invoice outbox statuses permit void", async () => {
+  for (const outboxStatus of ["CONFIRMED", "CANCELLED"]) {
+    const state = fixture([row("REPAIR_PREPAYMENT", 5000)], null, null, outboxStatus);
+    await voidInvoice(state.db, 1, 9);
+    assert.equal(state.getStatus(), "void", outboxStatus);
+    assert.equal(state.releases.length, 1, outboxStatus);
+  }
 });
 
 test("unrefunded final invoice payment blocks void", async () => {

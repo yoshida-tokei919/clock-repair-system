@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { effectiveAllocation, refundTotals } from "./payment-accounting";
 import { releaseAllocation } from "./allocation-release";
+import { hasUnresolvedInvoiceLineOutbox } from "./invoice-delivery-routing";
 
 export class InvoiceVoidError extends Error {
   constructor(message: string, readonly status = 409) { super(message); }
@@ -18,6 +19,9 @@ export async function voidInvoice(db: PrismaClient, invoiceId: number, adminId: 
           refunds: { select: { amount: true, status: true } } } } } } } });
     if (!invoice || !["issued", "paid"].includes(invoice.status)) throw new InvoiceVoidError("発行済み請求書のみ取消できます");
     if (rows[0].lineSendStartedAt) throw new InvoiceVoidError("LINE送信結果が未確定のため請求書を取消できません");
+    if (await hasUnresolvedInvoiceLineOutbox(tx, invoiceId)) {
+      throw new InvoiceVoidError("Invoice LINE delivery is unresolved; invoice cannot be voided");
+    }
     const ids = [...new Set(invoice.paymentAllocations.map(a => a.paymentId))].sort((a, b) => a - b);
     // Lock every contributing Payment before evaluating refund and release histories.
     for (const id of ids) await tx.$queryRaw`SELECT "id" FROM "Payment" WHERE "id" = ${id} FOR UPDATE`;

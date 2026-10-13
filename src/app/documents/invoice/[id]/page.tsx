@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { InvoicePdfActions } from "@/components/invoices/InvoicePdfActions";
 import { InvoicePaymentSummary } from "@/components/invoices/InvoicePaymentSummary";
 import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
+import { getInvoiceDeliveryState } from "@/lib/invoice-delivery-routing";
 export const dynamic = "force-dynamic";
 
 function formatPdfGeneratedAt(date: Date) {
@@ -36,6 +37,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
     });
 
     if (!invoice) return notFound();
+    const delivery = await getInvoiceDeliveryState(prisma, invoice.id);
 
     const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
     const prepaymentAppliedAmount = paymentSummary.prepaymentAppliedAmount;
@@ -101,7 +103,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
                                 保存済みPDFを表示しています。管理画面と共有画面は同じPDFファイルを参照します。
                             </p>
                         </div>
-                        <InvoicePdfActions invoiceId={invoice.id} lineSendRevision={invoice.lineSendRevision} hasPdf={true} canModifyInvoice={canModifyInvoice} canVoidInvoice={canVoidInvoice} />
+                        <InvoicePdfActions invoiceId={invoice.id} delivery={delivery} hasPdf={true} canModifyInvoice={canModifyInvoice} canVoidInvoice={canVoidInvoice} />
                     </div>
                     {invoice.status === "void" ? (
                         <div className="mt-3 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -148,7 +150,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
                     管理画面と共有画面で同じPDFを表示するため、先に請求書PDFを生成してください。
                 </p>
                 <div className="mt-4">
-                    <InvoicePdfActions invoiceId={invoice.id} lineSendRevision={invoice.lineSendRevision} hasPdf={false} canModifyInvoice={canModifyInvoice} canVoidInvoice={canVoidInvoice} />
+                    <InvoicePdfActions invoiceId={invoice.id} delivery={delivery} hasPdf={false} canModifyInvoice={canModifyInvoice} canVoidInvoice={canVoidInvoice} />
                 </div>
                 {invoice.status === "void" ? (
                     <div className="mt-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

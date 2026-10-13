@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { hasUnresolvedInvoiceLineOutbox } from "./invoice-delivery-routing";
 
 type PdfPublication = {
   invoiceId: number;
@@ -24,6 +25,7 @@ export async function publishInvoicePdf(
         throw new Error("Invoice was canceled while PDF generation was in progress");
       }
       if (lockedInvoice.lineSendStartedAt) throw new Error("Invoice has an unresolved LINE send");
+      if (await hasUnresolvedInvoiceLineOutbox(tx, invoiceId)) throw new Error("Invoice has an unresolved LINE outbox");
 
       await tx.$executeRaw`
         UPDATE "InvoicePdfFile"

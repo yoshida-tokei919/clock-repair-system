@@ -5,7 +5,7 @@ import { publishInvoicePdf } from "./invoice-pdf-publication";
 const input = { invoiceId: 1, pdfFileId: 7, storageKey: "invoices/1/7.pdf", hash: "expected-hash", fileSize: 123 };
 
 function fixture(options: { publicationError?: "committed" | "rolled-back"; status?: string; lineSendStartedAt?: Date | null;
-  readError?: boolean; inconsistent?: boolean } = {}) {
+  outboxStatus?: string; readError?: boolean; inconsistent?: boolean } = {}) {
   const invoice = { status: options.status ?? "issued", lineSendStartedAt: options.lineSendStartedAt ?? null,
     currentPdfFileId: 3 as number | null };
   const file = { invoiceId: 1, status: "draft", storageKey: "", hash: null as string | null,
@@ -22,6 +22,7 @@ function fixture(options: { publicationError?: "committed" | "rolled-back"; stat
         $queryRaw: async (strings: TemplateStringsArray) => {
           const sql = strings.join("?");
           if (!publishing && options.readError) throw new Error("read unavailable");
+          if (sql.includes('FROM "LineManagerSendOutbox"')) return options.outboxStatus ? [{ status: options.outboxStatus }] : [];
           if (sql.includes('"currentPdfFileId" FROM "Invoice"')) return [invoice];
           if (sql.includes('FROM "InvoicePdfFile"')) return [file];
           return [invoice];
@@ -116,5 +117,26 @@ test("concurrent void and unresolved LINE reservation block publication and pres
     assert.equal(state.previous.status, "current");
     assert.equal(state.file.status, "void");
     assert.deepEqual(state.deleted, [input.storageKey]);
+  }
+});
+
+test("unresolved invoice outbox statuses block publication and clean the draft", async () => {
+  for (const outboxStatus of ["APPROVED", "CLAIMED", "PRE_SEND_FAILED", "POST_UNCONFIRMED"]) {
+    const state = fixture({ outboxStatus });
+    assert.equal(await state.run(), "failed", outboxStatus);
+    assert.equal(state.invoice.currentPdfFileId, 3, outboxStatus);
+    assert.equal(state.previous.status, "current", outboxStatus);
+    assert.equal(state.file.status, "void", outboxStatus);
+    assert.deepEqual(state.deleted, [input.storageKey], outboxStatus);
+  }
+});
+
+test("settled invoice outbox statuses permit PDF publication", async () => {
+  for (const outboxStatus of ["CONFIRMED", "CANCELLED"]) {
+    const state = fixture({ outboxStatus });
+    assert.equal(await state.run(), "published", outboxStatus);
+    assert.equal(state.invoice.currentPdfFileId, input.pdfFileId, outboxStatus);
+    assert.equal(state.previous.status, "superseded", outboxStatus);
+    assert.deepEqual(state.deleted, [], outboxStatus);
   }
 });

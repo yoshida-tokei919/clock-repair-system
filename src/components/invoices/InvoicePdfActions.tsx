@@ -2,18 +2,31 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getOrCreateInvoiceLineOperation, invoiceLineOperationStorageKey,
-  shouldClearInvoiceLineOperation } from "@/lib/invoice-line-operation";
 
 type InvoicePdfActionsProps = {
   invoiceId: number;
-  lineSendRevision: number;
+  delivery: { method: "LINE" | "POSTAL"; status: string } | null;
   hasPdf: boolean;
   canModifyInvoice: boolean;
   canVoidInvoice: boolean;
 };
 
-export function InvoicePdfActions({ invoiceId, lineSendRevision, hasPdf, canModifyInvoice, canVoidInvoice }: InvoicePdfActionsProps) {
+function deliveryStatusLabel(status: string) {
+  switch (status) {
+    case "READY": return "未登録";
+    case "APPROVED": return "送信待ち（未送信）";
+    case "CLAIMED": return "送信処理中（未確認）";
+    case "PRE_SEND_FAILED": return "送信前失敗・再試行待ち";
+    case "POST_UNCONFIRMED": return "送信結果の照合待ち";
+    case "CONFIRMED": return "送信確認済み";
+    case "CANCELLED": return "送信待ち取消済み";
+    case "LEGACY_SENT": return "旧LINE送信記録あり（通常トーク照合対象外）";
+    case "LEGACY_UNRESOLVED": return "旧LINE送信状態の確認が必要";
+    default: return "状態の確認が必要";
+  }
+}
+
+export function InvoicePdfActions({ invoiceId, delivery, hasPdf, canModifyInvoice, canVoidInvoice }: InvoicePdfActionsProps) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -44,7 +57,7 @@ export function InvoicePdfActions({ invoiceId, lineSendRevision, hasPdf, canModi
 
   async function sendLine() {
     const confirmed = window.confirm(
-      "この請求書共有URLをLINEで送信します。\nPDF添付は行いません。\n送信してよろしいですか？"
+      "この請求書共有URLをLINE通常トークの送信待ちに登録します。\nPDF添付は行いません。\n登録してよろしいですか？"
     );
 
     if (!confirmed) return;
@@ -53,29 +66,18 @@ export function InvoicePdfActions({ invoiceId, lineSendRevision, hasPdf, canModi
     setIsSendingLine(true);
 
     try {
-      // Save before POST so a lost HTTP response or same-tab reload reuses this operation.
-      const operation = getOrCreateInvoiceLineOperation(sessionStorage, invoiceId, lineSendRevision, () => crypto.randomUUID());
       const response = await fetch(`/api/invoices/${invoiceId}/line`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(operation),
+        method: "POST",
       });
       const result = await response.json().catch(() => null);
 
-      if (shouldClearInvoiceLineOperation(response.status, result)) {
-        sessionStorage.removeItem(invoiceLineOperationStorageKey(invoiceId));
-      } else if (response.status === 409 && result?.staleRevision === true) {
-        sessionStorage.removeItem(invoiceLineOperationStorageKey(invoiceId));
-        router.refresh();
+      if (!response.ok || result?.ok !== true) {
+        throw new Error(result?.error || "LINE送信待ちの登録に失敗しました。");
       }
-
-      if (!response.ok || result?.ok !== true || typeof result?.sentAt !== "string") {
-        throw new Error(result?.error || "LINE送信に失敗しました。");
-      }
-
-      setMessage("送信しました。");
+      setMessage(result.outboxStatus === "CONFIRMED" ? "LINE通常トークで送信確認済みです。" : "LINE通常トークの送信待ちに登録しました。送信確認は照合後に反映されます。");
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "LINE送信に失敗しました。");
+      setMessage(error instanceof Error ? error.message : "LINE送信待ちの登録に失敗しました。");
     } finally {
       setIsSendingLine(false);
     }
@@ -111,6 +113,9 @@ export function InvoicePdfActions({ invoiceId, lineSendRevision, hasPdf, canModi
 
   return (
     <div className="flex flex-col gap-2 md:items-end">
+      {delivery ? <p className="text-sm text-slate-700">
+        {delivery.method === "POSTAL" ? "送付方法: 郵送（印刷対象・未送付）" : `送付方法: LINE通常トーク — ${deliveryStatusLabel(delivery.status)}`}
+      </p> : null}
       <div className="flex flex-wrap gap-2">
         {hasPdf ? (
           <>
@@ -129,14 +134,14 @@ export function InvoicePdfActions({ invoiceId, lineSendRevision, hasPdf, canModi
               >
                 {isGenerating ? "生成中..." : "PDFを生成"}
               </button>
-              <button
+              {delivery?.method === "LINE" && delivery.status === "READY" ? <button
                 type="button"
                 onClick={sendLine}
                 disabled={isGenerating || isSendingLine || isVoiding}
                 className="inline-flex h-9 items-center justify-center rounded bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSendingLine ? "送信中..." : "LINEで送信"}
-              </button>
+                {isSendingLine ? "登録中..." : "LINE通常トークの送信待ちに登録"}
+              </button> : null}
             </> : null}
           </>
         ) : (canModifyInvoice ? (
