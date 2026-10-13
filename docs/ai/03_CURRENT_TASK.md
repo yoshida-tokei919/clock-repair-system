@@ -71,7 +71,7 @@ B2Cの「問い合わせ → 受付 → 共有 → 見積/承認 → 修理 → 
 - Task206F — Gmail channel foundation: **未実装**。現時点ではメール送受信が必要な取引先案件がないため、優先度を下げる。必要案件が発生した時にCustomer Communication Hubへ統合し、見積書Gmail送信も同時に扱う。
 - B2B一括PhysicalTagのBrother QL-800実機複数枚連続印刷はsoftware経路はproduction済みだが、実機での複数枚連続出力確認は未完了。
 - B2B帳票の `NEC MultiWriter 5750C` 固定印刷経路はproduction済み。納品書・郵送請求書とも紙の実出力確認は実案件時に行う。
-- B2B E2Eは実案件の受付登録開始前。`docs/ai/06_B2B_E2E_RUN_LOG.md` を正本に、受付から納品・請求・手動入金確認まで通す。
+- B2B E2EはK-002〜K-005の一括受付・PhysicalTag準備（4/4成功）と、NFC UID登録 / R65 HID読取 / 対象Repair解決の実機確認まで進行済み。次は案件情報確認 / 見積・承認工程。NFCの4タグ全件確認や紙の連続出力成功を意味しない。`docs/ai/06_B2B_E2E_RUN_LOG.md` を正本に、納品・Shipment・請求・手動入金確認まで通す。
 - 入金確認は手動を正式運用とし、銀行口座API連携・自動消込は実装対象にしない。
 
 ## Other major completed foundations
