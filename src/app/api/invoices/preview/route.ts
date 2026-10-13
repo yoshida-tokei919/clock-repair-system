@@ -1,6 +1,7 @@
 import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { billingMonthBounds, parseBillingMonth } from "@/lib/b2b-billing-month";
 
 // GET /api/invoices/preview?customerId=1&month=2026-03
 // Returns uninvoiced repairs that belong to delivery notes issued in the target month.
@@ -15,15 +16,10 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "customerId and month are required" }, { status: 400 });
     }
 
-    const [year, mon] = month.split("-").map(Number);
-    if (!year || !mon || mon < 1 || mon > 12) {
+    if (!parseBillingMonth(month)) {
         return NextResponse.json({ error: "month must be YYYY-MM" }, { status: 400 });
     }
-
-    const from = new Date(`${year}-${String(mon).padStart(2, "0")}-01T00:00:00+09:00`);
-    const toMonth = mon === 12 ? 1 : mon + 1;
-    const toYear = mon === 12 ? year + 1 : year;
-    const to = new Date(`${toYear}-${String(toMonth).padStart(2, "0")}-01T00:00:00+09:00`);
+    const { from, to } = billingMonthBounds(month);
 
     const repairs = await prisma.repair.findMany({
         where: {

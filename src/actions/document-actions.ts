@@ -9,6 +9,7 @@ import {
 import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/lib/invoice-numbering";
 import { revalidatePath } from "next/cache";
 import { applyPrepaymentAllocations, availablePrepayment, findEligiblePrepayments, suggestPrepaymentAllocations, type RequestedAllocation } from "@/lib/prepayment-allocation";
+import { b2bPaymentDueDate, billingMonthBounds, billingMonthFromDate, isB2BBillingRepairEligible } from "@/lib/b2b-billing-month";
 
 export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     const ids = [...new Set(repairIds)];
@@ -47,7 +48,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
             include: {
                 customer: true,
                 estimate: { include: { items: true } },
-                deliveryNote: { select: { slipNumber: true, issuedDate: true } },
+                deliveryNote: { select: { slipNumber: true, issuedDate: true, customerId: true } },
             }
         });
 
@@ -72,6 +73,16 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
         }
 
         const customerIds = Object.keys(repairsByCustomer).map(Number);
+        if (type === "invoice") {
+            for (const customerId of customerIds) {
+                const group = repairsByCustomer[customerId];
+                if (group[0].customer.type === "individual") continue;
+                const month = group[0].deliveryNote && billingMonthFromDate(group[0].deliveryNote.issuedDate);
+                if (!month || group.some(repair => !isB2BBillingRepairEligible(repair, customerId, billingMonthBounds(month)))) {
+                    return { success: false, error: "法人請求は同じ対象月の納品済み未請求案件を選択してください" };
+                }
+            }
+        }
         let lastDocumentId = null;
         let createdCount = 0;
 
@@ -118,6 +129,8 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 documentId = note.id;
             } else if (type === 'invoice') {
                 const isB2C = customer.type === "individual";
+                const billingMonth = !isB2C && customerRepairs[0].deliveryNote
+                    ? billingMonthFromDate(customerRepairs[0].deliveryNote.issuedDate) : null;
                 if (!isB2C) {
                     const lastInvoice = await prisma.invoice.findFirst({
                         where: { invoiceNumber: { startsWith: prefix } },
@@ -136,17 +149,13 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                   const invoiceSeq = isB2C
                     ? Number.parseInt(invoiceNumber.slice(3), 10)
                     : seq;
-                  const dueDate = isB2C ? getB2CPaymentDueDate() : (() => {
-                    const date = new Date();
-                    date.setMonth(date.getMonth() + 2);
-                    date.setDate(0);
-                    return date;
-                  })();
+                  const dueDate = isB2C ? getB2CPaymentDueDate() : b2bPaymentDueDate(billingMonth!);
                   const created = await tx.invoice.create({
                     data: {
                         invoiceNumber,
                         customerId: customerId,
                         ...calculateIssuedInvoiceAmounts(totalAmount),
+                        billingMonth,
                         paymentDueDate: dueDate,
                         repairSnapshots: { create: buildInvoiceRepairSnapshotData(customerRepairs) },
                     }

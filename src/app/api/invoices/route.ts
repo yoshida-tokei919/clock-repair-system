@@ -9,6 +9,7 @@ import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/l
 import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 import { prisma } from "@/lib/prisma";
 import { applyPrepaymentAllocations, type RequestedAllocation } from "@/lib/prepayment-allocation";
+import { b2bPaymentDueDate, billingMonthBounds, isB2BBillingRepairEligible, parseBillingMonth } from "@/lib/b2b-billing-month";
 
 // GET /api/invoices — 請求書一覧
 export async function GET() {
@@ -64,10 +65,10 @@ export async function POST(req: NextRequest) {
     const unauthorized = await requireAdminApi();
     if (unauthorized) return unauthorized;
     const body = await req.json();
-    const { customerId, repairIds, paymentDueDate, allocations = [] } = body as {
+    const { customerId, repairIds, billingMonth, allocations = [] } = body as {
         customerId: number;
         repairIds: number[];
-        paymentDueDate?: string;
+        billingMonth?: string;
         allocations?: RequestedAllocation[];
     };
 
@@ -82,6 +83,10 @@ export async function POST(req: NextRequest) {
     }
 
     const isB2C = customer.type === "individual";
+    if (!isB2C && !parseBillingMonth(billingMonth)) {
+        return NextResponse.json({ error: "対象月はYYYY-MM形式で指定してください" }, { status: 400 });
+    }
+    const bounds = !isB2C ? billingMonthBounds(billingMonth!) : null;
 
     // 対象修理の合計金額を計算
     const uniqueRepairIds = Array.from(new Set(repairIds));
@@ -89,13 +94,14 @@ export async function POST(req: NextRequest) {
         where: { id: { in: uniqueRepairIds } },
         include: {
             estimate: { include: { items: true } },
-            deliveryNote: { select: { slipNumber: true, issuedDate: true } },
+            deliveryNote: { select: { slipNumber: true, issuedDate: true, customerId: true } },
         },
     });
 
     if (
         repairs.length !== uniqueRepairIds.length
-        || repairs.some((repair) => repair.customerId !== customerId || repair.invoiceId !== null)
+        || repairs.some((repair) => repair.customerId !== customerId || repair.invoiceId !== null
+            || (bounds && !isB2BBillingRepairEligible(repair, customerId, bounds)))
     ) {
         return NextResponse.json({ error: "請求対象の案件を確認してください" }, { status: 400 });
     }
@@ -126,7 +132,8 @@ export async function POST(req: NextRequest) {
                 invoiceNumber,
                 customerId,
                 ...amounts,
-                paymentDueDate: isB2C ? getB2CPaymentDueDate() : paymentDueDate ? new Date(paymentDueDate) : null,
+                billingMonth: isB2C ? null : billingMonth,
+                paymentDueDate: isB2C ? getB2CPaymentDueDate() : b2bPaymentDueDate(billingMonth!),
                 repairSnapshots: { create: buildInvoiceRepairSnapshotData(repairs) },
             },
         });

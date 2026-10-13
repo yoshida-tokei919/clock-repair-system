@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ConsolidatedInvoicePanel } from "@/components/invoices/ConsolidatedInvoicePanel";
+import { b2bPaymentDueDate, parseBillingMonth } from "@/lib/b2b-billing-month";
 
 type Partner = {
     id: number;
@@ -76,7 +77,6 @@ export default function InvoicesPage() {
     const [selectedMonth, setSelectedMonth] = useState(currentMonth());
     const [previews, setPreviews] = useState<PreviewRepair[] | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-    const [paymentDueDate, setPaymentDueDate] = useState("");
     const [loading, setLoading] = useState(false);
     const [previewLoading, setPreviewLoading] = useState(false);
     const [error, setError] = useState("");
@@ -133,7 +133,7 @@ export default function InvoicesPage() {
                 body: JSON.stringify({
                     customerId: selectedPartnerId,
                     repairIds: Array.from(selectedIds),
-                    paymentDueDate: paymentDueDate || undefined,
+                    billingMonth: selectedMonth,
                 }),
             });
             if (!res.ok) {
@@ -364,15 +364,10 @@ export default function InvoicesPage() {
                                 {selectedIds.size > 0 && (
                                     <>
                                         <div className="mb-4">
-                                            <label className="block text-sm font-medium text-gray-600 mb-1">
-                                                支払期限（任意）
-                                            </label>
-                                            <input
-                                                type="date"
-                                                value={paymentDueDate}
-                                                onChange={(e) => setPaymentDueDate(e.target.value)}
-                                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            />
+                                            <span className="block text-sm font-medium text-gray-600 mb-1">支払期限（対象月の翌月末）</span>
+                                            <span className="text-sm text-gray-800">
+                                                {parseBillingMonth(selectedMonth) ? fmtDate(b2bPaymentDueDate(selectedMonth).toISOString()) : "対象月を選択してください"}
+                                            </span>
                                         </div>
 
                                         {error && (
