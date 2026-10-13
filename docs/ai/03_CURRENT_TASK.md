@@ -26,6 +26,7 @@ B2Cの「問い合わせ → 受付 → 共有 → 見積/承認 → 修理 → 
 - Task206G1 Communication AI Brief: production complete。`production-task206g1-20261012`。
 - AI briefはOpenClaw等のtrusted local agentから生成・保存する。Next.jsから従量課金AI APIへ直接接続しない。
 - LINE実送信の正本は `APPROVED LineManagerSendOutbox -> Windows sender -> lineoa -> reconciliation -> CONFIRMED`。
+- Task206H1D - LINE Manager dedicated browser runtime alignment: **future / not started**. 2026-10-13 hourly mapping health repeatedly returned `manager_live_read_unavailable`; read-only diagnosis found fixed storage restore raising `InteractiveLoginRequired`. Normal Microsoft Edge is authenticated, but the dedicated recovery path is fixed to Playwright `channel="chrome"` and Chrome executable is not currently available on this PC. Preserve the isolated dedicated profile/storage and fail-closed auth boundary while aligning to an explicit allowlisted browser runtime. Confirm recovery before the next real LINE send.
 
 ### B2C customer journey
 

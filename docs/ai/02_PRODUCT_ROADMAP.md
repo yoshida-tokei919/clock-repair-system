@@ -809,6 +809,7 @@ OUTBOUND InquiryMessage確定
 B2C顧客導線の後続Taskは、H1-H5全完了を待たず、productionで利用中の既存LINE Outbox契約を前提に進める。
 
 - **H1**: reply bridge (`context / approve / status`) は本番運用可能な基盤として維持する。stale送信、二重approve、APPROVEDとCONFIRMEDの混同を防ぐ。
+- **H1D (future)**: Align the isolated LINE Manager auth profile/storage recovery with the actual production Windows browser runtime. Do not reuse cookies from the normal user browser. Keep the Task206H1A-C trusted-stage/challenge/storage validation boundaries. 2026-10-13 evidence: normal Edge session authenticated, dedicated storage restore returns `InteractiveLoginRequired`, and the current bootstrap is fixed to `channel="chrome"` while Chrome executable is unavailable. Require a non-sending storage-restore and Manager-read health smoke before resuming real LINE sends.
 - **H2**: Personal Plugin / remote MCP / Supabase OAuth案は保留。B2C導線のblockerにしない。
 - **H3 / H4**: OpenClaw local agent / Command BridgeのPoCは完了済みとして扱い、Customer / Repair / Inquiryの正本は引き続き時計修理業務アプリに置く。
 - **H5A**: Slack → n8n即時化は完了済みとして扱う。
