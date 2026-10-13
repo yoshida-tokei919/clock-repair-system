@@ -12,6 +12,7 @@ async function main() {
     const repairWorkActions = [
         { name: 'exchange',        displayName: '交換',   sortOrder: 10  },
         { name: 'repair',          displayName: '修理',   sortOrder: 20  },
+        { name: 'movement_repair', displayName: '動作修理', sortOrder: 25 },
         { name: 'adjust',          displayName: '調整',   sortOrder: 30  },
         { name: 'correction',      displayName: '修正',   sortOrder: 40  },
         { name: 'polish',          displayName: '研磨',   sortOrder: 50  },

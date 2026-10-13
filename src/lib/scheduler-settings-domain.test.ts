@@ -78,6 +78,14 @@ test("master applicability follows structured-work rules", async () => {
   await assert.rejects(() => validateStandardMasters(db, { ...input, repairType: "EXTERNAL", driveType: null }), /カテゴリ/);
   const wrongAction = { ...db, repairWorkAction: { findUnique: async () => ({ name: "painting", isActive: true }) } } as unknown as PrismaClient;
   await assert.rejects(() => validateStandardMasters(wrongAction, input), /処置/);
+  const movementAction = { ...db, repairWorkAction: { findUnique: async () => ({ name: "movement_repair", isActive: true }) } } as unknown as PrismaClient;
+  await assert.doesNotReject(() => validateStandardMasters(movementAction, input));
+  const externalMovementAction = {
+    ...movementAction,
+    repairWorkCategory: { findUnique: async () => ({ repairType: "EXTERNAL", name: "case_glass", isActive: true }) },
+  } as unknown as PrismaClient;
+  await assert.rejects(() => validateStandardMasters(externalMovementAction,
+    { ...input, repairType: "EXTERNAL", targetPartNameId: null, driveType: null }), /処置/);
   const wrongPart = { ...db, partNameMaster: { findUnique: async () => ({ key: "crown", partType: "part_external", isActive: true,
     category: { key: "crown_tube", partType: "part_external" } }) } } as unknown as PrismaClient;
   await assert.rejects(() => validateStandardMasters(wrongPart, input), /対象部品/);
@@ -86,6 +94,8 @@ test("master applicability follows structured-work rules", async () => {
 test("shared repair selectors preserve category mapping and internal fallback", () => {
   assert.equal(isRepairWorkActionApplicable("INTERNAL", "oil"), true);
   assert.equal(isRepairWorkActionApplicable("EXTERNAL", "oil"), false);
+  assert.equal(isRepairWorkActionApplicable("INTERNAL", "movement_repair"), true);
+  assert.equal(isRepairWorkActionApplicable("EXTERNAL", "movement_repair"), false);
   assert.equal(isRepairWorkActionApplicable("EXTERNAL", "painting"), true);
   assert.equal(isRepairWorkTargetPartApplicable("INTERNAL", "quartz",
     { key: "battery", partType: null, categoryKey: null }), true);

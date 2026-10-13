@@ -12,7 +12,7 @@ const PRODUCTION_CONFIRMATION = "TASK142_FOUNDATION_MASTER_IMPORT";
 const CLONE_CONFIRMATION = "TASK142_CLONE_IMPORT";
 
 const repairWorkActions = [
-  ["exchange", "交換", 10], ["repair", "修理", 20], ["adjust", "調整", 30], ["correction", "修正", 40],
+  ["exchange", "交換", 10], ["repair", "修理", 20], ["movement_repair", "動作修理", 25], ["adjust", "調整", 30], ["correction", "修正", 40],
   ["polish", "研磨", 50], ["clean", "洗浄", 60], ["oil", "注油", 70], ["make", "製作", 80],
   ["install", "取付", 90], ["remove", "除去", 100], ["hole_tightening", "穴締め", 110], ["staking", "かしめ", 120],
   ["overhaul", "オーバーホール", 130], ["inspection", "検査", 140], ["other", "その他", 150], ["processing", "加工", 160],
