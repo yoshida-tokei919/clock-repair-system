@@ -101,7 +101,7 @@ B2B案件を1件、以下の流れで実運用に近い形で通して確認す�
 
 ## その場修正記録
 
-- Task212A（local implementation / Production: pending）: 見積を口頭で承認された場合に管理者が実際の承認状態・日時を記録できず、通常ステータスの日付訂正も保存されない問題。見積・承認工程のblockerとして、管理者の明示承認操作とステータス履歴の日付修正を実装。独立レビュー・commit・本番反映は未実施。K-002の見積・承認工程からE2Eを継続する。
+- Task212A（production complete / 実案件確認待ち）: 口頭等で得た承認を指定日時・操作者とともに記録・訂正し、手動ステータス変更と日付訂正を保存できるように修正。カタリ独立レビュー済み、blocking findingなし。`6586417`、Railway `7525ef2b-86f0-4a76-a896-cd70b344edbb` SUCCESS、production smoke PASS。実案件の承認操作は未実施。K-002の見積・承認工程からE2Eを継続する。
 
 - Task211D（production complete、K-002再保存確認待ち）: K-002の修理明細保存時、手入力した内装交換部品行が `category=part_external` / `partType=interior` となりサーバーで拒否された。見積・承認工程を続けるためのblocker。新規行分類のみを修正し、サーバーの矛盾拒否は維持。対象: `src/components/repairs/RepairEntryForm.tsx`、`src/lib/repair-entry-item-classification.ts` と同test、Task文書。カタリ独立差分レビュー完了、blocking findingなし。本番反映済み（`5e67a35`、deployment `74ac3185-d76d-44a4-a3ab-d8d700920fdb` SUCCESS）。K-002の明細保存からE2Eを再開する。
 

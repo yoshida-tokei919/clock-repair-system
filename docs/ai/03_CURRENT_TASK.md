@@ -2,18 +2,18 @@
 
 ## 現在のcheckpoint — 2026-10-14
 
-Task212A（管理者の実承認・手動ステータス日付）はローカル実装済み。Production: pending。独立レビュー、commit、deploy前承認を経てからB2B E2E見積・承認工程を再開する。
+Task212A（管理者の実承認・手動ステータス日付）は独立レビュー・ユーザー承認・production反映済み。実案件での操作は未確認。B2B E2EはK-002の見積・承認工程から再開する。
 
 このファイルは、現在のproduction到達点、未完了事項、次に着手する候補だけを管理する。
 過去Taskの詳細は `docs/ai-tasks/`、全体の優先順位は `docs/ai/02_PRODUCT_ROADMAP.md`、B2B通しテストは `docs/ai/06_B2B_E2E_RUN_LOG.md` を参照する。
 
 ## Production current state
 
-- Latest application change: `5e67a35bdb187da6a2fe97ad0b0170ea5ca0aea6` — Task211D手入力内装部品の区分整合。Task211C / Task196G / Task205C-FIX1 / Task207A-Fを祖先に含む。後続docs-only commitでもこのapplication到達点を維持する。
-- Application rollout deployment: `74ac3185-d76d-44a4-a3ab-d8d700920fdb` — SUCCESS。後続docs-only rolloutのlatest deploymentはRailwayで確認する。
-- Railway production build SUCCESS。Task211D Local対象test 29件 / TypeScript PASS。
-- Runtime smoke: `/`=200、未認証 `GET /api/invoices/postal-print-targets`=401。認証済みK-002の保存再試行は未確認。
-- production tag: `production-task211d-20261014`。既存Task211C / Task207A-F等のtagsも維持。
+- Latest application change: `658641797f9922be6769182a67dc01fa65f114bc` — Task212A手動承認・ステータス日付。Task211C-D / Task196G / Task205C-FIX1 / Task207A-Fを祖先に含む。後続docs-only commitでもこのapplication到達点を維持する。
+- Application rollout deployment: `7525ef2b-86f0-4a76-a896-cd70b344edbb` — SUCCESS、region `sin`。後続docs-only rolloutのlatest deploymentはRailwayで確認する。
+- Railway production build SUCCESS。Task212A対象test 48件、最終限定test 20件 / TypeScript PASS。schema / migration / env変更なし。
+- Runtime smoke: `/`=200、未認証 `POST /api/repairs/5/manual-approval`=401、未認証 `PUT /api/repairs/5/status`=401。認証済み実画面の承認・日付訂正は未確認。
+- production tag: `production-task212a-20261014`。既存Task211C-D / Task207A-F等のtagsも維持。
 - Task211Dはschema / migration / env / production DB変更なし。E2E再開位置はK-002明細の保存再試行。
 - Task211C production master追加: `RepairWorkAction.id=25` / `movement_repair` / 動作修理 / sortOrder 25 / active。既存repair / adjust維持、1行だけ追加。schema / migration / env変更なし。
 - Task207B/C production migrations: `20261013021135 add_b2b_company_billing_foundation` / `20261013021204 add_consolidated_invoice`。Task207D-Fはschema / migration / env / production DB変更なし。

@@ -1,7 +1,14 @@
 # Task212A — 管理者の手動承認・ステータス日付
 
 Status: local implementation complete / Katari independent review complete
-Production: pending
+Production: complete — 2026-10-14
+
+- Application commit: `658641797f9922be6769182a67dc01fa65f114bc`。
+- Railway application deployment: `7525ef2b-86f0-4a76-a896-cd70b344edbb` — SUCCESS、region `sin`。
+- Explicit user approval received before main push。schema / migration / env変更なし、実案件の承認・日付変更はrollout中に実施していない。
+- Production smoke: `/`=200、未認証 `POST /api/repairs/5/manual-approval`=401、未認証 `PUT /api/repairs/5/status`=401。
+- Production tag: `production-task212a-20261014`。
+- 認証済み実画面での承認・日付訂正は未確認。
 
 ## Scope
 
@@ -28,5 +35,5 @@ Production: pending
 
 - 連絡方法・メモの専用欄は既存schemaにないため保存しない。schema拡張は本Taskに含めない。
 - カタリ独立レビュー完了。初回指摘（未保存変更と承認、承認訂正の操作者記録、履歴日付との分離、受付日整合、一覧の保存状態表示）を修正後、直接影響範囲を限定再レビュー。blocking findingなし。
-- 本番DB書込・deploy・pushは未実施。ユーザー承認後に本番反映する。認証済み実画面での動作確認は未実施。
+- ユーザー承認後にpush / deploy / production smoke完了。本番DBへの直接変更・実案件への承認操作は行っていない。認証済み実画面での動作確認は未実施。
 - 日付は既存カレンダーを使用し、承認には日本時間の時刻入力を追加。部品・在庫に応じたステータス正規化と送付待ちの受付制約は維持する。Shipmentの実発送・配達イベントは手動ステータス変更から生成しない。
