@@ -4,6 +4,7 @@ import { DeliveryPDFClientLoader } from "@/components/pdf/DeliveryPDFClientLoade
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { IssuedDateEditor } from "@/components/documents/IssuedDateEditor";
 import { displayIssuedDate, formatIssuedDate } from "@/lib/document-issued-date";
+import { DeliveryShippingEditor } from "@/components/documents/DeliveryShippingEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,10 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
     });
 
     if (!note) return notFound();
+    const [snapshotCount, linkedCount] = await Promise.all([
+        prisma.invoiceRepairSnapshot.count({ where: { deliveryNoteId: id } }),
+        prisma.repair.count({ where: { deliveryNoteId: id, invoiceId: { not: null } } }),
+    ]);
 
     // Transform to props expected by DeliveryDocument
     // We need to map DB structure to PDF props
@@ -66,9 +71,10 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
         },
         jobs: jobs,
         taxRate: 0.1,
-        shippingFee: note.repairs[0]?.estimate?.shipping || 0
+        shippingFee: note.shippingFee ?? 0
     };
 
-    return <div><div className="bg-white px-6 py-2"><IssuedDateEditor type="delivery" id={note.id} issuedDate={formatIssuedDate(note.issuedDate)} /></div>
+    return <div><div className="bg-white px-6 py-2"><IssuedDateEditor type="delivery" id={note.id} issuedDate={formatIssuedDate(note.issuedDate)} />
+        <DeliveryShippingEditor id={note.id} carrierCode={note.shippingCarrierCode} size={note.shippingSize} calculatedFee={note.shippingCalculatedFee} fee={note.shippingFee} locked={snapshotCount > 0 || linkedCount > 0} /></div>
         <DeliveryPDFClientLoader data={pdfData} allowFixedPrint={note.customer.type === "business"} /></div>;
 }

@@ -1796,6 +1796,11 @@ model DeliveryNote {
   
   totalAmount  Int      @default(0) // Cache for speed
   taxAmount    Int      @default(0)
+  shippingCarrierCode String?
+  shippingServiceCode String?
+  shippingSize Int?
+  shippingCalculatedFee Int?
+  shippingFee Int?
 }
 
 model Invoice {
@@ -1825,6 +1830,7 @@ model Invoice {
   
   totalAmount   Int      @default(0) // Issued pre-tax subtotal, integer JPY (existing meaning)
   taxAmount     Int      @default(0) // Issued tax, integer JPY
+  shippingFeeAmount Int @default(0) // Final customer shipping charge, already tax-included
   grossTotalAmount Int   // Issued payable total; INSERT trigger fills NULL for old writers
   status        String   @default("issued") // issued, paid
   paymentDueDate DateTime?
@@ -1866,6 +1872,7 @@ model ConsolidatedInvoiceSource {
   sourceCompanyName String?
   totalAmount Int
   taxAmount Int
+  shippingFeeAmount Int @default(0)
   grossTotalAmount Int
   issuedDate DateTime
   deliveryNotes ConsolidatedInvoiceDeliveryNote[]
@@ -1899,6 +1906,7 @@ model InvoiceRepairSnapshot {
   deliveryIssuedDate DateTime?
   deliveryDateActual DateTime?
   subtotalAmount    Int
+  deliveryShippingFee Int @default(0)
   createdAt         DateTime @default(now())
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)

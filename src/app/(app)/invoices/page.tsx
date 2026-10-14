@@ -7,6 +7,7 @@ import { ConsolidatedInvoicePanel } from "@/components/invoices/ConsolidatedInvo
 import { PostalInvoiceBatchPrint } from "@/components/invoices/PostalInvoiceBatchPrint";
 import { b2bPaymentDueDate, parseBillingMonth } from "@/lib/b2b-billing-month";
 import { IssuedDateDialog } from "@/components/documents/IssuedDateDialog";
+import { summarizeB2BInvoicePreview } from "@/lib/b2b-invoice-preview";
 
 type Partner = {
     id: number;
@@ -22,6 +23,8 @@ type PreviewRepair = {
     endUserName: string | null;
     deliveryDate: string;
     slipNumber: string;
+    deliveryNoteId: number | null;
+    shippingFee: number | null;
     watch: { brand: string; model: string; ref: string };
     subtotal: number;
 };
@@ -108,10 +111,15 @@ export default function InvoicesPage() {
                 `/api/invoices/preview?customerId=${selectedPartnerId}&month=${selectedMonth}`
             );
             const data = await res.json();
+            if (!res.ok || !Array.isArray(data)) {
+                throw new Error(typeof data?.error === "string" ? data.error : "修理案件の取得に失敗しました");
+            }
             setPreviews(data);
             setSelectedIds(new Set(data.map((r: PreviewRepair) => r.id)));
-        } catch {
-            setError("修理案件の取得に失敗しました");
+        } catch (error) {
+            setPreviews(null);
+            setSelectedIds(new Set());
+            setError(error instanceof Error ? error.message : "修理案件の取得に失敗しました");
         } finally {
             setPreviewLoading(false);
         }
@@ -126,7 +134,7 @@ export default function InvoicesPage() {
     }
 
     async function createInvoice(issuedDate?: string) {
-        if (!selectedPartnerId || selectedIds.size === 0) return;
+        if (!selectedPartnerId || selectedIds.size === 0 || total === null) return;
         setLoading(true);
         setError("");
         try {
@@ -156,9 +164,7 @@ export default function InvoicesPage() {
     }
 
     const selectedPreviews = previews?.filter((r) => selectedIds.has(r.id)) || [];
-    const subtotal = selectedPreviews.reduce((s, r) => s + r.subtotal, 0);
-    const tax = Math.floor(subtotal * 0.1);
-    const total = subtotal + tax;
+    const { subtotal, tax, shippingFeeAmount, total, unconfirmedNoteIds } = summarizeB2BInvoicePreview(selectedPreviews);
 
     const selectedPartner = partners.find((p) => p.id === selectedPartnerId);
 
@@ -265,6 +271,7 @@ export default function InvoicesPage() {
                         >
                             {previewLoading ? "取得中..." : "対象案件を確認する"}
                         </button>
+                        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
                         {/* ③ 修理案件プレビュー */}
                         {previews !== null && (
@@ -357,11 +364,18 @@ export default function InvoicesPage() {
                                                 <span>消費税（10%）</span>
                                                 <span>¥{tax.toLocaleString()}</span>
                                             </div>
+                                            <div className="flex justify-between text-gray-500">
+                                                <span>送料（税込・納品書ごとに1回）</span>
+                                                <span>{total === null ? "未確定" : `¥${shippingFeeAmount.toLocaleString()}`}</span>
+                                            </div>
                                             <div className="flex justify-between font-bold text-gray-800 mt-1 pt-1 border-t border-gray-200">
                                                 <span>合計請求額</span>
-                                                <span>¥{total.toLocaleString()}</span>
+                                                <span>{total === null ? "未確定" : `¥${total.toLocaleString()}`}</span>
                                             </div>
                                         </div>
+                                        {unconfirmedNoteIds.length > 0 && <p className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                                            選択中の納品書の送料が未確定です。先に送料を確定してください: {unconfirmedNoteIds.map((id, index) => <span key={id}>{index > 0 ? "、" : ""}<Link className="underline" href={`/documents/delivery/${id}`}>納品書 #{id}</Link></span>)}
+                                        </p>}
                                     </div>
                                 )}
 
@@ -375,13 +389,9 @@ export default function InvoicesPage() {
                                             </span>
                                         </div>
 
-                                        {error && (
-                                            <p className="text-red-500 text-sm mb-3">{error}</p>
-                                        )}
-
                                         <button
                                             onClick={() => setIssueDialogOpen(true)}
-                                            disabled={loading}
+                                            disabled={loading || total === null}
                                             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-sm transition-colors disabled:opacity-50"
                                         >
                                             {loading

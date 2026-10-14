@@ -5,7 +5,9 @@ import {
     buildInvoiceRepairSnapshotData,
     calculateIssuedInvoiceAmounts,
     calculateInvoiceRepairSubtotal,
+    aggregateDeliveryShipping,
 } from "@/lib/invoice-repair-snapshots";
+import { assertSingleCustomerDeliverySelection, validateDeliveryShipping, type DeliveryShippingInput } from "@/lib/delivery-shipping";
 import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/lib/invoice-numbering";
 import { revalidatePath } from "next/cache";
 import { applyPrepaymentAllocations, availablePrepayment, findEligiblePrepayments, suggestPrepaymentAllocations, type RequestedAllocation } from "@/lib/prepayment-allocation";
@@ -19,13 +21,13 @@ export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     if (!ids.length || ids.some(id => !Number.isSafeInteger(id) || id <= 0)) throw new Error("修理案件を選択してください");
     const repairs = await prisma.repair.findMany({ where: { id: { in: ids } },
         include: { customer: true, estimate: { include: { items: true } },
-            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true } } } });
+            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, shippingFee: true } } } });
     if (repairs.length !== ids.length || repairs.some(repair => repair.invoiceId !== null)) throw new Error("請求対象が変更されました");
     const groups = new Map<number, typeof repairs>();
     for (const repair of repairs) groups.set(repair.customerId, [...(groups.get(repair.customerId) ?? []), repair]);
     const result = [];
     for (const [customerId, group] of groups) {
-        const gross = calculateIssuedInvoiceAmounts(group.reduce((sum, repair) => sum + calculateInvoiceRepairSubtotal(repair), 0)).grossTotalAmount;
+        const gross = calculateIssuedInvoiceAmounts(group.reduce((sum, repair) => sum + calculateInvoiceRepairSubtotal(repair), 0), aggregateDeliveryShipping(group)).grossTotalAmount;
         const isB2C = group[0].customer.type === "individual";
         const payments = isB2C ? await findEligiblePrepayments(prisma, customerId, group.map(repair => repair.id)) : [];
         const receivedPrepaymentAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
@@ -41,10 +43,11 @@ export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     return result;
 }
 
-export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty', allocationsByCustomer?: Record<number, RequestedAllocation[]>, issueDate?: string) {
+export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty', allocationsByCustomer?: Record<number, RequestedAllocation[]>, issueDate?: string, shippingInput?: DeliveryShippingInput) {
     try {
         if (!await getAdminApiIdentity()) throw new Error("認証が必要です");
         const issuedDate = resolveIssuedDate(issueDate);
+        const shipping = type === "delivery" ? validateDeliveryShipping(shippingInput!) : null;
         if (repairIds.length === 0) return { success: false, error: "No repairs selected" };
 
         const uniqueRepairIds = Array.from(new Set(repairIds));
@@ -53,11 +56,15 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
             include: {
                 customer: true,
                 estimate: { include: { items: true } },
-                deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true } },
+                deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true, shippingFee: true } },
             }
         });
 
         if (repairs.length === 0) return { success: false, error: "Repairs not found" };
+        if (type === "delivery") {
+            if (repairs.length !== uniqueRepairIds.length) return { success: false, error: "納品書の対象案件を再確認してください" };
+            assertSingleCustomerDeliverySelection(repairs);
+        }
         if (type === "invoice" && repairs.length !== uniqueRepairIds.length) {
             return { success: false, error: "請求対象の案件を確認してください" };
         }
@@ -128,6 +135,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                         customerId: customerId,
                         totalAmount,
                         taxAmount,
+                        ...shipping,
                         repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
                     }
                 });
@@ -151,10 +159,10 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 const invoice = await prisma.$transaction(async (tx) => {
                   // Serialize issue-date edits with invoice snapshot creation.
                   for (const note of [...new Map(customerRepairs.filter(r => r.deliveryNote).map(r => [r.deliveryNote!.id, r.deliveryNote!])).values()].sort((a, b) => a.id - b.id)) {
-                    const [locked] = await tx.$queryRaw<{ issuedDate: Date }[]>`
-                      SELECT "issuedDate" FROM "DeliveryNote" WHERE "id" = ${note.id} FOR UPDATE`;
-                    if (!locked || locked.issuedDate.getTime() !== note.issuedDate.getTime()) {
-                      throw new Error("納品書の発行日が変更されました。再読み込みしてください");
+                    const [locked] = await tx.$queryRaw<{ issuedDate: Date; shippingFee: number | null }[]>`
+                      SELECT "issuedDate", "shippingFee" FROM "DeliveryNote" WHERE "id" = ${note.id} FOR UPDATE`;
+                    if (!locked || locked.issuedDate.getTime() !== note.issuedDate.getTime() || locked.shippingFee !== note.shippingFee) {
+                      throw new Error("納品書の発行日または送料が変更されました。再読み込みしてください");
                     }
                   }
                   const invoiceNumber = isB2C
@@ -169,7 +177,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                         invoiceNumber,
                         issuedDate,
                         customerId: customerId,
-                        ...calculateIssuedInvoiceAmounts(totalAmount),
+                        ...calculateIssuedInvoiceAmounts(totalAmount, aggregateDeliveryShipping(customerRepairs)),
                         billingMonth,
                         paymentDueDate: dueDate,
                         repairSnapshots: { create: buildInvoiceRepairSnapshotData(customerRepairs) },

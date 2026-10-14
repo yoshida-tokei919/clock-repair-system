@@ -16,6 +16,8 @@ import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { IssuedDateDialog } from "@/components/documents/IssuedDateDialog";
 import { formatIssuedDate } from "@/lib/document-issued-date";
+import { DeliveryIssueDialog } from "@/components/documents/DeliveryIssueDialog";
+import type { DeliveryShippingInput } from "@/lib/delivery-shipping";
 
 type RepairWithRelations = Repair & {
     customer: Customer;
@@ -74,11 +76,11 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         );
     };
 
-    const handleBulkAction = async (type: "delivery" | "estimate" | "invoice" | "warranty", issueDate?: string, allocations?: Record<number, { paymentId: number; allocatedAmount: number }[]>) => {
+    const handleBulkAction = async (type: "delivery" | "estimate" | "invoice" | "warranty", issueDate?: string, allocations?: Record<number, { paymentId: number; allocatedAmount: number }[]>, shipping?: DeliveryShippingInput) => {
         if (selectedIds.length === 0) return;
         setIsGenerating(true);
         try {
-            const result = await generateBulkDocument(selectedIds, type, allocations, issueDate);
+            const result = await generateBulkDocument(selectedIds, type, allocations, issueDate, shipping);
             if (result.success) {
                 setIssueType(null);
                 setInvoicePreview(null);
@@ -341,7 +343,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                             return <section key={group.customerId} className="space-y-2 rounded border p-3">
                                 <h3 className="font-semibold">{group.customerName}（{group.isB2C ? "一般" : "業者"}）</h3>
                                 <p>修理: {group.repairs.map(repair => repair.inquiryNumber).join("、")}</p>
-                                <p>修理総額（税込）: ¥{group.gross.toLocaleString()}</p>
+                                <p>請求総額（修理税込・送料込）: ¥{group.gross.toLocaleString()}</p>
                                 {group.isB2C && <>
                                     <p>受領済み前受金: ¥{group.receivedPrepaymentAmount.toLocaleString()}</p>
                                     <p>利用可能前受金: ¥{group.availablePrepaymentAmount.toLocaleString()}</p>
@@ -373,8 +375,9 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                         })}>この内容で請求書を作成</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
-            <IssuedDateDialog open={issueType !== null} title={`${issueType === "estimate" ? "見積書" : issueType === "warranty" ? "保証書" : "納品書"}の発行を確認`} busy={isGenerating}
+            <IssuedDateDialog open={issueType === "estimate" || issueType === "warranty"} title={`${issueType === "estimate" ? "見積書" : "保証書"}の発行を確認`} busy={isGenerating}
                 onClose={() => setIssueType(null)} onConfirm={date => { if (issueType) void handleBulkAction(issueType, date); }} />
+            <DeliveryIssueDialog open={issueType === "delivery"} busy={isGenerating} onClose={() => setIssueType(null)} onConfirm={(date, shipping) => void handleBulkAction("delivery", date, undefined, shipping)} />
             <Dialog open={!!activeMessage} onOpenChange={(open) => !open && setActiveMessage(null)}>
                 <DialogContent>
                     <DialogHeader>

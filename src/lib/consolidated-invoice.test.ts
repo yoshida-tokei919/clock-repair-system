@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertConsolidationSelection, assertSourcesAvailable, ConsolidatedInvoiceError, deliveryNoteBreakdown } from "./consolidated-invoice";
+import { assertConsolidationSelection, assertSourcesAvailable, ConsolidatedInvoiceError, consolidatedSourceAmounts, deliveryNoteBreakdown } from "./consolidated-invoice";
 
 const sources = [
   { id: 1, customerId: 10, status: "issued", grossTotalAmount: 11001 },
@@ -13,6 +13,13 @@ const sameCompany = [
 
 test("selected stores in one company sum canonical source invoice gross totals", () => {
   assert.equal(assertConsolidationSelection(sources, [1, 2], sameCompany, 7, 20), 33003);
+});
+
+test("a consolidated source preserves shipping and the gross invariant", () => {
+  assert.deepEqual(consolidatedSourceAmounts({ totalAmount: 10000, taxAmount: 1000, shippingFeeAmount: 800, grossTotalAmount: 11800 }),
+    { totalAmount: 10000, taxAmount: 1000, shippingFeeAmount: 800, grossTotalAmount: 11800 });
+  assert.deepEqual(consolidatedSourceAmounts({ totalAmount: 10000, taxAmount: 1000, shippingFeeAmount: 0, grossTotalAmount: 11000 }).shippingFeeAmount, 0);
+  assert.throws(() => consolidatedSourceAmounts({ totalAmount: 10000, taxAmount: 1000, shippingFeeAmount: 800, grossTotalAmount: 11000 }), ConsolidatedInvoiceError);
 });
 
 test("cross-company, standalone/B2C, and changed destination fail closed", () => {

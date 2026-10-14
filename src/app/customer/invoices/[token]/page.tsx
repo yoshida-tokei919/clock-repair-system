@@ -207,6 +207,7 @@ export default async function CustomerInvoicePage({
               <dt className="text-xs font-bold text-slate-500">請求総額（税込）</dt>
               <dd className="mt-1 font-semibold">{formatCurrency(invoice.grossTotalAmount)}</dd>
             </div>
+            {invoice.shippingFeeAmount > 0 && <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2"><dt className="text-xs font-bold text-slate-500">送料（税込・請求総額に含む）</dt><dd className="mt-1 font-semibold">{formatCurrency(invoice.shippingFeeAmount)}</dd></div>}
             {invoice.customer.type === "individual" ? <>
               <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">前受金充当額</dt><dd className="mt-1 font-semibold">{formatCurrency(prepaymentApplied)}</dd></div>
               <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">今回請求額</dt><dd className="mt-1 font-semibold">{formatCurrency(invoice.grossTotalAmount - prepaymentApplied)}</dd></div>

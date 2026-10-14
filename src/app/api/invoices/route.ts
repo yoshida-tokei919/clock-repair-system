@@ -4,6 +4,7 @@ import {
     buildInvoiceRepairSnapshotData,
     calculateIssuedInvoiceAmounts,
     calculateInvoiceRepairSubtotal,
+    aggregateDeliveryShipping,
 } from "@/lib/invoice-repair-snapshots";
 import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/lib/invoice-numbering";
 import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
         where: { id: { in: uniqueRepairIds } },
         include: {
             estimate: { include: { items: true } },
-            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true } },
+            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true, shippingFee: true } },
         },
     });
 
@@ -114,16 +115,15 @@ export async function POST(req: NextRequest) {
     const subtotal = repairs.reduce((sum, r) => {
         return sum + calculateInvoiceRepairSubtotal(r);
     }, 0);
-    const amounts = calculateIssuedInvoiceAmounts(subtotal);
 
     // トランザクションで請求書作成・修理紐付け・SEQ更新
     try {
     const invoice = await prisma.$transaction(async (tx) => {
         for (const note of [...new Map(repairs.filter(repair => repair.deliveryNote).map(repair => [repair.deliveryNote!.id, repair.deliveryNote!])).values()].sort((a, b) => a.id - b.id)) {
-            const [locked] = await tx.$queryRaw<{ issuedDate: Date }[]>`
-                SELECT "issuedDate" FROM "DeliveryNote" WHERE "id" = ${note.id} FOR UPDATE`;
-            if (!locked || locked.issuedDate.getTime() !== note.issuedDate.getTime()) {
-                throw new Error("納品書の発行日が変更されました。再読み込みしてください");
+            const [locked] = await tx.$queryRaw<{ issuedDate: Date; shippingFee: number | null }[]>`
+                SELECT "issuedDate", "shippingFee" FROM "DeliveryNote" WHERE "id" = ${note.id} FOR UPDATE`;
+            if (!locked || locked.issuedDate.getTime() !== note.issuedDate.getTime() || locked.shippingFee !== note.shippingFee) {
+                throw new Error("納品書の発行日または送料が変更されました。再読み込みしてください");
             }
         }
         let newSeq: number;
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
                 invoiceNumber,
                 issuedDate,
                 customerId,
-                ...amounts,
+                ...calculateIssuedInvoiceAmounts(subtotal, aggregateDeliveryShipping(repairs)),
                 billingMonth: isB2C ? null : billingMonth,
                 paymentDueDate: isB2C ? getB2CPaymentDueDate() : b2bPaymentDueDate(billingMonth!),
                 repairSnapshots: { create: buildInvoiceRepairSnapshotData(repairs) },

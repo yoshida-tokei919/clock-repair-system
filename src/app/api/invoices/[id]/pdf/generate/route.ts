@@ -124,6 +124,7 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     taxRate: 0.1,
     subtotalAmount: invoice.totalAmount,
     taxAmount: invoice.taxAmount,
+    shippingFeeAmount: invoice.shippingFeeAmount,
     grossTotalAmount: invoice.grossTotalAmount,
     prepaymentAppliedAmount: invoice.paymentAllocations.reduce((sum, allocation) =>
       sum + (allocation.payment.kind === "REPAIR_PREPAYMENT" && allocation.payment.status === "SUCCEEDED"

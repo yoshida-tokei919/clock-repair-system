@@ -4,6 +4,16 @@ import { hasConsistentInvoiceSnapshots } from "./invoice-repair-snapshots";
 
 export class ConsolidatedInvoiceError extends Error {}
 
+export function consolidatedSourceAmounts(invoice: {
+  totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
+}) {
+  if (invoice.grossTotalAmount !== invoice.totalAmount + invoice.taxAmount + invoice.shippingFeeAmount) {
+    throw new ConsolidatedInvoiceError("元請求書の確定額が一致しません。");
+  }
+  return { totalAmount: invoice.totalAmount, taxAmount: invoice.taxAmount,
+    shippingFeeAmount: invoice.shippingFeeAmount, grossTotalAmount: invoice.grossTotalAmount };
+}
+
 export function assertSourcesAvailable(sources: readonly { consolidatedSource: { id: number } | null }[]) {
   if (sources.some(source => source.consolidatedSource !== null)) {
     throw new ConsolidatedInvoiceError("選択した請求書は既に集約済みです。");
@@ -100,8 +110,7 @@ export async function createConsolidatedInvoice(
       sources: { create: ordered.map(invoice => ({ invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber, sourceCustomerId: invoice.customerId,
         sourceCustomerName: invoice.customer.name, sourceCompanyName: invoice.customer.companyName,
-        totalAmount: invoice.totalAmount, taxAmount: invoice.taxAmount,
-        grossTotalAmount: invoice.grossTotalAmount, issuedDate: invoice.issuedDate,
+        ...consolidatedSourceAmounts(invoice), issuedDate: invoice.issuedDate,
         deliveryNotes: { create: deliveryNoteBreakdown(invoice.repairSnapshots,
           hasConsistentInvoiceSnapshots(invoice)) },
       })) },

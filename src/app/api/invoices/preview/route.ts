@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
         include: {
             watch: { include: { brand: true, model: true, reference: true } },
             estimate: { include: { items: true } },
-            deliveryNote: { select: { slipNumber: true, issuedDate: true } },
+            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, shippingFee: true } },
         },
         orderBy: { deliveryNoteId: "asc" },
     });
@@ -52,6 +52,8 @@ export async function GET(req: NextRequest) {
             endUserName: r.endUserName,
             deliveryDate: r.deliveryNote?.issuedDate.toISOString(),
             slipNumber: r.deliveryNote?.slipNumber || r.inquiryNumber,
+            deliveryNoteId: r.deliveryNote?.id ?? null,
+            shippingFee: r.deliveryNote?.shippingFee ?? null,
             watch: {
                 brand: r.watch.brand?.nameJp || r.watch.brand?.name || "",
                 model: r.watch.model?.name || "",
