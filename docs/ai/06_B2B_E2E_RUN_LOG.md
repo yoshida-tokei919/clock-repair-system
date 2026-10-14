@@ -101,7 +101,7 @@ B2B案件を1件、以下の流れで実運用に近い形で通して確認す�
 
 ## その場修正記録
 
-- Task212B（local fix / Production: pending）: Kanban `/repairs/board` の写真サムネイルが、Task156以降のprivate R2 object keyを画像URLとして使い表示されない。既存の認証付き写真read routeを使う局所UX修正。E2E継続は阻害しない。対象: board pageとTask文書。検証・commitはTask文書に記録する。
+- Task212B（production complete / E2E non-blocker）: Kanban `/repairs/board` の写真サムネイルが、Task156以降のprivate R2 object keyを画像URLとして使い表示されない問題を、既存の認証付き写真read route再利用で局所修正。`2b0e245`、Railway `d4151c89-4fe7-4713-ad9e-a0eae9294578` SUCCESS、production smoke PASS。schema / migration / DB / R2設定 / auth変更なし。認証済み画面での写真表示は通常利用時に確認する。
 
 - Task212A-FIX1（production complete / J-001再保存確認待ち）: Repair J-001 で訪問しただけの中間ステータス日付が履歴訂正として送られ、ステータス保存を阻害。保存済み履歴と最終選択ステータスだけを日付訂正対象にする局所修正。対象: `src/components/repairs/RepairEntryForm.tsx`、`src/lib/repair-status-transition.ts` と関連test、Task文書。最終19件test・型チェックPASS、カタリ独立レビュー済み。ユーザー承認後に本番反映済み（`6697845`、Railway `a0e0f8ae-b862-471b-b510-941912497d1e` SUCCESS、production smoke PASS）。J-001のステータス保存を再試行する。
 
