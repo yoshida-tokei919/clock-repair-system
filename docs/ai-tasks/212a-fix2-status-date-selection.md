@@ -1,6 +1,6 @@
 # Task212A-FIX2 — ステータス日付の変更時に対象ステータスを選択
 
-Status: local implementation verified / production pending
+Status: production complete
 
 案件詳細のステータス日付を選択・変更した際、既存の選択制限が許す場合に、その工程を保存対象のステータスとして選択する。カレンダーを開くだけでは切り替えず、保存は既存の保存ボタンで行う。
 
@@ -14,3 +14,11 @@ Status: local implementation verified / production pending
 - Focused Node tests: 14 passed, 0 failed.
 - `npx tsc --noEmit --incremental false --pretty false`: PASS.
 - `git diff --check`: PASS.
+
+## Production
+
+- Application commit: `60c59ccbfc5756b0afbc3ad8568d602fadc0c651`.
+- Railway deployment: `dca939f4-6ac0-4f28-97b1-135a1c3c4de7` - SUCCESS (`sin`).
+- Production smoke: `/` = 200, unauthenticated `PATCH /api/repairs/9` = 401, unauthenticated `/repairs/9` = 307.
+- Production tag: `production-task212a-fix2-20261015`.
+- J-001 authenticated real-case resave remains user confirmation.
