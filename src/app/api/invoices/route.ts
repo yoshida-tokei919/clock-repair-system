@@ -10,6 +10,7 @@ import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 import { prisma } from "@/lib/prisma";
 import { applyPrepaymentAllocations, type RequestedAllocation } from "@/lib/prepayment-allocation";
 import { b2bPaymentDueDate, billingMonthBounds, isB2BBillingRepairEligible, parseBillingMonth } from "@/lib/b2b-billing-month";
+import { resolveIssuedDate } from "@/lib/document-issued-date";
 
 // GET /api/invoices — 請求書一覧
 export async function GET() {
@@ -65,12 +66,16 @@ export async function POST(req: NextRequest) {
     const unauthorized = await requireAdminApi();
     if (unauthorized) return unauthorized;
     const body = await req.json();
-    const { customerId, repairIds, billingMonth, allocations = [] } = body as {
+    const { customerId, repairIds, billingMonth, issuedDate: issueDate, allocations = [] } = body as {
         customerId: number;
         repairIds: number[];
         billingMonth?: string;
+        issuedDate?: string;
         allocations?: RequestedAllocation[];
     };
+    let issuedDate: Date;
+    try { issuedDate = resolveIssuedDate(issueDate); }
+    catch { return NextResponse.json({ error: "有効な発行日を指定してください" }, { status: 400 }); }
 
     if (!customerId || !repairIds?.length) {
         return NextResponse.json({ error: "取引先と修理案件を指定してください" }, { status: 400 });
@@ -94,7 +99,7 @@ export async function POST(req: NextRequest) {
         where: { id: { in: uniqueRepairIds } },
         include: {
             estimate: { include: { items: true } },
-            deliveryNote: { select: { slipNumber: true, issuedDate: true, customerId: true } },
+            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true } },
         },
     });
 
@@ -114,6 +119,13 @@ export async function POST(req: NextRequest) {
     // トランザクションで請求書作成・修理紐付け・SEQ更新
     try {
     const invoice = await prisma.$transaction(async (tx) => {
+        for (const note of [...new Map(repairs.filter(repair => repair.deliveryNote).map(repair => [repair.deliveryNote!.id, repair.deliveryNote!])).values()].sort((a, b) => a.id - b.id)) {
+            const [locked] = await tx.$queryRaw<{ issuedDate: Date }[]>`
+                SELECT "issuedDate" FROM "DeliveryNote" WHERE "id" = ${note.id} FOR UPDATE`;
+            if (!locked || locked.issuedDate.getTime() !== note.issuedDate.getTime()) {
+                throw new Error("納品書の発行日が変更されました。再読み込みしてください");
+            }
+        }
         let newSeq: number;
         let invoiceNumber: string;
 
@@ -130,6 +142,7 @@ export async function POST(req: NextRequest) {
         const created = await tx.invoice.create({
             data: {
                 invoiceNumber,
+                issuedDate,
                 customerId,
                 ...amounts,
                 billingMonth: isB2C ? null : billingMonth,

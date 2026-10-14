@@ -7,6 +7,8 @@ type PdfPublication = {
   storageKey: string;
   hash: string;
   fileSize: number;
+  expectedIssuedDate?: Date;
+  requestedIssuedDate?: Date;
 };
 
 export async function publishInvoicePdf(
@@ -14,18 +16,19 @@ export async function publishInvoicePdf(
   pdf: PdfPublication,
   deleteUploadedPdf: (storageKey: string) => Promise<void>,
 ): Promise<"published" | "failed" | "uncertain"> {
-  const { invoiceId, pdfFileId, storageKey, hash, fileSize } = pdf;
+  const { invoiceId, pdfFileId, storageKey, hash, fileSize, expectedIssuedDate, requestedIssuedDate } = pdf;
 
   try {
     await db.$transaction(async (tx) => {
-      const [lockedInvoice] = await tx.$queryRaw<{ status: string; lineSendStartedAt: Date | null }[]>`
-        SELECT "status", "lineSendStartedAt" FROM "Invoice" WHERE "id" = ${invoiceId} FOR UPDATE
+      const [lockedInvoice] = await tx.$queryRaw<{ status: string; lineSendStartedAt: Date | null; issuedDate: Date }[]>`
+        SELECT "status", "lineSendStartedAt", "issuedDate" FROM "Invoice" WHERE "id" = ${invoiceId} FOR UPDATE
       `;
       if (!lockedInvoice || !["issued", "paid"].includes(lockedInvoice.status)) {
         throw new Error("Invoice was canceled while PDF generation was in progress");
       }
       if (lockedInvoice.lineSendStartedAt) throw new Error("Invoice has an unresolved LINE send");
       if (await hasUnresolvedInvoiceLineOutbox(tx, invoiceId)) throw new Error("Invoice has an unresolved LINE outbox");
+      if (expectedIssuedDate && lockedInvoice.issuedDate.getTime() !== expectedIssuedDate.getTime()) throw new Error("Invoice issue date changed during PDF generation");
 
       await tx.$executeRaw`
         UPDATE "InvoicePdfFile"
@@ -48,7 +51,7 @@ export async function publishInvoicePdf(
 
       await tx.$executeRaw`
         UPDATE "Invoice"
-        SET "currentPdfFileId" = ${pdfFileId}
+        SET "currentPdfFileId" = ${pdfFileId}, "issuedDate" = ${requestedIssuedDate ?? lockedInvoice.issuedDate}
         WHERE "id" = ${invoiceId}
       `;
     });

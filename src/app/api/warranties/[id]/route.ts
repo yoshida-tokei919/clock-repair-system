@@ -1,6 +1,7 @@
 import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { displayIssuedDate, formatIssuedDate } from "@/lib/document-issued-date";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const unauthorized = await requireAdminApi();
@@ -32,7 +33,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({
         warrantyNumber: warranty.warrantyNumber,
-        issueDate: warranty.issuedDate.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
+        issueDate: displayIssuedDate(warranty.issuedDate),
+        issuedDate: formatIssuedDate(warranty.issuedDate),
         guaranteeStart: warranty.guaranteeStart.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
         guaranteeEnd: warranty.guaranteeEnd.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
         watch: { brand, model, ref, serial },

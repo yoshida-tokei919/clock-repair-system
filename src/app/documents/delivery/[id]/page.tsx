@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { DeliveryPDFClientLoader } from "@/components/pdf/DeliveryPDFClientLoader";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
+import { IssuedDateEditor } from "@/components/documents/IssuedDateEditor";
+import { displayIssuedDate, formatIssuedDate } from "@/lib/document-issued-date";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +59,7 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
 
     const pdfData = {
         deliveryNumber: note.slipNumber,
-        date: note.issuedDate.toLocaleDateString("ja-JP"),
+        date: displayIssuedDate(note.issuedDate),
         customer: {
             name: note.customer.name,
             address: note.customer.address || undefined
@@ -67,5 +69,6 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
         shippingFee: note.repairs[0]?.estimate?.shipping || 0
     };
 
-    return <DeliveryPDFClientLoader data={pdfData} allowFixedPrint={note.customer.type === "business"} />;
+    return <div><div className="bg-white px-6 py-2"><IssuedDateEditor type="delivery" id={note.id} issuedDate={formatIssuedDate(note.issuedDate)} /></div>
+        <DeliveryPDFClientLoader data={pdfData} allowFixedPrint={note.customer.type === "business"} /></div>;
 }

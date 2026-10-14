@@ -7,7 +7,7 @@ const input = { invoiceId: 1, pdfFileId: 7, storageKey: "invoices/1/7.pdf", hash
 function fixture(options: { publicationError?: "committed" | "rolled-back"; status?: string; lineSendStartedAt?: Date | null;
   outboxStatus?: string; readError?: boolean; inconsistent?: boolean } = {}) {
   const invoice = { status: options.status ?? "issued", lineSendStartedAt: options.lineSendStartedAt ?? null,
-    currentPdfFileId: 3 as number | null };
+    currentPdfFileId: 3 as number | null, issuedDate: new Date("2026-10-14T15:00:00Z") };
   const file = { invoiceId: 1, status: "draft", storageKey: "", hash: null as string | null,
     fileSize: null as number | null };
   const previous = { status: "current" };
@@ -27,12 +27,15 @@ function fixture(options: { publicationError?: "committed" | "rolled-back"; stat
           if (sql.includes('FROM "InvoicePdfFile"')) return [file];
           return [invoice];
         },
-        $executeRaw: async (strings: TemplateStringsArray) => {
+        $executeRaw: async (strings: TemplateStringsArray, ...values: any[]) => {
           const sql = strings.join("?");
           if (sql.includes("'superseded'")) previous.status = "superseded";
           else if (sql.includes("'current'")) Object.assign(file, { status: "current", storageKey: input.storageKey,
             hash: input.hash, fileSize: input.fileSize });
-          else if (sql.includes('SET "currentPdfFileId"')) invoice.currentPdfFileId = input.pdfFileId;
+          else if (sql.includes('SET "currentPdfFileId"')) {
+            invoice.currentPdfFileId = input.pdfFileId;
+            invoice.issuedDate = values[1];
+          }
           else if (sql.includes("'void'")) {
             assert.equal(file.status, "draft");
             assert.notEqual(invoice.currentPdfFileId, input.pdfFileId);
@@ -64,7 +67,8 @@ function fixture(options: { publicationError?: "committed" | "rolled-back"; stat
       return callback(tx);
     },
   };
-  const run = () => publishInvoicePdf(db, input, async key => { deleted.push(key); });
+  const run = (dates: { expectedIssuedDate?: Date; requestedIssuedDate?: Date } = {}) =>
+    publishInvoicePdf(db, { ...input, ...dates }, async key => { deleted.push(key); });
   return { run, invoice, file, previous, deleted, voidUpdates: () => voidUpdates,
     transactions: () => publicationCalls };
 }
@@ -107,6 +111,18 @@ test("ordinary successful publication retains the success path", async () => {
   assert.equal(state.file.status, "current");
   assert.equal(state.previous.status, "superseded");
   assert.deepEqual(state.deleted, []);
+});
+
+test("issue-date edit publishes a new PDF and date together, rejecting stale date", async () => {
+  const state = fixture();
+  const original = new Date(state.invoice.issuedDate);
+  const requested = new Date("2026-10-15T15:00:00Z");
+  assert.equal(await state.run({ expectedIssuedDate: original, requestedIssuedDate: requested }), "published");
+  assert.equal(state.invoice.issuedDate.getTime(), requested.getTime());
+  const stale = fixture();
+  assert.equal(await stale.run({ expectedIssuedDate: requested, requestedIssuedDate: original }), "failed");
+  assert.equal(stale.invoice.currentPdfFileId, 3);
+  assert.equal(stale.invoice.issuedDate.getTime(), original.getTime());
 });
 
 test("concurrent void and unresolved LINE reservation block publication and preserve old PDF", async () => {

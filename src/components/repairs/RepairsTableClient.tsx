@@ -14,6 +14,8 @@ import { generateBulkDocument, previewBulkInvoiceAllocations } from "@/actions/d
 import { cn } from "@/lib/utils";
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { IssuedDateDialog } from "@/components/documents/IssuedDateDialog";
+import { formatIssuedDate } from "@/lib/document-issued-date";
 
 type RepairWithRelations = Repair & {
     customer: Customer;
@@ -46,6 +48,9 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     const router = useRouter();
     const { toast } = useToast();
     const [isGenerating, setIsGenerating] = useState(false);
+    const [issueType, setIssueType] = useState<"delivery" | "estimate" | "warranty" | null>(null);
+    const [invoiceIssueDate, setInvoiceIssueDate] = useState("");
+    const [invoiceDateEdited, setInvoiceDateEdited] = useState(false);
     useAutoRefreshOnReturn();
 
     const toggleSelectAll = (checked: boolean | "indeterminate") => {
@@ -69,12 +74,13 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         );
     };
 
-    const handleBulkAction = async (type: "delivery" | "estimate" | "invoice", allocations?: Record<number, { paymentId: number; allocatedAmount: number }[]>) => {
+    const handleBulkAction = async (type: "delivery" | "estimate" | "invoice" | "warranty", issueDate?: string, allocations?: Record<number, { paymentId: number; allocatedAmount: number }[]>) => {
         if (selectedIds.length === 0) return;
         setIsGenerating(true);
         try {
-            const result = await generateBulkDocument(selectedIds, type, allocations);
+            const result = await generateBulkDocument(selectedIds, type, allocations, issueDate);
             if (result.success) {
+                setIssueType(null);
                 setInvoicePreview(null);
                 toast({
                     title: "作成完了",
@@ -84,6 +90,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     if (type === "delivery") router.push(`/documents/delivery/${result.documentId}`);
                     if (type === "estimate") router.push(`/documents/estimate/${result.documentId}`);
                     if (type === "invoice") router.push(`/documents/invoice/${result.documentId}`);
+                    if (type === "warranty") router.push(`/documents/warranty/${result.documentId}`);
                 } else {
                     router.refresh();
                 }
@@ -111,6 +118,8 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         try {
             const preview = await previewBulkInvoiceAllocations(selectedIds);
             setInvoicePreview(preview);
+            setInvoiceIssueDate(formatIssuedDate(new Date()));
+            setInvoiceDateEdited(false);
             setRequestedAllocations(Object.fromEntries(preview.map(group => [group.customerId,
                 Object.fromEntries(group.suggested.map(row => [row.paymentId, row.allocatedAmount]))])));
         } catch (error) {
@@ -123,7 +132,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         const allocations = Object.fromEntries(invoicePreview.map(group => [group.customerId,
             group.payments.map(payment => ({ paymentId: payment.id, allocatedAmount: requestedAllocations[group.customerId]?.[payment.id] ?? 0 }))
                 .filter(row => row.allocatedAmount > 0)]));
-        await handleBulkAction("invoice", allocations);
+        await handleBulkAction("invoice", invoiceDateEdited ? invoiceIssueDate : undefined, allocations);
     };
 
     const handleMarkRead = async () => {
@@ -150,17 +159,20 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                 <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-md animate-in fade-in slide-in-from-top-2">
                     <span className="font-bold text-blue-700">{selectedIds.length}件選択中</span>
                     <div className="h-4 w-px bg-blue-300 mx-2" />
-                    <Button size="sm" variant="outline" onClick={() => handleBulkAction("estimate")} disabled={isGenerating}>
+                    <Button size="sm" variant="outline" onClick={() => setIssueType("estimate")} disabled={isGenerating}>
                         <FileText className="mr-2 h-4 w-4" />
                         見積書作成
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleBulkAction("delivery")} disabled={isGenerating}>
+                    <Button size="sm" variant="outline" onClick={() => setIssueType("delivery")} disabled={isGenerating}>
                         <Truck className="mr-2 h-4 w-4" />
                         納品書作成
                     </Button>
                     <Button size="sm" variant="outline" onClick={openInvoicePreview} disabled={isGenerating}>
                         <FileText className="mr-2 h-4 w-4" />
                         請求書作成
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setIssueType("warranty")} disabled={isGenerating}>
+                        <FileText className="mr-2 h-4 w-4" />保証書作成
                     </Button>
                 </div>
             )}
@@ -322,6 +334,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
             <Dialog open={invoicePreview !== null} onOpenChange={(open) => !open && !isGenerating && setInvoicePreview(null)}>
                 <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
                     <DialogHeader><DialogTitle>請求書と前受金の充当を確認</DialogTitle></DialogHeader>
+                    <label className="text-sm">発行日（日本時間）<input type="date" className="ml-2 rounded border px-2 py-1" value={invoiceIssueDate} onChange={event => { setInvoiceIssueDate(event.target.value); setInvoiceDateEdited(true); }} /></label>
                     <div className="space-y-5 text-sm">
                         {invoicePreview?.map(group => {
                             const applied = group.payments.reduce((sum, payment) => sum + (requestedAllocations[group.customerId]?.[payment.id] ?? 0), 0);
@@ -353,13 +366,15 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                         })}
                     </div>
                     <DialogFooter><Button variant="outline" onClick={() => setInvoicePreview(null)} disabled={isGenerating}>戻る</Button>
-                        <Button onClick={confirmInvoice} disabled={isGenerating || invoicePreview?.some(group => {
+                        <Button onClick={confirmInvoice} disabled={isGenerating || !invoiceIssueDate || invoicePreview?.some(group => {
                             const amounts = group.payments.map(payment => requestedAllocations[group.customerId]?.[payment.id] ?? 0);
                             return amounts.some((amount, index) => !Number.isSafeInteger(amount) || amount < 0 || amount > group.payments[index].availableAmount)
                                 || amounts.reduce((sum, amount) => sum + amount, 0) > group.gross;
                         })}>この内容で請求書を作成</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
+            <IssuedDateDialog open={issueType !== null} title={`${issueType === "estimate" ? "見積書" : issueType === "warranty" ? "保証書" : "納品書"}の発行を確認`} busy={isGenerating}
+                onClose={() => setIssueType(null)} onConfirm={date => { if (issueType) void handleBulkAction(issueType, date); }} />
             <Dialog open={!!activeMessage} onOpenChange={(open) => !open && setActiveMessage(null)}>
                 <DialogContent>
                     <DialogHeader>

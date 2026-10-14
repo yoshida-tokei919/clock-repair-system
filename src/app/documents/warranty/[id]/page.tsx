@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { WarrantyDocument } from '@/components/pdf/WarrantyDocument';
 import { usePDF, Document, Page, Text } from '@react-pdf/renderer';
+import { IssuedDateEditor } from '@/components/documents/IssuedDateEditor';
 
 export default function WarrantyDocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = React.use(params);
@@ -44,6 +45,8 @@ export default function WarrantyDocumentPage({ params }: { params: Promise<{ id:
         <div className="h-screen flex flex-col bg-gray-100">
             <div className="bg-white px-6 py-3 shadow flex justify-between items-center shrink-0">
                 <h1 className="font-bold text-lg">修理保証書: {docData.warrantyNumber}</h1>
+                <IssuedDateEditor type="warranty" id={Number(resolvedParams.id)} issuedDate={docData.issuedDate}
+                  onSaved={() => { setIsReady(false); fetch(`/api/warranties/${resolvedParams.id}`).then(response => response.json()).then(setDocData); }} />
                 {instance.url && (
                     <a
                         href={instance.url}

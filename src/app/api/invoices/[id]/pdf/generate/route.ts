@@ -14,6 +14,7 @@ import {
 } from "@/lib/invoice-pdf-storage";
 import { publishInvoicePdf } from "@/lib/invoice-pdf-publication";
 import { prisma } from "@/lib/prisma";
+import { displayIssuedDate, parseIssuedDate } from "@/lib/document-issued-date";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ async function renderInvoicePdfBuffer(data: InvoiceDocumentProps["data"]) {
   return streamToBuffer(stream);
 }
 
-function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof findInvoiceForPdf>>>) {
+function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof findInvoiceForPdf>>>, requestedDate?: Date) {
   const deliveryGroups = new Map<
     string,
     {
@@ -85,7 +86,7 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
   const invoiceItems = Array.from(deliveryGroups.values())
     .sort((a, b) => a.date.getTime() - b.date.getTime())
     .map((group) => ({
-      date: group.date.toLocaleDateString("ja-JP"),
+      date: displayIssuedDate(group.date),
       slipNumber: group.slipNumber,
       description: `${group.repairCount}点`,
       amount: group.amount,
@@ -112,7 +113,7 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
 
   return {
     invoiceNumber: invoice.invoiceNumber,
-    date: invoice.issuedDate.toLocaleDateString("ja-JP"),
+    date: displayIssuedDate(requestedDate ?? invoice.issuedDate),
     dueDate: invoice.paymentDueDate?.toLocaleDateString("ja-JP") || "",
     customer: {
       name: invoice.customer.name,
@@ -150,7 +151,7 @@ function findInvoiceForPdf(invoiceId: number) {
   });
 }
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const unauthorized = await requireAdminApi();
   if (unauthorized) return unauthorized;
   const session = await getServerSession(authOptions);
@@ -165,6 +166,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   if (!invoice) {
     return NextResponse.json({ ok: false, error: "Invoice not found" }, { status: 404 });
+  }
+  let requestedDate: Date | undefined;
+  try {
+    const body = await request.json().catch(() => ({}));
+    if (body.issuedDate !== undefined) requestedDate = parseIssuedDate(body.issuedDate);
+  } catch {
+    return NextResponse.json({ ok: false, error: "有効な発行日を指定してください" }, { status: 400 });
   }
 
   if (!["issued", "paid"].includes(invoice.status)) {
@@ -184,7 +192,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   let pdfBuffer: Buffer;
 
   try {
-    pdfBuffer = await renderInvoicePdfBuffer(buildInvoicePdfData(invoice));
+    pdfBuffer = await renderInvoicePdfBuffer(buildInvoicePdfData(invoice, requestedDate));
   } catch (error) {
     console.error("Invoice PDF render failed", {
       invoiceId: invoice.id,
@@ -291,6 +299,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     storageKey,
     hash,
     fileSize: pdfBuffer.byteLength,
+    expectedIssuedDate: invoice.issuedDate,
+    requestedIssuedDate: requestedDate,
   }, deleteInvoicePdf);
   if (publication === "uncertain") {
     return NextResponse.json(

@@ -64,7 +64,7 @@ export async function getRepairDataForPDF(id: number) {
         // B2B請求書用の納品履歴。勝手な生成はやめ、正規のdeliveryNoteレコードがあればそれを使用。
         deliveries: repair.deliveryNote ? [
             {
-                date: repair.deliveryNote.issuedDate.toLocaleDateString("ja-JP"),
+                date: repair.deliveryNote.issuedDate.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
                 slipNo: repair.deliveryNote.slipNumber,
                 count: 1,
                 amount: Math.floor((repair.estimate?.items.reduce((s, i) => s + i.unitPrice, 0) || 0) * 1.1)

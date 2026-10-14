@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ConsolidatedInvoicePanel } from "@/components/invoices/ConsolidatedInvoicePanel";
 import { PostalInvoiceBatchPrint } from "@/components/invoices/PostalInvoiceBatchPrint";
 import { b2bPaymentDueDate, parseBillingMonth } from "@/lib/b2b-billing-month";
+import { IssuedDateDialog } from "@/components/documents/IssuedDateDialog";
 
 type Partner = {
     id: number;
@@ -81,6 +82,7 @@ export default function InvoicesPage() {
     const [loading, setLoading] = useState(false);
     const [previewLoading, setPreviewLoading] = useState(false);
     const [error, setError] = useState("");
+    const [issueDialogOpen, setIssueDialogOpen] = useState(false);
 
     useEffect(() => {
         fetch("/api/invoices")
@@ -123,7 +125,7 @@ export default function InvoicesPage() {
         });
     }
 
-    async function createInvoice() {
+    async function createInvoice(issuedDate?: string) {
         if (!selectedPartnerId || selectedIds.size === 0) return;
         setLoading(true);
         setError("");
@@ -135,6 +137,7 @@ export default function InvoicesPage() {
                     customerId: selectedPartnerId,
                     repairIds: Array.from(selectedIds),
                     billingMonth: selectedMonth,
+                    issuedDate,
                 }),
             });
             if (!res.ok) {
@@ -143,6 +146,7 @@ export default function InvoicesPage() {
                 return;
             }
             const invoice = await res.json();
+            setIssueDialogOpen(false);
             router.push(`/documents/invoice/${invoice.id}`);
         } catch {
             setError("請求書の作成に失敗しました");
@@ -376,7 +380,7 @@ export default function InvoicesPage() {
                                         )}
 
                                         <button
-                                            onClick={createInvoice}
+                                            onClick={() => setIssueDialogOpen(true)}
                                             disabled={loading}
                                             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-sm transition-colors disabled:opacity-50"
                                         >
@@ -393,6 +397,8 @@ export default function InvoicesPage() {
                 <PostalInvoiceBatchPrint />
                 <ConsolidatedInvoicePanel />
             </div>
+            <IssuedDateDialog open={issueDialogOpen} title="請求書の発行を確認" busy={loading}
+                onClose={() => setIssueDialogOpen(false)} onConfirm={date => void createInvoice(date)} />
         </div>
     );
 }

@@ -13,6 +13,7 @@ import {
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { renderEstimatePdfBuffer } from "@/lib/estimate-pdf-render";
 import { prisma } from "@/lib/prisma";
+import { displayIssuedDate, parseIssuedDate } from "@/lib/document-issued-date";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ function getEstimatePdfFileName(estimateNumber: string) {
   return `estimate_${estimateNumber.replace(/[^\w.-]+/g, "_")}.pdf`;
 }
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const unauthorized = await requireAdminApi();
   if (unauthorized) return unauthorized;
   const session = await getServerSession(authOptions);
@@ -74,6 +75,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       { status: 404 }
     );
   }
+  let requestedDate: Date | null = null;
+  try {
+    const body = await request.json().catch(() => ({}));
+    if (body.issuedDate !== undefined) requestedDate = parseIssuedDate(body.issuedDate);
+  } catch {
+    return NextResponse.json({ ok: false, error: "有効な発行日を指定してください" }, { status: 400 });
+  }
 
   const jobs = estimateDocument.repairs.map((repair) => {
     const estimateItems = repair.estimate?.items || [];
@@ -113,7 +121,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const pdfData: EstimateServerDocumentProps["data"] = {
     estimateNumber: estimateDocument.estimateNumber,
-    date: estimateDocument.issuedDate.toLocaleDateString("ja-JP"),
+    date: displayIssuedDate(requestedDate ?? estimateDocument.issuedDate),
     customer: {
       name: getPdfCustomerName(estimateDocument.customer),
       type: estimateDocument.customer.type,
@@ -204,6 +212,11 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     uploaded = true;
 
     await prisma.$transaction(async (tx) => {
+      const [locked] = await tx.$queryRaw<{ issuedDate: Date }[]>`
+        SELECT "issuedDate" FROM "EstimateDocument" WHERE "id" = ${estimateDocument.id} FOR UPDATE`;
+      if (!locked || locked.issuedDate.getTime() !== estimateDocument.issuedDate.getTime()) {
+        throw new Error("発行日が変更されました。再読み込みしてください");
+      }
       await tx.$executeRaw`
         UPDATE "EstimatePdfFile"
         SET "status" = 'superseded',
@@ -224,7 +237,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
       await tx.$executeRaw`
         UPDATE "EstimateDocument"
-        SET "currentPdfFileId" = ${pdfFile.id}
+        SET "currentPdfFileId" = ${pdfFile.id}, "issuedDate" = ${requestedDate ?? estimateDocument.issuedDate}
         WHERE "id" = ${estimateDocument.id}
       `;
     });

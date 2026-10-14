@@ -10,13 +10,16 @@ import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/l
 import { revalidatePath } from "next/cache";
 import { applyPrepaymentAllocations, availablePrepayment, findEligiblePrepayments, suggestPrepaymentAllocations, type RequestedAllocation } from "@/lib/prepayment-allocation";
 import { b2bPaymentDueDate, billingMonthBounds, billingMonthFromDate, isB2BBillingRepairEligible } from "@/lib/b2b-billing-month";
+import { getAdminApiIdentity } from "@/lib/admin-api-auth";
+import { resolveIssuedDate } from "@/lib/document-issued-date";
 
 export async function previewBulkInvoiceAllocations(repairIds: number[]) {
+    if (!await getAdminApiIdentity()) throw new Error("認証が必要です");
     const ids = [...new Set(repairIds)];
     if (!ids.length || ids.some(id => !Number.isSafeInteger(id) || id <= 0)) throw new Error("修理案件を選択してください");
     const repairs = await prisma.repair.findMany({ where: { id: { in: ids } },
         include: { customer: true, estimate: { include: { items: true } },
-            deliveryNote: { select: { slipNumber: true, issuedDate: true } } } });
+            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true } } } });
     if (repairs.length !== ids.length || repairs.some(repair => repair.invoiceId !== null)) throw new Error("請求対象が変更されました");
     const groups = new Map<number, typeof repairs>();
     for (const repair of repairs) groups.set(repair.customerId, [...(groups.get(repair.customerId) ?? []), repair]);
@@ -38,8 +41,10 @@ export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     return result;
 }
 
-export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty', allocationsByCustomer?: Record<number, RequestedAllocation[]>) {
+export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty', allocationsByCustomer?: Record<number, RequestedAllocation[]>, issueDate?: string) {
     try {
+        if (!await getAdminApiIdentity()) throw new Error("認証が必要です");
+        const issuedDate = resolveIssuedDate(issueDate);
         if (repairIds.length === 0) return { success: false, error: "No repairs selected" };
 
         const uniqueRepairIds = Array.from(new Set(repairIds));
@@ -48,7 +53,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
             include: {
                 customer: true,
                 estimate: { include: { items: true } },
-                deliveryNote: { select: { slipNumber: true, issuedDate: true, customerId: true } },
+                deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true } },
             }
         });
 
@@ -119,6 +124,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 const note = await prisma.deliveryNote.create({
                     data: {
                         slipNumber: docNumber,
+                        issuedDate,
                         customerId: customerId,
                         totalAmount,
                         taxAmount,
@@ -143,6 +149,14 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 }
 
                 const invoice = await prisma.$transaction(async (tx) => {
+                  // Serialize issue-date edits with invoice snapshot creation.
+                  for (const note of [...new Map(customerRepairs.filter(r => r.deliveryNote).map(r => [r.deliveryNote!.id, r.deliveryNote!])).values()].sort((a, b) => a.id - b.id)) {
+                    const [locked] = await tx.$queryRaw<{ issuedDate: Date }[]>`
+                      SELECT "issuedDate" FROM "DeliveryNote" WHERE "id" = ${note.id} FOR UPDATE`;
+                    if (!locked || locked.issuedDate.getTime() !== note.issuedDate.getTime()) {
+                      throw new Error("納品書の発行日が変更されました。再読み込みしてください");
+                    }
+                  }
                   const invoiceNumber = isB2C
                     ? await getNextB2CInvoiceNumberForTransaction(tx)
                     : docNumber;
@@ -153,6 +167,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                   const created = await tx.invoice.create({
                     data: {
                         invoiceNumber,
+                        issuedDate,
                         customerId: customerId,
                         ...calculateIssuedInvoiceAmounts(totalAmount),
                         billingMonth,
@@ -188,6 +203,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 const estimateDoc = await prisma.estimateDocument.create({
                     data: {
                         estimateNumber: docNumber,
+                        issuedDate,
                         customerId: customerId,
                         totalAmount,
                         taxAmount,
@@ -214,6 +230,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 const warranty = await prisma.warranty.create({
                     data: {
                         warrantyNumber: docNumber,
+                        issuedDate,
                         customerId,
                         guaranteeStart: baseDate,
                         guaranteeEnd,
@@ -239,8 +256,10 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
     }
 }
 
-export async function generateWarrantyDocument(repairId: number) {
+export async function generateWarrantyDocument(repairId: number, issueDate?: string) {
     try {
+        if (!await getAdminApiIdentity()) throw new Error("認証が必要です");
+        const issuedDate = resolveIssuedDate(issueDate);
         const repair = await prisma.repair.findUnique({
             where: { id: repairId },
             include: {
@@ -273,6 +292,7 @@ export async function generateWarrantyDocument(repairId: number) {
         const warranty = await prisma.warranty.create({
             data: {
                 warrantyNumber,
+                issuedDate,
                 customerId: customer.id,
                 guaranteeStart: baseDate,
                 guaranteeEnd,

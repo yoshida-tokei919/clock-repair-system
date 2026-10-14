@@ -213,7 +213,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
         <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-bold tracking-wide text-slate-500">時計修理のご案内</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">修理状況・お見積</h1>
-          {documentMeta && <p className="mt-2 text-sm text-slate-500">{documentMeta.estimateNumber} / {documentMeta.issuedDate.toLocaleDateString("ja-JP")}</p>}
+          {documentMeta && <p className="mt-2 text-sm text-slate-500">{documentMeta.estimateNumber} / {new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo" }).format(documentMeta.issuedDate)}</p>}
         </header>
 
         {prepaymentReturn === "success" && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">前受金のお支払い結果を確認中です。反映まで少し時間がかかる場合があります。</p>}
@@ -412,7 +412,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
               <p className="mt-3 text-base text-slate-700">共有先: {customerName} 様</p>
               {documentMeta && (
                 <p className="mt-1 text-sm text-slate-500">
-                  {documentMeta?.estimateNumber} / {documentMeta?.issuedDate.toLocaleDateString("ja-JP")}
+                  {documentMeta?.estimateNumber} / {documentMeta?.issuedDate.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                 </p>
               )}
             </div>
@@ -601,7 +601,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
               <div className="text-lg font-bold">{customerName || "お客様"}</div>
               {documentMeta && (
                 <p className="mt-1 text-xs text-slate-500">
-                  {documentMeta?.estimateNumber} / {documentMeta?.issuedDate.toLocaleDateString("ja-JP")}
+                  {documentMeta?.estimateNumber} / {documentMeta?.issuedDate.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                 </p>
               )}
             </div>

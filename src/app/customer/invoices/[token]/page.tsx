@@ -24,7 +24,7 @@ type DeliveryGroup = {
 };
 
 function formatDate(date: Date | null | undefined) {
-  return date ? date.toLocaleDateString("ja-JP") : "未設定";
+  return date ? date.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "未設定";
 }
 
 function formatCurrency(amount: number) {

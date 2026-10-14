@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { EstimatePdfActions } from "@/components/estimates/EstimatePdfActions";
+import { IssuedDateEditor } from "@/components/documents/IssuedDateEditor";
+import { formatIssuedDate } from "@/lib/document-issued-date";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,7 @@ export default async function EstimateDocumentPage({ params }: { params: Promise
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
                             <h1 className="font-bold text-lg">見積書: {estimateDoc.estimateNumber}</h1>
+                            <IssuedDateEditor type="estimate" id={estimateDoc.id} issuedDate={formatIssuedDate(estimateDoc.issuedDate)} hasPdf />
                             {returnLink}
                             <p className="mt-1 text-xs text-slate-500">
                                 保存済みPDFを表示しています。管理画面と共有画面は同じPDFファイルを参照します。
@@ -111,6 +114,7 @@ export default async function EstimateDocumentPage({ params }: { params: Promise
         <div className="min-h-screen bg-gray-100 p-6">
             <div className="rounded border border-amber-200 bg-amber-50 p-5 text-amber-950">
                 <h1 className="text-lg font-bold">見積書: {estimateDoc.estimateNumber}</h1>
+                <IssuedDateEditor type="estimate" id={estimateDoc.id} issuedDate={formatIssuedDate(estimateDoc.issuedDate)} />
                 <p className="mt-3 text-sm">保存済みPDFはまだ生成されていません。</p>
                 {returnLink}
                 <p className="mt-1 text-xs text-amber-800">

@@ -4,6 +4,8 @@ import { InvoicePdfActions } from "@/components/invoices/InvoicePdfActions";
 import { InvoicePaymentSummary } from "@/components/invoices/InvoicePaymentSummary";
 import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 import { getInvoiceDeliveryState } from "@/lib/invoice-delivery-routing";
+import { IssuedDateEditor } from "@/components/documents/IssuedDateEditor";
+import { formatIssuedDate } from "@/lib/document-issued-date";
 export const dynamic = "force-dynamic";
 
 function formatPdfGeneratedAt(date: Date) {
@@ -98,6 +100,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
                             <h1 className="font-bold text-lg">請求書: {invoice.invoiceNumber}</h1>
+                            {canModifyInvoice && <IssuedDateEditor type="invoice" id={invoice.id} issuedDate={formatIssuedDate(invoice.issuedDate)} hasPdf />}
                             <p className="mt-1 text-sm text-slate-600">{invoice.customer.name}</p>
                             <p className="mt-1 text-xs text-slate-500">
                                 保存済みPDFを表示しています。管理画面と共有画面は同じPDFファイルを参照します。
@@ -144,6 +147,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
         <div className="min-h-screen bg-gray-100 p-6">
             <div className="rounded border border-amber-200 bg-amber-50 p-5 text-amber-950">
                 <h1 className="text-lg font-bold">請求書: {invoice.invoiceNumber}</h1>
+                {canModifyInvoice && <IssuedDateEditor type="invoice" id={invoice.id} issuedDate={formatIssuedDate(invoice.issuedDate)} hasPdf={!!currentPdfFile} />}
                 <p className="mt-1 text-sm">{invoice.customer.name}</p>
                 <p className="mt-3 text-sm">保存済みPDFはまだ生成されていません。</p>
                 <p className="mt-1 text-xs text-amber-800">
