@@ -103,6 +103,7 @@ B2B案件を1件、以下の流れで実運用に近い形で通して確認す�
 
 - Task213A（production complete）: J-001等の深夜0時台JSTで帳票発行日が前日のUTC暦日になる問題を修正。commit `63565fe`、Railway `6efff504-adbb-41a0-95f3-d572857fcf5f`、tag `production-task213a-20261015`。E2E実案件での確認は該当工程で行う。
 - Task213B（local implementation / Production: pending）: 納品書発行時に配送方法・サイズ・顧客請求送料を明示確定し、請求書に納品書単位で送料を1回だけ加算する実装。既存納品書の送料は未確定のまま、既存請求書の送料は0円。production backup・migration・deploy後にE2E実案件で確認する。
+- Task213C1（local implementation / Production: pending）: B2B店舗Customerに配送会社・サービス・サイズ・顧客請求送料の任意既定値を保存し、Task213B納品書発行確認画面の初期値にだけ使用する。発行時の編集・明示確定と既存DeliveryNoteの送料snapshotは維持。独立レビュー完了（blocking 1件修正後、再レビューでblockingなし）。production backup・migration・deploy、E2E実案件確認は未実施。
 
 - Task212B（production complete / E2E non-blocker）: Kanban `/repairs/board` の写真サムネイルが、Task156以降のprivate R2 object keyを画像URLとして使い表示されない問題を、既存の認証付き写真read route再利用で局所修正。`2b0e245`、Railway `d4151c89-4fe7-4713-ad9e-a0eae9294578` SUCCESS、production smoke PASS。schema / migration / DB / R2設定 / auth変更なし。認証済み画面での写真表示は通常利用時に確認する。
 

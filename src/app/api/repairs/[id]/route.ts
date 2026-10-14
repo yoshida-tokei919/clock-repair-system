@@ -167,6 +167,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                     data: {
                         type: customerType,
                         isPartner: customerType === 'business',
+                        ...(customerType === 'individual' ? {
+                            defaultShippingCarrierCode: null,
+                            defaultShippingServiceCode: null,
+                            defaultShippingSize: null,
+                            defaultShippingFee: null,
+                        } : {}),
                         prefix: customerType === 'business' ? body.customer.prefix || undefined : 'C',
                         name: body.customer.name,
                         phone: body.customer.phone || null,

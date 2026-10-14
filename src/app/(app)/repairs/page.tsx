@@ -40,7 +40,8 @@ export default async function RepairsPage({
         where,
         orderBy: { id: "desc" },
         include: {
-            customer: { select: { name: true, type: true } },
+            customer: { select: { id: true, name: true, type: true, defaultShippingCarrierCode: true,
+                defaultShippingServiceCode: true, defaultShippingSize: true, defaultShippingFee: true } },
             watch: {
                 select: {
                     serialNumber: true,

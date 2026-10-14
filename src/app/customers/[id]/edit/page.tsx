@@ -76,7 +76,8 @@ export default function CustomerEditPage({ params }: { params: Promise<{ id: str
             </button>
             <button
               type="button"
-              onClick={() => setData({ ...data, type: "individual" })}
+              onClick={() => setData({ ...data, type: "individual", defaultShippingCarrierCode: null,
+                defaultShippingServiceCode: null, defaultShippingSize: null, defaultShippingFee: null })}
               className={cn(
                 "flex-1 text-xs font-bold py-1.5 rounded-sm transition-all flex items-center justify-center gap-1",
                 data.type === "individual" ? "bg-white shadow-sm text-green-600" : "text-zinc-400"
@@ -211,6 +212,33 @@ export default function CustomerEditPage({ params }: { params: Promise<{ id: str
             />
           </div>
         </Card>
+
+        {data.type === "business" && (
+          <Card className="p-6 space-y-4 border-zinc-200 shadow-sm">
+            <h3 className="text-sm font-bold">納品書の配送・請求送料の既定値</h3>
+            <p className="text-sm text-zinc-600">この店舗の納品書発行時に初期入力します。発行時に確認・変更できます。未設定のままでも保存できます。</p>
+            <label className="block text-sm">配送会社・サービス
+              <select className="mt-1 block w-full rounded border p-2" value={data.defaultShippingCarrierCode ?? ""}
+                onChange={e => setData({ ...data, defaultShippingCarrierCode: e.target.value || null,
+                  defaultShippingServiceCode: e.target.value === "JAPAN_POST" ? "YU_PACK" : e.target.value === "YAMATO" ? "TA_Q_BIN" : null,
+                  defaultShippingSize: e.target.value ? data.defaultShippingSize : null,
+                  defaultShippingFee: e.target.value ? data.defaultShippingFee : null })}>
+                <option value="">未設定</option><option value="JAPAN_POST">日本郵便・ゆうパック</option><option value="YAMATO">ヤマト運輸・宅急便</option>
+              </select>
+            </label>
+            {data.defaultShippingCarrierCode && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <label className="block text-sm">サイズ
+                <select className="mt-1 block w-full rounded border p-2" value={data.defaultShippingSize ?? ""} onChange={e => setData({ ...data, defaultShippingSize: e.target.value ? Number(e.target.value) : null })}>
+                  <option value="">選択してください</option>{[60, 80, 100, 120, 140, 160, 170, 180, 200].map(size => <option key={size} value={size}>{size}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm">お客様への請求送料（税込・円）
+                <Input type="number" min="0" max="2147483647" step="1" className="mt-1" value={data.defaultShippingFee ?? ""}
+                  onChange={e => setData({ ...data, defaultShippingFee: e.target.value === "" ? null : e.target.value })} placeholder="0円も可" />
+              </label>
+            </div>}
+          </Card>
+        )}
 
         {data.type === "business" && (
           <Card className="p-6 space-y-4 border-l-4 border-l-blue-500 shadow-sm border-zinc-200">

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { deleteCustomerSafely } from "@/lib/customer-deletion-safety";
 import { revalidatePath } from "next/cache";
+import { validateCustomerDefaultShipping } from "@/lib/customer-default-shipping";
 
 /**
  * 送信された文字列が「ひらがな・全角カタカナ・半角英数字・漢字」のみかチェック
@@ -96,6 +97,12 @@ export async function createCustomer(data: any) {
 export async function updateCustomer(id: number, data: any) {
     try {
         const type = data.type || 'individual';
+        const defaultShipping = validateCustomerDefaultShipping(type, {
+            defaultShippingCarrierCode: data.defaultShippingCarrierCode ?? null,
+            defaultShippingServiceCode: data.defaultShippingServiceCode ?? null,
+            defaultShippingSize: data.defaultShippingSize == null || data.defaultShippingSize === '' ? null : Number(data.defaultShippingSize),
+            defaultShippingFee: data.defaultShippingFee == null || data.defaultShippingFee === '' ? null : Number(data.defaultShippingFee),
+        });
         const displayName = type === 'business' ? data.companyName : data.name;
         const finalPrefix = type === 'business'
             ? data.prefix?.trim().toUpperCase()
@@ -130,6 +137,7 @@ export async function updateCustomer(id: number, data: any) {
                 companyName: data.companyName,
                 kana: data.kana,
                 rank: parseInt(data.rank || "1"),
+                ...defaultShipping,
             }
         });
         revalidatePath("/customers");

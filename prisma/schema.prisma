@@ -42,6 +42,10 @@ model Customer {
   isPartner    Boolean  @default(false)
   prefix       String?  // e.g. "T", "JK"
   currentSeq   Int      @default(0) // Last issued sequence (e.g. 100)
+  defaultShippingCarrierCode String?
+  defaultShippingServiceCode String?
+  defaultShippingSize Int?
+  defaultShippingFee Int?
   
   // Document Sequences
   seqEstimate  Int      @default(0)

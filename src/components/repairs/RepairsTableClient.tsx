@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Repair, Customer, Brand, Model, Watch } from "@prisma/client";
@@ -18,6 +18,7 @@ import { IssuedDateDialog } from "@/components/documents/IssuedDateDialog";
 import { formatIssuedDate } from "@/lib/document-issued-date";
 import { DeliveryIssueDialog } from "@/components/documents/DeliveryIssueDialog";
 import type { DeliveryShippingInput } from "@/lib/delivery-shipping";
+import type { CustomerDefaultShipping } from "@/lib/customer-default-shipping";
 
 type RepairWithRelations = Repair & {
     customer: Customer;
@@ -40,6 +41,16 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     const [invoicePreview, setInvoicePreview] = useState<Awaited<ReturnType<typeof previewBulkInvoiceAllocations>> | null>(null);
     const [requestedAllocations, setRequestedAllocations] = useState<Record<number, Record<number, number>>>({});
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const deliveryCustomerDefault = useMemo<CustomerDefaultShipping | null>(() => {
+        const selectedCustomers = repairs.filter(repair => selectedIds.includes(repair.id)).map(repair => repair.customer);
+        const customer = selectedCustomers.length > 0 && selectedCustomers.every(row => row.id === selectedCustomers[0].id)
+            ? selectedCustomers[0] : null;
+        return customer?.type === "business" ? {
+            defaultShippingCarrierCode: customer.defaultShippingCarrierCode,
+            defaultShippingServiceCode: customer.defaultShippingServiceCode,
+            defaultShippingSize: customer.defaultShippingSize, defaultShippingFee: customer.defaultShippingFee,
+        } : null;
+    }, [repairs, selectedIds]);
     const [readRepairIds, setReadRepairIds] = useState<number[]>([]);
     const [activeMessage, setActiveMessage] = useState<{
         repairId: number;
@@ -377,7 +388,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
             </Dialog>
             <IssuedDateDialog open={issueType === "estimate" || issueType === "warranty"} title={`${issueType === "estimate" ? "見積書" : "保証書"}の発行を確認`} busy={isGenerating}
                 onClose={() => setIssueType(null)} onConfirm={date => { if (issueType) void handleBulkAction(issueType, date); }} />
-            <DeliveryIssueDialog open={issueType === "delivery"} busy={isGenerating} onClose={() => setIssueType(null)} onConfirm={(date, shipping) => void handleBulkAction("delivery", date, undefined, shipping)} />
+            <DeliveryIssueDialog open={issueType === "delivery"} busy={isGenerating} customerType={deliveryCustomerDefault ? "business" : null} customerDefault={deliveryCustomerDefault} onClose={() => setIssueType(null)} onConfirm={(date, shipping) => void handleBulkAction("delivery", date, undefined, shipping)} />
             <Dialog open={!!activeMessage} onOpenChange={(open) => !open && setActiveMessage(null)}>
                 <DialogContent>
                     <DialogHeader>
