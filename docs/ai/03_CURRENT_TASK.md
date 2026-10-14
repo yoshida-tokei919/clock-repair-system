@@ -2,18 +2,18 @@
 
 ## 現在のcheckpoint — 2026-10-14
 
-Task212A（管理者の実承認・手動ステータス日付）は独立レビュー・ユーザー承認・production反映済み。実案件での操作は未確認。B2B E2EはK-002の見積・承認工程から再開する。
+Task212AとTask212A-FIX1は独立レビュー・ユーザー承認・production反映済み。FIX1はJ-001で発見した未保存の中間ステータス日付による保存失敗を修正。直近の確認はJ-001再保存から行い、K-002等のB2B E2E見積・承認工程も継続する。実案件の再保存成功は未確認。
 
 このファイルは、現在のproduction到達点、未完了事項、次に着手する候補だけを管理する。
 過去Taskの詳細は `docs/ai-tasks/`、全体の優先順位は `docs/ai/02_PRODUCT_ROADMAP.md`、B2B通しテストは `docs/ai/06_B2B_E2E_RUN_LOG.md` を参照する。
 
 ## Production current state
 
-- Latest application change: `658641797f9922be6769182a67dc01fa65f114bc` — Task212A手動承認・ステータス日付。Task211C-D / Task196G / Task205C-FIX1 / Task207A-Fを祖先に含む。後続docs-only commitでもこのapplication到達点を維持する。
-- Application rollout deployment: `7525ef2b-86f0-4a76-a896-cd70b344edbb` — SUCCESS、region `sin`。後続docs-only rolloutのlatest deploymentはRailwayで確認する。
-- Railway production build SUCCESS。Task212A対象test 48件、最終限定test 20件 / TypeScript PASS。schema / migration / env変更なし。
-- Runtime smoke: `/`=200、未認証 `POST /api/repairs/5/manual-approval`=401、未認証 `PUT /api/repairs/5/status`=401。認証済み実画面の承認・日付訂正は未確認。
-- production tag: `production-task212a-20261014`。既存Task211C-D / Task207A-F等のtagsも維持。
+- Latest application change: `669784583309f198c8e6c30fa43d9642aa45aec8` — Task212A-FIX1中間ステータス日付の送信対象修正。Task212A / Task211C-D / Task196G / Task205C-FIX1 / Task207A-Fを祖先に含む。後続docs-only commitでもこのapplication到達点を維持する。
+- Application rollout deployment: `a0e0f8ae-b862-471b-b510-941912497d1e` — SUCCESS。後続docs-only rolloutのlatest deploymentはRailwayで確認する。
+- Railway production build SUCCESS。FIX1対象test 19件 / TypeScript PASS。schema / migration / env変更なし。
+- Runtime smoke: `/`=200、未認証 `PATCH /api/repairs/9`=401。認証済み実画面のJ-001再保存は未確認。
+- production tag: `production-task212a-fix1-20261014`。既存Task212A / Task211C-D / Task207A-F等のtagsも維持。
 - Task211Dはschema / migration / env / production DB変更なし。E2E再開位置はK-002明細の保存再試行。
 - Task211C production master追加: `RepairWorkAction.id=25` / `movement_repair` / 動作修理 / sortOrder 25 / active。既存repair / adjust維持、1行だけ追加。schema / migration / env変更なし。
 - Task207B/C production migrations: `20261013021135 add_b2b_company_billing_foundation` / `20261013021204 add_consolidated_invoice`。Task207D-Fはschema / migration / env / production DB変更なし。
