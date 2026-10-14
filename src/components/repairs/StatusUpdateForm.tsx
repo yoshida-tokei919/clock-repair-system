@@ -62,6 +62,8 @@ export function StatusUpdateForm({ repairId, currentStatus }: { repairId: number
         setWarnings(data.warnings);
         return;
       }
+      setStatus(data.repair?.status ?? status);
+      router.refresh();
     } else {
       // 通常のServer Action経由
       const result = await updateRepairStatus(repairId, status);
@@ -70,6 +72,8 @@ export function StatusUpdateForm({ repairId, currentStatus }: { repairId: number
         alert('更新に失敗しました。');
         return;
       }
+      setStatus(result.status ?? status);
+      router.refresh();
     }
   };
 

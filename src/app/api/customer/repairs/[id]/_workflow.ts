@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { APPROVAL_EVENT_PREFIX } from "@/lib/repair-approval-audit";
 
 export async function findRepairIdByPublicToken(value: string) {
   if (!value.trim()) return null;
@@ -19,7 +20,7 @@ export async function addStatusLogIfMissing(
   changedAt = new Date()
 ) {
   const latest = await tx.repairStatusLog.findFirst({
-    where: { repairId },
+    where: { repairId, status: { not: { startsWith: APPROVAL_EVENT_PREFIX } } },
     orderBy: { id: "desc" },
   });
 

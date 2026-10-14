@@ -8,6 +8,7 @@ import { PhysicalTagPanel } from "@/components/repairs/PhysicalTagPanel";
 import { RepairPrepaymentPanel } from "@/components/repairs/RepairPrepaymentPanel";
 import { recommendZoneForRepair } from "@/lib/storage-zone-repair";
 import { compareStorageZone, STORAGE_COMPARISON_LABELS } from "@/lib/storage-zone-recommendation";
+import { isApprovalAuditStatus } from "@/lib/repair-approval-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +84,7 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
             partAllocations: { select: { partsMasterId: true, quantity: true, state: true } },
             photos: true,
             logs: {
-                orderBy: { changedAt: 'asc' },
+                orderBy: { id: 'asc' },
                 select: { status: true, changedAt: true }
             },
             customerMessages: {
@@ -159,8 +160,9 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
     // RepairEntryForm のステータスバーは日本語ステータス名をキーにして日付を読む。
     const statusLog: Record<string, string> = {};
     repair.logs.forEach(log => {
+        if (isApprovalAuditStatus(log.status)) return;
         // 同一ステータスが複数ある場合は最新を使用
-        statusLog[log.status] = log.changedAt.toLocaleDateString("ja-JP");
+        statusLog[log.status] = log.changedAt.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
     });
 
     // JSON.parse(JSON.stringify(...)) で Date オブジェクトを文字列化してクライアントへ渡す

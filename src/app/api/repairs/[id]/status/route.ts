@@ -1,40 +1,23 @@
-import { requireAdminApi } from "@/lib/admin-api-auth";
+import { getAdminApiIdentity } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
-import { getRepairStatusTransition } from "@/lib/repair-status-transition";
+import { parseManualDate, persistManualRepairStatus } from "@/lib/repair-manual-status";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const unauthorized = await requireAdminApi();
-  if (unauthorized) return unauthorized;
+  const admin = await getAdminApiIdentity();
+  if (!admin) return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
   const repairId = Number((await params).id);
-  const { status } = await req.json();
+  const { status, date } = await req.json();
 
   if (!Number.isInteger(repairId) || typeof status !== "string") {
     return NextResponse.json({ error: "Invalid repair or status" }, { status: 400 });
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const repair = await tx.repair.findUniqueOrThrow({
-      where: { id: repairId },
-      select: { status: true },
-    });
-
-    // A manual status is only a requested state. Allocation and active orders
-    // determine the persisted parts status in the same transaction.
-    if (status !== repair.status) {
-      await tx.repair.update({
-        where: { id: repairId },
-        data: { status, ...getRepairStatusTransition(repair.status, status) },
-      });
-    }
-    const reconciliation = await reconcileRepairPartAllocations(tx, repairId, {
-      requestedStatus: status,
-    });
-    await addConfirmedRepairStatusLog(tx, repairId, reconciliation.status);
-    const updatedRepair = await tx.repair.findUniqueOrThrow({ where: { id: repairId } });
-    return { repair: updatedRepair, warnings: [], reconciliation };
-  });
-
-  return NextResponse.json(result);
+  try {
+    const selectedDate = date === undefined ? undefined : parseManualDate(date);
+    const result = await prisma.$transaction((tx) => persistManualRepairStatus(tx, repairId, status, admin.id, selectedDate));
+    return NextResponse.json({ repair: result.repair, warnings: [], reconciliation: result.reconciliation, normalized: result.repair.status !== status });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "更新に失敗しました。" }, { status: 400 });
+  }
 }

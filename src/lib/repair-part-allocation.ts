@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { APPROVAL_EVENT_PREFIX } from "@/lib/repair-approval-audit";
 import {
     canApplyPartsOrderStatus,
     getRepairStatusAfterPartsFlowCompletion,
@@ -278,7 +279,7 @@ export async function addConfirmedRepairStatusLog(
     status: string,
 ) {
     const latest = await tx.repairStatusLog.findFirst({
-        where: { repairId },
+        where: { repairId, status: { not: { startsWith: APPROVAL_EVENT_PREFIX } } },
         orderBy: { id: "desc" },
         select: { status: true },
     });

@@ -2,46 +2,20 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { getRepairStatusTransition } from "@/lib/repair-status-transition";
+import { getAdminApiIdentity } from "@/lib/admin-api-auth";
+import { persistManualRepairStatus } from "@/lib/repair-manual-status";
 
 export async function updateRepairStatus(repairId: number, newStatus: string, note?: string) {
     try {
-        await prisma.$transaction(async (tx) => {
-            // 1. Fetch current to check approvalDate
-            const current = await tx.repair.findUnique({ where: { id: repairId } });
-            if (!current) throw new Error(`Repair ID ${repairId} not found`);
-
-            const isApprovalStatus = ['作業中', '部品待ち(未注文)', '部品待ち(注文済み)', '作業完了', '納品済み'].includes(newStatus);
-            const shouldSetApprovalDate = isApprovalStatus && !current.approvalDate;
-            const statusTransition = getRepairStatusTransition(current.status, newStatus);
-
-            // 2. Update Repair Status
-            await tx.repair.update({
-                where: { id: repairId },
-                data: {
-                    status: newStatus,
-                    approvalDate: shouldSetApprovalDate ? new Date() : undefined,
-                    ...statusTransition,
-                }
-            });
-
-            // 3. Add Log
-            const admin = await tx.admin.findUnique({ where: { id: 1 } });
-
-            await tx.repairStatusLog.create({
-                data: {
-                    repairId: repairId,
-                    status: newStatus,
-                    changedBy: admin ? 1 : null
-                }
-            });
-        });
+        const admin = await getAdminApiIdentity();
+        if (!admin) throw new Error("認証が必要です。");
+        const { repair } = await prisma.$transaction((tx) => persistManualRepairStatus(tx, repairId, newStatus, admin.id));
 
         revalidatePath(`/repairs/${repairId}`);
         revalidatePath('/repairs');
         revalidatePath('/repairs/board');
 
-        return { success: true };
+        return { success: true, status: repair.status };
     } catch (error: any) {
         console.error("Status Update Error Detailed:", {
             message: error.message,

@@ -2,6 +2,8 @@
 
 ## 現在のcheckpoint — 2026-10-14
 
+Task212A（管理者の実承認・手動ステータス日付）はローカル実装済み。Production: pending。独立レビュー、commit、deploy前承認を経てからB2B E2E見積・承認工程を再開する。
+
 このファイルは、現在のproduction到達点、未完了事項、次に着手する候補だけを管理する。
 過去Taskの詳細は `docs/ai-tasks/`、全体の優先順位は `docs/ai/02_PRODUCT_ROADMAP.md`、B2B通しテストは `docs/ai/06_B2B_E2E_RUN_LOG.md` を参照する。
 

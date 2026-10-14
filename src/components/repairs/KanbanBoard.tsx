@@ -86,6 +86,8 @@ export function KanbanBoard({ initialRepairs }: KanbanBoardProps) {
                 description: result.error || "サーバーエラーが発生しました。",
                 variant: "destructive"
             });
+        } else {
+            setRepairs(prev => prev.map(r => r.id === repairId ? { ...r, status: result.status ?? newStatus } : r));
         }
     };
 

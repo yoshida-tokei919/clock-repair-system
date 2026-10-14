@@ -6,9 +6,15 @@ import { prisma } from "@/lib/prisma";
 
 /** Fail closed at the route boundary, before parsing input or querying business data. */
 export async function requireAdminApi(): Promise<NextResponse | null> {
+  const admin = await getAdminApiIdentity();
+  if (!admin) return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
+  return null;
+}
+
+export async function getAdminApiIdentity(): Promise<{ id: number } | null> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
-    return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
+    return null;
   }
 
   const admin = await prisma.admin.findUnique({
@@ -16,8 +22,7 @@ export async function requireAdminApi(): Promise<NextResponse | null> {
     select: { id: true },
   });
   if (!admin) {
-    return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
+    return null;
   }
-
-  return null;
+  return admin;
 }

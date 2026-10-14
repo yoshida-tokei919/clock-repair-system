@@ -1,8 +1,7 @@
-import { requireAdminApi } from "@/lib/admin-api-auth";
+import { getAdminApiIdentity } from "@/lib/admin-api-auth";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
 import { resolveRepairMovementMaker } from "@/lib/repair-movement-maker";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
@@ -21,6 +20,7 @@ import {
 } from "@/lib/repair-photo-sharing";
 import { enforceRepairPhotoPostingOptOut } from "@/lib/repair-photo-posting-opt-out";
 import { getRepairStatusTransition } from "@/lib/repair-status-transition";
+import { assertRepairStatus, correctManualStatusDate, ManualStatusValidationError, parseManualDate, persistManualRepairStatus } from "@/lib/repair-manual-status";
 
 function normalizeCustomerType(value?: string | null): "business" | "individual" | null {
     if (value === "business") return "business";
@@ -37,8 +37,8 @@ function requireCustomerType(value?: string | null): "business" | "individual" {
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const unauthorized = await requireAdminApi();
-    if (unauthorized) return unauthorized;
+    const admin = await getAdminApiIdentity();
+    if (!admin) return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
     try {
         const id = parseInt((await params).id);
         const body = await req.json();
@@ -189,6 +189,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             const dbStatus = requestedStatus === "受付" && hasEstimateItems && repairRecord.status !== "送付待ち"
                 ? "見積中"
                 : requestedStatus;
+            assertRepairStatus(dbStatus);
+            if (body.statusDateUpdates !== undefined && (typeof body.statusDateUpdates !== "object" || body.statusDateUpdates === null || Array.isArray(body.statusDateUpdates))) {
+                throw new ManualStatusValidationError("ステータス日付が不正です。");
+            }
+            const statusDateUpdates = new Map<string, Date>();
+            for (const [key, value] of Object.entries(body.statusDateUpdates ?? {})) {
+                assertRepairStatus(key);
+                statusDateUpdates.set(key, parseManualDate(value));
+            }
             const statusTransition = dbStatus !== repairRecord.status
                 ? getRepairStatusTransition(repairRecord.status, dbStatus)
                 : {};
@@ -219,46 +228,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
             await enforceRepairPhotoPostingOptOut(tx, id, photoPostingOptOut);
 
-            // RepairStatusLog: スチE�Eタスが変化した場合�Eみ記録
             if (hasEstimateItems && dbStatus === "見積中") {
-                const receptionLog = await tx.repairStatusLog.findFirst({
-                    where: { repairId: id, status: "受付" }
-                });
-                if (!receptionLog) {
-                    await tx.repairStatusLog.create({
-                        data: { repairId: id, status: "受付", changedAt: repairRecord.createdAt }
-                    });
-                }
-                const logDateStr = body.statusLog?.[dbStatus];
-                let changedAt = new Date();
-                if (logDateStr) {
-                    const parts = logDateStr.split('/');
-                    if (parts.length === 3) {
-                        changedAt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                    }
-                }
-                const existingStatusLog = await tx.repairStatusLog.findFirst({
-                    where: { repairId: id, status: dbStatus }
-                });
-                if (!existingStatusLog) {
-                    await tx.repairStatusLog.create({
-                        data: { repairId: id, status: dbStatus, changedAt }
-                    });
-                }
-            } else if (
-                dbStatus !== repairRecord.status
-                && !["部品待ち(未注文)", "部品待ち(注文済み)", "部品入荷済み", "作業待ち"].includes(dbStatus)
-            ) {
-                const logDateStr = body.statusLog?.[dbStatus];
-                let changedAt = new Date();
-                if (logDateStr) {
-                    const parts = logDateStr.split('/');
-                    if (parts.length === 3) {
-                        changedAt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                    }
-                }
-                await tx.repairStatusLog.create({
-                    data: { repairId: id, status: dbStatus, changedAt }
+                const receptionLog = await tx.repairStatusLog.findFirst({ where: { repairId: id, status: "受付" }, select: { id: true } });
+                if (!receptionLog) await tx.repairStatusLog.create({
+                    data: { repairId: id, status: "受付", changedAt: repairRecord.createdAt, changedBy: admin.id },
                 });
             }
 
@@ -473,9 +446,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 }));
             }
 
-            const reconciliation = await reconcileRepairPartAllocations(tx, id, { requestedStatus: dbStatus });
-            await addConfirmedRepairStatusLog(tx, id, reconciliation.status);
-            updatedRepair = await tx.repair.findUniqueOrThrow({ where: { id } });
+            updatedRepair = (await persistManualRepairStatus(tx, id, dbStatus, admin.id, statusDateUpdates.get(dbStatus))).repair;
+            for (const [status, date] of statusDateUpdates) {
+                if (status === dbStatus) continue;
+                await correctManualStatusDate(tx, id, status, date, admin.id, updatedRepair.status);
+            }
+
+            if (statusDateUpdates.has("受付") && dbStatus !== "受付") {
+                updatedRepair = await tx.repair.findUniqueOrThrow({ where: { id } });
+            }
 
             return updatedRepair;
         }, {
@@ -487,6 +466,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     } catch (error: any) {
         if (error instanceof RepairPartValidationError) {
             return NextResponse.json({ error: error.message }, { status: error.status });
+        }
+        if (error instanceof ManualStatusValidationError) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
         }
         console.error("Update Error:", error);
         return NextResponse.json(

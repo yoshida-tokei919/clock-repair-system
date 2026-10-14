@@ -91,6 +91,8 @@ export function RepairListStatusSelect({ id, currentStatus }: Props) {
       if (data.warnings && data.warnings.length > 0) {
         setWarnings(data.warnings);
       }
+      setStatus(data.repair?.status ?? newStatus);
+      router.refresh();
     } else {
       const result = await updateRepairStatus(id, newStatus);
       setIsPending(false);
@@ -98,6 +100,9 @@ export function RepairListStatusSelect({ id, currentStatus }: Props) {
       if (!result.success) {
         setStatus(oldStatus);
         alert('更新に失敗しました。');
+      } else {
+        setStatus(result.status ?? newStatus);
+        router.refresh();
       }
     }
   };

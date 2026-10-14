@@ -33,6 +33,7 @@ import { createEstimateItemFromPart } from "@/lib/estimate-item";
 import { getNewItemClassification, type AddItemCategory } from "@/lib/repair-entry-item-classification";
 import { canApplyPartsOrderStatus, getRepairStatusFromActiveOrderStatuses } from "@/lib/repair-parts-status";
 import { getRepairStatusForSave } from "@/lib/repair-status-transition";
+import { hasUnsavedApprovalDraft } from "@/lib/repair-approval-draft";
 import {
     PART_INPUT_TYPES,
     type PartInputType,
@@ -555,6 +556,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [isCreatingPublicCase, setIsCreatingPublicCase] = useState(false);
     const [isEditingEnabled, setIsEditingEnabled] = useState(mode !== 'view');
     const isReadOnly = mode === 'view' && !isEditingEnabled;
+    const approvalDraftBaselineRef = useRef<string | null>(null);
 
     useEffect(() => {
         setIsEditingEnabled(mode !== 'view');
@@ -567,6 +569,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 ? new Date(initialData.createdAt).toLocaleDateString('ja-JP')
                 : new Date().toLocaleDateString('ja-JP');
             setStatusLog(prev => prev["受付"] ? prev : { ...prev, "受付": receptionDate });
+            approvalDraftBaselineRef.current = null;
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -574,6 +577,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [status, setStatus] = useState<string>(initialData?.status || "受付");
     const [persistedStatus, setPersistedStatus] = useState<string>(initialData?.status || "受付");
     const [statusLog, setStatusLog] = useState<Record<string, string>>(initialData?.statusLog ?? {});
+    const [approvalAt, setApprovalAt] = useState(() => initialData?.approvalDate
+        ? new Date(new Date(initialData.approvalDate).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
+        : "");
+    const [approvalStatus, setApprovalStatus] = useState(initialData?.approvalStatus ?? "pending");
+    const [isRecordingApproval, setIsRecordingApproval] = useState(false);
     const [customerId, setCustomerId] = useState<number | null>(initialData?.customer?.id || null);
     const [customerTypeSelection, setCustomerTypeSelection] = useState<CustomerTypeSelection>(
         normalizeCustomerTypeSelection(initialData?.customer?.type)
@@ -705,6 +713,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         setStatus(serverStatus);
         setPersistedStatus(serverStatus);
         setStatusLog(initialData.statusLog ?? {});
+        approvalDraftBaselineRef.current = null;
+        setApprovalStatus(initialData.approvalStatus ?? "pending");
+        setApprovalAt(initialData.approvalDate
+            ? new Date(new Date(initialData.approvalDate).getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
+            : "");
         setOrderList((initialData.orderRequests ?? []).map((order: any) => ({
             id: order.id,
             partId: order.partsMasterId,
@@ -1978,6 +1991,46 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, [orderList, status]);
 
     // --- ACTIONS ---
+    const approvalDraftSnapshot = JSON.stringify({
+        status, statusLog, customerTypeSelection, customerName, customerPrefix, customerPhone, lineId, address,
+        brand, model, refName, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, serial,
+        lineItems, orderList, diagnosis, internalNotes, customerNote, partnerRef, endUserName, accessories,
+    });
+    if (approvalDraftBaselineRef.current === null) approvalDraftBaselineRef.current = approvalDraftSnapshot;
+
+    const handleRecordApproval = async () => {
+        if (isSaving) {
+            alert("保存完了後に承認を記録してください。");
+            return;
+        }
+        if (!initialData?.id || !approvalAt) {
+            alert("承認を得た日時を入力してください。");
+            return;
+        }
+        if (hasUnsavedApprovalDraft(approvalDraftBaselineRef.current ?? "", approvalDraftSnapshot)) {
+            alert("未保存の案件・見積変更があります。先に保存してから承認を記録してください。");
+            return;
+        }
+        setIsRecordingApproval(true);
+        try {
+            const res = await fetch(`/api/repairs/${initialData.id}/manual-approval`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ approvalAt }),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "承認記録に失敗しました。");
+            setApprovalStatus(json.repair.approvalStatus);
+            setStatus(json.repair.status);
+            setPersistedStatus(json.repair.status);
+            router.refresh();
+        } catch (error) {
+            alert(error instanceof Error ? error.message : "承認記録に失敗しました。");
+        } finally {
+            setIsRecordingApproval(false);
+        }
+    };
+
     const handleSave = async () => {
         if (isReadOnly) return;
         if (!customerTypeSelection) {
@@ -1993,6 +2046,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             const hasEstimateItems = lineItems.length > 0;
             const nextStatus = getRepairStatusForSave(persistedStatus, status, hasEstimateItems);
             const nextStatusLog = { ...statusLog };
+            const statusDateUpdates = Object.fromEntries(
+                Object.entries(statusLog).filter(([key, value]) => value && value !== initialData?.statusLog?.[key])
+            );
             if (hasEstimateItems && (nextStatus === "見積中" || status === "見積中")) {
                 if (!nextStatusLog["受付"]) {
                     nextStatusLog["受付"] = initialData?.createdAt
@@ -2066,6 +2122,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 },
                 status: nextStatus,
                 statusLog: nextStatusLog,
+                statusDateUpdates: mode === 'create' ? undefined : statusDateUpdates,
                 explicitOrderPartsMasterIds: mode === 'create'
                     ? Array.from(explicitlyRequestedOrderPartIdsRef.current)
                     : undefined,
@@ -2093,9 +2150,13 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 router.push(`/repairs/${json.repair.id}`);
             } else {
                 const savedStatus = typeof json.repair?.status === "string" ? json.repair.status : nextStatus;
+                if (savedStatus !== nextStatus) {
+                    alert(`在庫・発注状況により、ステータスは「${savedStatus}」で保存されました。`);
+                }
                 setStatus(savedStatus);
                 setPersistedStatus(savedStatus);
                 setStatusLog(prev => ({ ...prev, ...nextStatusLog }));
+                approvalDraftBaselineRef.current = null;
                 if (mode === 'view') setIsEditingEnabled(false);
                 router.refresh();
             }
@@ -2554,6 +2615,19 @@ ${shopName}
 
             {/* --- STATUS BAR --- */}
             <div className="bg-white border-b border-zinc-200 px-4 py-3 shadow-sm w-full">
+                {mode !== 'create' && (
+                    <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-semibold">見積承認: {approvalStatus === 'approved' ? '承認済み' : '未承認'}</span>
+                        <label htmlFor="manual-approval-at">実際に承認を得た日時（日本時間）</label>
+                        <input id="manual-approval-at" type="datetime-local" value={approvalAt}
+                            onChange={(event) => setApprovalAt(event.target.value)}
+                            className="rounded border border-zinc-300 px-2 py-1" />
+                        <Button type="button" size="sm" variant="outline" onClick={handleRecordApproval}
+                            disabled={isRecordingApproval || isSaving || !approvalAt}>
+                            {isRecordingApproval ? '記録中...' : approvalStatus === 'approved' ? '承認日時を訂正' : '実際に得た承認を記録'}
+                        </Button>
+                    </div>
+                )}
                 {/* メインフロー：横一列・画面幅いっぱい */}
                 <div className="flex items-stretch w-full overflow-x-auto">
                     {MAIN_STATUS_STEPS.map((step, idx) => {
