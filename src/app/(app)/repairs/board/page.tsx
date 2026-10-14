@@ -5,6 +5,7 @@ import { KanbanBoard } from "@/components/repairs/KanbanBoard";
 import { ArrowLeft, LayoutDashboard, ListFilter } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { isR2RepairPhotoKey } from "@/lib/r2-repair-photos";
 
 export default async function KanbanPage() {
     // Fetch Active Repairs (Exclude Delivered/Canceled for Board Clarity?)
@@ -25,7 +26,8 @@ export default async function KanbanPage() {
             },
             photos: {
                 orderBy: { id: 'desc' },
-                take: 1
+                take: 1,
+                select: { id: true, storageKey: true }
             } // Thumbnail
         },
         orderBy: {
@@ -49,7 +51,11 @@ export default async function KanbanPage() {
         endUserName: r.endUserName, // Added
         status: r.status,
         approvalDate: r.approvalDate ? r.approvalDate.toLocaleDateString("ja-JP") : null,
-        photo: r.photos[0]?.storageKey || null
+        photo: isR2RepairPhotoKey(r.photos[0]?.storageKey)
+            ? `/api/repair-photos/${r.photos[0].id}`
+            : /^(https?:|data:|blob:)/i.test(r.photos[0]?.storageKey ?? '')
+                ? r.photos[0].storageKey
+                : null
     }));
 
     return (
