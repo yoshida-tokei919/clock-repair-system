@@ -33,6 +33,7 @@ import { createEstimateItemFromPart } from "@/lib/estimate-item";
 import { getNewItemClassification, type AddItemCategory } from "@/lib/repair-entry-item-classification";
 import { canApplyPartsOrderStatus, getRepairStatusFromActiveOrderStatuses } from "@/lib/repair-parts-status";
 import { getRepairStatusForSave, getStatusDateUpdates } from "@/lib/repair-status-transition";
+import { canSelectRepairStatusStep, shouldSelectStatusStepOnDateChange } from "@/lib/repair-status-step-selection";
 import { hasUnsavedApprovalDraft } from "@/lib/repair-approval-draft";
 import {
     PART_INPUT_TYPES,
@@ -2659,8 +2660,7 @@ ${shopName}
                                         type="button"
                                         onClick={() => {
                                             if (isReadOnly) return;
-                                            if (status === "送付待ち" && step.id !== "受付") return;
-                                            if (step.id === "送付待ち" && status !== "受付") return;
+                                            if (!canSelectRepairStatusStep(status, step.id)) return;
                                             const isShippingReceptionTransition = status === "送付待ち" && step.id === "受付";
                                             const isReceptionShippingTransition = status === "受付" && step.id === "送付待ち";
                                             setStatus(step.id);
@@ -2690,6 +2690,11 @@ ${shopName}
                                                 className="text-xs border border-blue-300 rounded px-1 py-0.5 w-full max-w-[110px] text-center"
                                                 defaultValue={toInputDate(displayDate || '')}
                                                 onChange={e => {
+                                                    if (isReadOnly || !canSelectRepairStatusStep(status, step.id)) return;
+                                                    if (e.target.value === toInputDate(displayDate || '')) return;
+                                                    if (shouldSelectStatusStepOnDateChange(status, step.id, toInputDate(displayDate || ''), e.target.value)) {
+                                                        setStatus(step.id);
+                                                    }
                                                     setStatusLog(prev => ({
                                                         ...prev,
                                                         [step.id]: toLocaleDate(e.target.value)
