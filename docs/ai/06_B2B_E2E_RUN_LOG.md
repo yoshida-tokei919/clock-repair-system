@@ -101,6 +101,8 @@ B2B案件を1件、以下の流れで実運用に近い形で通して確認す�
 
 ## その場修正記録
 
+- Task212A-FIX1（local implementation complete / Katari review complete、Production: pending）: Repair J-001 で訪問しただけの中間ステータス日付が履歴訂正として送られ、ステータス保存を阻害。保存済み履歴と最終選択ステータスだけを日付訂正対象にする局所修正。対象: `src/components/repairs/RepairEntryForm.tsx`、`src/lib/repair-status-transition.ts` と関連test、Task文書。最終19件test・型チェックPASS、カタリ独立レビュー済み。push・本番反映は承認待ち。反映後、J-001のステータス保存を再試行する。
+
 - Task212A（production complete / 実案件確認待ち）: 口頭等で得た承認を指定日時・操作者とともに記録・訂正し、手動ステータス変更と日付訂正を保存できるように修正。カタリ独立レビュー済み、blocking findingなし。`6586417`、Railway `7525ef2b-86f0-4a76-a896-cd70b344edbb` SUCCESS、production smoke PASS。実案件の承認操作は未実施。K-002の見積・承認工程からE2Eを継続する。
 
 - Task211D（production complete、K-002再保存確認待ち）: K-002の修理明細保存時、手入力した内装交換部品行が `category=part_external` / `partType=interior` となりサーバーで拒否された。見積・承認工程を続けるためのblocker。新規行分類のみを修正し、サーバーの矛盾拒否は維持。対象: `src/components/repairs/RepairEntryForm.tsx`、`src/lib/repair-entry-item-classification.ts` と同test、Task文書。カタリ独立差分レビュー完了、blocking findingなし。本番反映済み（`5e67a35`、deployment `74ac3185-d76d-44a4-a3ab-d8d700920fdb` SUCCESS）。K-002の明細保存からE2Eを再開する。

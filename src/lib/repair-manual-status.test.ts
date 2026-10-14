@@ -117,3 +117,13 @@ test("reception correction updates Repair.receptionDate and the latest log atomi
   assert.equal(logs[0].changedAt.toISOString(), "2026-10-01T00:00:00.000Z");
   await assert.rejects(correctManualStatusDate(tx as never, 10, "受付", date, 42, "送付待ち"), /送付待ち中/);
 });
+
+test("a correction for a status with no saved history remains rejected", async () => {
+  const tx = {
+    repairStatusLog: { findFirst: async () => null },
+  };
+  await assert.rejects(
+    correctManualStatusDate(tx as never, 10, "作業中", parseManualDate("2026-10-14"), 42, "作業待ち"),
+    /履歴がないため日付を修正できません/,
+  );
+});

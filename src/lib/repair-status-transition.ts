@@ -2,6 +2,19 @@ export const SHIPPING_WAITING_STATUS = "送付待ち";
 export const RECEPTION_STATUS = "受付";
 export const ESTIMATING_STATUS = "見積中";
 
+export function getStatusDateUpdates(
+    draftStatusLog: Record<string, string>,
+    savedStatusLog: Record<string, string>,
+    requestedStatus: string,
+): Record<string, string> {
+    return Object.fromEntries(
+        Object.entries(draftStatusLog).filter(([status, date]) =>
+            date && (status === requestedStatus || Object.hasOwn(savedStatusLog, status))
+            && date !== savedStatusLog[status]
+        ),
+    );
+}
+
 export function getRepairStatusForSave(
     persistedStatus: string,
     selectedStatus: string,

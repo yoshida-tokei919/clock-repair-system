@@ -32,7 +32,7 @@ import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { createEstimateItemFromPart } from "@/lib/estimate-item";
 import { getNewItemClassification, type AddItemCategory } from "@/lib/repair-entry-item-classification";
 import { canApplyPartsOrderStatus, getRepairStatusFromActiveOrderStatuses } from "@/lib/repair-parts-status";
-import { getRepairStatusForSave } from "@/lib/repair-status-transition";
+import { getRepairStatusForSave, getStatusDateUpdates } from "@/lib/repair-status-transition";
 import { hasUnsavedApprovalDraft } from "@/lib/repair-approval-draft";
 import {
     PART_INPUT_TYPES,
@@ -2046,9 +2046,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             const hasEstimateItems = lineItems.length > 0;
             const nextStatus = getRepairStatusForSave(persistedStatus, status, hasEstimateItems);
             const nextStatusLog = { ...statusLog };
-            const statusDateUpdates = Object.fromEntries(
-                Object.entries(statusLog).filter(([key, value]) => value && value !== initialData?.statusLog?.[key])
-            );
+            const statusDateUpdates = getStatusDateUpdates(statusLog, initialData?.statusLog ?? {}, nextStatus);
             if (hasEstimateItems && (nextStatus === "見積中" || status === "見積中")) {
                 if (!nextStatusLog["受付"]) {
                     nextStatusLog["受付"] = initialData?.createdAt
@@ -2155,7 +2153,12 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 }
                 setStatus(savedStatus);
                 setPersistedStatus(savedStatus);
-                setStatusLog(prev => ({ ...prev, ...nextStatusLog }));
+                setStatusLog({
+                    ...(initialData?.statusLog ?? {}),
+                    ...Object.fromEntries(Object.entries(statusDateUpdates).filter(([key]) =>
+                        key !== nextStatus || savedStatus === nextStatus
+                    )),
+                });
                 approvalDraftBaselineRef.current = null;
                 if (mode === 'view') setIsEditingEnabled(false);
                 router.refresh();
