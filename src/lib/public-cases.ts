@@ -376,49 +376,120 @@ async function findB2CPublicCases(
   return cases.filter((publicCase) => !containsCopyKeyword(publicCase));
 }
 
-export async function getB2CPublicCasesForGallery(query = "", brand = "") {
+export function buildB2CGalleryWhere(query = "", brand = ""): Prisma.PublicCaseWhereInput {
   const normalizedQuery = normalizePublicCaseSearchQuery(query);
   const normalizedBrand = normalizePublicCaseBrandFilter(brand);
+  return withPublicCaseGalleryFilters({
+    showPriceB2c: false,
+    NOT: buildPublicCaseCopyKeywordWhere(),
+    ...(isLocalDatabaseUrl()
+      ? { OR: [
+          { b2cPublishStatus: "PUBLISHED" as const, reviewStatus: "APPROVED" as const },
+          { sourceType: "FMP" as const },
+        ] }
+      : { b2cPublishStatus: "PUBLISHED" as const, reviewStatus: "APPROVED" as const }),
+  }, normalizedQuery, normalizedBrand);
+}
 
-  if (isLocalDatabaseUrl()) {
-    const [webAppCases, fmpCases] = await Promise.all([
-      findB2CPublicCases(
-        withPublicCaseGalleryFilters(
-          {
-            sourceType: "WEB_APP",
-            b2cPublishStatus: "PUBLISHED",
-            reviewStatus: "APPROVED",
-            showPriceB2c: false,
-          },
-          normalizedQuery,
-          normalizedBrand,
-        ),
-      ),
-      findB2CPublicCases(
-        withPublicCaseGalleryFilters(
-          { sourceType: "FMP", showPriceB2c: false },
-          normalizedQuery,
-          normalizedBrand,
-        ),
-      ),
-    ]);
-
-    return [...webAppCases, ...fmpCases].slice(0, galleryTake);
-  }
-
-  const publishedCases = await findB2CPublicCases(
-    withPublicCaseGalleryFilters(
-      {
-        b2cPublishStatus: "PUBLISHED",
-        reviewStatus: "APPROVED",
-        showPriceB2c: false,
+export async function getB2CPublicCasesPage(query = "", brand = "", offset = 0) {
+  const where = buildB2CGalleryWhere(query, brand);
+  const safeOffset = Number.isSafeInteger(offset) && offset > 0 ? Math.min(offset, 100000) : 0;
+  const [total, cases] = await prisma.$transaction([
+    prisma.publicCase.count({ where }),
+    prisma.publicCase.findMany({
+      where,
+      include: {
+        workItems: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+        images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }, { id: "asc" }] },
       },
-      normalizedQuery,
-      normalizedBrand,
-    ),
-  );
+      orderBy: [{ receivedDate: "desc" }, { id: "asc" }],
+      skip: safeOffset,
+      take: galleryTake,
+    }),
+  ]);
+  return { total, cases };
+}
 
-  return publishedCases;
+export async function getB2CPublishedCaseCount() {
+  return prisma.publicCase.count({ where: buildB2CGalleryWhere() });
+}
+
+export async function getB2CPublicCasesForGallery(query = "", brand = "") {
+  return (await getB2CPublicCasesPage(query, brand)).cases;
+}
+
+export function toGalleryCard(publicCase: B2CPublicCaseForGallery) {
+  return {
+    id: publicCase.id,
+    brandDisplayName: publicCase.brandDisplayName,
+    brandName: publicCase.brandName,
+    modelName: publicCase.modelName,
+    ref: publicCase.ref,
+    caliber: publicCase.caliber,
+    workItems: publicCase.workItems.map((item) => ({
+      id: item.id,
+      isPublishable: item.isPublishable,
+      b2cDisplayName: item.b2cDisplayName,
+      b2bDisplayName: item.b2bDisplayName,
+    })),
+    images: publicCase.images.slice(0, 1).map((image) => ({ url: image.url })),
+  };
+}
+
+export type GalleryCard = ReturnType<typeof toGalleryCard>;
+
+export type PublicCaseBizFilters = {
+  q: string;
+  brand: string;
+  model: string;
+  ref: string;
+  cal: string;
+  work: string;
+};
+
+export function normalizePublicCasePage(value?: string | null): number {
+  const parsed = Number(value);
+  return value && /^\d+$/.test(value) && Number.isSafeInteger(parsed) && parsed > 0
+    ? Math.min(parsed, 100000)
+    : 1;
+}
+
+export function normalizePublicCasePageSize(value?: string | null): 30 | 50 | 100 {
+  return value === "50" ? 50 : value === "100" ? 100 : 30;
+}
+
+export function parsePublicCaseGalleryOffset(value: string | null): number | null {
+  if (value === null) return 0;
+  if (!/^\d{1,6}$/.test(value) || Number(value) > 100000) return null;
+  return Number(value);
+}
+
+export function buildPublicCaseBizWhere(filters: PublicCaseBizFilters): Prisma.PublicCaseWhereInput {
+  const contains = (value: string) => ({ contains: value, mode: "insensitive" as const });
+  const clauses: Prisma.PublicCaseWhereInput[] = [
+    withPublicCaseB2BSearch({}, filters.q),
+  ];
+  if (filters.brand) clauses.push({ OR: [
+    { brandName: contains(filters.brand) },
+    { brandDisplayName: contains(filters.brand) },
+    { brandNameKana: contains(filters.brand) },
+  ] });
+  if (filters.model) clauses.push({ modelName: contains(filters.model) });
+  if (filters.ref) clauses.push({ ref: contains(filters.ref) });
+  if (filters.cal) clauses.push({ caliber: contains(filters.cal) });
+  if (filters.work) clauses.push({ OR: [
+    { searchText: contains(filters.work) },
+    { workItems: { some: { OR: [
+      { b2bDisplayName: contains(filters.work) },
+      { b2cDisplayName: contains(filters.work) },
+      { normalizedWorkName: contains(filters.work) },
+    ] } } },
+    { partItems: { some: { OR: [
+      { displayName: contains(filters.work) },
+      { normalizedSourceText: contains(filters.work) },
+    ] } } },
+  ] });
+  return { AND: clauses };
 }
 
 function toBrandOptions(cases: B2CPublicCaseForGallery[]): PublicCaseBrandOption[] {
@@ -523,30 +594,36 @@ async function findB2BPublicCases(
   return cases.filter((publicCase) => !containsCopyKeyword(publicCase));
 }
 
-export async function getB2BPublicCasesForBizPage(query = "") {
-  const normalizedQuery = normalizePublicCaseSearchQuery(query);
-  const publishedCases = await findB2BPublicCases(
-    withPublicCaseB2BSearch(
-      {
-        b2bPublishStatus: "PUBLISHED",
-        reviewStatus: "APPROVED",
-      },
-      normalizedQuery,
-    ),
-  );
-
-  if (publishedCases.length > 0 || !isLocalDatabaseUrl()) {
-    return publishedCases;
+export async function getB2BPublicCasesForBizPage(
+  filters: PublicCaseBizFilters,
+  requestedPage = 1,
+  pageSize: 30 | 50 | 100 = 30,
+) {
+  const search = buildPublicCaseBizWhere(filters);
+  const base: Prisma.PublicCaseWhereInput = {
+    b2bPublishStatus: "PUBLISHED",
+    reviewStatus: "APPROVED",
+    NOT: buildPublicCaseCopyKeywordWhere(),
+  };
+  let where: Prisma.PublicCaseWhereInput = { AND: [base, search] };
+  let total = await prisma.publicCase.count({ where });
+  if (total === 0 && isLocalDatabaseUrl()) {
+    where = { AND: [{ sourceType: "FMP", NOT: buildPublicCaseCopyKeywordWhere() }, search] };
+    total = await prisma.publicCase.count({ where });
   }
-
-  return findB2BPublicCases(
-    withPublicCaseB2BSearch(
-      {
-        sourceType: "FMP",
-      },
-      normalizedQuery,
-    ),
-  );
+  const page = Math.min(requestedPage, Math.max(1, Math.ceil(total / pageSize)));
+  const cases = await prisma.publicCase.findMany({
+    where,
+    include: {
+      workItems: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      partItems: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }, { id: "asc" }] },
+    },
+    orderBy: [{ receivedDate: "desc" }, { id: "asc" }],
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+  });
+  return { cases, total, page, pageSize };
 }
 
 async function findB2CPublicCaseDetail(

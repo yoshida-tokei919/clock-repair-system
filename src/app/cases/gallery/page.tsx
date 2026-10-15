@@ -1,12 +1,13 @@
-import { ArrowRight, ImageOff } from "lucide-react";
 import Link from "next/link";
+import { GalleryResults } from "./gallery-results";
 import { JsonLd, breadcrumbJsonLd, fixedPageSeo } from "@/lib/seo";
 import {
   getB2CBrandOptionsForGallery,
-  getB2CPublicCasesForGallery,
+  getB2CPublishedCaseCount,
+  getB2CPublicCasesPage,
   normalizePublicCaseBrandFilter,
   normalizePublicCaseSearchQuery,
-  type B2CPublicCaseForGallery,
+  toGalleryCard,
 } from "@/lib/public-cases";
 
 export const dynamic = "force-dynamic";
@@ -16,10 +17,6 @@ type GallerySearchParams = {
   q?: string | string[];
   brand?: string | string[];
 };
-
-function text(value?: string | null): string {
-  return (value ?? "").trim();
-}
 
 function getSearchQuery(searchParams?: GallerySearchParams): string {
   const rawQuery = Array.isArray(searchParams?.q) ? searchParams.q[0] : searchParams?.q;
@@ -33,99 +30,6 @@ function getBrandFilter(searchParams?: GallerySearchParams): string {
   return normalizePublicCaseBrandFilter(rawBrand);
 }
 
-function getBrandDisplayName(publicCase: B2CPublicCaseForGallery): string {
-  return text(publicCase.brandDisplayName) || text(publicCase.brandName);
-}
-
-function getWorkDisplayName(publicCase: B2CPublicCaseForGallery): string {
-  const work = publicCase.workItems
-    .filter((workItem) => workItem.isPublishable)
-    .map((workItem) => text(workItem.b2cDisplayName) || text(workItem.b2bDisplayName))
-    .find(Boolean);
-
-  return work || "修理内容確認中";
-}
-
-function getTitle(publicCase: B2CPublicCaseForGallery, workName: string): string {
-  return (
-    text(publicCase.modelName) ||
-    (text(publicCase.ref) ? `Ref. ${text(publicCase.ref)}` : "") ||
-    (text(publicCase.caliber) ? `Cal. ${text(publicCase.caliber)}` : "") ||
-    workName ||
-    "修理事例"
-  );
-}
-
-function getMeta(publicCase: B2CPublicCaseForGallery): string {
-  return [
-    text(publicCase.ref) ? `Ref. ${text(publicCase.ref)}` : "",
-    text(publicCase.caliber) ? `Cal. ${text(publicCase.caliber)}` : "",
-  ]
-    .filter(Boolean)
-    .join(" / ");
-}
-
-function CaseImage({ publicCase }: { publicCase: B2CPublicCaseForGallery }) {
-  const image = publicCase.images[0];
-  const src = text(image?.url);
-  const brand = getBrandDisplayName(publicCase);
-  const title = text(publicCase.modelName) || text(publicCase.ref) || "修理事例";
-
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={`${brand ? `${brand} ` : ""}${title}`}
-        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-      />
-    );
-  }
-
-  return (
-    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-neutral-100 to-stone-200">
-      <ImageOff className="h-8 w-8 text-neutral-400" aria-hidden="true" />
-    </div>
-  );
-}
-
-function PublicCaseGalleryCard({ publicCase }: { publicCase: B2CPublicCaseForGallery }) {
-  const brand = getBrandDisplayName(publicCase);
-  const workName = getWorkDisplayName(publicCase);
-  const title = getTitle(publicCase, workName);
-  const meta = getMeta(publicCase);
-
-  return (
-    <article className="group overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-      <div className="aspect-[4/3] overflow-hidden bg-neutral-100">
-        <CaseImage publicCase={publicCase} />
-      </div>
-      <div className="p-5">
-        {brand ? (
-          <p className="mb-2 text-base font-bold leading-tight text-blue-950">
-            {brand}
-          </p>
-        ) : null}
-        <h2 className="mb-2 text-lg font-bold leading-snug text-neutral-900">
-          {title}
-        </h2>
-        {meta ? (
-          <p className="mb-3 text-sm font-medium text-neutral-600">{meta}</p>
-        ) : null}
-        <p className="mb-5 text-sm font-semibold leading-6 text-blue-900">
-          {workName}
-        </p>
-        <Link
-          href={`/cases/gallery/${publicCase.id}`}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-neutral-900"
-        >
-          詳しく見る
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </Link>
-      </div>
-    </article>
-  );
-}
-
 export default async function GalleryPage({
   searchParams,
 }: {
@@ -134,13 +38,14 @@ export default async function GalleryPage({
   const resolvedSearchParams = await searchParams;
   const query = getSearchQuery(resolvedSearchParams);
   const brand = getBrandFilter(resolvedSearchParams);
-  const [publicCases, brandOptions] = await Promise.all([
-    getB2CPublicCasesForGallery(query, brand),
+  const hasFilters = Boolean(query || brand);
+  const [result, brandOptions, publishedTotal] = await Promise.all([
+    getB2CPublicCasesPage(query, brand),
     getB2CBrandOptionsForGallery(),
+    hasFilters ? getB2CPublishedCaseCount() : Promise.resolve(null),
   ]);
   const selectedBrandLabel =
     brandOptions.find((option) => option.value === brand)?.label || brand;
-  const hasFilters = Boolean(query || brand);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 md:px-8">
@@ -212,21 +117,19 @@ export default async function GalleryPage({
         </div>
       </form>
 
+      <p className="mb-6 text-lg font-bold text-blue-950">公開中の修理事例 {(publishedTotal ?? result.total).toLocaleString("ja-JP")}件</p>
+
       {hasFilters ? (
         <p className="mb-6 text-sm font-medium text-neutral-600">
           {query ? `「${query}」` : ""}
           {query && brand ? " / " : ""}
           {brand ? `ブランド: ${selectedBrandLabel}` : ""}
-          の検索結果: {publicCases.length}件
+          の検索結果: {result.total.toLocaleString("ja-JP")}件
         </p>
       ) : null}
 
-      {publicCases.length > 0 ? (
-        <div className="grid grid-cols-1 gap-7 md:grid-cols-2 lg:grid-cols-3">
-          {publicCases.map((publicCase) => (
-            <PublicCaseGalleryCard key={publicCase.id} publicCase={publicCase} />
-          ))}
-        </div>
+      {result.cases.length > 0 ? (
+        <GalleryResults key={`${query}:${brand}`} initialCases={result.cases.map(toGalleryCard)} total={result.total} query={query} brand={brand} />
       ) : (
         <div className="rounded-lg border border-neutral-200 bg-white px-5 py-8 text-center text-sm leading-7 text-neutral-500">
           {hasFilters ? (
