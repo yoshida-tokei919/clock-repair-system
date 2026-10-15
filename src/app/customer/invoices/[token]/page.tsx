@@ -94,6 +94,7 @@ function findInvoiceForSharePage(invoiceId: number) {
     where: { id: invoiceId },
     include: {
       customer: true,
+      billingCustomer: true,
       repairSnapshots: true,
       paymentAllocations: {
         select: {
@@ -193,6 +194,11 @@ export default async function CustomerInvoicePage({
                   <dt className="text-xs font-bold text-slate-500">取引先名</dt>
                   <dd className="mt-1 font-semibold">{customerName}</dd>
                 </div>
+                {invoice.billingCustomerId && invoice.billingCustomerId !== invoice.customerId && invoice.billingCustomer &&
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <dt className="text-xs font-bold text-slate-500">請求先</dt>
+                    <dd className="mt-1 font-semibold">{invoice.billingCustomer.companyName || invoice.billingCustomer.name}</dd>
+                  </div>}
               </>
             ) : null}
             <div className="rounded-lg bg-slate-50 p-3">

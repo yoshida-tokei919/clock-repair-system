@@ -9,6 +9,7 @@ import {
 } from "@/lib/invoice-repair-snapshots";
 import { assertSingleCustomerDeliverySelection, validateDeliveryShipping, type DeliveryShippingInput } from "@/lib/delivery-shipping";
 import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/lib/invoice-numbering";
+import { nextB2BSourceInvoiceNumber, resolveInvoiceRecipientForIssue } from "@/lib/invoice-recipient";
 import { revalidatePath } from "next/cache";
 import { applyPrepaymentAllocations, availablePrepayment, findEligiblePrepayments, suggestPrepaymentAllocations, type RequestedAllocation } from "@/lib/prepayment-allocation";
 import { b2bPaymentDueDate, billingMonthBounds, billingMonthFromDate, isB2BBillingRepairEligible } from "@/lib/b2b-billing-month";
@@ -145,18 +146,11 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 const isB2C = customer.type === "individual";
                 const billingMonth = !isB2C && customerRepairs[0].deliveryNote
                     ? billingMonthFromDate(customerRepairs[0].deliveryNote.issuedDate) : null;
-                if (!isB2C) {
-                    const lastInvoice = await prisma.invoice.findFirst({
-                        where: { invoiceNumber: { startsWith: prefix } },
-                        orderBy: { id: 'desc' }
-                    });
-                    seq = lastInvoice
-                        ? (parseInt(lastInvoice.invoiceNumber.replace(/\D/g, '') || '0', 10) + 1)
-                        : 1;
-                    docNumber = `${prefix}I-${String(seq).padStart(3, '0')}`;
-                }
-
                 const invoice = await prisma.$transaction(async (tx) => {
+                  const { source, billingCustomerId } = await resolveInvoiceRecipientForIssue(tx, customerId);
+                  if (source.type !== customer.type || source.prefix !== customer.prefix) {
+                    throw new Error("請求元の顧客設定が変更されました。再読み込みしてください");
+                  }
                   // Serialize issue-date edits with invoice snapshot creation.
                   for (const note of [...new Map(customerRepairs.filter(r => r.deliveryNote).map(r => [r.deliveryNote!.id, r.deliveryNote!])).values()].sort((a, b) => a.id - b.id)) {
                     const [locked] = await tx.$queryRaw<{ issuedDate: Date; shippingFee: number | null }[]>`
@@ -165,18 +159,20 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                       throw new Error("納品書の発行日または送料が変更されました。再読み込みしてください");
                     }
                   }
+                  const sourceNumber = isB2C ? null : nextB2BSourceInvoiceNumber(source);
                   const invoiceNumber = isB2C
                     ? await getNextB2CInvoiceNumberForTransaction(tx)
-                    : docNumber;
+                    : sourceNumber!.invoiceNumber;
                   const invoiceSeq = isB2C
                     ? Number.parseInt(invoiceNumber.slice(3), 10)
-                    : seq;
+                    : sourceNumber!.sequence;
                   const dueDate = isB2C ? getB2CPaymentDueDate() : b2bPaymentDueDate(billingMonth!);
                   const created = await tx.invoice.create({
                     data: {
                         invoiceNumber,
                         issuedDate,
                         customerId: customerId,
+                        billingCustomerId,
                         ...calculateIssuedInvoiceAmounts(totalAmount, aggregateDeliveryShipping(customerRepairs)),
                         billingMonth,
                         paymentDueDate: dueDate,

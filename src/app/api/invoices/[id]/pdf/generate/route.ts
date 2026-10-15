@@ -15,6 +15,7 @@ import {
 import { publishInvoicePdf } from "@/lib/invoice-pdf-publication";
 import { prisma } from "@/lib/prisma";
 import { displayIssuedDate, parseIssuedDate } from "@/lib/document-issued-date";
+import { invoicePdfParties } from "@/lib/invoice-recipient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,7 @@ async function renderInvoicePdfBuffer(data: InvoiceDocumentProps["data"]) {
 }
 
 function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof findInvoiceForPdf>>>, requestedDate?: Date) {
+  const parties = invoicePdfParties(invoice);
   const deliveryGroups = new Map<
     string,
     {
@@ -117,11 +119,8 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     invoiceNumber: invoice.invoiceNumber,
     date: displayIssuedDate(requestedDate ?? invoice.issuedDate),
     dueDate: invoice.paymentDueDate?.toLocaleDateString("ja-JP") || "",
-    customer: {
-      name: invoice.customer.name,
-      address: invoice.customer.address || undefined,
-      type: invoice.customer.type,
-    },
+    customer: parties.recipient,
+    sourceCustomerName: parties.sourceCustomerName,
     items: invoiceItems,
     taxRate: 0.1,
     subtotalAmount: invoice.totalAmount,
@@ -141,6 +140,7 @@ function findInvoiceForPdf(invoiceId: number) {
     where: { id: invoiceId },
     include: {
       customer: true,
+      billingCustomer: true,
       repairSnapshots: true,
       paymentAllocations: { select: { allocatedAmount: true, releases: { select: { amount: true } },
         payment: { select: { kind: true, status: true } } } },

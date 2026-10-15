@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { deleteCustomerSafely } from "@/lib/customer-deletion-safety";
 import { revalidatePath } from "next/cache";
 import { validateCustomerDefaultShipping } from "@/lib/customer-default-shipping";
+import { assertCustomerCanBecomeIndividual } from "@/lib/invoice-recipient";
 
 /**
  * 送信された文字列が「ひらがな・全角カタカナ・半角英数字・漢字」のみかチェック
@@ -123,7 +124,9 @@ export async function updateCustomer(id: number, data: any) {
             }
         }
 
-        const updated = await prisma.customer.update({
+        const updated = await prisma.$transaction(async tx => {
+          if (type === 'individual') await assertCustomerCanBecomeIndividual(tx, id);
+          return tx.customer.update({
             where: { id },
             data: {
                 name: displayName,
@@ -138,7 +141,9 @@ export async function updateCustomer(id: number, data: any) {
                 kana: data.kana,
                 rank: parseInt(data.rank || "1"),
                 ...defaultShipping,
+                invoiceRecipientCustomerId: type === 'individual' ? null : undefined,
             }
+          });
         });
         revalidatePath("/customers");
         revalidatePath(`/customers/${id}`);

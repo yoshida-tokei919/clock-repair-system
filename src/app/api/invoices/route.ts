@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { applyPrepaymentAllocations, type RequestedAllocation } from "@/lib/prepayment-allocation";
 import { b2bPaymentDueDate, billingMonthBounds, isB2BBillingRepairEligible, parseBillingMonth } from "@/lib/b2b-billing-month";
 import { resolveIssuedDate } from "@/lib/document-issued-date";
+import { nextB2BSourceInvoiceNumber, resolveInvoiceRecipientForIssue } from "@/lib/invoice-recipient";
 
 // GET /api/invoices — 請求書一覧
 export async function GET() {
@@ -21,6 +22,7 @@ export async function GET() {
         orderBy: { issuedDate: "desc" },
         include: {
             customer: { select: { id: true, name: true, companyName: true, type: true } },
+            billingCustomer: { select: { id: true, name: true, companyName: true } },
             repairs: { select: { id: true } },
             paymentAllocations: {
                 select: {
@@ -119,6 +121,8 @@ export async function POST(req: NextRequest) {
     // トランザクションで請求書作成・修理紐付け・SEQ更新
     try {
     const invoice = await prisma.$transaction(async (tx) => {
+        const { source, billingCustomerId } = await resolveInvoiceRecipientForIssue(tx, customerId);
+        if (source.type !== customer.type) throw new Error("請求元の顧客区分が変更されました。再読み込みしてください");
         for (const note of [...new Map(repairs.filter(repair => repair.deliveryNote).map(repair => [repair.deliveryNote!.id, repair.deliveryNote!])).values()].sort((a, b) => a.id - b.id)) {
             const [locked] = await tx.$queryRaw<{ issuedDate: Date; shippingFee: number | null }[]>`
                 SELECT "issuedDate", "shippingFee" FROM "DeliveryNote" WHERE "id" = ${note.id} FOR UPDATE`;
@@ -134,9 +138,7 @@ export async function POST(req: NextRequest) {
             newSeq = Number.parseInt(invoiceNumber.slice(3), 10);
         } else {
             // Keep the existing B2B per-customer numbering behavior unchanged.
-            const prefix = customer.prefix || "C";
-            newSeq = customer.seqInvoice + 1;
-            invoiceNumber = `${prefix}I-${String(newSeq).padStart(3, "0")}`;
+            ({ sequence: newSeq, invoiceNumber } = nextB2BSourceInvoiceNumber(source));
         }
 
         const created = await tx.invoice.create({
@@ -144,6 +146,7 @@ export async function POST(req: NextRequest) {
                 invoiceNumber,
                 issuedDate,
                 customerId,
+                billingCustomerId,
                 ...calculateIssuedInvoiceAmounts(subtotal, aggregateDeliveryShipping(repairs)),
                 billingMonth: isB2C ? null : billingMonth,
                 paymentDueDate: isB2C ? getB2CPaymentDueDate() : b2bPaymentDueDate(billingMonth!),

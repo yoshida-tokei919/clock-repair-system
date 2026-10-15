@@ -16,6 +16,7 @@ export async function GET() {
     select: {
       id: true, invoiceNumber: true, status: true,
       customer: { select: { name: true, companyName: true, type: true } },
+      billingCustomer: { select: { name: true, companyName: true } },
       currentPdfFile: { select: { status: true, storageKey: true } },
     },
   });
@@ -24,6 +25,6 @@ export async function GET() {
   return NextResponse.json(ready.filter((invoice, index) => isPostalInvoicePrintTarget(invoice, states[index])).map(invoice => ({
     id: invoice.id,
     invoiceNumber: invoice.invoiceNumber,
-    customerName: invoice.customer.companyName || invoice.customer.name,
+    customerName: invoice.billingCustomer?.companyName || invoice.billingCustomer?.name || invoice.customer.companyName || invoice.customer.name,
   })));
 }

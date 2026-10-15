@@ -52,12 +52,16 @@ model Customer {
   seqDelivery  Int      @default(0)
   seqInvoice   Int      @default(0)
   seqWarranty  Int      @default(0)
+  invoiceRecipientCustomerId Int?
+  invoiceRecipientCustomer Customer? @relation("DefaultInvoiceRecipient", fields: [invoiceRecipientCustomerId], references: [id], onDelete: Restrict)
+  invoiceRecipientFor Customer[] @relation("DefaultInvoiceRecipient")
 
   watches           Watch[]
   repairs           Repair[]
   shipments         Shipment[]
   deliveryNotes     DeliveryNote[]
   invoices          Invoice[]
+  billingInvoices   Invoice[] @relation("InvoiceBillingCustomer")
   estimateDocuments EstimateDocument[]
   estimatePdfFiles  EstimatePdfFile[]
   invoicePdfFiles   InvoicePdfFile[]
@@ -71,6 +75,8 @@ model Customer {
   communicationAiBriefs CommunicationAiBrief[]
   b2bCompanyMembership B2BCompanyMembership?
   consolidatedBillingDestinations ConsolidatedInvoice[] @relation("ConsolidatedBillingDestination")
+
+  @@index([invoiceRecipientCustomerId])
 }
 
 // Explicit B2B billing group. Repair, DeliveryNote, Invoice and Shipment keep their store Customer.
@@ -1825,6 +1831,8 @@ model Invoice {
   
   customerId    Int
   customer      Customer @relation(fields: [customerId], references: [id])
+  billingCustomerId Int?
+  billingCustomer Customer? @relation("InvoiceBillingCustomer", fields: [billingCustomerId], references: [id], onDelete: Restrict)
   
   repairs       Repair[]
   repairSnapshots InvoiceRepairSnapshot[]
@@ -1840,6 +1848,8 @@ model Invoice {
   status        String   @default("issued") // issued, paid
   paymentDueDate DateTime?
   sentAt        DateTime?
+
+  @@index([billingCustomerId])
 }
 
 // Historical billing bundle; original store invoices remain the financial source records.

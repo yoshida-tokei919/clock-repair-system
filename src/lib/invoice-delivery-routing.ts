@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { buildCustomerShareUrl } from "./customer-share-url";
 import { createApprovedLineManagerSendOutbox } from "./line-manager-send-outbox";
+import { effectiveInvoiceRecipientId, lockInvoiceRecipientCustomers } from "./invoice-recipient";
 
 export const invoiceDeliveryKey = (invoiceId: number) => `b2b-invoice-line:${invoiceId}`;
 
@@ -52,14 +53,16 @@ export function buildInvoiceLineMessage(label: string, sharedUrl: string) {
 
 export async function getInvoiceDeliveryState(db: PrismaClient, invoiceId: number) {
   const invoice = await db.invoice.findUnique({ where: { id: invoiceId }, select: {
-    customerId: true, status: true, customer: { select: { type: true } }, sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true,
+    customerId: true, billingCustomerId: true, status: true, customer: { select: { type: true } },
+    billingCustomer: { select: { type: true } }, sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true,
   } });
   if (!invoice || invoice.customer.type !== "business" || !["issued", "paid"].includes(invoice.status)) return null;
+  if (invoice.billingCustomerId != null && invoice.billingCustomerId !== invoice.customerId && invoice.billingCustomer?.type !== "business") return null;
   const outbox = await db.lineManagerSendOutbox.findUnique({ where: { idempotencyKey: invoiceDeliveryKey(invoiceId) }, select: { status: true } });
   if (outbox) return { method: "LINE" as const, status: outbox.status };
   if (invoice.sentAt) return { method: "LINE" as const, status: "LEGACY_SENT" as const };
   if (invoice.lineSendRetryKey || invoice.lineSendStartedAt) return { method: "LINE" as const, status: "LEGACY_UNRESOLVED" as const };
-  const destination = await resolveInvoiceLineDestination(db, invoice.customerId);
+  const destination = await resolveInvoiceLineDestination(db, effectiveInvoiceRecipientId(invoice));
   return destination ? { method: "LINE" as const, status: "READY" as const } : { method: "POSTAL" as const, status: "PRINT_PENDING" as const };
 }
 
@@ -68,18 +71,27 @@ export async function queueInvoiceLineDelivery(
   createApproved = createApprovedLineManagerSendOutbox,
 ) {
   if (!Number.isSafeInteger(invoiceId) || invoiceId <= 0) throw new InvoiceDeliveryUnavailableError("請求書IDが不正です。", 400);
-  const initial = await db.invoice.findUnique({ where: { id: invoiceId }, select: { customerId: true } });
+  const initial = await db.invoice.findUnique({ where: { id: invoiceId }, select: { customerId: true, billingCustomerId: true } });
   if (!initial) throw new InvoiceDeliveryUnavailableError("請求書が見つかりません。", 404);
   return db.$transaction(async tx => {
-    const customers = await tx.$queryRaw<{ id: number }[]>`SELECT "id" FROM "Customer" WHERE "id" = ${initial.customerId} FOR UPDATE`;
-    const invoices = await tx.$queryRaw<{ id: number }[]>`SELECT "id" FROM "Invoice" WHERE "id" = ${invoiceId} AND "customerId" = ${initial.customerId} FOR UPDATE`;
-    if (customers.length !== 1 || invoices.length !== 1) throw new InvoiceDeliveryUnavailableError("請求書の顧客が変更されました。");
+    const recipientId = effectiveInvoiceRecipientId(initial);
+    const locked = await lockInvoiceRecipientCustomers(tx, [initial.customerId, recipientId]);
+    if (recipientId !== initial.customerId && locked.get(recipientId)?.type !== "business") {
+      throw new InvoiceDeliveryUnavailableError("請求先の法人顧客を確認できません。");
+    }
+    const invoices = await tx.$queryRaw<{ id: number; billingCustomerId: number | null }[]>`
+      SELECT "id", "billingCustomerId" FROM "Invoice" WHERE "id" = ${invoiceId} AND "customerId" = ${initial.customerId} FOR UPDATE`;
+    if (invoices.length !== 1 || invoices[0].billingCustomerId !== initial.billingCustomerId) throw new InvoiceDeliveryUnavailableError("請求書の請求先が変更されました。");
     const invoice = await tx.invoice.findUnique({ where: { id: invoiceId }, select: {
-      id: true, customerId: true, status: true, billingMonth: true, publicToken: true, sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true,
-      customer: { select: { type: true } }, currentPdfFile: { select: { status: true, storageKey: true } },
+      id: true, customerId: true, billingCustomerId: true, status: true, billingMonth: true, publicToken: true, sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true,
+      customer: { select: { type: true } }, billingCustomer: { select: { type: true } },
+      currentPdfFile: { select: { status: true, storageKey: true } },
     } });
     if (!invoice || invoice.customer.type !== "business" || !["issued", "paid"].includes(invoice.status)) {
       throw new InvoiceDeliveryUnavailableError("法人の発行済み請求書のみ送信待ちにできます。");
+    }
+    if (invoice.billingCustomerId != null && invoice.billingCustomerId !== invoice.customerId && invoice.billingCustomer?.type !== "business") {
+      throw new InvoiceDeliveryUnavailableError("請求先の法人顧客を確認できません。");
     }
     if (invoice.sentAt) throw new InvoiceDeliveryUnavailableError("旧LINE送信記録があるため再送信を止めました。履歴を確認してください。");
     if (invoice.lineSendRetryKey || invoice.lineSendStartedAt) throw new InvoiceDeliveryUnavailableError("旧LINE送信状態が未確定です。履歴を確認してください。");
@@ -90,11 +102,11 @@ export async function queueInvoiceLineDelivery(
     const existing = await tx.lineManagerSendOutbox.findUnique({ where: { idempotencyKey: key }, select: { status: true } });
     if (existing?.status === "CANCELLED") throw new InvoiceDeliveryUnavailableError("この請求書のLINE送信待ちは取り消されています。");
     if (existing) return { method: "LINE" as const, outboxStatus: existing.status };
-    const destination = await resolveInvoiceLineDestination(tx, invoice.customerId);
+    const destination = await resolveInvoiceLineDestination(tx, recipientId);
     if (!destination) throw new InvoiceDeliveryUnavailableError("確認済みのLINE送信先がないため郵送対象です。", 409, true);
     const users = await tx.$queryRaw<{ linkedCustomerId: number | null }[]>`
       SELECT "linkedCustomerId" FROM "LineUser" WHERE "id" = ${destination.lineUserId} FOR UPDATE`;
-    if (users.length !== 1 || users[0].linkedCustomerId !== invoice.customerId) {
+    if (users.length !== 1 || users[0].linkedCustomerId !== recipientId) {
       throw new InvoiceDeliveryUnavailableError("LINE送信先の紐付けが変更されたため郵送対象です。", 409, true);
     }
     const token = invoice.publicToken ?? randomBytes(24).toString("base64url");

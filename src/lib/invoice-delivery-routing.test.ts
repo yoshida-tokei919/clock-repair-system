@@ -71,6 +71,60 @@ test("postal classification is visible without creating a send intent", async ()
   assert.deepEqual(await getInvoiceDeliveryState(db, 8), { method: "POSTAL", status: "PRINT_PENDING" });
 });
 
+test("delivery state uses the saved recipient and legacy null falls back to source", async () => {
+  const lookedUp: number[] = [];
+  let billingCustomerId: number | null = 22;
+  const valid = { id: 5, linkedCustomerId: 22, lineManagerChat: { id: 11, lineUserId: 5, verifiedAt: new Date() } };
+  const db = {
+    invoice: { findUnique: async () => ({ customerId: 11, billingCustomerId, status: "issued",
+      customer: { type: "business" }, billingCustomer: billingCustomerId ? { type: "business" } : null,
+      sentAt: null, lineSendRetryKey: null, lineSendStartedAt: null }) },
+    lineManagerSendOutbox: { findUnique: async () => null },
+    lineUser: { findMany: async (query: { where: { linkedCustomerId: number } }) => {
+      lookedUp.push(query.where.linkedCustomerId);
+      return query.where.linkedCustomerId === 22 ? [valid] : [];
+    } },
+    inquiry: destinationFixture().db.inquiry,
+  } as unknown as PrismaClient;
+  assert.deepEqual(await getInvoiceDeliveryState(db, 8), { method: "LINE", status: "READY" });
+  billingCustomerId = null;
+  assert.deepEqual(await getInvoiceDeliveryState(db, 8), { method: "POSTAL", status: "PRINT_PENDING" });
+  assert.deepEqual(lookedUp, [22, 11]);
+});
+
+test("alternate invoice routes through the saved recipient and rechecks its LINE link under lock", async () => {
+  const lookedUp: number[] = [];
+  const locked: number[] = [];
+  const routing = destinationFixture({ users: [{ id: 5, linkedCustomerId: 11,
+    lineManagerChat: { id: 11, lineUserId: 5, verifiedAt: new Date() } }] }).db;
+  const invoice = { id: 8, customerId: 22, billingCustomerId: 11, status: "issued", billingMonth: "2026-10",
+    publicToken: "token", sentAt: null, lineSendRetryKey: null, lineSendStartedAt: null,
+    customer: { type: "business" }, billingCustomer: { type: "business" },
+    currentPdfFile: { status: "current", storageKey: "pdf" } };
+  const tx = {
+    $queryRaw: async (parts: TemplateStringsArray, id: number) => {
+      if (parts[0].includes('FROM "Customer"')) { locked.push(id); return [{ id, type: "business" }]; }
+      if (parts[0].includes('FROM "Invoice"')) return [{ id: 8, billingCustomerId: 11 }];
+      if (parts[0].includes('FROM "LineUser"')) return [{ linkedCustomerId: 11 }];
+      return [];
+    },
+    invoice: { findUnique: async () => invoice },
+    lineUser: { findMany: async (query: { where: { linkedCustomerId: number } }) => {
+      lookedUp.push(query.where.linkedCustomerId);
+      return routing.lineUser.findMany(query);
+    } },
+    inquiry: routing.inquiry,
+    lineManagerSendOutbox: { findUnique: async () => null },
+    repair: { findMany: async () => [] },
+  };
+  const db = { invoice: { findUnique: async () => ({ customerId: 22, billingCustomerId: 11 }) },
+    $transaction: async (fn: (value: typeof tx) => Promise<unknown>) => fn(tx) } as unknown as PrismaClient;
+  const result = await queueInvoiceLineDelivery(db, 8, "https://example.com", async () => ({ status: "APPROVED" }) as never);
+  assert.deepEqual(result, { method: "LINE", outboxStatus: "APPROVED" });
+  assert.deepEqual(locked, [11, 22]);
+  assert.deepEqual(lookedUp, [11]);
+});
+
 test("void invoices are never postal print targets", async () => {
   const db = { invoice: { findUnique: async () => ({ customerId: 7, status: "void", customer: { type: "business" } }) } } as unknown as PrismaClient;
   assert.equal(await getInvoiceDeliveryState(db, 8), null);

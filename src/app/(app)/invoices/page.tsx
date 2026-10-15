@@ -40,6 +40,8 @@ type Invoice = {
     paymentStatus?: "paid" | "pending" | "unpaid" | "void";
     paymentDueDate: string | null;
     customer: { id: number; name: string; companyName: string | null };
+    billingCustomerId: number | null;
+    billingCustomer: { id: number; name: string; companyName: string | null } | null;
     repairs: { id: number }[];
 };
 
@@ -205,6 +207,8 @@ export default function InvoicesPage() {
                                                 <span className="ml-2 text-gray-600 text-sm">
                                                     {inv.customer.companyName || inv.customer.name}
                                                 </span>
+                                                {inv.billingCustomerId && inv.billingCustomerId !== inv.customer.id && inv.billingCustomer &&
+                                                    <span className="ml-2 text-blue-700 text-sm">請求先: {inv.billingCustomer.companyName || inv.billingCustomer.name}</span>}
                                             </div>
                                             <span
                                                 className={`text-xs px-2 py-0.5 rounded-full font-medium ${invoiceStatusClass(inv.paymentStatus ?? inv.status)}`}
