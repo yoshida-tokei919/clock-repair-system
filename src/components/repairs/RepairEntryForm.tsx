@@ -28,6 +28,8 @@ import {
     DialogDescription
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { timepieceTypeInputValue } from "@/lib/timepiece-type";
+import { TimepieceTypeCombobox } from "./TimepieceTypeCombobox";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { createEstimateItemFromPart } from "@/lib/estimate-item";
 import { getNewItemClassification, type AddItemCategory } from "@/lib/repair-entry-item-classification";
@@ -599,6 +601,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [shippingFee, setShippingFee] = useState(0);
 
     // --- 2. WATCH DATA ---
+    const [timepieceType, setTimepieceType] = useState(() => timepieceTypeInputValue(initialData?.watch ?? {}));
     const [brand, setBrand] = useState(initialData?.watch?.brand?.name || "");
     const [model, setModel] = useState(initialData?.watch?.model?.name || "");
     const [refName, setRefName] = useState(initialData?.watch?.reference?.name || "");
@@ -1521,7 +1524,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         customer: { name: customerName, type: customerTypeSelection, address, phone: customerPhone },
         endUserName,
         partnerRef,
-        watch: { brand, model, ref: refName, serial, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber },
+        watch: { timepieceType, brand, model, ref: refName, serial, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber },
         estimate: {
             items: lineItems.map(i => ({
                 name: i.name,
@@ -1994,7 +1997,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // --- ACTIONS ---
     const approvalDraftSnapshot = JSON.stringify({
         status, statusLog, customerTypeSelection, customerName, customerPrefix, customerPhone, lineId, address,
-        brand, model, refName, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, serial,
+        timepieceType, brand, model, refName, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, serial,
         lineItems, orderList, diagnosis, internalNotes, customerNote, partnerRef, endUserName, accessories,
     });
     if (approvalDraftBaselineRef.current === null) approvalDraftBaselineRef.current = approvalDraftSnapshot;
@@ -2071,6 +2074,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     prefix: isB2B ? (customerPrefix || undefined) : 'C',
                 },
                 watch: {
+                    timepieceType,
                     brand,
                     model,
                     ref: refName,
@@ -3036,6 +3040,9 @@ ${shopName}
                             </h3>
                             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
                                 <div className="space-y-2">
+                                    <FormRow label="時計の種類">
+                                        <TimepieceTypeCombobox value={timepieceType} onChange={setTimepieceType} disabled={isReadOnly} />
+                                    </FormRow>
                                     <FormRow label="ブランド">
                                         <AdvancedCombobox value={brand} onChange={handleWatchBrandChange} options={brandOpts} placeholder="ブランド名..." requireSelection />
                                     </FormRow>

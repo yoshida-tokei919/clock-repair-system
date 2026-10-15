@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { findOrCreateBrand, findOrCreateCaliber, findOrCreateModel, findOrCreateWatchReference, resolveBrand } from "@/lib/master-normalize";
+import { parseTimepieceType } from "@/lib/timepiece-type";
 
 export const B2B_BATCH_LIMIT = 30;
 
@@ -8,6 +9,7 @@ export class B2bBatchIntakeError extends Error {
 }
 
 type Row = {
+  timepieceType: ReturnType<typeof parseTimepieceType>;
   partnerRef: string | null;
   endUserName: string | null;
   brandId: number | null;
@@ -49,7 +51,11 @@ export function parseB2bBatchPayload(value: unknown): { partnerId: number; rows:
     const brandId = row.brandId == null ? null : row.brandId as number;
     const brandName = optionalText(row.brandName, "ブランド", 200);
     if (!brandId && !brandName) throw new B2bBatchIntakeError(`${index + 1}本目のブランドを入力してください。`);
+    let timepieceType: ReturnType<typeof parseTimepieceType>;
+    try { timepieceType = parseTimepieceType(row.timepieceType); }
+    catch (error) { throw new B2bBatchIntakeError((error as Error).message); }
     return {
+      timepieceType,
       partnerRef: optionalText(row.partnerRef, "取引先管理番号", 200),
       endUserName: optionalText(row.endUserName, "エンドユーザー名", 200),
       brandId,
@@ -149,6 +155,7 @@ export async function createB2bBatchIntake(
         customerId: partner.id, brandId: watchBrandId, modelId: model?.id ?? null,
         referenceId: reference?.id ?? null, caliberId: caliber?.id ?? null,
         serialNumber: row.serial,
+        ...row.timepieceType,
       } });
       sequence += 1;
       const inquiryNumber = `${prefix}-${String(sequence).padStart(3, "0")}`;

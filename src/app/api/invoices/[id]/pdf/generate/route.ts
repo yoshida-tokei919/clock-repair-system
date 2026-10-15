@@ -99,6 +99,8 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
       inquiryNumber: row.inquiryNumber,
       watch: {
         brand: repair?.watch.brand.name ?? "",
+        timepieceType: repair?.watch.timepieceType,
+        timepieceTypeLabel: repair?.watch.timepieceTypeLabel,
         model: repair?.watch.model?.name ?? repair?.watch.modelNameInput ?? "",
         ref: repair?.watch.reference?.name ?? undefined,
         serial: repair?.watch.serialNumber ?? undefined,

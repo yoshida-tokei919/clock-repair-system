@@ -6,6 +6,7 @@ import { addConfirmedRepairStatusLog, canAllocateRepairParts, reconcileRepairPar
 import { findOrCreateBrand, findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
 import { mergeWatchRefs } from "@/lib/parts-master-compatibility";
+import { parseTimepieceType, timepieceTypeUpdateForCreateReuse, TimepieceTypeError } from "@/lib/timepiece-type";
 import { getRepairPartType, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
@@ -274,6 +275,7 @@ export async function POST(req: Request) {
                         referenceId: referenceId,
                         caliberId: caliberId,
                         serialNumber: serialInput, // Can be null
+                        ...parseTimepieceType(body.watch.timepieceType),
                         customerId: customerId!,
                     }
                 });
@@ -287,7 +289,8 @@ export async function POST(req: Request) {
                         modelId: modelId,
                         referenceId: referenceId,
                         caliberId: caliberId,
-                        serialNumber: serialInput
+                        serialNumber: serialInput,
+                        ...timepieceTypeUpdateForCreateReuse(body.watch.timepieceType),
                     }
                 });
             }
@@ -596,6 +599,7 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ success: true, repair: result.repair, stockWarnings: result.stockWarnings });
     } catch (error: any) {
+        if (error instanceof TimepieceTypeError) return NextResponse.json({ error: error.message }, { status: 400 });
         if (error instanceof RepairPartValidationError) {
             return NextResponse.json({ error: error.message }, { status: error.status });
         }

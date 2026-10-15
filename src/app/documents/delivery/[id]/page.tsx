@@ -45,6 +45,8 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
             endUserName: (repair as any).endUserName || undefined,
             watch: {
                 brand: repair.watch.brand?.name || "",
+                timepieceType: repair.watch.timepieceType,
+                timepieceTypeLabel: repair.watch.timepieceTypeLabel,
                 model: repair.watch.model?.name || "",
                 ref: repair.watch.reference?.name || "",
                 serial: repair.watch.serialNumber || ""

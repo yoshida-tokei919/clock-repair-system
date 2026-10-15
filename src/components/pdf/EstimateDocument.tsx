@@ -2,6 +2,8 @@
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
 import { formatPartDisplay } from '@/lib/formatPartDisplay';
+import { formatWatchInformation } from '@/lib/timepiece-type';
+import type { TimepieceType } from '@prisma/client';
 
 Font.register({
   family: 'Noto Sans JP',
@@ -40,7 +42,7 @@ export interface EstimateDocumentProps {
       partnerRef?: string;
       endUserName?: string;
       customerNote?: string;
-      watch: { brand: string; model: string; ref?: string; serial?: string; };
+      watch: { brand: string; model: string; ref?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
       items: { name: string; price: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
     }[];
   }
@@ -107,7 +109,7 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
           {/* Rows */}
           {data.jobs.map((job, idx) => {
             const jobTotal = job.items.reduce((s, i) => s + i.price, 0);
-            const watchInfo = `${job.watch.brand}\n${job.watch.model}\nRef: ${job.watch.ref || '-'}\nSer: ${job.watch.serial || '-'}`;
+            const watchInfo = formatWatchInformation(job.watch, 'estimate');
 
             return (
               <View key={idx} style={[styles.b2bRow, { minHeight: 30 }]}>

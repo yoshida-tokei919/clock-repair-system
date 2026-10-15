@@ -37,7 +37,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         issuedDate: formatIssuedDate(warranty.issuedDate),
         guaranteeStart: warranty.guaranteeStart.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
         guaranteeEnd: warranty.guaranteeEnd.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
-        watch: { brand, model, ref, serial },
+        watch: { brand, model, ref, serial, timepieceType: repair?.watch.timepieceType, timepieceTypeLabel: repair?.watch.timepieceTypeLabel },
         repairSummary: workSummary,
     });
 }

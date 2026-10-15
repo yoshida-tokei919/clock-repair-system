@@ -30,16 +30,30 @@ export default function InvoicePreviewPage({ params }: { params: Promise<{ id: s
 
     // Manual Trigger State
     const [isReady, setIsReady] = useState(false);
+    const invoiceData = React.useMemo(() => pdfData?.customer?.type === 'individual' ? {
+        ...pdfData,
+        dueDate: pdfData.dueDate || '別途通知',
+        taxRate: 0.1,
+        items: [],
+        subtotalAmount: pdfData.jobs.reduce((sum: number, job: any) =>
+            sum + job.items.reduce((jobSum: number, item: any) => jobSum + item.price * (item.qty ?? 1), 0), 0),
+        b2cJobs: pdfData.jobs.map((job: any) => ({
+            inquiryNumber: job.inquiryId,
+            watch: job.watch,
+            workDescriptions: job.items.map((item: any) => item.displayName || item.name),
+            amount: job.items.reduce((sum: number, item: any) => sum + item.price * (item.qty ?? 1), 0),
+        })),
+    } : pdfData, [pdfData]);
     const [instance, updateInstance] = usePDF({
-        document: pdfData ? <InvoiceDocument data={pdfData} /> : <Document><Page><Text>Loading...</Text></Page></Document>
+        document: invoiceData ? <InvoiceDocument data={invoiceData} /> : <Document><Page><Text>Loading...</Text></Page></Document>
     });
 
     // Only update instance when isReady becomes true (User initiated)
     useEffect(() => {
-        if (isReady && pdfData) {
-            updateInstance(<InvoiceDocument data={pdfData} />);
+        if (isReady && invoiceData) {
+            updateInstance(<InvoiceDocument data={invoiceData} />);
         }
-    }, [isReady, pdfData, updateInstance]);
+    }, [isReady, invoiceData, updateInstance]);
 
     if (loading) {
         return <div className="min-h-screen flex items-center justify-center">データを取得中...</div>;

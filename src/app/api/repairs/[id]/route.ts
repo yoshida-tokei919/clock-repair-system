@@ -6,6 +6,7 @@ import { findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
 import { resolveRepairMovementMaker } from "@/lib/repair-movement-maker";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
 import { mergeWatchRefs, resolvePatchProductRef } from "@/lib/parts-master-compatibility";
+import { parseTimepieceType, TimepieceTypeError } from "@/lib/timepiece-type";
 import { getRepairPartType, isExistingRepairPartLink, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
@@ -154,6 +155,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                         referenceId: referenceId,
                         caliberId: caliberId,
                         serialNumber: body.watch.serial || null,
+                        ...(body.watch.timepieceType !== undefined ? parseTimepieceType(body.watch.timepieceType) : {}),
                     }
                 });
             }
@@ -470,6 +472,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
         return NextResponse.json({ success: true, repair: result });
     } catch (error: any) {
+        if (error instanceof TimepieceTypeError) return NextResponse.json({ error: error.message }, { status: 400 });
         if (error instanceof RepairPartValidationError) {
             return NextResponse.json({ error: error.message }, { status: error.status });
         }

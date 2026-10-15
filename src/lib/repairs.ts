@@ -44,9 +44,11 @@ export async function getRepairDataForPDF(id: number) {
                 customerNote: repair.customerNote || "",
                 watch: {
                     brand: repair.watch.brand.name,
+                    timepieceType: repair.watch.timepieceType,
+                    timepieceTypeLabel: repair.watch.timepieceTypeLabel,
                     model: repair.watch.model?.name || repair.watch.modelNameInput || "モデル未設定",
-                    ref: repair.watch.reference?.name || "-",
-                    serial: repair.watch.serialNumber || "-",
+                    ref: repair.watch.reference?.name || "",
+                    serial: repair.watch.serialNumber || "",
                 },
                 items: repair.estimate?.items.map(item => ({
                     name: item.itemName,

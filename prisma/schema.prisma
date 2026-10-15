@@ -812,6 +812,7 @@ model Watch {
   caliberId    Int?
   baseCaliberId Int?
   timepieceType TimepieceType?
+  timepieceTypeLabel String? @db.VarChar(100)
   driveType    WatchDriveType?
   serialNumber String? // Optional for vintage/unknown
   customerId   Int

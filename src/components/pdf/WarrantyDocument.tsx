@@ -1,5 +1,7 @@
 
 import React from 'react';
+import { formatWatchHeading, formatWarrantyIdentifiers } from '@/lib/timepiece-type';
+import type { TimepieceType } from '@prisma/client';
 import { Page, Text, View, Document, StyleSheet, Font, Image } from '@react-pdf/renderer';
 
 Font.register({
@@ -112,7 +114,7 @@ export interface WarrantyDocumentProps {
         issueDate: string;
         guaranteeStart: string;
         guaranteeEnd: string;
-        watch: { brand: string; model: string; ref?: string; serial: string; };
+        watch: { brand: string; model: string; ref?: string; serial: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
         repairSummary: string; // "Overhaul, Gaskets"
         qrCodeUrl?: string; // Data URL for QR Code image
     }
@@ -134,11 +136,11 @@ export function WarrantyDocument({ data }: WarrantyDocumentProps) {
                     <View style={styles.content}>
                         <View style={styles.row}>
                             <Text style={styles.label}>BRAND / MODEL</Text>
-                            <Text style={styles.value}>{data.watch.brand} {data.watch.model}</Text>
+                            <Text style={styles.value}>{formatWatchHeading(data.watch)}</Text>
                         </View>
                         <View style={styles.row}>
                             <Text style={styles.label}>REF. / SERIAL</Text>
-                            <Text style={styles.value}>{data.watch.ref || '-'} / {data.watch.serial}</Text>
+                            <Text style={styles.value}>{formatWarrantyIdentifiers(data.watch)}</Text>
                         </View>
                         <View style={styles.row}>
                             <Text style={styles.label}>REPAIR CONTENT</Text>

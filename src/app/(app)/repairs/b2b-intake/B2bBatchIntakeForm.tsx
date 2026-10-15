@@ -6,12 +6,13 @@ import { useEffect, useId, useRef, useState } from "react";
 import { getB2bBrandMasters, getB2bModelMasters } from "@/actions/b2b-intake-master-actions";
 import { changeBrand, changeModel, changeRef, filterIntakeChoices, intakeComboboxKeyDecision, matchingModel, modelCacheKey, optionsForRow, shouldPreventB2bBatchEnter, type ModelChoice, type RefChoice, type CaliberChoice, type SearchChoice } from "@/lib/b2b-intake-drilldown";
 import { B2bBatchTagPrinting } from "./B2bBatchTagPrinting";
+import { TimepieceTypeCombobox } from "@/components/repairs/TimepieceTypeCombobox";
 
 // Keep the operator-facing cap in sync with the server validation.
 const B2B_BATCH_LIMIT = 30;
 
 type Row = {
-  key: number; brandId: string; brandName: string; partnerRef: string; endUserName: string;
+  key: number; timepieceType: string; brandId: string; brandName: string; partnerRef: string; endUserName: string;
   model: string; ref: string; serial: string; caliber: string;
   movementMaker: string; movementMakerId: string; movementCaliber: string;
   baseMovementMaker: string; baseMovementMakerId: string; baseMovementCaliber: string; workSummary: string;
@@ -28,7 +29,7 @@ type BrandChoice = { id: number; name: string; nameJp: string; nameEn: string | 
 
 let nextKey = 1;
 const newRow = (): Row => ({
-  key: nextKey++, brandId: "", brandName: "", partnerRef: "", endUserName: "", model: "",
+  key: nextKey++, timepieceType: "", brandId: "", brandName: "", partnerRef: "", endUserName: "", model: "",
   ref: "", serial: "", caliber: "", movementMaker: "", movementMakerId: "", movementCaliber: "",
   baseMovementMaker: "", baseMovementMakerId: "", baseMovementCaliber: "", workSummary: "",
 });
@@ -254,6 +255,7 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <label className="text-sm">取引先管理番号<input className={`${inputClass} mt-1`} maxLength={200} value={row.partnerRef} onChange={(e) => updateRow(row.key, "partnerRef", e.target.value)} disabled={busy || uncertain} /></label>
           <label className="text-sm">エンドユーザー名<input className={`${inputClass} mt-1`} maxLength={200} value={row.endUserName} onChange={(e) => updateRow(row.key, "endUserName", e.target.value)} disabled={busy || uncertain} /></label>
+          <label className="text-sm">時計の種類<TimepieceTypeCombobox value={row.timepieceType} onChange={(value) => updateRow(row.key, "timepieceType", value)} disabled={busy || uncertain} /></label>
           <label className="text-sm">ブランド *<IntakeCombobox value={row.brandName} choices={brandChoices(brands)}
             onChange={(name) => updateBrand(row.key, name)} onSelect={(choice) => updateBrand(row.key, choice.value, String(choice.id))}
             required disabled={busy || uncertain} placeholder="ブランドを検索・入力" /></label>

@@ -1,3 +1,6 @@
+import { formatWatchInformation } from '@/lib/timepiece-type';
+import type { TimepieceType } from '@prisma/client';
+
 export interface EstimateServerDocumentProps {
   data: {
     estimateNumber: string;
@@ -12,7 +15,7 @@ export interface EstimateServerDocumentProps {
       partnerRef?: string;
       endUserName?: string;
       customerNote?: string;
-      watch: { brand: string; model: string; ref?: string; serial?: string };
+      watch: { brand: string; model: string; ref?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null };
       subtotalAmount?: number;
       taxAmount?: number;
       totalAmount?: number;
@@ -196,9 +199,7 @@ export function createEstimateServerDocumentElement(
           const jobTotal = isB2C
             ? job.totalAmount ?? 0
             : job.items.reduce((sum, item) => sum + item.price, 0);
-          const watchInfo = `${job.watch.brand}\n${job.watch.model}\nRef: ${
-            job.watch.ref || "-"
-          }\nSer: ${job.watch.serial || "-"}`;
+          const watchInfo = formatWatchInformation(job.watch, 'estimate');
 
           return el(
             View,

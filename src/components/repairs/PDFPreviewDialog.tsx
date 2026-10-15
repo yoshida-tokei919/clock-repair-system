@@ -13,6 +13,7 @@ import { WarrantyDocument } from "@/components/pdf/WarrantyDocument";
 import { Loader2, Printer, Download } from "lucide-react";
 import QRCode from "qrcode";
 import { formatPartDisplay } from "@/lib/formatPartDisplay";
+import { parseTimepieceType } from "@/lib/timepiece-type";
 
 interface PDFPreviewDialogProps {
     isOpen: boolean;
@@ -62,6 +63,7 @@ export default function PDFPreviewDialog({ isOpen, onClose, repairData }: PDFPre
         partnerRef: repairData.partnerRef || "", // 貴社管理No
         endUserName: repairData.endUserName || "",
         watch: {
+            ...parseTimepieceType(repairData.watch?.timepieceType),
             brand: repairData.watch?.brand || repairData.watch?.brandName || "",
             model: repairData.watch?.model || repairData.watch?.modelName || "",
             ref: repairData.watch?.ref || repairData.watch?.refName || "",
@@ -113,6 +115,12 @@ export default function PDFPreviewDialog({ isOpen, onClose, repairData }: PDFPre
             description: `時計修理代 (${j.watch.brand} ${j.watch.model})`,
             amount: j.items.reduce((s: number, x: any) => s + x.price, 0)
         })),
+        b2cJobs: commonCustomer.type === 'individual' ? jobsList.map(j => ({
+            inquiryNumber: j.inquiryNumber,
+            watch: j.watch,
+            workDescriptions: j.items.map((item: any) => item.displayName || item.name),
+            amount: j.items.reduce((sum: number, item: any) => sum + item.price, 0),
+        })) : undefined,
         taxRate: 0.1
     };
 

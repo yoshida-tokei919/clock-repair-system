@@ -2,6 +2,8 @@
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
 import { formatPartDisplay } from '@/lib/formatPartDisplay';
+import { formatWatchInformation } from '@/lib/timepiece-type';
+import type { TimepieceType } from '@prisma/client';
 
 Font.register({
     family: 'Noto Sans JP',
@@ -45,7 +47,7 @@ export interface DeliveryDocumentProps {
             inquiryNumber: string;
             endUserName?: string;
             partnerRef?: string;
-            watch: { brand: string; model: string; ref?: string; serial?: string; };
+            watch: { brand: string; model: string; ref?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
             items: { name: string; price: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
         }[];
         taxRate: number; // 0.1
@@ -99,7 +101,7 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
                     {data.jobs.map((job, idx) => {
                         const jobTotal = job.items.reduce((s, i) => s + i.price, 0);
                         // FIXED: Added Ref to watch info
-                        const watchInfo = `${job.watch.brand} ${job.watch.model}\nRef: ${job.watch.ref || '-'} / Ser: ${job.watch.serial || '-'}`;
+                        const watchInfo = formatWatchInformation(job.watch, 'delivery');
 
                         return (
                             <View key={idx} style={styles.b2bRow}>

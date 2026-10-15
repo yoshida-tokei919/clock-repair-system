@@ -97,6 +97,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       customerNote: repair.customerNote || "",
       watch: {
         brand: repair.watch.brand?.name || "",
+        timepieceType: repair.watch.timepieceType,
+        timepieceTypeLabel: repair.watch.timepieceTypeLabel,
         model: repair.watch.model?.name || "",
         ref: repair.watch.reference?.name || undefined,
         serial: repair.watch.serialNumber || undefined,

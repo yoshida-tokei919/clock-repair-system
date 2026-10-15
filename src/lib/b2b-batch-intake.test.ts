@@ -12,8 +12,9 @@ test("payload requires an existing partner ID, 1–30 rows and a selected brand"
   assert.throws(() => parseB2bBatchPayload({ partnerId: 1, rows: Array(31).fill(row) }), B2bBatchIntakeError);
   assert.throws(() => parseB2bBatchPayload({ partnerId: 1, rows: [{ ...row, brandId: 0 }] }), B2bBatchIntakeError);
   assert.throws(() => parseB2bBatchPayload({ partnerId: 1, rows: [{ ...row, workSummary: "x".repeat(1001) }] }), B2bBatchIntakeError);
+  assert.throws(() => parseB2bBatchPayload({ partnerId: 1, rows: [{ ...row, timepieceType: "x".repeat(101) }] }), B2bBatchIntakeError);
   assert.deepEqual(parseB2bBatchPayload({ partnerId: 1, rows: [{ ...row, model: "  ", serial: " S-1 " }] }).rows[0],
-    { partnerRef: "P-1", endUserName: "Owner", brandId: 4, brandName: null,
+    { timepieceType: { timepieceType: "WRISTWATCH", timepieceTypeLabel: null }, partnerRef: "P-1", endUserName: "Owner", brandId: 4, brandName: null,
       model: null, ref: null, serial: "S-1", caliber: null,
       movementMaker: null, movementCaliber: null, baseMovementMaker: null, baseMovementCaliber: null,
       workSummary: "Check crown" });
@@ -92,7 +93,7 @@ function fixture(options: {
 
 test("one transaction locks partner before sequence read and creates each intake record", async () => {
   const state = fixture();
-  const input = parseB2bBatchPayload({ partnerId: 2, rows: [row, { ...row, partnerRef: "P-2" }] });
+  const input = parseB2bBatchPayload({ partnerId: 2, rows: [row, { ...row, partnerRef: "P-2", timepieceType: " ホールクロック " }] });
   const result = await createB2bBatchIntake(state.db, input, 9);
   assert.deepEqual(result.repairs.map((repair) => repair.inquiryNumber), ["AB-011", "AB-012"]);
   assert.deepEqual(state.events.slice(0, 2), ["lock", "customer-read"]);
@@ -102,6 +103,8 @@ test("one transaction locks partner before sequence read and creates each intake
   });
   assert.equal(state.currentSeq, 12);
   assert.equal(state.watches.length, 2);
+  assert.deepEqual(state.watches.map((watch) => [watch.timepieceType, watch.timepieceTypeLabel]),
+    [["WRISTWATCH", null], ["OTHER", "ホールクロック"]]);
   assert.equal(state.persisted.length, 2);
   assert.equal(state.persisted[0].status, "受付");
   assert.equal(state.persisted[0].partsAllocationLegacy, false);
