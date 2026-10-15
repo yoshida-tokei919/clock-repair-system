@@ -77,6 +77,7 @@ import {
     getExternalRepairPricingRules
 } from "@/actions/master-actions";
 import { getCustomers } from "@/actions/customer-actions";
+import { calculateTaxableAmounts, laborCustomerUnitPrice, partCustomerUnitPrice, type PricingTaxMode } from "@/lib/pricing-tax";
 
 // --- COMPONENTS ---
 import { QuickRegisterDialog } from "@/components/repairs/QuickRegisterDialog";
@@ -350,6 +351,7 @@ const AdvancedCombobox: React.FC<{
         phone?: string | null,
         lineId?: string | null,
         address?: string | null,
+        pricingTaxMode?: string | null,
         searchText?: string,
         searchKeys?: string[],
     }) => void;
@@ -386,6 +388,7 @@ const AdvancedCombobox: React.FC<{
         phone?: string | null,
         lineId?: string | null,
         address?: string | null,
+        pricingTaxMode?: string | null,
         searchText?: string,
         searchKeys?: string[],
     }[];
@@ -586,6 +589,9 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [approvalStatus, setApprovalStatus] = useState(initialData?.approvalStatus ?? "pending");
     const [isRecordingApproval, setIsRecordingApproval] = useState(false);
     const [customerId, setCustomerId] = useState<number | null>(initialData?.customer?.id || null);
+    const [pricingTaxMode, setPricingTaxMode] = useState<PricingTaxMode>(
+        initialData?.estimate?.pricingTaxMode === "INCLUSIVE" || (!initialData?.estimate && initialData?.customer?.pricingTaxMode === "INCLUSIVE") ? "INCLUSIVE" : "EXCLUSIVE"
+    );
     const [customerTypeSelection, setCustomerTypeSelection] = useState<CustomerTypeSelection>(
         normalizeCustomerTypeSelection(initialData?.customer?.type)
     );
@@ -628,6 +634,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         name: string;
         partNameEn?: string;
         price: number;   // 上代
+        basePrice?: number; // New PartsMaster tax-exclusive price, never inferred from displayed gross
         cost?: number;   // 仕入値（管理者のみ）
         quantity: number; // 個数
         partRef?: string;
@@ -929,7 +936,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         return createEstimateItemFromPart(part, {
             ...base,
             name: buildSelectedPartName(base.name, part),
-            price: part.price ?? part.retailPrice ?? base.price,
+            price: partCustomerUnitPrice(part.price ?? part.retailPrice ?? base.price, pricingTaxMode),
+            basePrice: part.price ?? part.retailPrice ?? base.price,
             cost: part.cost ?? part.latestCostYen ?? base.cost,
             grade: part.grade ?? base.grade,
             spec: part.grade || base.spec,
@@ -938,7 +946,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
             partsMasterId: part.partsMasterId ?? part.partId ?? part.id ?? base.partsMasterId ?? null,
             standardPartNameId: part.standardPartNameId ?? base.standardPartNameId ?? null,
         }) as LineItem
-    }, [buildSelectedPartName]);
+    }, [buildSelectedPartName, pricingTaxMode]);
 
     const queuePartForOrderList = useCallback((partId: number, quantity = 1) => {
         if (quantity <= 0) return false;
@@ -1290,6 +1298,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const handleCustomerTypeSelect = useCallback((nextType: Exclude<CustomerTypeSelection, null>) => {
         if (customerTypeSelection !== nextType) {
             setCustomerId(null);
+            setPricingTaxMode("EXCLUSIVE");
             setCustomerName("");
             setCustomerOpts([]);
             setCustomerPhone("");
@@ -1785,7 +1794,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 setRawPricingRuleCandidates(safeRules.map(r => ({
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
-                    price: r.minPrice,
+                    price: laborCustomerUnitPrice(r.minPrice),
                     maxPrice: r.maxPrice,
                     pricingRuleId: r.id,
                     caliberId: r.caliberId,
@@ -1799,7 +1808,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 setWorkOpts(dedupedRules.map(r => ({
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
-                    price: r.minPrice,
+                     price: laborCustomerUnitPrice(r.minPrice),
                     maxPrice: r.maxPrice,
                     pricingRuleId: r.id,
                     caliberId: r.caliberId,
@@ -1847,7 +1856,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                 const toWorkOption = (r: any) => ({
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
-                    price: r.minPrice,
+                    price: laborCustomerUnitPrice(r.minPrice),
                     maxPrice: r.maxPrice,
                     pricingRuleId: r.id,
                     caliberId: r.caliberId,
@@ -1978,9 +1987,8 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     }, [newWorkActionId, visibleRepairWorkActionOptions]);
 
     // --- CALCULATIONS ---
-    const totalAmount = lineItems.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);
-    const taxAmount = Math.floor(totalAmount * 0.1);
-    const grandTotal = totalAmount + taxAmount;
+    const lineSum = lineItems.reduce((sum, i) => sum + i.price * (i.quantity || 1), 0);
+    const { grossAmount: grandTotal } = calculateTaxableAmounts(lineSum, pricingTaxMode);
 
     useEffect(() => {
         if (!canApplyPartsOrderStatus(status)) return;
@@ -2100,6 +2108,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                         partType: i.partType ?? null,
                         name: i.name,
                         price: i.price,
+                        basePrice: i.basePrice,
                         cost: i.cost ?? null,
                         notes: i.spec,
                         grade: i.grade ?? null,
@@ -2955,6 +2964,7 @@ ${shopName}
                                                 if (!customerTypeSelection) return;
                                                 setCustomerName(value);
                                                 setCustomerId(null);
+                                                setPricingTaxMode("EXCLUSIVE");
                                             }}
                                             onSearchChange={async (s) => {
                                                 if (!customerTypeSelection) {
@@ -2972,6 +2982,7 @@ ${shopName}
                                                     phone: c.phone,
                                                     lineId: c.lineId,
                                                     address: c.address,
+                                                     pricingTaxMode: c.pricingTaxMode,
                                                 })));
                                             }}
                                             onSelectOption={(option) => {
@@ -2981,6 +2992,9 @@ ${shopName}
                                                     return;
                                                 }
                                                 setCustomerId(option.id ?? null);
+                                                 setPricingTaxMode(initialData?.estimate
+                                                     ? (initialData.estimate.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE")
+                                                     : optionCustomerType === "business" && option.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE");
                                                 setCustomerName(option.value);
                                                 setCustomerPrefix(optionCustomerType === 'business' ? (option.prefix || "") : "C");
                                                 setCustomerPhone(option.phone || "");
@@ -3170,7 +3184,7 @@ ${shopName}
                                 <div className="grid grid-cols-12 text-xs text-zinc-500 font-bold border-b pb-1 px-1">
                                     <div className="col-span-6">項目 / 部品</div>
                                     <div className="col-span-1 text-right">仕入値</div>
-                                    <div className="col-span-2 text-right">上代（税抜）</div>
+                                    <div className="col-span-2 text-right">{pricingTaxMode === "INCLUSIVE" ? "単価（税込・最終）" : "上代（税抜）"}</div>
                                     <div className="col-span-1 text-center">個数</div>
                                     <div className="col-span-1 text-center">🔍</div>
                                     <div className="col-span-1 text-right">操作</div>
@@ -3243,13 +3257,16 @@ ${shopName}
                                             <input
                                                 type="number"
                                                 className="h-8 w-full text-right text-sm border border-zinc-200 rounded px-1.5 font-mono"
-                                                value={item.price}
+                                                 value={pricingTaxMode === "INCLUSIVE" && isPartItem && !item.partsMasterId ? item.basePrice ?? "" : item.price}
                                                 onChange={e => setLineItems(lineItems.map((li, i) =>
-                                                    i === idx ? { ...li, price: parseInt(e.target.value) || 0 } : li
+                                                     i === idx ? pricingTaxMode === "INCLUSIVE" && li.category.includes("part") && !li.partsMasterId
+                                                         ? { ...li, basePrice: parseInt(e.target.value) || 0,
+                                                             price: partCustomerUnitPrice(parseInt(e.target.value) || 0, pricingTaxMode) }
+                                                         : { ...li, price: parseInt(e.target.value) || 0 } : li
                                                 ))}
                                             />
                                             <div className="mt-0.5 text-right text-xs text-zinc-400">
-                                                税抜小計 ¥{(item.price * (item.quantity || 1)).toLocaleString()}
+                                                 {pricingTaxMode === "INCLUSIVE" && isPartItem && !item.partsMasterId ? "部品上代（税抜）→ 税込小計" : pricingTaxMode === "INCLUSIVE" ? "税込小計" : "税抜小計"} ¥{(item.price * (item.quantity || 1)).toLocaleString()}
                                             </div>
                                         </div>
                                         <div className="col-span-1">
@@ -3491,6 +3508,7 @@ ${shopName}
                                             <Input className="h-9 text-sm pl-8 font-mono text-right" placeholder="0" value={newItemCost} onChange={e => setNewItemCost(e.target.value)} />
                                         </div>
                                         <div className="relative w-24">
+                                             {pricingTaxMode === "INCLUSIVE" && <span className="absolute -top-4 left-0 whitespace-nowrap text-[10px] text-zinc-600">{isAddingPartItem ? "部品上代（税抜）" : "技術料（税込）"}</span>}
                                             <span className="absolute left-2 top-2.5 text-xs">¥</span>
                                             <Input className="h-9 text-sm pl-5 font-mono text-right" placeholder="0" value={newItemPrice} onChange={e => {
                                                 setNewItemPrice(e.target.value);
@@ -3539,7 +3557,8 @@ ${shopName}
                                                 } : {}),
                                                 name: resolvedItemName,
                                                 cost: parseInt(newItemCost) || undefined,
-                                                price: parseInt(newItemPrice) || 0,
+                                                 price: isAddingPartItem ? partCustomerUnitPrice(parseInt(newItemPrice) || 0, pricingTaxMode) : parseInt(newItemPrice) || 0,
+                                                 ...(isAddingPartItem ? { basePrice: parseInt(newItemPrice) || 0 } : {}),
                                                 quantity: parseInt(newItemQty) || 1,
                                                 spec: newItemSpec,
                                                 ...(isAddingLaborItem ? {

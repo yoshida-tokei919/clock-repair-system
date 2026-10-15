@@ -15,6 +15,7 @@ import { applyPrepaymentAllocations, availablePrepayment, findEligiblePrepayment
 import { b2bPaymentDueDate, billingMonthBounds, billingMonthFromDate, isB2BBillingRepairEligible } from "@/lib/b2b-billing-month";
 import { getAdminApiIdentity } from "@/lib/admin-api-auth";
 import { resolveIssuedDate } from "@/lib/document-issued-date";
+import { calculateTaxableAmounts, commonEstimateMode, sumCustomerLines } from "@/lib/pricing-tax";
 
 export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     if (!await getAdminApiIdentity()) throw new Error("認証が必要です");
@@ -22,13 +23,15 @@ export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     if (!ids.length || ids.some(id => !Number.isSafeInteger(id) || id <= 0)) throw new Error("修理案件を選択してください");
     const repairs = await prisma.repair.findMany({ where: { id: { in: ids } },
         include: { customer: true, estimate: { include: { items: true } },
-            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, shippingFee: true } } } });
+            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, shippingFee: true, pricingTaxMode: true } } } });
     if (repairs.length !== ids.length || repairs.some(repair => repair.invoiceId !== null)) throw new Error("請求対象が変更されました");
     const groups = new Map<number, typeof repairs>();
     for (const repair of repairs) groups.set(repair.customerId, [...(groups.get(repair.customerId) ?? []), repair]);
     const result = [];
     for (const [customerId, group] of groups) {
-        const gross = calculateIssuedInvoiceAmounts(group.reduce((sum, repair) => sum + calculateInvoiceRepairSubtotal(repair), 0), aggregateDeliveryShipping(group)).grossTotalAmount;
+        const mode = commonEstimateMode(group);
+        if (group.some(repair => repair.deliveryNote && repair.deliveryNote.pricingTaxMode !== mode)) throw new Error("納品書と見積の税表示方式が一致しません");
+        const gross = calculateIssuedInvoiceAmounts(group.reduce((sum, repair) => sum + calculateInvoiceRepairSubtotal(repair), 0), aggregateDeliveryShipping(group), mode).grossTotalAmount;
         const isB2C = group[0].customer.type === "individual";
         const payments = isB2C ? await findEligiblePrepayments(prisma, customerId, group.map(repair => repair.id)) : [];
         const receivedPrepaymentAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
@@ -57,7 +60,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
             include: {
                 customer: true,
                 estimate: { include: { items: true } },
-                deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true, shippingFee: true } },
+                deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true, shippingFee: true, pricingTaxMode: true } },
             }
         });
 
@@ -105,14 +108,12 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
             const prefix = customer.prefix || "X";
 
             // Calculate Totals from all selected repairs
-            let totalAmount = 0;
-            customerRepairs.forEach(r => {
-                const subtotal = type === "invoice"
-                    ? calculateInvoiceRepairSubtotal(r)
-                    : r.estimate?.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0) || 0;
-                totalAmount += subtotal;
-            });
-            const taxAmount = Math.floor(totalAmount * 0.1);
+            const pricingTaxMode = type === "warranty" ? "EXCLUSIVE" : commonEstimateMode(customerRepairs);
+            if (type === "invoice" && customerRepairs.some(repair => repair.deliveryNote && repair.deliveryNote.pricingTaxMode !== pricingTaxMode)) {
+                throw new Error("納品書と見積の税表示方式が一致しません");
+            }
+            const lineSum = type === "warranty" ? 0 : customerRepairs.reduce((sum, repair) => sum + sumCustomerLines(repair.estimate?.items ?? []), 0);
+            const { totalAmount, taxAmount } = calculateTaxableAmounts(lineSum, pricingTaxMode);
 
             let seq = 0;
             let docNumber = "";
@@ -136,6 +137,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                         customerId: customerId,
                         totalAmount,
                         taxAmount,
+                        pricingTaxMode,
                         ...shipping,
                         repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
                     }
@@ -173,10 +175,11 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                         issuedDate,
                         customerId: customerId,
                         billingCustomerId,
-                        ...calculateIssuedInvoiceAmounts(totalAmount, aggregateDeliveryShipping(customerRepairs)),
+                        ...calculateIssuedInvoiceAmounts(lineSum, aggregateDeliveryShipping(customerRepairs), pricingTaxMode),
+                        pricingTaxMode,
                         billingMonth,
                         paymentDueDate: dueDate,
-                        repairSnapshots: { create: buildInvoiceRepairSnapshotData(customerRepairs) },
+                        repairSnapshots: { create: buildInvoiceRepairSnapshotData(customerRepairs, pricingTaxMode) },
                     }
                   });
                   const claimed = await tx.repair.updateMany({
@@ -211,6 +214,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                         customerId: customerId,
                         totalAmount,
                         taxAmount,
+                        pricingTaxMode,
                         repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
                     }
                 });

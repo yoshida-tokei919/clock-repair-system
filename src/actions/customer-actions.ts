@@ -98,6 +98,9 @@ export async function createCustomer(data: any) {
 export async function updateCustomer(id: number, data: any) {
     try {
         const type = data.type || 'individual';
+        if (type === 'business' && data.pricingTaxMode !== 'EXCLUSIVE' && data.pricingTaxMode !== 'INCLUSIVE') {
+            throw new Error('価格の税表示方式を選択してください');
+        }
         const defaultShipping = validateCustomerDefaultShipping(type, {
             defaultShippingCarrierCode: data.defaultShippingCarrierCode ?? null,
             defaultShippingServiceCode: data.defaultShippingServiceCode ?? null,
@@ -141,6 +144,7 @@ export async function updateCustomer(id: number, data: any) {
                 kana: data.kana,
                 rank: parseInt(data.rank || "1"),
                 ...defaultShipping,
+                pricingTaxMode: type === 'business' ? data.pricingTaxMode : 'EXCLUSIVE',
                 invoiceRecipientCustomerId: type === 'individual' ? null : undefined,
             }
           });

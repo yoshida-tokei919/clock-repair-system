@@ -10,6 +10,7 @@ import { parseTimepieceType, timepieceTypeUpdateForCreateReuse, TimepieceTypeErr
 import { getRepairPartType, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
+import { calculateTaxableAmounts, effectivePricingTaxMode, repairPartBasePrice, sumCustomerLines } from "@/lib/pricing-tax";
 import {
     estimateItemsLikeToRepairLineItemInputs,
     replaceRepairLineItems,
@@ -150,6 +151,7 @@ export async function POST(req: Request) {
                 }
                 customerId = customer.id;
             }
+            const pricingTaxMode = effectivePricingTaxMode(customer);
 
             // 2. Watch Handling (Simplified matching)
             // 2. Watch Handling (Simplified matching)
@@ -473,7 +475,7 @@ export async function POST(req: Request) {
                             costOriginal: existingMaster.costOriginal,
                             latestCostYen: item.cost ?? existingMaster.latestCostYen,
                             markupRate: existingMaster.markupRate,
-                            retailPrice: item.price ?? existingMaster.retailPrice,
+                            retailPrice: repairPartBasePrice({ ...item, price: item.price ?? existingMaster.retailPrice }, pricingTaxMode, existingMaster.retailPrice),
                             // A repair form carries a display snapshot only. Never let it
                             // overwrite live unreserved stock during a repair save.
                             stockQuantity: existingMaster.stockQuantity,
@@ -516,24 +518,26 @@ export async function POST(req: Request) {
                         notes1: item.note1,
                         notes2: item.note2,
                         latestCostYen: item.cost,
-                        retailPrice: item.price,
+                        retailPrice: repairPartBasePrice(item, pricingTaxMode),
                         stockQuantity: item.stockQuantity ?? 0,
                     }, tx as any, { strictRepairIdentity: true });
 
                     return { ...item, partsMasterId: syncedPart.id };
                 }));
 
-                const total = estimateItems.reduce((sum: number, item: any) => sum + (Number(item.price) || 0), 0);
-                const techFee = estimateItems.filter((i: any) => i.type === 'labor').reduce((sum: number, i: any) => sum + (Number(i.price) || 0), 0);
-                const partsFee = estimateItems.filter((i: any) => i.type === 'part').reduce((sum: number, i: any) => sum + (Number(i.price) || 0), 0);
+                const lineSum = sumCustomerLines(estimateItems.map((item: any) => ({ unitPrice: item.price, quantity: item.quantity ?? 1 })));
+                const techFee = sumCustomerLines(estimateItems.filter((i: any) => i.type === 'labor').map((item: any) => ({ unitPrice: item.price, quantity: item.quantity ?? 1 })));
+                const partsFee = sumCustomerLines(estimateItems.filter((i: any) => i.type === 'part').map((item: any) => ({ unitPrice: item.price, quantity: item.quantity ?? 1 })));
+                const amounts = calculateTaxableAmounts(lineSum, pricingTaxMode);
 
                 await tx.estimate.create({
                     data: {
                         repairId: repair.id,
-                        totalAmount: total,
+                        totalAmount: amounts.totalAmount,
                         technicalFee: techFee,
                         partsTotal: partsFee,
-                        taxAmount: Math.floor(total * 0.1),
+                        taxAmount: amounts.taxAmount,
+                        pricingTaxMode,
                         items: {
                             create: estimateItems.map((item: any) => ({
                                 ...estimateItemSnapshots(item),

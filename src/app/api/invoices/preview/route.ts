@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
                 ref: r.watch.reference?.name || "",
             },
             subtotal,
+            pricingTaxMode: r.estimate?.pricingTaxMode ?? "EXCLUSIVE",
         };
     });
 

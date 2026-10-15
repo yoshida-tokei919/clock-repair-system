@@ -13,6 +13,7 @@ import { applyPrepaymentAllocations, type RequestedAllocation } from "@/lib/prep
 import { b2bPaymentDueDate, billingMonthBounds, isB2BBillingRepairEligible, parseBillingMonth } from "@/lib/b2b-billing-month";
 import { resolveIssuedDate } from "@/lib/document-issued-date";
 import { nextB2BSourceInvoiceNumber, resolveInvoiceRecipientForIssue } from "@/lib/invoice-recipient";
+import { commonEstimateMode } from "@/lib/pricing-tax";
 
 // GET /api/invoices — 請求書一覧
 export async function GET() {
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
         where: { id: { in: uniqueRepairIds } },
         include: {
             estimate: { include: { items: true } },
-            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true, shippingFee: true } },
+            deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true, shippingFee: true, pricingTaxMode: true } },
         },
     });
 
@@ -117,6 +118,12 @@ export async function POST(req: NextRequest) {
     const subtotal = repairs.reduce((sum, r) => {
         return sum + calculateInvoiceRepairSubtotal(r);
     }, 0);
+    let pricingTaxMode: ReturnType<typeof commonEstimateMode>;
+    try { pricingTaxMode = commonEstimateMode(repairs); }
+    catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "税表示方式を確認してください" }, { status: 400 }); }
+    if (repairs.some(repair => repair.deliveryNote && repair.deliveryNote.pricingTaxMode !== pricingTaxMode)) {
+        return NextResponse.json({ error: "納品書と見積の税表示方式が一致しません" }, { status: 400 });
+    }
 
     // トランザクションで請求書作成・修理紐付け・SEQ更新
     try {
@@ -147,10 +154,11 @@ export async function POST(req: NextRequest) {
                 issuedDate,
                 customerId,
                 billingCustomerId,
-                ...calculateIssuedInvoiceAmounts(subtotal, aggregateDeliveryShipping(repairs)),
+                ...calculateIssuedInvoiceAmounts(subtotal, aggregateDeliveryShipping(repairs), pricingTaxMode),
+                pricingTaxMode,
                 billingMonth: isB2C ? null : billingMonth,
                 paymentDueDate: isB2C ? getB2CPaymentDueDate() : b2bPaymentDueDate(billingMonth!),
-                repairSnapshots: { create: buildInvoiceRepairSnapshotData(repairs) },
+                repairSnapshots: { create: buildInvoiceRepairSnapshotData(repairs, pricingTaxMode) },
             },
         });
         const claimed = await tx.repair.updateMany({

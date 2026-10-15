@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { aggregateDeliveryShipping, buildInvoiceRepairSnapshotData, calculateIssuedInvoiceAmounts, hasConsistentInvoiceSnapshots } from "./invoice-repair-snapshots";
+import { aggregateDeliveryShipping, buildInvoiceRepairSnapshotData, calculateIssuedInvoiceAmounts, hasConsistentInvoiceSnapshots, invoicePdfRepairAmount } from "./invoice-repair-snapshots";
+import { commonEstimateMode } from "./pricing-tax";
 
 test("invoice repair snapshots retain invoice-time amount and delivery details", () => {
   const issuedDate = new Date("2026-09-14T00:00:00.000Z");
@@ -69,4 +70,27 @@ test("editing estimates never changes issued snapshots; missing or inconsistent 
   assert.equal(hasConsistentInvoiceSnapshots({ ...invoice, repairSnapshots: [] }), false);
   assert.equal(hasConsistentInvoiceSnapshots({ ...invoice, totalAmount: 99000 }), false);
   assert.equal(hasConsistentInvoiceSnapshots({ ...invoice, grossTotalAmount: 99000 }), false);
+});
+
+test("inclusive invoice snapshots keep displayed gross and reconcile net deterministically", () => {
+  const repairs = [
+    { id: 2, inquiryNumber: "B-002", deliveryNoteId: 4, deliveryNote: { slipNumber: "BD-004", issuedDate: new Date("2026-10-15"), shippingFee: 800 }, deliveryDateActual: null,
+      estimate: { pricingTaxMode: "INCLUSIVE", items: [{ unitPrice: 44000, quantity: 1 }] } },
+    { id: 1, inquiryNumber: "B-001", deliveryNoteId: 4, deliveryNote: { slipNumber: "BD-004", issuedDate: new Date("2026-10-15"), shippingFee: 800 }, deliveryDateActual: null,
+      estimate: { pricingTaxMode: "INCLUSIVE", items: [{ unitPrice: 15000, quantity: 1 }] } },
+  ];
+  const mode = commonEstimateMode(repairs);
+  assert.equal(mode, "INCLUSIVE");
+  const rows = buildInvoiceRepairSnapshotData(repairs, mode);
+  assert.deepEqual(rows.map(row => row.repairId), [1, 2]);
+  assert.deepEqual(rows.map(row => row.grossAmount), [15000, 44000]);
+  assert.equal(rows.reduce((sum, row) => sum + row.subtotalAmount, 0), 53637);
+  const invoice = { ...calculateIssuedInvoiceAmounts(59000, 800, mode), pricingTaxMode: mode, repairSnapshots: rows };
+  assert.deepEqual({ total: invoice.totalAmount, tax: invoice.taxAmount, gross: invoice.grossTotalAmount },
+    { total: 53637, tax: 5363, gross: 59800 });
+  assert.equal(hasConsistentInvoiceSnapshots(invoice), true);
+  assert.equal(rows.reduce((sum, row) => sum + invoicePdfRepairAmount(row, mode), 0), 59000);
+  assert.equal(hasConsistentInvoiceSnapshots({ ...invoice, repairSnapshots: rows.map(row => ({ ...row, grossAmount: (row.grossAmount ?? 0) + 1 })) }), false);
+  assert.equal(hasConsistentInvoiceSnapshots({ ...invoice, pricingTaxMode: "EXCLUSIVE" }), false);
+  assert.equal(commonEstimateMode(repairs), "INCLUSIVE"); // Billing recipient has no role in source estimate mode.
 });

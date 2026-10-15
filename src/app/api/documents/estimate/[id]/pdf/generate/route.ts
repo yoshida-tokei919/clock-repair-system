@@ -14,6 +14,7 @@ import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { renderEstimatePdfBuffer } from "@/lib/estimate-pdf-render";
 import { prisma } from "@/lib/prisma";
 import { displayIssuedDate, parseIssuedDate } from "@/lib/document-issued-date";
+import { sumCustomerLines } from "@/lib/pricing-tax";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,6 +76,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       { status: 404 }
     );
   }
+  if (sumCustomerLines(estimateDocument.repairs.flatMap(repair => repair.estimate?.items ?? [])) !== estimateDocument.totalAmount +
+      (estimateDocument.pricingTaxMode === "INCLUSIVE" ? estimateDocument.taxAmount : 0)) {
+    return NextResponse.json({ ok: false, error: "発行時の見積額と現在の明細が一致しません。保存済みPDFをご確認ください。" }, { status: 409 });
+  }
   let requestedDate: Date | null = null;
   try {
     const body = await request.json().catch(() => ({}));
@@ -106,6 +111,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       items: estimateItems.map((item) => ({
         name: item.itemName,
         price: item.unitPrice,
+        quantity: item.quantity,
         type: item.type,
         grade: item.partsMaster?.grade ?? undefined,
         note2: item.partsMaster?.notes2 ?? undefined,
@@ -132,6 +138,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     subtotalAmount: estimateDocument.totalAmount,
     taxAmount: estimateDocument.taxAmount,
     totalAmount: estimateDocument.totalAmount + estimateDocument.taxAmount,
+    pricingTaxMode: estimateDocument.pricingTaxMode,
     jobs,
   };
 

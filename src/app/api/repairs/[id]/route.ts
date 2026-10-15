@@ -10,6 +10,7 @@ import { parseTimepieceType, TimepieceTypeError } from "@/lib/timepiece-type";
 import { getRepairPartType, isExistingRepairPartLink, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
+import { calculateTaxableAmounts, effectivePricingTaxMode, repairPartBasePrice, sumCustomerLines } from "@/lib/pricing-tax";
 import {
     estimateItemsLikeToRepairLineItemInputs,
     replaceRepairLineItems,
@@ -55,6 +56,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             if (!repairRecord) {
                 throw new Error("修琁E��録が見つかりません");
             }
+            const [sourceCustomer, savedEstimate] = await Promise.all([
+                tx.customer.findUniqueOrThrow({ where: { id: repairRecord.customerId }, select: { type: true, pricingTaxMode: true } }),
+                tx.estimate.findUnique({ where: { repairId: id }, select: { pricingTaxMode: true } }),
+            ]);
+            const pricingTaxMode = savedEstimate?.pricingTaxMode === "INCLUSIVE"
+                ? "INCLUSIVE" : savedEstimate ? "EXCLUSIVE" : effectivePricingTaxMode(sourceCustomer);
 
             // Capture this Repair's persisted PART links before the replacement deletes them.
             const persistedPartLinks = new Map((await tx.repairLineItem.findMany({
@@ -170,6 +177,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                         type: customerType,
                         isPartner: customerType === 'business',
                         ...(customerType === 'individual' ? {
+                            pricingTaxMode: "EXCLUSIVE",
                             defaultShippingCarrierCode: null,
                             defaultShippingServiceCode: null,
                             defaultShippingSize: null,
@@ -245,17 +253,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
             // 4. Update Estimates
             if (body.estimate?.items) {
-                const total = body.estimate.items.reduce(
-                    (sum: number, item: any) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)),
-                    0
-                );
+                const lineSum = sumCustomerLines(body.estimate.items.map((item: any) => ({ unitPrice: item.price, quantity: item.quantity ?? 1 })));
                 const techFee = body.estimate.items
                     .filter((item: any) => item.type === 'labor')
-                    .reduce((sum: number, item: any) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
+                    .reduce((sum: number, item: any) => sum + item.price * (item.quantity ?? 1), 0);
                 const partsFee = body.estimate.items
                     .filter((item: any) => item.type === 'part')
-                    .reduce((sum: number, item: any) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
-                const taxAmount = Math.floor(total * 0.1);
+                    .reduce((sum: number, item: any) => sum + item.price * (item.quantity ?? 1), 0);
+                const { totalAmount, taxAmount } = calculateTaxableAmounts(lineSum, pricingTaxMode);
 
                 // Use the returned estimate from upsert directly
                 const estimate = await tx.estimate.upsert({
@@ -264,14 +269,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                         repairId: id,
                         technicalFee: techFee,
                         partsTotal: partsFee,
-                        totalAmount: total,
+                        totalAmount,
                         taxAmount,
+                        pricingTaxMode,
                     },
                     update: {
                         technicalFee: techFee,
                         partsTotal: partsFee,
-                        totalAmount: total,
+                        totalAmount,
                         taxAmount,
+                        pricingTaxMode,
                     }
                 });
 
@@ -333,7 +340,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                                     costOriginal: existingMaster.costOriginal,
                                     latestCostYen: item.cost ?? existingMaster.latestCostYen,
                                     markupRate: existingMaster.markupRate,
-                                    retailPrice: item.price ?? existingMaster.retailPrice,
+                                    retailPrice: repairPartBasePrice({ ...item, price: item.price ?? existingMaster.retailPrice }, pricingTaxMode, existingMaster.retailPrice),
                                     // A repair form carries a display snapshot only. Never let it
                                     // overwrite live unreserved stock during a repair save.
                                     stockQuantity: existingMaster.stockQuantity,
@@ -378,7 +385,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                                 notes1: item.note1,
                                 notes2: item.note2,
                                 latestCostYen: item.cost,
-                                retailPrice: item.price,
+                                retailPrice: repairPartBasePrice(item, pricingTaxMode),
                                 stockQuantity: item.stockQuantity ?? 0,
                             }, tx as any, { strictRepairIdentity: true });
 

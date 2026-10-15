@@ -78,7 +78,7 @@ export default function CustomerEditPage({ params }: { params: Promise<{ id: str
             <button
               type="button"
               onClick={() => setData({ ...data, type: "individual", defaultShippingCarrierCode: null,
-                defaultShippingServiceCode: null, defaultShippingSize: null, defaultShippingFee: null })}
+                defaultShippingServiceCode: null, defaultShippingSize: null, defaultShippingFee: null, pricingTaxMode: "EXCLUSIVE" })}
               className={cn(
                 "flex-1 text-xs font-bold py-1.5 rounded-sm transition-all flex items-center justify-center gap-1",
                 data.type === "individual" ? "bg-white shadow-sm text-green-600" : "text-zinc-400"
@@ -213,6 +213,18 @@ export default function CustomerEditPage({ params }: { params: Promise<{ id: str
             />
           </div>
         </Card>
+
+        {data.type === "business" && (
+          <Card className="p-6 space-y-3 border-zinc-200 shadow-sm">
+            <h3 className="text-sm font-bold">修理価格の税表示方式</h3>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1" checked={data.pricingTaxMode === "INCLUSIVE"}
+                onChange={e => setData({ ...data, pricingTaxMode: e.target.checked ? "INCLUSIVE" : "EXCLUSIVE" })} />
+              <span>この取引先の技術料は入力額を税込の最終額として扱い、部品は税抜上代に10%を加えて税込価格を表示・請求する</span>
+            </label>
+            <p className="text-xs text-zinc-500">変更前に保存した見積・発行済み帳票の税表示方式は変わりません。</p>
+          </Card>
+        )}
 
         {data.type === "business" && (
           <Card className="p-6 space-y-4 border-zinc-200 shadow-sm">

@@ -35,6 +35,7 @@ export interface EstimateDocumentProps {
   data: {
     estimateNumber: string;
     date: string;
+    pricingTaxMode?: string;
     customer: { name: string; address?: string; type?: string; };
     jobs: {
       id: string;
@@ -43,7 +44,7 @@ export interface EstimateDocumentProps {
       endUserName?: string;
       customerNote?: string;
       watch: { brand: string; model: string; ref?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
-      items: { name: string; price: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
+      items: { name: string; price: number; qty?: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
     }[];
   }
 }
@@ -103,12 +104,12 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
             <Text wrap={false} style={[styles.colEndUser, { width: '9%', fontSize: 8, paddingRight: 5 }]}>顧客名</Text>
             <Text wrap={false} style={[styles.colWatch, { width: '20.5%', fontSize: 8, paddingRight: 2 }]}>時計情報</Text>
             <Text wrap={false} style={[{ width: '44%' }, { fontSize: 9, borderLeftWidth: 1, borderColor: '#ccc', paddingLeft: 0, marginLeft: 1 }]}>作業明細・交換部品 / 単価</Text>
-            <Text style={[styles.colTotal, { width: '10%' }]}>小計(税抜)</Text>
+            <Text style={[styles.colTotal, { width: '10%' }]}>{data.pricingTaxMode === "INCLUSIVE" ? "金額(税込)" : "小計(税抜)"}</Text>
           </View>
 
           {/* Rows */}
           {data.jobs.map((job, idx) => {
-            const jobTotal = job.items.reduce((s, i) => s + i.price, 0);
+            const jobTotal = job.items.reduce((s, i) => s + i.price * (i.qty ?? 1), 0);
             const watchInfo = formatWatchInformation(job.watch, 'estimate');
 
             return (

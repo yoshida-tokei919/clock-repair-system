@@ -22,6 +22,7 @@ model Admin {
 model Customer {
   id           Int      @id @default(autoincrement())
   type         String   // 'individual', 'business'
+  pricingTaxMode String @default("EXCLUSIVE") // EXCLUSIVE or INCLUSIVE; business customers only
   rank         Int      @default(1) // 1 to 5
   name         String
   kana         String?
@@ -1377,6 +1378,7 @@ model Estimate {
   shipping       Int      @default(0)
   taxAmount      Int      @default(0)
   totalAmount    Int      @default(0)
+  pricingTaxMode String   @default("EXCLUSIVE")
   isActive       Boolean  @default(true)
   
   repair         Repair         @relation(fields: [repairId], references: [id])
@@ -1807,6 +1809,7 @@ model DeliveryNote {
   
   totalAmount  Int      @default(0) // Cache for speed
   taxAmount    Int      @default(0)
+  pricingTaxMode String @default("EXCLUSIVE")
   shippingCarrierCode String?
   shippingServiceCode String?
   shippingSize Int?
@@ -1843,6 +1846,7 @@ model Invoice {
   
   totalAmount   Int      @default(0) // Issued pre-tax subtotal, integer JPY (existing meaning)
   taxAmount     Int      @default(0) // Issued tax, integer JPY
+  pricingTaxMode String @default("EXCLUSIVE")
   shippingFeeAmount Int @default(0) // Final customer shipping charge, already tax-included
   grossTotalAmount Int   // Issued payable total; INSERT trigger fills NULL for old writers
   status        String   @default("issued") // issued, paid
@@ -1920,7 +1924,8 @@ model InvoiceRepairSnapshot {
   deliverySlipNumber String?
   deliveryIssuedDate DateTime?
   deliveryDateActual DateTime?
-  subtotalAmount    Int
+  subtotalAmount    Int // Net allocation; inclusive tax is allocated by cumulative gross in repair ID order
+  grossAmount       Int? // Final taxable displayed repair amount; NULL for legacy exclusive rows
   deliveryShippingFee Int @default(0)
   createdAt         DateTime @default(now())
 
@@ -2083,6 +2088,7 @@ model EstimateDocument {
 
   totalAmount     Int      @default(0)
   taxAmount       Int      @default(0)
+  pricingTaxMode  String   @default("EXCLUSIVE")
 }
 
 model EstimatePdfFile {

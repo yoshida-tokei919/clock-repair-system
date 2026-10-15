@@ -27,6 +27,7 @@ type PreviewRepair = {
     shippingFee: number | null;
     watch: { brand: string; model: string; ref: string };
     subtotal: number;
+    pricingTaxMode?: string;
 };
 
 type Invoice = {
@@ -166,7 +167,12 @@ export default function InvoicesPage() {
     }
 
     const selectedPreviews = previews?.filter((r) => selectedIds.has(r.id)) || [];
-    const { subtotal, tax, shippingFeeAmount, total, unconfirmedNoteIds } = summarizeB2BInvoicePreview(selectedPreviews);
+    const selectedModes = new Set(selectedPreviews.map(row => row.pricingTaxMode ?? "EXCLUSIVE"));
+    const mixedModes = selectedModes.size > 1;
+    const summary = summarizeB2BInvoicePreview(mixedModes ? [] : selectedPreviews);
+    const { subtotal, tax, shippingFeeAmount, unconfirmedNoteIds } = summary;
+    const total = mixedModes ? null : summary.total;
+    const inclusivePreview = selectedModes.has("INCLUSIVE");
 
     const selectedPartner = partners.find((p) => p.id === selectedPartnerId);
 
@@ -311,7 +317,7 @@ export default function InvoicesPage() {
                                                         <th className="px-2 py-2 text-left">管理No</th>
                                                         <th className="px-2 py-2 text-left">時計</th>
                                                         <th className="px-2 py-2 text-left">納品日</th>
-                                                        <th className="px-2 py-2 text-right">金額(税抜)</th>
+                                                        <th className="px-2 py-2 text-right">金額{inclusivePreview ? "(税込)" : "(税抜)"}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -361,11 +367,11 @@ export default function InvoicesPage() {
                                         {/* 金額サマリー */}
                                         <div className="mt-3 bg-gray-50 rounded-lg px-4 py-3 text-sm">
                                             <div className="flex justify-between text-gray-500">
-                                                <span>小計（{selectedIds.size}件）</span>
+                                                 <span>{inclusivePreview ? "課税対象額（税込）" : "小計"}（{selectedIds.size}件）</span>
                                                 <span>¥{subtotal.toLocaleString()}</span>
                                             </div>
                                             <div className="flex justify-between text-gray-500">
-                                                <span>消費税（10%）</span>
+                                                 <span>{inclusivePreview ? "内消費税（10%）" : "消費税（10%）"}</span>
                                                 <span>¥{tax.toLocaleString()}</span>
                                             </div>
                                             <div className="flex justify-between text-gray-500">
@@ -377,6 +383,7 @@ export default function InvoicesPage() {
                                                 <span>{total === null ? "未確定" : `¥${total.toLocaleString()}`}</span>
                                             </div>
                                         </div>
+                                        {mixedModes && <p className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">税表示方式が異なる見積は同じ請求書にまとめられません。</p>}
                                         {unconfirmedNoteIds.length > 0 && <p className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                                             選択中の納品書の送料が未確定です。先に送料を確定してください: {unconfirmedNoteIds.map((id, index) => <span key={id}>{index > 0 ? "、" : ""}<Link className="underline" href={`/documents/delivery/${id}`}>納品書 #{id}</Link></span>)}
                                         </p>}

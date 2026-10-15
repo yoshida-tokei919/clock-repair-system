@@ -48,17 +48,21 @@ export interface DeliveryDocumentProps {
             endUserName?: string;
             partnerRef?: string;
             watch: { brand: string; model: string; ref?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
-            items: { name: string; price: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
+            items: { name: string; price: number; quantity?: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
         }[];
         taxRate: number; // 0.1
+        pricingTaxMode?: string;
+        subtotalAmount?: number;
+        taxAmount?: number;
         shippingFee: number; // Added
     }
 }
 
 export function DeliveryDocument({ data }: DeliveryDocumentProps) {
     // Calc Totals
-    const subTotal = data.jobs.reduce((sum, job) => sum + job.items.reduce((s, i) => s + i.price, 0), 0);
-    const tax = Math.floor(subTotal * data.taxRate);
+    const inclusive = data.pricingTaxMode === "INCLUSIVE";
+    const subTotal = data.subtotalAmount ?? data.jobs.reduce((sum, job) => sum + job.items.reduce((s, i) => s + i.price * (i.quantity ?? 1), 0), 0);
+    const tax = data.taxAmount ?? Math.floor(subTotal * data.taxRate);
     const grandTotal = subTotal + tax + (data.shippingFee || 0);
 
     return (
@@ -95,11 +99,11 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
                         <Text style={[styles.colInquiry, { width: '10%' }]}>貴社管理No</Text>
                         <Text style={[styles.colEndUser, { width: '15%' }]}>お客様名</Text>
                         <Text style={[styles.colWatch, { width: '35%' }]}>時計情報 / 単価</Text>
-                        <Text style={[styles.colTotal, { width: '15%' }]}>小計(税抜)</Text>
+                        <Text style={[styles.colTotal, { width: '15%' }]}>{inclusive ? '金額(税込)' : '小計(税抜)'}</Text>
                     </View>
 
                     {data.jobs.map((job, idx) => {
-                        const jobTotal = job.items.reduce((s, i) => s + i.price, 0);
+                        const jobTotal = job.items.reduce((s, i) => s + i.price * (i.quantity ?? 1), 0);
                         // FIXED: Added Ref to watch info
                         const watchInfo = formatWatchInformation(job.watch, 'delivery');
 
@@ -133,15 +137,15 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
                 {/* TOTALS */}
                 <View style={styles.summaryArea}>
                     <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>小計</Text>
-                        <Text style={styles.summaryValue}>¥{subTotal.toLocaleString()}</Text>
+                        <Text style={styles.summaryLabel}>{inclusive ? '課税対象額（税込）' : '小計'}</Text>
+                        <Text style={styles.summaryValue}>¥{(inclusive ? subTotal + tax : subTotal).toLocaleString()}</Text>
                     </View>
                     <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>消費税 (10%)</Text>
+                        <Text style={styles.summaryLabel}>{inclusive ? '内消費税 (10%)' : '消費税 (10%)'}</Text>
                         <Text style={styles.summaryValue}>¥{tax.toLocaleString()}</Text>
                     </View>
                     <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>送料</Text>
+                        <Text style={styles.summaryLabel}>{inclusive ? '送料（税込）' : '送料'}</Text>
                         <Text style={styles.summaryValue}>¥{(data.shippingFee || 0).toLocaleString()}</Text>
                     </View>
                     <View style={[styles.summaryRow, styles.grandTotal]}>

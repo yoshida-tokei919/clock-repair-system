@@ -99,10 +99,11 @@ function getEstimateTotal(repair: any) {
 }
 
 function getEstimateAmounts(repair: any) {
-  const subtotal = getEstimateTotal(repair);
-  const taxAmount = Math.floor(subtotal * 0.1);
-
-  return { subtotal, taxAmount, total: subtotal + taxAmount };
+  const lineSum = getEstimateTotal(repair);
+  const inclusive = repair.estimate?.pricingTaxMode === "INCLUSIVE";
+  const taxAmount = Number(BigInt(lineSum) * BigInt(10) / BigInt(inclusive ? 110 : 100));
+  const subtotal = inclusive ? lineSum - taxAmount : lineSum;
+  return { subtotal, taxAmount, total: inclusive ? lineSum : lineSum + taxAmount };
 }
 
 function getEndUserDisplayName(repair: any) {
@@ -268,7 +269,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
                 <section className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">見積内容</h2>{repair.estimateDocument && readToken && <PdfLinkButton href={`/customer/repairs/${readToken}/estimate.pdf`} />}</div>
                   <div className="mt-3 divide-y divide-slate-100">{estimateItems.length === 0 ? <p className="py-3 text-sm text-slate-500">見積明細はまだありません。</p> : estimateItems.map((item: any) => <div key={item.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div className="min-w-0 font-medium">{item.type === "part" ? formatPartDisplay({ name: item.itemName, grade: item.partsMaster?.grade, note2: item.partsMaster?.notes2 }) : item.itemName}{item.quantity > 1 && <span className="ml-2 text-slate-500">数量 {item.quantity}</span>}</div><span className="shrink-0 font-mono font-bold">¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}</span></div>)}</div>
-                  <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm"><div className="flex justify-between text-slate-600"><span>税抜小計</span><span className="font-mono">¥{subtotal.toLocaleString()}</span></div><div className="flex justify-between text-slate-600"><span>消費税（10%）</span><span className="font-mono">¥{taxAmount.toLocaleString()}</span></div><div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2"><span className="font-bold">税込合計</span><span className="font-mono text-xl font-bold text-blue-700">¥{total.toLocaleString()}</span></div></div>
+                  <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm"><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "課税対象額（税込）" : "税抜小計"}</span><span className="font-mono">¥{(repair.estimate?.pricingTaxMode === "INCLUSIVE" ? total : subtotal).toLocaleString()}</span></div><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "内消費税（10%）" : "消費税（10%）"}</span><span className="font-mono">¥{taxAmount.toLocaleString()}</span></div><div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2"><span className="font-bold">税込合計</span><span className="font-mono text-xl font-bold text-blue-700">¥{total.toLocaleString()}</span></div></div>
                 </section>
 
                 {repair.prepayments.length > 0 && (
@@ -530,11 +531,11 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
 
                     <div className="mt-4 space-y-2 border-t border-slate-200 pt-3">
                       <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
-                        <div>税抜小計</div>
-                        <div className="font-mono font-medium">¥{subtotal.toLocaleString()}</div>
+                        <div>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "課税対象額（税込）" : "税抜小計"}</div>
+                        <div className="font-mono font-medium">¥{(repair.estimate?.pricingTaxMode === "INCLUSIVE" ? total : subtotal).toLocaleString()}</div>
                       </div>
                       <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
-                        <div>消費税（10%）</div>
+                        <div>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "内消費税（10%）" : "消費税（10%）"}</div>
                         <div className="font-mono font-medium">¥{taxAmount.toLocaleString()}</div>
                       </div>
                       <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2 pt-1">

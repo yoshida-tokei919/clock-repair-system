@@ -9,6 +9,7 @@ export interface EstimateServerDocumentProps {
     subtotalAmount?: number;
     taxAmount?: number;
     totalAmount?: number;
+    pricingTaxMode?: string;
     jobs: {
       id: string;
       inquiryNumber: string;
@@ -22,6 +23,7 @@ export interface EstimateServerDocumentProps {
       items: {
         name: string;
         price: number;
+        quantity?: number;
         type?: string;
         grade?: string;
         note2?: string;
@@ -49,7 +51,8 @@ export function createEstimateServerDocumentElement(
   };
   const withCustomerHonorific = (value: string, customerType?: string) =>
     customerType === "business" ? withOnchu(value) : withSama(value);
-  const isB2C = data.customer.type === "individual";
+  const isB2C = data.customer.type === "individual" && data.pricingTaxMode !== "INCLUSIVE";
+  const inclusive = !isB2C && data.pricingTaxMode === "INCLUSIVE";
   const columns = {
     no: "3%",
     inquiry: "9%",
@@ -175,7 +178,7 @@ export function createEstimateServerDocumentElement(
           el(Text, { wrap: false, style: { width: columns.endUser, fontSize: 7, textAlign: "right", paddingRight: 5 } }, "お客様名"),
           el(Text, { wrap: false, style: { width: columns.watch, fontSize: 7, textAlign: "right", paddingRight: 4, fontWeight: "bold" } }, "時計情報"),
           el(Text, { wrap: false, style: { width: columns.items, fontSize: 7, borderLeftWidth: 1, borderColor: "#ccc", paddingLeft: 4 } }, "作業明細・交換部品 / 単価"),
-          el(Text, { wrap: false, style: { width: columns.total, textAlign: "right", fontSize: 7, fontWeight: "bold" } }, "金額(税抜)")
+          el(Text, { wrap: false, style: { width: columns.total, textAlign: "right", fontSize: 7, fontWeight: "bold" } }, inclusive ? "金額(税込)" : "金額(税抜)")
         ),
         isB2C
           ? el(
@@ -198,7 +201,7 @@ export function createEstimateServerDocumentElement(
         data.jobs.map((job, index) => {
           const jobTotal = isB2C
             ? job.totalAmount ?? 0
-            : job.items.reduce((sum, item) => sum + item.price, 0);
+            : job.items.reduce((sum, item) => sum + item.price * (item.quantity ?? 1), 0);
           const watchInfo = formatWatchInformation(job.watch, 'estimate');
 
           return el(

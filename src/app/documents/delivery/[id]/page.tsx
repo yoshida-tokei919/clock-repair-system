@@ -5,6 +5,7 @@ import { formatPartDisplay } from "@/lib/formatPartDisplay";
 import { IssuedDateEditor } from "@/components/documents/IssuedDateEditor";
 import { displayIssuedDate, formatIssuedDate } from "@/lib/document-issued-date";
 import { DeliveryShippingEditor } from "@/components/documents/DeliveryShippingEditor";
+import { sumCustomerLines } from "@/lib/pricing-tax";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,11 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
     });
 
     if (!note) return notFound();
+    const currentLineSum = sumCustomerLines(note.repairs.flatMap(repair => repair.estimate?.items ?? []));
+    const issuedLineSum = note.totalAmount + (note.pricingTaxMode === "INCLUSIVE" ? note.taxAmount : 0);
+    if (currentLineSum !== issuedLineSum) {
+        return <div className="p-6 text-red-700">発行時の納品額と現在の明細が一致しません。保存済み帳票を確認してください。</div>;
+    }
     const [snapshotCount, linkedCount] = await Promise.all([
         prisma.invoiceRepairSnapshot.count({ where: { deliveryNoteId: id } }),
         prisma.repair.count({ where: { deliveryNoteId: id, invoiceId: { not: null } } }),
@@ -36,8 +42,6 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
 
     const jobs = note.repairs.map(repair => {
         const estimateItems = repair.estimate?.items || [];
-        const subtotal = estimateItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-        const tax = Math.floor(subtotal * 0.1);
 
         return {
             inquiryNumber: repair.inquiryNumber,
@@ -54,6 +58,7 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
             items: estimateItems.map(i => ({
                 name: i.itemName,
                 price: i.unitPrice,
+                quantity: i.quantity,
                 type: i.type,
                 grade: i.partsMaster?.grade ?? undefined,
                 note2: i.partsMaster?.notes2 ?? undefined,
@@ -73,6 +78,9 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
         },
         jobs: jobs,
         taxRate: 0.1,
+        pricingTaxMode: note.pricingTaxMode,
+        subtotalAmount: note.totalAmount,
+        taxAmount: note.taxAmount,
         shippingFee: note.shippingFee ?? 0
     };
 

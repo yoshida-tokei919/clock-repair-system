@@ -1,4 +1,4 @@
-import { hasConsistentInvoiceSnapshots } from "@/lib/invoice-repair-snapshots";
+import { hasConsistentInvoiceSnapshots, invoicePdfRepairAmount } from "@/lib/invoice-repair-snapshots";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import path from "path";
@@ -73,14 +73,14 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     const existing = deliveryGroups.get(groupKey);
     if (existing) {
       existing.repairCount += 1;
-      existing.amount += row.subtotalAmount;
+      existing.amount += invoicePdfRepairAmount(row, invoice.pricingTaxMode as "EXCLUSIVE" | "INCLUSIVE");
       if (groupDate < existing.date) existing.date = groupDate;
     } else {
       deliveryGroups.set(groupKey, {
         slipNumber: row.deliverySlipNumber || "未紐付け",
         date: groupDate,
         repairCount: 1,
-        amount: row.subtotalAmount,
+        amount: invoicePdfRepairAmount(row, invoice.pricingTaxMode as "EXCLUSIVE" | "INCLUSIVE"),
       });
     }
   }
@@ -123,6 +123,7 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     sourceCustomerName: parties.sourceCustomerName,
     items: invoiceItems,
     taxRate: 0.1,
+    pricingTaxMode: invoice.pricingTaxMode,
     subtotalAmount: invoice.totalAmount,
     taxAmount: invoice.taxAmount,
     shippingFeeAmount: invoice.shippingFeeAmount,

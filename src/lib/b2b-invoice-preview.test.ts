@@ -20,3 +20,14 @@ test("unconfirmed selected delivery shipping blocks a payable total; explicit ze
     { subtotal: 1000, deliveryNoteId: 9, shippingFee: 900 },
   ]));
 });
+
+test("inclusive preview keeps final line gross and reports included tax", () => {
+  assert.deepEqual(summarizeB2BInvoicePreview([
+    { subtotal: 15000, deliveryNoteId: 4, shippingFee: 800, pricingTaxMode: "INCLUSIVE" },
+    { subtotal: 44000, deliveryNoteId: 4, shippingFee: 800, pricingTaxMode: "INCLUSIVE" },
+  ]), { subtotal: 59000, tax: 5363, shippingFeeAmount: 800, total: 59800, unconfirmedNoteIds: [] });
+  assert.throws(() => summarizeB2BInvoicePreview([
+    { subtotal: 15000, deliveryNoteId: 4, shippingFee: 0, pricingTaxMode: "INCLUSIVE" },
+    { subtotal: 10000, deliveryNoteId: 4, shippingFee: 0, pricingTaxMode: "EXCLUSIVE" },
+  ]));
+});

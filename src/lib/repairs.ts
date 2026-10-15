@@ -2,6 +2,7 @@
 
 import { prisma } from "./prisma";
 import { formatPartDisplay } from "./formatPartDisplay";
+import { calculateTaxableAmounts, sumCustomerLines, type PricingTaxMode } from "./pricing-tax";
 
 export async function getRepairDataForPDF(id: number) {
     const repair = await prisma.repair.findUnique({
@@ -21,6 +22,8 @@ export async function getRepairDataForPDF(id: number) {
     });
 
     if (!repair) return null;
+    const pricingTaxMode: PricingTaxMode = repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE";
+    const amounts = calculateTaxableAmounts(sumCustomerLines(repair.estimate?.items ?? []), pricingTaxMode);
 
     return {
         id: repair.inquiryNumber,
@@ -30,6 +33,16 @@ export async function getRepairDataForPDF(id: number) {
         estimateNumber: repair.estimateDocument?.estimateNumber || "-",
         deliveryNumber: repair.deliveryNote?.slipNumber || "-",
         invoiceNumber: repair.invoice?.invoiceNumber || "-",
+        pricingTaxMode,
+        taxRate: 0.1,
+        subtotalAmount: amounts.totalAmount,
+        taxAmount: amounts.taxAmount,
+        grossTotalAmount: amounts.grossAmount + (repair.deliveryNote?.shippingFee ?? 0),
+        shippingFeeAmount: repair.deliveryNote?.shippingFee ?? 0,
+        shippingFee: repair.deliveryNote?.shippingFee ?? 0,
+        items: repair.deliveryNote ? [{ date: repair.deliveryNote.issuedDate.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
+            slipNumber: repair.deliveryNote.slipNumber, description: "1点",
+            amount: pricingTaxMode === "INCLUSIVE" ? amounts.grossAmount : amounts.totalAmount }] : [],
 
         customer: {
             name: repair.customer.name,
@@ -52,7 +65,8 @@ export async function getRepairDataForPDF(id: number) {
                 },
                 items: repair.estimate?.items.map(item => ({
                     name: item.itemName,
-                    qty: 1,
+                    qty: item.quantity,
+                    quantity: item.quantity,
                     price: item.unitPrice,
                     type: item.type as 'technical' | 'parts' | 'other',
                     grade: item.partsMaster?.grade || "",
@@ -69,7 +83,7 @@ export async function getRepairDataForPDF(id: number) {
                 date: repair.deliveryNote.issuedDate.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
                 slipNo: repair.deliveryNote.slipNumber,
                 count: 1,
-                amount: Math.floor((repair.estimate?.items.reduce((s, i) => s + i.unitPrice, 0) || 0) * 1.1)
+                amount: amounts.grossAmount
             }
         ] : []
     };
