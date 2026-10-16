@@ -64,9 +64,11 @@ function IntakeCombobox({ value, choices, onChange, onSelect, disabled, required
       aria-controls={listId} aria-activedescendant={open && activeIndex >= 0 && activeIndex < filtered.length ? `${listId}-${activeIndex}` : undefined}
       value={value} maxLength={200} required={required} disabled={disabled} placeholder={placeholder}
       onFocus={() => setListState((current) => ({ ...current, open: true }))}
+      onBlur={() => setListState({ open: false, activeIndex: -1 })}
       onChange={(event) => { onChange(event.target.value); setListState({ open: true, activeIndex: -1 }); }}
       onKeyDown={(event) => {
         if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+        if (event.key === "Tab") { setListState({ open: false, activeIndex: -1 }); return; }
         if (event.key !== "Escape" && event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Enter") return;
         const decision = intakeComboboxKeyDecision(listState, event.key, filtered.length);
         if (event.key !== "Enter") {
@@ -77,7 +79,7 @@ function IntakeCombobox({ value, choices, onChange, onSelect, disabled, required
       }} />
     {open && <div id={listId} role="listbox" className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-md border bg-white shadow-lg">
       {filtered.length ? filtered.map((choice, index) =>
-        <button id={`${listId}-${index}`} key={`${choice.id ?? choice.value}-${index}`} type="button" role="option" aria-selected={activeIndex === index}
+        <button id={`${listId}-${index}`} key={`${choice.id ?? choice.value}-${index}`} type="button" role="option" tabIndex={-1} aria-selected={activeIndex === index}
           className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${activeIndex === index ? "bg-blue-50" : ""}`}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => selectChoice(choice)}>
