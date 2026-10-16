@@ -222,3 +222,14 @@ Hardware follow-up（通しテストblockerではない）:
 - K-002の手入力した内装交換部品行で保存時に区分矛盾エラーが発生。新規行が `category=part_external` / `partType=interior` となることをコード上で確認した。PartsMasterに一致しない手入力経路で表面化する。
 - Task211Dで新規行の分類を修正。サーバー側の矛盾拒否は維持。ローカル対象test 29件、型チェック、`git diff --check` はPASS。カタリ独立差分レビュー完了、blocking findingなし。ユーザー承認後にproduction反映済み（`5e67a35`、deployment `74ac3185-d76d-44a4-a3ab-d8d700920fdb` SUCCESS、production smoke PASS）。認証済み画面での保存再試行は未確認。
 - 再開位置: **Task211D本番反映済み。K-002の明細保存から再試行 → 見積・承認工程**。後続工程は未確認。
+
+### 2026-10-17 — QL-800 b-PAC接続障害と実ラベル4枚出力
+
+- 新規B2B受付 `S-001`〜`S-004`（PhysicalTag `PT-000011`〜`PT-000014`）で、一括印刷開始時に最初の1枚が「印刷結果不明」となり、実際の紙出力は0枚だった。NFC UIDはこの時点では未登録。
+- 切り分けの結果、Brother b-PAC Extension自体、QL-800（USB003 / Normal）、b-PAC3 Client、`bpacHost.exe` は正常。専用Edgeから `chrome.runtime.connectNative("com.brother.bpac")` を実行すると `Failed to start native messaging host.` となった。
+- Edge診断ログで `COMSPEC is not set` → `Error launching process ...\bpacHost.exe` を確認。Desktop Commander等から起動した専用Edgeが `COMSPEC` を持たない環境を継承したことが原因。
+- ローカル運用対策として、ユーザー環境変数 `COMSPEC=C:\WINDOWS\system32\cmd.exe` を設定。さらに `C:\Users\yoshi\AppData\Local\clock-repair-system\launchers\open-repair-app-edge.ps1` を作成し、専用Edge起動前にMachine `ComSpec` を明示的にprocessへ設定してから、専用profile `clock-repair-api-session` / CDP `127.0.0.1:9223` で再起動する経路を用意した。
+- 対策後のread-only確認で b-PAC `IDocument::GetMediaName` が `connect=true / ret=true / 62mm` を返すことを確認。
+- 失われた一括受付画面stateは再利用せず、productionの各Repair詳細から既存PhysicalTagを再利用して1枚ずつ順次印刷。`S-001/PT-000011`、`S-002/PT-000012`、`S-003/PT-000013`、`S-004/PT-000014` の4件すべてでアプリ側の `Brother QL-800へ1枚印刷しました` 成功確認まで完了した。新規PhysicalTag発行・NFC登録・DB変更は行っていない。
+- これによりQL-800実機で4枚連続して出力できることは確認できた。一方、再起動で一括受付のReact stateが失われたため、`B2bBatchTagPrinting` の同一画面4枚連続操作そのものの再実行確認とは区別する。
+- repoアプリコード / schema / migration / env / production DB変更なし。今回の恒久対策はWindowsローカル運用設定とlauncherのみ。
