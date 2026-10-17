@@ -96,6 +96,8 @@ test("shared repair selectors preserve category mapping and internal fallback", 
   assert.equal(isRepairWorkActionApplicable("EXTERNAL", "oil"), false);
   assert.equal(isRepairWorkActionApplicable("INTERNAL", "movement_repair"), true);
   assert.equal(isRepairWorkActionApplicable("EXTERNAL", "movement_repair"), false);
+  assert.equal(isRepairWorkActionApplicable("INTERNAL", "rust_removal"), true);
+  assert.equal(isRepairWorkActionApplicable("EXTERNAL", "rust_removal"), true);
   assert.equal(isRepairWorkActionApplicable("EXTERNAL", "painting"), true);
   assert.equal(isRepairWorkTargetPartApplicable("INTERNAL", "quartz",
     { key: "battery", partType: null, categoryKey: null }), true);

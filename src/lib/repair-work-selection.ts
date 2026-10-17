@@ -2,7 +2,7 @@ import { getTargetPartKeysForRepairWorkCategory } from "@/lib/repair-work-target
 
 export const INTERNAL_REPAIR_WORK_ACTION_KEYS = new Set([
   "exchange", "repair", "movement_repair", "adjust", "correction", "polish", "clean", "oil", "make",
-  "install", "remove", "hole_tightening", "staking", "overhaul", "inspection",
+  "install", "remove", "hole_tightening", "staking", "overhaul", "inspection", "rust_removal",
 ]);
 export const EXTERNAL_REPAIR_WORK_ACTION_KEYS = new Set([
   "exchange", "install", "repair", "correction", "adjust", "processing", "make",
