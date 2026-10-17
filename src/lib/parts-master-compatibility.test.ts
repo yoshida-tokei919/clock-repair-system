@@ -8,6 +8,7 @@ import {
     matchesStandardPartNameIdentity,
     mergeWatchRefs,
     preserveStandardPartNameId,
+    resolvePatchCaseRef,
     resolvePatchProductRef,
     watchRefsAllowIdentity,
 } from "./parts-master-compatibility";
@@ -46,6 +47,21 @@ test("PATCH product Ref distinguishes clearing from omission for exterior part l
     const replaced = resolvePatchProductRef({ ref: "16610" }, savedRef);
     assert.deepEqual(replaced, { name: "16610", supplied: true });
     assert.equal(mergeWatchRefs(replaced.name, "196.123"), "16610, 196.123");
+});
+
+test("PATCH Case Ref preserves omission, clears blanks, and accepts either Ref for strict fit", () => {
+    const savedCaseRef = "196.1536";
+    assert.deepEqual(resolvePatchCaseRef({}, savedCaseRef), { name: savedCaseRef, supplied: false });
+    assert.deepEqual(resolvePatchCaseRef(undefined, savedCaseRef), { name: savedCaseRef, supplied: false });
+    assert.deepEqual(resolvePatchCaseRef({ caseRef: "  " }, savedCaseRef), { name: null, supplied: true });
+    assert.deepEqual(resolvePatchCaseRef({ caseRef: null }, savedCaseRef), { name: null, supplied: true });
+    assert.deepEqual(resolvePatchCaseRef({ caseRef: "196.1537" }, savedCaseRef), { name: "196.1537", supplied: true });
+
+    const selected = { brandId: 1, modelId: 10, standardPartNameId: "crown", standardPartName: "リューズ" };
+    const casePart = { ...part, watchRefs: savedCaseRef };
+    assert.equal(matchesExteriorPartCandidate(casePart, { ...selected, currentRefs: mergeWatchRefs("2516.50", savedCaseRef) }), true);
+    assert.equal(matchesExteriorPartCandidate(casePart, { ...selected, currentRefs: mergeWatchRefs("2516.50", null) }), false);
+    assert.equal(matchesExteriorPartCandidate({ ...casePart, watchRefs: "2516.50" }, { ...selected, currentRefs: mergeWatchRefs("2516.50", savedCaseRef) }), true);
 });
 
 test("watch refs compare normalized whole tokens across supported separators", () => {

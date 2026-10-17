@@ -3,7 +3,7 @@ import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { addConfirmedRepairStatusLog, canAllocateRepairParts, reconcileRepairPartAllocations, syncExistingPendingRepairOrders } from "@/lib/repair-part-allocation";
-import { findOrCreateBrand, findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
+import { findOrCreateBrand, findOrCreateCaliber, findOrCreateWatchReference, resolveBrand } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
 import { mergeWatchRefs } from "@/lib/parts-master-compatibility";
 import { parseTimepieceType, timepieceTypeUpdateForCreateReuse, TimepieceTypeError } from "@/lib/timepiece-type";
@@ -244,28 +244,33 @@ export async function POST(req: Request) {
 
             // Handle WatchReference
             let referenceId: number | null = null;
-            const refNameInput = body.watch.ref;
+            const refNameInput = body.watch.ref?.trim() || null;
             if (refNameInput) {
-                const wr = await tx.watchReference.findFirst({
-                    where: { modelId: modelId, name: refNameInput }
-                });
-                if (wr) {
-                    referenceId = wr.id;
-                    // If caliberId was not set, use the one from reference if available
-                    if (!caliberId && wr.caliberId) {
-                        caliberId = wr.caliberId;
-                    }
-                } else {
-                    // Create new reference and link to current caliber
-                    const newWr = await tx.watchReference.create({
-                        data: {
-                            modelId: modelId,
-                            name: refNameInput,
-                            caliberId: caliberId
-                        }
+                const wr = await findOrCreateWatchReference(tx, modelId, refNameInput, caliberId);
+                referenceId = wr.id;
+                // Preserve caliber inference from an existing Model Ref.
+                if (!caliberId) {
+                    const savedRef = await tx.watchReference.findUnique({
+                        where: { id: wr.id }, select: { caliberId: true }
                     });
-                    referenceId = newWr.id;
+                    if (savedRef?.caliberId) caliberId = savedRef.caliberId;
                 }
+            }
+
+            // Older clients may omit Case Ref while reusing a Watch by serial.
+            // Preserve that value unless the client explicitly clears it.
+            const caseRefSupplied = Object.prototype.hasOwnProperty.call(body.watch, "caseRef");
+            let caseRefNameInput = body.watch.caseRef?.trim() || null;
+            let caseReferenceId: number | null = null;
+            if (!caseRefSupplied && watch?.caseReferenceId) {
+                const savedCaseRef = await tx.watchReference.findUnique({
+                    where: { id: watch.caseReferenceId }, select: { id: true, modelId: true, name: true }
+                });
+                caseRefNameInput = savedCaseRef?.name ?? null;
+                if (savedCaseRef?.modelId === modelId) caseReferenceId = savedCaseRef.id;
+            }
+            if (caseRefNameInput && !caseReferenceId) {
+                caseReferenceId = (await findOrCreateWatchReference(tx, modelId, caseRefNameInput, null)).id;
             }
 
             if (!watch) {
@@ -275,6 +280,7 @@ export async function POST(req: Request) {
                         brandId: brand.id,
                         modelId: modelId,
                         referenceId: referenceId,
+                        caseReferenceId,
                         caliberId: caliberId,
                         serialNumber: serialInput, // Can be null
                         ...parseTimepieceType(body.watch.timepieceType),
@@ -290,6 +296,7 @@ export async function POST(req: Request) {
                         brandId: brand.id,
                         modelId: modelId,
                         referenceId: referenceId,
+                        caseReferenceId,
                         caliberId: caliberId,
                         serialNumber: serialInput,
                         ...timepieceTypeUpdateForCreateReuse(body.watch.timepieceType),
@@ -425,10 +432,7 @@ export async function POST(req: Request) {
             // 6. Create Estimate (if items exist)
             let estimateItems = body.estimate?.items || [];
             if (estimateItems.length > 0) {
-                const caseRefName = watch?.caseReferenceId
-                    ? (await tx.watchReference.findUnique({ where: { id: watch.caseReferenceId }, select: { name: true } }))?.name
-                    : null;
-                const currentWatchRefs = mergeWatchRefs(refNameInput, caseRefName);
+                const currentWatchRefs = mergeWatchRefs(refNameInput, caseRefNameInput);
                 estimateItems = await Promise.all(estimateItems.map(async (item: any) => {
                     if (item.type !== 'part') return item;
                     const isInteriorPart = getRepairPartType(item) === "interior";

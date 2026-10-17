@@ -43,3 +43,16 @@ test("reference registration is normalized within its selected Model", async () 
   assert.equal(created.name, "3570.50");
   assert.equal(fake.references.length, 2);
 });
+
+test("Case Ref reuses normalized values per model without setting a caliber", async () => {
+  const fake = fakeDb();
+  const existing = await findOrCreateWatchReference(fake.db, 1, "  145.022  ", null);
+  assert.equal(existing.id, 2);
+  assert.equal(fake.references.length, 1);
+
+  const created = await findOrCreateWatchReference(fake.db, 2, " 145.022 ", null);
+  assert.equal(created.modelId, 2);
+  assert.equal(created.name, "145.022");
+  assert.equal("caliberId" in created, false);
+  assert.equal(fake.references.length, 2);
+});

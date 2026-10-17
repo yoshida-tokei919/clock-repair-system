@@ -611,7 +611,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [brand, setBrand] = useState(initialData?.watch?.brand?.name || "");
     const [model, setModel] = useState(initialData?.watch?.model?.name || "");
     const [refName, setRefName] = useState(initialData?.watch?.reference?.name || "");
-    const caseRefName = initialData?.watch?.caseReference?.name || "";
+    const [caseRefName, setCaseRefName] = useState(initialData?.watch?.caseReference?.name || "");
     const [caliber, setCaliber] = useState(initialData?.watch?.caliber?.name || "");
     const [movementMaker, setMovementMaker] = useState(initialData?.movementMaker?.name || "");
     const [movementCaliber, setMovementCaliber] = useState(initialData?.movementCaliber?.name || "");
@@ -1395,6 +1395,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         if (model && (!nextBrandId || !modelOpts.some((option) => option.brandId === nextBrandId && isValueInOptions(model, [option])))) {
             setModel("");
             setRefName("");
+            setCaseRefName("");
             setCaliber("");
         }
     }, [brandOpts, getOptionIdByValue, isValueInOptions, model, modelOpts]);
@@ -1533,7 +1534,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         customer: { name: customerName, type: customerTypeSelection, address, phone: customerPhone },
         endUserName,
         partnerRef,
-        watch: { timepieceType, brand, model, ref: refName, serial, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber },
+        watch: { timepieceType, brand, model, ref: refName, caseRef: caseRefName, serial, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber },
         estimate: {
             items: lineItems.map(i => ({
                 name: i.name,
@@ -1688,16 +1689,21 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
 
     // 2. Model -> Refs & Calibers
     useEffect(() => {
+        let cancelled = false;
+        setRefOpts([]);
         if (!model) return;
         const m = modelOpts.find(o => o.value === model);
         if (m) {
-            getRefsByModel(m.id).then(d => setRefOpts(d.map((r: any) => ({ label: r.name, value: r.name, sub: r.caliber?.name, caliber: r.caliber?.name }))));
+            getRefsByModel(m.id).then(d => {
+                if (!cancelled) setRefOpts(d.map((r: any) => ({ label: r.name, value: r.name, sub: r.caliber?.name, caliber: r.caliber?.name })));
+            });
             // Also fetch calibers linked to model
             if (brand) {
                 const b = brandOpts.find(o => o.value === brand);
                 if (b) getCalibersForModel(b.id, m.id).then(d => setCalOpts(d.map((c: any) => ({ label: c.name, value: c.name, id: c.id }))));
             }
         }
+        return () => { cancelled = true; };
     }, [model, modelOpts, brand, brandOpts]);
 
     // 3. Ref -> Caliber Auto-fill
@@ -2005,7 +2011,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     // --- ACTIONS ---
     const approvalDraftSnapshot = JSON.stringify({
         status, statusLog, customerTypeSelection, customerName, customerPrefix, customerPhone, lineId, address,
-        timepieceType, brand, model, refName, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, serial,
+        timepieceType, brand, model, refName, caseRefName, caliber, movementMaker, movementCaliber, baseMovementMaker, baseMovementCaliber, serial,
         lineItems, orderList, diagnosis, internalNotes, customerNote, partnerRef, endUserName, accessories,
     });
     if (approvalDraftBaselineRef.current === null) approvalDraftBaselineRef.current = approvalDraftSnapshot;
@@ -2086,6 +2092,7 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
                     brand,
                     model,
                     ref: refName,
+                    caseRef: caseRefName,
                     serial,
                     caliber,
                     movementMaker,
@@ -3061,14 +3068,28 @@ ${shopName}
                                         <AdvancedCombobox value={brand} onChange={handleWatchBrandChange} options={brandOpts} placeholder="ブランド名..." requireSelection />
                                     </FormRow>
                                     <FormRow label="モデル">
-                                        <AdvancedCombobox value={model} onChange={setModel} options={modelOpts} placeholder="モデル名..." />
+                                        <AdvancedCombobox value={model} onChange={(value) => {
+                                            if (value !== model) {
+                                                setRefName("");
+                                                setCaseRefName("");
+                                                setRefOpts([]);
+                                            }
+                                            setModel(value);
+                                        }} options={modelOpts} placeholder="モデル名..." />
                                     </FormRow>
-                                    <FormRow label="Ref">
+                                    <FormRow label="モデルRef">
                                         <AdvancedCombobox value={refName} onChange={(value) => {
                                             setRefName(value);
                                             setSelectedWorkOption(null);
                                             setWorkOpts([]);
-                                        }} options={refOpts} placeholder="Ref.No..." />
+                                        }} options={refOpts} placeholder="モデルRef..." />
+                                    </FormRow>
+                                    <FormRow label="ケースRef">
+                                        <AdvancedCombobox value={caseRefName} onChange={(value) => {
+                                            setCaseRefName(value);
+                                            setSelectedWorkOption(null);
+                                            setWorkOpts([]);
+                                        }} options={refOpts} placeholder="ケースRef..." />
                                     </FormRow>
                                     <div className="grid gap-2 rounded-md border border-zinc-200 bg-zinc-50/70 p-2 md:grid-cols-2">
                                         <div className="space-y-2">

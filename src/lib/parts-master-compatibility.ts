@@ -1,14 +1,29 @@
 import { normalizeMasterName } from "@/lib/master-normalize";
 
+function resolvePatchWatchRef(
+    watch: Record<string, string | null | undefined> | null | undefined,
+    field: "ref" | "caseRef",
+    savedRef?: string | null
+): { name: string | null; supplied: boolean } {
+    const supplied = watch != null && Object.prototype.hasOwnProperty.call(watch, field);
+    return {
+        name: supplied ? watch[field]?.trim() || null : savedRef ?? null,
+        supplied,
+    };
+}
+
 export function resolvePatchProductRef(
     watch: { ref?: string | null } | null | undefined,
     savedRef?: string | null
 ): { name: string | null; supplied: boolean } {
-    const supplied = watch != null && Object.prototype.hasOwnProperty.call(watch, "ref");
-    return {
-        name: supplied ? (watch.ref?.trim() ? watch.ref : null) : savedRef ?? null,
-        supplied,
-    };
+    return resolvePatchWatchRef(watch, "ref", savedRef);
+}
+
+export function resolvePatchCaseRef(
+    watch: { caseRef?: string | null } | null | undefined,
+    savedRef?: string | null
+): { name: string | null; supplied: boolean } {
+    return resolvePatchWatchRef(watch, "caseRef", savedRef);
 }
 
 export function splitWatchRefs(value?: string | null): string[] {

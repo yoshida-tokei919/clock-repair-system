@@ -2,10 +2,10 @@ import { getAdminApiIdentity } from "@/lib/admin-api-auth";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { findOrCreateCaliber, resolveBrand } from "@/lib/master-normalize";
+import { findOrCreateCaliber, findOrCreateWatchReference, resolveBrand } from "@/lib/master-normalize";
 import { resolveRepairMovementMaker } from "@/lib/repair-movement-maker";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
-import { mergeWatchRefs, resolvePatchProductRef } from "@/lib/parts-master-compatibility";
+import { mergeWatchRefs, resolvePatchCaseRef, resolvePatchProductRef } from "@/lib/parts-master-compatibility";
 import { parseTimepieceType, TimepieceTypeError } from "@/lib/timepiece-type";
 import { getRepairPartType, isExistingRepairPartLink, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
@@ -74,6 +74,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             let caliberId = repairRecord.watch.caliberId;
             let referenceId = repairRecord.watch.referenceId;
             const productRef = resolvePatchProductRef(body.watch, repairRecord.watch.reference?.name);
+            let caseReferenceId = repairRecord.watch.caseReferenceId;
+            const caseRef = resolvePatchCaseRef(body.watch, repairRecord.watch.caseReference?.name);
             let movementMakerId = repairRecord.movementMakerId;
             let movementCaliberId = repairRecord.movementCaliberId;
             let baseMovementMakerId = repairRecord.baseMovementMakerId;
@@ -132,24 +134,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                     ? (await findOrCreateCaliber(tx as any, baseMovementCaliberInput, baseMovementMakerId)).id
                     : null;
 
-                // Reference Handling
-                if (productRef.supplied && !productRef.name) {
+                // Rebind retained refs as well when the model changes. A WatchReference
+                // must belong to the Watch's current model.
+                const modelChanged = modelId !== repairRecord.watch.modelId;
+                if (productRef.supplied || modelChanged) {
+                    if (productRef.name && !modelId) throw new Error("Model Ref にはモデルが必要です。");
                     referenceId = null;
-                } else if (productRef.supplied && productRef.name && modelId) {
-                    const wr = await tx.watchReference.findFirst({
-                        where: { modelId: modelId, name: productRef.name }
-                    });
-                    if (wr) {
-                        referenceId = wr.id;
-                    } else {
-                        const newWr = await tx.watchReference.create({
-                            data: {
-                                modelId: modelId,
-                                name: productRef.name,
-                                caliberId: caliberId
-                            }
-                        });
-                        referenceId = newWr.id;
+                    if (productRef.name && modelId) {
+                        referenceId = (await findOrCreateWatchReference(tx, modelId, productRef.name, caliberId)).id;
+                    }
+                }
+                if (caseRef.supplied || modelChanged) {
+                    if (caseRef.name && !modelId) throw new Error("Case Ref にはモデルが必要です。");
+                    caseReferenceId = null;
+                    if (caseRef.name && modelId) {
+                        caseReferenceId = (await findOrCreateWatchReference(tx, modelId, caseRef.name, null)).id;
                     }
                 }
 
@@ -160,6 +159,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                         brandId: brandId,
                         modelId: modelId,
                         referenceId: referenceId,
+                        caseReferenceId,
                         caliberId: caliberId,
                         serialNumber: body.watch.serial || null,
                         ...(body.watch.timepieceType !== undefined ? parseTimepieceType(body.watch.timepieceType) : {}),
@@ -289,7 +289,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                     if (body.estimate.items.length > 0) {
                         const currentWatchRefs = mergeWatchRefs(
                             productRef.name,
-                            repairRecord.watch.caseReference?.name
+                            caseRef.name
                         );
                         const syncedEstimateItems = await Promise.all(body.estimate.items.map(async (item: any) => {
                             if (item.type !== 'part') return item;
