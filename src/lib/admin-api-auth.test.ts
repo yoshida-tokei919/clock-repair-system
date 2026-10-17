@@ -56,6 +56,7 @@ const protectedRoutes: Record<string, string[]> = {
   "repairs/[id]/messages/read": ["POST"],
   "repairs/[id]/photo-posting-opt-out": ["POST"],
   "repairs/[id]/photos": ["GET", "POST", "PATCH", "DELETE"],
+  "repairs/[id]/mobile-photo-token": ["POST"],
   "repairs/[id]/public-case": ["POST"],
   "public-cases/[id]": ["PATCH"],
   "settings/procurement/feedback": ["GET"],

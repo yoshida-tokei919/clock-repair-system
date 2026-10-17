@@ -3,16 +3,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { photoSharingFallbacks, repairPhotoCategory, repairPhotoStage } from "@/lib/repair-photo-sharing";
 import { deleteRepairPhotoObject, uploadRepairPhotoObject } from "@/lib/r2-repair-photos";
+import { verifiedMobileRepairPhotoId } from "@/lib/mobile-repair-photo-token";
 
 const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export async function POST(request: NextRequest) {
+  const mobileToken = request.headers.get("x-mobile-photo-token");
   const unauthorized = await requireAdminApi();
-  if (unauthorized) return unauthorized;
+  const mobileRepairId = unauthorized && mobileToken ? verifiedMobileRepairPhotoId(mobileToken) : null;
+  if (unauthorized && mobileRepairId === null) return unauthorized;
   try {
     const data = await request.formData();
     const file = data.get("file");
     const repairId = Number(data.get("repairId"));
+    if (unauthorized && repairId !== mobileRepairId) return unauthorized;
     const category = repairPhotoCategory(data.get("category"));
     const stage = repairPhotoStage(data.get("stage"));
     if (!(file instanceof File)) return NextResponse.json({ success: false, error: "No file uploaded" }, { status: 400 });

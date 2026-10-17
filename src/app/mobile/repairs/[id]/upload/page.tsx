@@ -23,6 +23,9 @@ export default function MobileUploadPage({ params }: { params: Promise<{ id: str
 
         try {
             for (const file of files) {
+                const token = new URLSearchParams(window.location.hash.slice(1)).get("token");
+                if (!token) throw new Error("撮影リンクが無効です。PCでQRコードを再表示してください。");
+
                 // 1. Compress
                 const options = {
                     maxSizeMB: 1,
@@ -44,18 +47,20 @@ export default function MobileUploadPage({ params }: { params: Promise<{ id: str
                 const res = await fetch("/api/upload", {
                     method: "POST",
                     body: formData,
+                    headers: { "x-mobile-photo-token": token },
                 });
 
-                if (res.ok) {
+                const result = await res.json();
+                if (res.ok && result.success) {
                     setUploadedCount(prev => prev + 1);
                     toast({ title: "アップロード完了", description: "PCの画面に反映されます", className: "bg-green-500 text-white" });
                 } else {
-                    throw new Error("Upload failed");
+                    throw new Error(res.status === 401 ? "撮影リンクの有効期限が切れました。PCでQRコードを再表示してください。" : result.error || "アップロードに失敗しました");
                 }
             }
         } catch (error) {
             console.error(error);
-            toast({ title: "エラー", description: "アップロードに失敗しました", variant: "destructive" });
+            toast({ title: "エラー", description: error instanceof Error ? error.message : "アップロードに失敗しました", variant: "destructive" });
         } finally {
             setIsUploading(false);
             // Reset input
@@ -106,8 +111,8 @@ export default function MobileUploadPage({ params }: { params: Promise<{ id: str
                             size="lg"
                             className="h-32 flex flex-col gap-3 bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800 text-zinc-300 rounded-2xl active:scale-95 transition-all"
                             onClick={() => {
-                                // Remove capture attribute to allow gallery selection if needed, 
-                                // but for now simple click is fine. 
+                                // Remove capture attribute to allow gallery selection if needed,
+                                // but for now simple click is fine.
                                 // To specifically open gallery we might need another input without 'capture'
                                 // but standard behavior usually offers choice.
                                 fileInputRef.current?.click();

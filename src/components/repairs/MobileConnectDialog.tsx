@@ -3,9 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Smartphone, Check, Loader2, X } from "lucide-react";
+import { Smartphone, Loader2 } from "lucide-react";
 import QRCode from "qrcode";
-import { cn } from "@/lib/utils";
 
 interface MobileConnectDialogProps {
     isOpen: boolean;
@@ -17,6 +16,7 @@ interface MobileConnectDialogProps {
 export function MobileConnectDialog({ isOpen, onClose, repairId, onPhotosUploaded }: MobileConnectDialogProps) {
     const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
     const [isListening, setIsListening] = useState(false);
+    const [qrError, setQrError] = useState(false);
 
     // Generate QR Code
     useEffect(() => {
@@ -26,15 +26,23 @@ export function MobileConnectDialog({ isOpen, onClose, repairId, onPhotosUploade
             // Assuming the user can access via the network IP or a tunnel.
             // For this implementation, we use window.location.origin
             const baseUrl = window.location.origin;
-            const targetUrl = `${baseUrl}/mobile/repairs/${repairId}/upload`;
-
-            QRCode.toDataURL(targetUrl, { width: 400, margin: 2, color: { dark: "#000000", light: "#ffffff" } })
-                .then(url => setQrCodeUrl(url))
-                .catch(err => console.error(err));
-
-            setIsListening(true);
+            let cancelled = false;
+            setQrCodeUrl("");
+            setQrError(false);
+            setIsListening(false);
+            fetch(`/api/repairs/${repairId}/mobile-photo-token`, { method: "POST", cache: "no-store" })
+                .then(async (response) => {
+                    if (!response.ok) throw new Error("Could not create mobile upload link");
+                    const { token } = await response.json();
+                    const targetUrl = `${baseUrl}/mobile/repairs/${repairId}/upload#token=${encodeURIComponent(token)}`;
+                    return QRCode.toDataURL(targetUrl, { width: 400, margin: 2, color: { dark: "#000000", light: "#ffffff" } });
+                })
+                .then(url => { if (!cancelled) { setQrCodeUrl(url); setIsListening(true); } })
+                .catch(err => { if (!cancelled) { console.error(err); setQrError(true); } });
+            return () => { cancelled = true; setIsListening(false); };
         } else {
             setIsListening(false);
+            setQrCodeUrl("");
         }
     }, [isOpen, repairId]);
 
@@ -71,6 +79,8 @@ export function MobileConnectDialog({ isOpen, onClose, repairId, onPhotosUploade
                             <div className="p-4 bg-white rounded-xl border-2 border-dashed border-blue-200 shadow-sm">
                                 <img src={qrCodeUrl} alt="QR Code" className="w-64 h-64" />
                             </div>
+                        ) : qrError ? (
+                            <div className="w-64 h-64 bg-zinc-100 rounded-xl flex items-center justify-center text-sm text-red-600 text-center p-4">QRコードを作成できませんでした。閉じて再度お試しください。</div>
                         ) : (
                             <div className="w-64 h-64 bg-zinc-100 rounded-xl flex items-center justify-center">
                                 <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
@@ -78,10 +88,10 @@ export function MobileConnectDialog({ isOpen, onClose, repairId, onPhotosUploade
                         )}
 
                         {/* Status Badge */}
-                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-2 animate-pulse">
+                        {qrCodeUrl && <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-2 animate-pulse">
                             <Loader2 className="w-3 h-3 animate-spin" />
                             接続待機中...
-                        </div>
+                        </div>}
                     </div>
 
                     <div className="text-center space-y-1">
