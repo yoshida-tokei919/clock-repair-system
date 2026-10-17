@@ -22,7 +22,7 @@ import {
 } from "@/lib/repair-photo-sharing";
 import { enforceRepairPhotoPostingOptOut } from "@/lib/repair-photo-posting-opt-out";
 import { getRepairStatusTransition } from "@/lib/repair-status-transition";
-import { assertRepairStatus, correctManualStatusDate, ManualStatusValidationError, parseManualDate, persistManualRepairStatus } from "@/lib/repair-manual-status";
+import { assertGenericRepairPatchAllowed, assertManualRepairStatusTransition, assertRepairStatus, correctManualStatusDate, ManualStatusValidationError, parseManualDate, persistManualRepairStatus } from "@/lib/repair-manual-status";
 
 function normalizeCustomerType(value?: string | null): "business" | "individual" | null {
     if (value === "business") return "business";
@@ -56,6 +56,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             if (!repairRecord) {
                 throw new Error("修琁E��録が見つかりません");
             }
+            assertGenericRepairPatchAllowed(repairRecord.status);
             const [sourceCustomer, savedEstimate] = await Promise.all([
                 tx.customer.findUniqueOrThrow({ where: { id: repairRecord.customerId }, select: { type: true, pricingTaxMode: true } }),
                 tx.estimate.findUnique({ where: { repairId: id }, select: { pricingTaxMode: true } }),
@@ -206,6 +207,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 ? "見積中"
                 : requestedStatus;
             assertRepairStatus(dbStatus);
+            assertManualRepairStatusTransition(repairRecord.status, dbStatus);
             if (body.statusDateUpdates !== undefined && (typeof body.statusDateUpdates !== "object" || body.statusDateUpdates === null || Array.isArray(body.statusDateUpdates))) {
                 throw new ManualStatusValidationError("ステータス日付が不正です。");
             }

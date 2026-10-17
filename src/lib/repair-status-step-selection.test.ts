@@ -18,3 +18,11 @@ test("date selection changes status only for an allowed new date", () => {
     assert.equal(shouldSelectStatusStepOnDateChange("送付待ち", "作業完了", "", "2026-10-15"), false);
     assert.equal(shouldSelectStatusStepOnDateChange("送付待ち", "受付", "", "2026-10-15"), true);
 });
+
+
+test("dedicated return status only permits delivery completion", () => {
+    assert.equal(canSelectRepairStatusStep("修理不可返却", "納品済み"), true);
+    assert.equal(canSelectRepairStatusStep("キャンセル返却", "納品済み"), true);
+    assert.equal(canSelectRepairStatusStep("修理不可返却", "作業待ち"), false);
+    assert.equal(canSelectRepairStatusStep("キャンセル返却", "作業待ち"), false);
+});

@@ -68,7 +68,7 @@ export function resolveStorageZoneRecommendation(input: Input): StorageZoneRecom
     }
   } else if (status === "納品済み") {
     result = recommendation("NONE", null, [], "DELIVERED", "納品済みのため現役の保管場所割当は不要です。");
-  } else if (status === "キャンセル") {
+  } else if (status === "キャンセル" || status === "修理不可返却" || status === "キャンセル返却") {
     result = recommendation("OPTIONAL", "発送・引渡し待ち", ["発送・引渡し待ち", "要確認"], "CANCELLED", "返却前の保管はあり得ます。返却完了はこの状態だけでは判断できません。");
   } else if (status === "保留") {
     result = recommendation("REQUIRED", "要確認", ["要確認"], "ON_HOLD", "保留中の保管場所を確認してください。");
@@ -85,7 +85,7 @@ export function resolveStorageZoneRecommendation(input: Input): StorageZoneRecom
       approvalStatus !== "approved") {
     result.attention.push("個人顧客の作業段階ですが、承認済みではありません。整合確認が必要です。");
   }
-  if (approvalStatus === "rejected" && !["保留", "キャンセル", "納品済み"].includes(status)) {
+  if (approvalStatus === "rejected" && !["保留", "修理不可返却", "キャンセル返却", "キャンセル", "納品済み"].includes(status)) {
     result.attention.push("承認却下と案件状態の整合確認が必要です。");
   }
   return result;

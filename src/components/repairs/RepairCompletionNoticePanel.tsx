@@ -10,7 +10,7 @@ import {
 } from "@/lib/repair-completion-notice-message";
 
 type Notice = { id: number; status: CompletionNoticeStatus; approvedAt: string; confirmedAt: string | null };
-type Payload = Omit<CompletionNoticeState, "notice"> & { ok: true; notice: Notice | null };
+type Payload = Omit<CompletionNoticeState, "notice"> & { ok: true; repairStatus: string; notice: Notice | null };
 const displayTime = (value: string) => new Intl.DateTimeFormat("ja-JP", {
   year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
   timeZone: "Asia/Tokyo",
@@ -37,6 +37,8 @@ export function RepairCompletionNoticePanel({ repairId }: { repairId: number }) 
       const data = await response.json();
       if (!response.ok || data.ok !== true) throw new Error(data.error || "作業完了連絡の状態を読み込めませんでした。");
       setState(data as Payload);
+      if (data.repairStatus === "修理不可返却") setDraft(current => current === defaultRepairCompletionNoticeText() ? "修理が難しいため、お預かり品の返却準備を進めます。" : current);
+      if (data.repairStatus === "キャンセル返却") setDraft(current => current === defaultRepairCompletionNoticeText() ? "キャンセルに伴い、お預かり品の返却準備を進めます。" : current);
       if (reconcileHold && !data.notice && data.eligible && data.hasVerifiedLineDestination) setHold(false);
       setError(null);
     } catch (cause) {
@@ -104,9 +106,9 @@ export function RepairCompletionNoticePanel({ repairId }: { repairId: number }) 
 
   const canPrepare = !loading && !hold && !preparing && canPrepareRepairCompletionNotice(state, draft);
 
-  return <section className="space-y-3 rounded border p-4" aria-label="作業完了のLINE連絡">
+  return <section className="space-y-3 rounded border p-4" aria-label="発送・返却のLINE連絡">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h3 className="font-semibold">作業完了のLINE連絡</h3>
+      <h3 className="font-semibold">発送・返却のLINE連絡</h3>
       <Button type="button" size="sm" variant="outline" onClick={() => void refresh(true)} disabled={loading || submitting}>状態を更新</Button>
     </div>
     {loading && <p className="text-sm text-zinc-600">作業完了連絡の状態を確認しています…</p>}
@@ -121,7 +123,7 @@ export function RepairCompletionNoticePanel({ repairId }: { repairId: number }) 
     </div> : state && !state.hasVerifiedLineDestination ?
       <p className="text-sm text-amber-800">確認済みのLINE送信先がありません。作業完了連絡は作成できません。</p> :
       state && !state.eligible ?
-        <p className="text-sm text-amber-800">この修理は現在、作業完了のLINE連絡の対象ではありません。</p> :
+        <p className="text-sm text-amber-800">この案件は現在、発送・返却のLINE連絡の対象ではありません。</p> :
         state && <div className="space-y-2">
           <label htmlFor={`completion-notice-${repairId}`} className="text-sm font-medium">お客様へ送る冒頭文を確認・編集</label>
           <Textarea id={`completion-notice-${repairId}`} value={draft} maxLength={COMPLETION_NOTICE_INTRO_LIMIT}

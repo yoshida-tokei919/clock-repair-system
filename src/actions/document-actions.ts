@@ -7,7 +7,7 @@ import {
     calculateInvoiceRepairSubtotal,
     aggregateDeliveryShipping,
 } from "@/lib/invoice-repair-snapshots";
-import { assertSingleCustomerDeliverySelection, validateDeliveryShipping, type DeliveryShippingInput } from "@/lib/delivery-shipping";
+import { assertNoDuplicateReturnShipping, assertSingleCustomerDeliverySelection, validateDeliveryShipping, type DeliveryShippingInput } from "@/lib/delivery-shipping";
 import { getB2CPaymentDueDate, getNextB2CInvoiceNumberForTransaction } from "@/lib/invoice-numbering";
 import { nextB2BSourceInvoiceNumber, resolveInvoiceRecipientForIssue } from "@/lib/invoice-recipient";
 import { revalidatePath } from "next/cache";
@@ -66,6 +66,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
 
         if (repairs.length === 0) return { success: false, error: "Repairs not found" };
         if (type === "delivery") {
+            assertNoDuplicateReturnShipping(repairs, shipping!.shippingFee);
             if (repairs.length !== uniqueRepairIds.length) return { success: false, error: "納品書の対象案件を再確認してください" };
             assertSingleCustomerDeliverySelection(repairs);
         }

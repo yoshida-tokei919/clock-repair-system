@@ -67,7 +67,7 @@ export async function finalizeDeliveredShipmentRepairs(
         });
         continue;
       }
-      if (repair.status !== "作業完了") {
+      if (!["作業完了", "修理不可返却", "キャンセル返却"].includes(repair.status)) {
         results.push({ shipmentId, repairId, outcome: "SKIPPED", reason: "repair_status_changed" });
         continue;
       }

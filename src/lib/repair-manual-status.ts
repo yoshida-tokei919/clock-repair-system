@@ -4,13 +4,26 @@ import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/l
 import { getRepairStatusTransition } from "@/lib/repair-status-transition";
 import { APPROVAL_EVENT_PREFIX } from "@/lib/repair-approval-audit";
 
-export const REPAIR_STATUSES = ["送付待ち", "受付", "見積中", "承認待ち", "部品待ち(未注文)", "部品待ち(注文済み)", "部品入荷済み", "作業待ち", "作業中", "作業完了", "納品済み", "キャンセル", "保留"] as const;
+export const REPAIR_STATUSES = ["送付待ち", "受付", "見積中", "承認待ち", "部品待ち(未注文)", "部品待ち(注文済み)", "部品入荷済み", "作業待ち", "作業中", "作業完了", "納品済み", "修理不可返却", "キャンセル返却", "キャンセル", "保留"] as const;
+const RETURN_STATUSES = new Set(["修理不可返却", "キャンセル返却"]);
 
 export class ManualStatusValidationError extends Error {}
 
 export function assertRepairStatus(value: unknown): asserts value is string {
   if (typeof value !== "string" || !REPAIR_STATUSES.includes(value as typeof REPAIR_STATUSES[number])) {
     throw new ManualStatusValidationError("無効なステータスです。");
+  }
+}
+
+export function assertGenericRepairPatchAllowed(currentStatus: string) {
+  if (RETURN_STATUSES.has(currentStatus)) {
+    throw new ManualStatusValidationError("返却処理済みの案件は通常編集できません。納品済みへの更新はステータス操作から行ってください。");
+  }
+}
+
+export function assertManualRepairStatusTransition(currentStatus: string, requestedStatus: string, allowReturnStatus = false) {
+  if (RETURN_STATUSES.has(requestedStatus) && !allowReturnStatus) {
+    throw new ManualStatusValidationError("返却ステータスは専用の返却処理から確定してください。");
   }
 }
 
@@ -36,10 +49,11 @@ export async function correctManualStatusDate(
   repairId: number,
   status: string,
   date: Date,
-  actorId: number,
+  actorId: number | null,
   currentStatus: string,
 ) {
   assertRepairStatus(status);
+  if (RETURN_STATUSES.has(status)) throw new ManualStatusValidationError("返却処理の履歴日は通常のステータス編集から変更できません。");
   const log = await tx.repairStatusLog.findFirst({
     where: { repairId, status }, orderBy: { id: "desc" }, select: { id: true },
   });
@@ -55,12 +69,14 @@ export async function persistManualRepairStatus(
   tx: Prisma.TransactionClient,
   repairId: number,
   requestedStatus: string,
-  actorId: number,
+  actorId: number | null,
   date?: Date,
   reconcile: typeof reconcileRepairPartAllocations = reconcileRepairPartAllocations,
+  options: { allowReturnStatus?: boolean } = {},
 ) {
   assertRepairStatus(requestedStatus);
   const current = await tx.repair.findUniqueOrThrow({ where: { id: repairId }, select: { status: true } });
+  assertManualRepairStatusTransition(current.status, requestedStatus, options.allowReturnStatus);
   const priorLog = await tx.repairStatusLog.findFirst({ where: { repairId }, orderBy: { id: "desc" }, select: { id: true } });
   if (current.status !== requestedStatus) {
     await tx.repair.update({ where: { id: repairId }, data: { status: requestedStatus, ...getRepairStatusTransition(current.status, requestedStatus) } });

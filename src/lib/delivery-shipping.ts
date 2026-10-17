@@ -30,6 +30,20 @@ export function validateDeliveryShipping(input: DeliveryShippingInput) {
     shippingSize: input.size!, shippingCalculatedFee: null, shippingFee: fee! };
 }
 
+export function assertNoDuplicateReturnShipping(
+  repairs: readonly { status: string; estimate?: { items?: readonly { itemName: string; unitPrice: number; quantity?: number }[] } | null }[],
+  deliveryShippingFee: number,
+) {
+  if (deliveryShippingFee <= 0) return;
+  const hasEmbeddedReturnShipping = repairs.some(repair =>
+    ["修理不可返却", "キャンセル返却"].includes(repair.status)
+    && repair.estimate?.items?.some(item => item.itemName === "返送料" && item.unitPrice * (item.quantity ?? 1) > 0),
+  );
+  if (hasEmbeddedReturnShipping) {
+    throw new Error("返却明細に返送料が含まれているため、納品書の送料は0円にしてください。");
+  }
+}
+
 export function canEditDeliveryShipping(hasSnapshot: boolean, hasLinkedInvoice: boolean) {
   return !hasSnapshot && !hasLinkedInvoice;
 }

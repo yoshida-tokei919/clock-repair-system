@@ -41,6 +41,7 @@ const paymentInclude = {
   repair: {
     select: {
       id: true,
+      status: true,
       customerId: true,
       publicToken: true,
       estimateDocument: { select: { publicToken: true } },
@@ -59,6 +60,9 @@ function validatePayment(payment: CheckoutPayment | null, token: string) {
   if (payment.repair.id !== payment.repairId || payment.repair.customerId !== payment.customerId
     || payment.repair.customer.type !== "individual") {
     throw new PrepaymentCheckoutError("Prepayment customer does not match", 403);
+  }
+  if (["修理不可返却", "キャンセル返却"].includes(payment.repair.status)) {
+    throw new PrepaymentCheckoutError("返却処理済みの案件では前受金の決済を開始できません。", 409);
   }
   if (payment.kind !== "REPAIR_PREPAYMENT" || payment.status !== "PENDING"
     || payment.provider !== "STRIPE" || payment.method !== "CARD" || payment.currency !== "JPY"

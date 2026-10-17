@@ -376,16 +376,19 @@ test("invalid token, B2B, unrelated customer, missing tokens and malformed promo
   await assert.rejects(getPublicIntakeDeliveryPreference(f.db, "abcdefghijklmnopqrstuvwx99999999"), (error: IntakeDeliveryPreferenceError) => error.status === 404);
 });
 
-test("active outbound Shipment and cancelled Repair block grouped answer", async () => {
-  for (const change of [
-    (f: ReturnType<typeof fixture>) => { f.repairs[0].shipmentRepairs.push({ shipment: { id: 20, customerId: 3, direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null, repairs: [{ repairId: 10 }] } }); },
-    (f: ReturnType<typeof fixture>) => { f.repairs[1].status = "キャンセル"; },
-  ]) {
-    const f = fixture(); change(f);
-    await assert.rejects(savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "NONE" }, now), (error: IntakeDeliveryPreferenceError) => error.status === 409);
-    assert.equal(f.preferenceWrites, 0);
-    assert.equal(f.shipmentWrites, 0);
+test("active outbound Shipment blocks grouped answer, while terminal returns remain deliverable", async () => {
+  const blocked = fixture();
+  blocked.repairs[0].shipmentRepairs.push({ shipment: { id: 20, customerId: 3, direction: "OUTBOUND", status: "DRAFT", actualShippedAt: null, repairs: [{ repairId: 10 }] } });
+  await assert.rejects(savePublicIntakeDeliveryPreference(blocked.db, tokenA, { groupKind: "ALL", mode: "NONE" }, now), (error: IntakeDeliveryPreferenceError) => error.status === 409);
+  assert.equal(blocked.preferenceWrites, 0);
+  for (const status of ["キャンセル返却", "修理不可返却"]) {
+    const f = fixture(); f.repairs[1].status = status;
+    await savePublicIntakeDeliveryPreference(f.db, tokenA, { groupKind: "ALL", mode: "NONE" }, now);
+    assert.equal(f.preferenceWrites, 1);
   }
+  const legacyCancelled = fixture(); legacyCancelled.repairs[1].status = "キャンセル";
+  await assert.rejects(savePublicIntakeDeliveryPreference(legacyCancelled.db, tokenA, { groupKind: "ALL", mode: "NONE" }, now), (error: IntakeDeliveryPreferenceError) => error.status === 409);
+  assert.equal(legacyCancelled.preferenceWrites, 0);
 });
 
 test("saved preference remains readable and duplicate-safe with an exact outbound Shipment", async () => {

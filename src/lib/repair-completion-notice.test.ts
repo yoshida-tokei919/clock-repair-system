@@ -39,7 +39,7 @@ test("GET is read-only, reports eligibility, destination and exact-key outbox ev
     } },
   };
   assert.deepEqual(await getRepairCompletionNotice(db, 10), {
-    eligible: true, hasVerifiedLineDestination: true,
+    eligible: true, repairStatus: repair().status, hasVerifiedLineDestination: true,
     notice: { id: 2, status: "CONFIRMED", approvedAt, confirmedAt: approvedAt },
   });
   assert.equal(readKey, "repair-completion-notice:10");
@@ -47,7 +47,7 @@ test("GET is read-only, reports eligibility, destination and exact-key outbox ev
   assert.equal((await getRepairCompletionNotice(db, 10)).eligible, false);
   db.repair.findUnique = async () => repair({ inquiryWatchPromotion: null });
   assert.deepEqual(await getRepairCompletionNotice(db, 10), {
-    eligible: false, hasVerifiedLineDestination: false,
+    eligible: false, repairStatus: repair().status, hasVerifiedLineDestination: false,
     notice: { id: 2, status: "CONFIRMED", approvedAt, confirmedAt: approvedAt },
   });
 });

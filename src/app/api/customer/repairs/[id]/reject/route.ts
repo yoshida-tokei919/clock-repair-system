@@ -33,6 +33,9 @@ export async function POST(
     if (repair.status === "キャンセル") {
       throw new Error("キャンセル済みの案件は差戻しできません。");
     }
+    if (["修理不可返却", "キャンセル返却"].includes(repair.status)) {
+      throw new Error("返却処理済みの案件は差戻しできません。");
+    }
 
     const updated = await tx.repair.update({
       where: { id: repair.id },

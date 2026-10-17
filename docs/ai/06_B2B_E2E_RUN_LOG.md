@@ -101,6 +101,7 @@ B2B案件を1件、以下の流れで実運用に近い形で通して確認す�
 
 ## その場修正記録
 
+- B2B shared cancel/return（local implementation / Production: pending）: 取引先共有ページへ「キャンセル・返却する」を追加。確認後、B2B案件だけを `キャンセル返却` へ変更し、現行明細を「キャンセルによる返却」0円へ置換する。取引先操作は案件コメントにも記録する。既存の返却安全ガード（未受領、発行済み請求書/納品書、消費済み部品、PENDING前受金等）は維持。公開トークンは数値Repair IDを受け付けず、B2Cはサーバー側で拒否する。focused test 27/27・TypeScript・diff check PASS。Codex独立レビューは利用枠上限で未実施、カタリ自己レビュー済み。production反映は未実施。
 - Task213A（production complete）: J-001等の深夜0時台JSTで帳票発行日が前日のUTC暦日になる問題を修正。commit `63565fe`、Railway `6efff504-adbb-41a0-95f3-d572857fcf5f`、tag `production-task213a-20261015`。E2E実案件での確認は該当工程で行う。
 - Task213B（local implementation / Production: pending）: 納品書発行時に配送方法・サイズ・顧客請求送料を明示確定し、請求書に納品書単位で送料を1回だけ加算する実装。既存納品書の送料は未確定のまま、既存請求書の送料は0円。production backup・migration・deploy後にE2E実案件で確認する。
 - Task213C1（local implementation / Production: pending）: B2B店舗Customerに配送会社・サービス・サイズ・顧客請求送料の任意既定値を保存し、Task213B納品書発行確認画面の初期値にだけ使用する。発行時の編集・明示確定と既存DeliveryNoteの送料snapshotは維持。独立レビュー完了（blocking 1件修正後、再レビューでblockingなし）。production backup・migration・deploy、E2E実案件確認は未実施。

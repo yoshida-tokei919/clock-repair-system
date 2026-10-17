@@ -58,6 +58,30 @@ test("one intake request freezes both Repair rows and queues one grouped outbox"
   assert.equal(f.shipmentWrites, 0);
 });
 
+test("dedicated returns can enter grouped shipping, while legacy cancel still blocks", async () => {
+  for (const status of ["修理不可返却", "キャンセル返却"]) {
+    const f = fixture(); f.repairs[0].status = status;
+    await requestIntakeShippingDecision(f.db, 10, "https://example.test");
+    assert.deepEqual(f.decision.repairs.map((r: any) => r.completedAtRequest), [true, false]);
+    assert.match(f.outbox.text, /発送準備が整いました/);
+    assert.doesNotMatch(f.outbox.text, /修理が完了|完成した|すべて完成/);
+    assert.match(f.outbox.text, /https:\/\/example\.test\/customer\/repairs\/opaque-10/);
+  }
+  const legacy = fixture(); legacy.repairs[0].status = "キャンセル";
+  await assert.rejects(requestIntakeShippingDecision(legacy.db, 10, "https://example.test"), IntakeShippingDecisionError);
+  assert.equal(legacy.outboxWrites, 0);
+});
+
+test("a ready group mixing completed and returned watches uses neutral shipping text", async () => {
+  const f = fixture();
+  f.repairs.push({ id: 12, inquiryNumber: "T-12", customerId: 3, status: "キャンセル返却", publicToken: "opaque-12", publicTokenCreatedAt: usedAt, customer: { type: "individual" }, shipmentRepairs: [] });
+  f.invite.inquiryWatches.push({ inquiryWatch: { inquiryId: 5, promotedRepairId: 12 } });
+  await requestIntakeShippingDecision(f.db, 10, "https://example.test");
+  assert.match(f.outbox.text, /発送可能な2本/);
+  assert.doesNotMatch(f.outbox.text, /修理が完了|完成した|すべて完成/);
+  assert.match(f.outbox.text, /https:\/\/example\.test\/customer\/repairs\/opaque-10/);
+});
+
 test("customer response is token-bound, one-time and does not create Shipment", async () => {
   const f = fixture();
   await requestIntakeShippingDecision(f.db, 10, "https://example.test");

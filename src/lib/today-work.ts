@@ -17,7 +17,7 @@ export type TodayWorkRow = {
   partsReadyDate: string | null; overdue: boolean; deadlineConflict: boolean;
 };
 
-const TERMINAL = new Set(["作業完了", "納品済み", "キャンセル"]);
+const TERMINAL = new Set(["作業完了", "納品済み", "修理不可返却", "キャンセル返却", "キャンセル"]);
 const compareNullable = (a: string | null, b: string | null) =>
   a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1;
 

@@ -559,6 +559,11 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const router = useRouter();
     useAutoRefreshOnReturn({ refreshOnFocus: false, refreshOnVisibility: false });
     const [isSaving, setIsSaving] = useState(false);
+    const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+    const [returnOutcome, setReturnOutcome] = useState<"修理不可返却" | "キャンセル返却">("修理不可返却");
+    const [returnCharge, setReturnCharge] = useState("0");
+    const [returnShipping, setReturnShipping] = useState("0");
+    const [returnError, setReturnError] = useState("");
     const [isCreatingPublicCase, setIsCreatingPublicCase] = useState(false);
     const [isEditingEnabled, setIsEditingEnabled] = useState(mode !== 'view');
     const isReadOnly = mode === 'view' && !isEditingEnabled;
@@ -2049,8 +2054,53 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         }
     };
 
+    const handleReturn = async () => {
+        if (isReadOnly || !initialData?.id || mode === 'create' || status === '送付待ち') return;
+        setIsSaving(true);
+        setReturnError("");
+        try {
+            const res = await fetch(`/api/repairs/${initialData.id}/return`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ outcome: returnOutcome, charge: Number(returnCharge), shipping: Number(returnShipping) }),
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || "返却処理に失敗しました。");
+            window.location.reload();
+        } catch (error) {
+            setReturnError(error instanceof Error ? error.message : "返却処理に失敗しました。");
+            setIsSaving(false);
+        }
+    };
+
     const handleSave = async () => {
         if (isReadOnly) return;
+        if (["修理不可返却", "キャンセル返却"].includes(persistedStatus)) {
+            if (!initialData?.id) return;
+            if (status !== "納品済み") {
+                alert("返却処理済みの案件は通常編集できません。返却完了後は「納品済み」への更新のみ可能です。");
+                return;
+            }
+            setIsSaving(true);
+            try {
+                const res = await fetch(`/api/repairs/${initialData.id}/status`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "納品済み" }),
+                });
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.error || "ステータス更新に失敗しました。");
+                setStatus("納品済み");
+                setPersistedStatus("納品済み");
+                if (mode === "view") setIsEditingEnabled(false);
+                router.refresh();
+            } catch (error) {
+                console.error(error);
+                alert(error instanceof Error ? `保存に失敗しました: ${error.message}` : "保存に失敗しました。");
+            } finally {
+                setIsSaving(false);
+            }
+            return;
+        }
         if (!customerTypeSelection) {
             alert("顧客種別（業者/B2B または 一般/B2C）を選択してください。");
             return;
@@ -2743,11 +2793,11 @@ ${shopName}
                         );
                     })}
 
-                    {/* 保留・キャンセルボタン */}
+                    {/* 保留・返却処理 */}
                     <div className="flex flex-col gap-2 self-center ml-4 shrink-0 border-l-2 border-zinc-200 pl-4">
                         <button
                             type="button"
-                            onClick={() => { if (!isReadOnly) setStatus('保留'); }}
+                            onClick={() => { if (!isReadOnly && status !== '修理不可返却' && status !== 'キャンセル返却' && status !== 'キャンセル') setStatus('保留'); }}
                             className={cn(
                                 "text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all",
                                 status === '保留'
@@ -2759,7 +2809,8 @@ ${shopName}
                         </button>
                         <button
                             type="button"
-                            onClick={() => { if (!isReadOnly) setStatus('キャンセル'); }}
+                            onClick={() => { setReturnError(""); setReturnDialogOpen(true); }}
+                            disabled={isReadOnly || !initialData?.id || isSaving || status === '送付待ち' || status === '納品済み' || status === '修理不可返却' || status === 'キャンセル返却' || status === 'キャンセル'}
                             className={cn(
                                 "text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all",
                                 status === 'キャンセル'
@@ -2767,8 +2818,19 @@ ${shopName}
                                     : "border-zinc-300 text-zinc-400 hover:border-red-400 hover:text-red-600"
                             )}
                         >
-                            キャンセル
+                            返却処理
                         </button>
+                        {status === '送付待ち' && (
+                            <button
+                                type="button"
+                                onClick={() => { if (!isReadOnly) setStatus('キャンセル'); }}
+                                disabled={isReadOnly || isSaving}
+                                className="text-sm px-3 py-1.5 rounded-lg border-2 font-bold transition-all border-zinc-300 text-zinc-500 hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                            >
+                                キャンセル
+                            </button>
+                        )}
+                        {!initialData?.id && <span className="text-xs text-zinc-500">保存後に利用できます</span>}
                     </div>
                 </div>
 
@@ -3939,6 +4001,19 @@ ${shopName}
                 }}
             />
 
+            <Dialog open={returnDialogOpen} onOpenChange={(open) => { if (!isSaving) setReturnDialogOpen(open); }}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>返却処理</DialogTitle><DialogDescription>現在の確定請求明細を返却明細に置き換えます。発行済み・承認済みの見積書PDFと履歴は保持されます。画面上の未保存の編集内容は反映されません。</DialogDescription></DialogHeader>
+                    <div className="space-y-3">
+                        <div><Label htmlFor="return-outcome">結果</Label><select id="return-outcome" className="w-full rounded border p-2" value={returnOutcome} onChange={event => setReturnOutcome(event.target.value as "修理不可返却" | "キャンセル返却")}><option value="修理不可返却">修理不可</option><option value="キャンセル返却">キャンセル</option></select></div>
+                        <div><Label htmlFor="return-charge">返却料金（円）</Label><Input id="return-charge" type="number" min="0" step="1" value={returnCharge} onChange={event => setReturnCharge(event.target.value)} /></div>
+                        <div><Label htmlFor="return-shipping">返送料（円・任意）</Label><Input id="return-shipping" type="number" min="0" step="1" value={returnShipping} onChange={event => setReturnShipping(event.target.value)} /><p className="mt-1 text-xs text-amber-700">ここで返送料を計上した場合、納品書側の送料は0円にしてください。重複請求はサーバー側でも防止します。</p></div>
+                        <p className="font-bold">最終請求額（税込）：{Number.isSafeInteger(Number(returnCharge)) && Number.isSafeInteger(Number(returnShipping)) && Number(returnCharge) >= 0 && Number(returnShipping) >= 0 ? (pricingTaxMode === "INCLUSIVE" ? Number(returnCharge) + Number(returnShipping) : Number(returnCharge) + Number(returnShipping) + Math.floor((Number(returnCharge) + Number(returnShipping)) / 10)).toLocaleString() : "―"} 円</p>
+                        {returnError && <p role="alert" className="text-sm text-red-600">{returnError}</p>}
+                    </div>
+                    <DialogFooter><Button type="button" variant="outline" onClick={() => setReturnDialogOpen(false)} disabled={isSaving}>閉じる</Button><Button type="button" onClick={handleReturn} disabled={isSaving || !returnCharge || !returnShipping || !Number.isSafeInteger(Number(returnCharge)) || !Number.isSafeInteger(Number(returnShipping)) || Number(returnCharge) < 0 || Number(returnShipping) < 0}>{isSaving ? "処理中..." : "返却処理を確定"}</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
             <Dialog open={photoSettingsOpen} onOpenChange={setPhotoSettingsOpen}>
                 <DialogContent className="max-w-4xl">
                     <DialogHeader>

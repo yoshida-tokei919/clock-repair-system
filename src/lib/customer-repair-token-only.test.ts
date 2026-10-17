@@ -32,7 +32,7 @@ test("customer Repair lookup uses exact publicToken, including a literal numeric
       },
     },
   };
-  const workflow = loadModule(`${routeRoot}/_workflow.ts`, { "@/lib/prisma": { prisma } });
+  const workflow = loadModule(`${routeRoot}/_workflow.ts`, { "@/lib/prisma": { prisma }, "@/lib/repair-approval-audit": { APPROVAL_EVENT_PREFIX: "approval:" } });
 
   assert.equal(await workflow.findRepairIdByPublicToken("1"), null);
   assert.equal(await workflow.findRepairIdByPublicToken("opaque-token"), 1);
@@ -49,6 +49,7 @@ test("customer Repair lookup uses exact publicToken, including a literal numeric
 for (const [routeName, body] of [
   ["approve", {}],
   ["reject", { body: "Reason" }],
+  ["cancel-return", {}],
   ["messages", { body: "Message" }],
   ["return-address", {}],
   ["photo-posting-opt-out", { photoPostingOptOut: true }],
@@ -68,7 +69,7 @@ for (const [routeName, body] of [
       $queryRaw: mutation,
       $transaction: mutation,
     };
-    const workflow = loadModule(`${routeRoot}/_workflow.ts`, { "@/lib/prisma": { prisma } });
+    const workflow = loadModule(`${routeRoot}/_workflow.ts`, { "@/lib/prisma": { prisma }, "@/lib/repair-approval-audit": { APPROVAL_EVENT_PREFIX: "approval:" } });
     const route = loadModule(`${routeRoot}/${routeName}/route.ts`, {
       "next/server": {
         NextResponse: {
@@ -82,6 +83,7 @@ for (const [routeName, body] of [
       "@/lib/return-address": {},
       "@/lib/repair-part-allocation": {},
       "@/lib/repair-photo-posting-opt-out": {},
+      "@/lib/repair-return": { applyRepairReturn: mutation },
       "../_workflow": workflow,
     });
     const request = new Request(`http://localhost/api/customer/repairs/1/${routeName}`, {

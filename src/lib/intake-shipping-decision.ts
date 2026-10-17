@@ -7,7 +7,7 @@ export class IntakeShippingDecisionError extends Error {
 }
 
 export const intakeShippingDecisionKey = (inviteId: number) => `intake-shipping-decision-request:${inviteId}`;
-const complete = (status: string) => status === "作業完了";
+const complete = (status: string) => ["作業完了", "修理不可返却", "キャンセル返却"].includes(status);
 const unavailable = () => new IntakeShippingDecisionError(409, "この受付の発送確認は現在利用できません。状態を更新してください。");
 
 async function group(tx: Prisma.TransactionClient, inviteId: number, requireNewRequestEligibility: boolean) {
@@ -32,7 +32,7 @@ async function group(tx: Prisma.TransactionClient, inviteId: number, requireNewR
       invite.inquiryWatches.some(w => w.inquiryWatch.inquiryId !== invite.inquiryId || !w.inquiryWatch.promotedRepairId || !ids.has(w.inquiryWatch.promotedRepairId)) ||
       new Set(invite.inquiryWatches.map(w => w.inquiryWatch.promotedRepairId)).size !== ids.size ||
       invite.repairs.some(r => r.customerId !== customerId || r.customer.type !== "individual" ||
-        !r.publicToken || r.publicTokenCreatedAt?.getTime() !== invite.usedAt!.getTime() || r.status.includes("キャンセル") ||
+        !r.publicToken || r.publicTokenCreatedAt?.getTime() !== invite.usedAt!.getTime() || r.status === "キャンセル" ||
         r.shipmentRepairs.some(s => s.shipment.direction === "OUTBOUND" && s.shipment.status !== "CANCELLED"))) throw unavailable();
   const completed = invite.repairs.filter(r => complete(r.status));
   if (requireNewRequestEligibility && (!invite.lineUser.lineManagerChat?.verifiedAt ||
@@ -100,7 +100,10 @@ export async function requestIntakeShippingDecision(db: PrismaClient, repairId: 
       if (!invite.lineUser?.lineManagerChat?.verifiedAt || !completed.length || completed.length === invite.repairs.length) throw unavailable();
       if (!appUrl || !/^https:\/\//i.test(appUrl)) throw unavailable();
       const url = buildCustomerShareUrl(`/customer/repairs/${invite.repairs[0].publicToken}`, appUrl, appUrl);
-      const text = `一部の時計の修理が完了しました。\n完成した${completed.length}本を先に発送するか、すべて完成するまで待つか、下記の修理状況ページからご回答ください。\n${url}`;
+      const hasReturn = completed.some(r => r.status === "修理不可返却" || r.status === "キャンセル返却");
+      const text = hasReturn
+        ? `一部の時計の発送準備が整いました。\n発送可能な${completed.length}本を先に発送するか、残りの時計とまとめて発送するか、下記の修理状況ページからご回答ください。\n${url}`
+        : `一部の時計の修理が完了しました。\n完成した${completed.length}本を先に発送するか、すべて完成するまで待つか、下記の修理状況ページからご回答ください。\n${url}`;
       const outbox = await createApprovedLineManagerSendOutbox(tx, {
         inquiryId: invite.inquiryId!, lineManagerChatId: invite.lineUser!.lineManagerChat!.id,
         idempotencyKey: intakeShippingDecisionKey(invite.id), text,

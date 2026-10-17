@@ -12,12 +12,16 @@ export const SCHEDULE_GROUPS: { key: ScheduleGroup; label: string }[] = [
   { key: "UNPLANNED", label: "予定日未設定" },
 ];
 
+export function isRepairReadyForOutbound(status: string) {
+  return ["作業完了", "修理不可返却", "キャンセル返却"].includes(status);
+}
+
 export function shipmentRepairSummary(repairs: readonly { repair: { status: string; deliveryNoteId: number | null } }[]) {
   const total = repairs.length;
-  const workCompleted = repairs.filter(({ repair }) => repair.status === "作業完了").length;
+  const outboundReady = repairs.filter(({ repair }) => isRepairReadyForOutbound(repair.status)).length;
   const notesIssued = repairs.filter(({ repair }) => repair.deliveryNoteId !== null).length;
   const deliveryNoteState = notesIssued === 0 ? "未発行" : notesIssued === total ? "全件発行済み" : "一部発行済み";
-  return { total, workCompleted, notesIssued, deliveryNoteState };
+  return { total, outboundReady, notesIssued, deliveryNoteState };
 }
 
 export function activeStorageLocation<T extends { releasedAt: Date | string | null; storageLocation: unknown }>(

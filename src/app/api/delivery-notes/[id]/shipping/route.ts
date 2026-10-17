@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-api-auth";
-import { canEditDeliveryShipping, validateDeliveryShipping, type DeliveryShippingInput } from "@/lib/delivery-shipping";
+import { assertNoDuplicateReturnShipping, canEditDeliveryShipping, validateDeliveryShipping, type DeliveryShippingInput } from "@/lib/delivery-shipping";
 import { prisma } from "@/lib/prisma";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,6 +18,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const historical = await tx.invoiceRepairSnapshot.count({ where: { deliveryNoteId: id } });
       const linked = await tx.repair.count({ where: { deliveryNoteId: id, invoiceId: { not: null } } });
       if (!canEditDeliveryShipping(historical > 0, linked > 0)) throw new Error("請求履歴のある納品書の送料は変更できません");
+      if (shipping.shippingFee > 0) {
+        const repairs = await tx.repair.findMany({
+          where: { deliveryNoteId: id },
+          select: { status: true, estimate: { select: { items: { select: { itemName: true, unitPrice: true, quantity: true } } } } },
+        });
+        assertNoDuplicateReturnShipping(repairs, shipping.shippingFee);
+      }
       await tx.deliveryNote.update({ where: { id }, data: shipping });
     });
     return NextResponse.json({ ok: true });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assertRepairStatus, correctManualStatusDate, parseManualDate, persistManualRepairStatus } from "./repair-manual-status";
+import { assertGenericRepairPatchAllowed, assertManualRepairStatusTransition, assertRepairStatus, correctManualStatusDate, parseManualDate, persistManualRepairStatus } from "./repair-manual-status";
 
 test("manual approval time is interpreted in Japan time", () => {
   assert.equal(parseManualDate("2026-10-14T09:35", true).toISOString(), "2026-10-14T00:35:00.000Z");
@@ -17,6 +17,23 @@ test("invalid and overflowing dates are rejected", () => {
 test("only known repair statuses are accepted", () => {
   assert.doesNotThrow(() => assertRepairStatus("作業中"));
   assert.throws(() => assertRepairStatus("approved"));
+});
+
+test("generic full Repair edit is blocked after dedicated return", () => {
+  assert.throws(() => assertGenericRepairPatchAllowed("修理不可返却"));
+  assert.throws(() => assertGenericRepairPatchAllowed("キャンセル返却"));
+  assert.doesNotThrow(() => assertGenericRepairPatchAllowed("作業完了"));
+});
+
+test("generic status changes cannot enter either return status, while stored return status stays valid", async () => {
+  for (const status of ["修理不可返却", "キャンセル返却"]) {
+    assert.doesNotThrow(() => assertRepairStatus(status));
+    assert.throws(() => assertManualRepairStatusTransition("作業中", status), /専用の返却処理/);
+    assert.throws(() => assertManualRepairStatusTransition(status, status));
+    const tx = { repair: { findUniqueOrThrow: async () => ({ status: "作業中" }), update: async () => { throw new Error("unexpected write"); } } };
+    await assert.rejects(persistManualRepairStatus(tx as never, 7, status, 42), /専用の返却処理/);
+    await assert.rejects(correctManualStatusDate({} as never, 7, status, new Date(), 42, status), /通常のステータス編集から変更できません/);
+  }
 });
 
 test("same-status reception correction keeps approval pending and older history intact", async () => {

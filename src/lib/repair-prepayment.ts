@@ -48,6 +48,7 @@ export async function createRepairPrepayment(
         where: { id: repairId },
         select: {
           id: true,
+          status: true,
           customerId: true,
           publicToken: true,
           customer: { select: { type: true } },
@@ -55,6 +56,9 @@ export async function createRepairPrepayment(
         },
       });
       if (!repair) throw new RepairPrepaymentError("Repair not found", 404);
+      if (["修理不可返却", "キャンセル返却"].includes(repair.status)) {
+        throw new RepairPrepaymentError("返却処理済みの案件では前受金を作成・再利用できません。", 409);
+      }
       if (repair.customer.type !== "individual") {
         throw new RepairPrepaymentError("Online prepayment is available only for individual customers", 403);
       }

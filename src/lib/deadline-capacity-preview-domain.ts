@@ -39,7 +39,7 @@ export type PreviewRepairAnalysis = PreviewRepair & {
   analysisReason: AnalysisReason;
 };
 
-const TERMINAL = new Set(["作業完了", "納品済み", "キャンセル"]);
+const TERMINAL = new Set(["作業完了", "納品済み", "修理不可返却", "キャンセル返却", "キャンセル"]);
 const addDays = (date: string, days: number) => {
   const value = parseWorkDate(date);
   value.setUTCDate(value.getUTCDate() + days);

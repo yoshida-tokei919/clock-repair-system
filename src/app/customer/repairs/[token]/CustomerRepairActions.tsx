@@ -20,6 +20,7 @@ type Props = {
   showApproval?: boolean;
   lineUrl?: string;
   inquiryNumber: string;
+  repairStatus?: string;
   messages?: CustomerMessage[];
   customerName?: string;
   photoPostingOptOut?: boolean;
@@ -217,13 +218,14 @@ function getBusinessMessageSenderName(message: CustomerMessage, partnerName?: st
   return `${name || "取引先"} 様`;
 }
 
-export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, messages = [], customerName, photoPostingOptOut = false, approvalDisabled = false, approvalDisabledMessage = "", approvalAddress, approvalDialogOpen: controlledApprovalDialogOpen, onApprovalDialogOpenChange, onEditReturnAddress }: Props) {
+export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, repairStatus = "", messages = [], customerName, photoPostingOptOut = false, approvalDisabled = false, approvalDisabledMessage = "", approvalAddress, approvalDialogOpen: controlledApprovalDialogOpen, onApprovalDialogOpenChange, onEditReturnAddress }: Props) {
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
   const [approved, setApproved] = useState(isApproved);
   const [postingOptOut, setPostingOptOut] = useState(photoPostingOptOut);
   const [uncontrolledApprovalDialogOpen, setUncontrolledApprovalDialogOpen] = useState(false);
+  const [cancelReturnDialogOpen, setCancelReturnDialogOpen] = useState(false);
   const approvalDialogOpen = controlledApprovalDialogOpen ?? uncontrolledApprovalDialogOpen;
   const setApprovalDialogOpen = (open: boolean) => {
     if (controlledApprovalDialogOpen === undefined) setUncontrolledApprovalDialogOpen(open);
@@ -292,6 +294,18 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
     }
   };
 
+  const handleCancelReturn = async () => {
+    if (!isBusiness || loading) return;
+    try {
+      await postAction("cancel-return");
+      setCancelReturnDialogOpen(false);
+      router.refresh();
+      alert("キャンセル・返却を受け付けました。");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "キャンセル・返却処理に失敗しました。");
+    }
+  };
+
   const handlePostingOptOut = async (checked: boolean) => {
     try {
       await postAction("photo-posting-opt-out", { photoPostingOptOut: checked });
@@ -307,27 +321,58 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
       <section className="rounded-xl border border-blue-100 bg-[#f8fbff] p-4 shadow-sm">
         <div className="mb-3 border-b border-blue-100 pb-3">
           <p className="text-sm font-bold text-slate-800">ご確認・ご回答</p>
-          <p className="mt-1 text-sm text-slate-600">見積内容をご確認のうえ、承認または修正依頼を選択してください。</p>
+          <p className="mt-1 text-sm text-slate-600">{["修理不可返却", "キャンセル返却"].includes(repairStatus) ? "キャンセル・返却を受け付けています。返却状況をご確認ください。" : "見積内容をご確認のうえ、承認・修正依頼・キャンセル返却を選択してください。"}</p>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={handleApprove}
-            disabled={approved || !!loading}
-            className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <CheckCircle className="h-5 w-5" />
-            <span>{approved ? "承認済み" : "この内容で承認する"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleReject}
-            disabled={!!loading}
-            className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-3 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
-          >
-            <span>修正を依頼する</span>
-          </button>
-        </div>
+        {["修理不可返却", "キャンセル返却"].includes(repairStatus) ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900">
+            キャンセル・返却処理済みです。返却状況は上部のステータスをご確認ください。
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={handleApprove}
+              disabled={approved || !!loading}
+              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <CheckCircle className="h-5 w-5" />
+              <span>{approved ? "承認済み" : "この内容で承認する"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleReject}
+              disabled={!!loading}
+              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <span>修正を依頼する</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCancelReturnDialogOpen(true)}
+              disabled={!!loading || ["送付待ち", "納品済み", "キャンセル"].includes(repairStatus)}
+              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-3 text-sm font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span>キャンセル・返却する</span>
+            </button>
+          </div>
+        )}
+
+        <Dialog open={cancelReturnDialogOpen} onOpenChange={(open) => { if (!loading) setCancelReturnDialogOpen(open); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>キャンセル・返却しますか？</DialogTitle>
+              <DialogDescription>
+                確定すると案件ステータスが「キャンセル返却」になり、現在の明細は「キャンセルによる返却（0円）」へ変更されます。共有画面から元に戻すことはできません。
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <button type="button" onClick={() => setCancelReturnDialogOpen(false)} disabled={!!loading} className="h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">戻る</button>
+              <button type="button" onClick={() => void handleCancelReturn()} disabled={!!loading} className="h-11 rounded-lg bg-red-600 px-4 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
+                {loading === "cancel-return" ? "処理中..." : "キャンセル・返却を確定"}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="mt-5">
           <h2 className="text-base font-bold text-slate-900">コメント</h2>

@@ -9,7 +9,8 @@ test("customer repair API uses one dynamic slug and keeps the prepayment checkou
   const repairsPath = join(process.cwd(), "src", "app", "api", "customer", "repairs");
   const dynamicSlugs = readdirSync(repairsPath, { withFileTypes: true })
     .filter(entry => entry.isDirectory() && /^\[[^\]]+\]$/.test(entry.name))
-    .map(entry => entry.name);
+    .map(entry => entry.name)
+    .filter(slug => existsSync(join(repairsPath, slug, "prepayments", "[paymentId]", "checkout", "route.ts")));
   assert.deepEqual(dynamicSlugs, ["[id]"]);
   assert.ok(existsSync(join(repairsPath, "[id]", "prepayments", "[paymentId]", "checkout", "route.ts")));
 });
@@ -28,7 +29,7 @@ function mockSetup(options: {
 } = {}) {
   const payment: any = { id: 10, kind: "REPAIR_PREPAYMENT", repairId: 5, customerId: 7, amount: 12000,
     purpose: "部品前受金", currency: "JPY", provider: "STRIPE", method: "CARD", status: "PENDING", allocations: [],
-    repair: { id: 5, customerId: 7, publicToken: "repair-token", estimateDocument: { publicToken: "doc-token" }, customer: { type: "individual" } },
+    repair: { id: 5, status: "作業中", customerId: 7, publicToken: "repair-token", estimateDocument: { publicToken: "doc-token" }, customer: { type: "individual" } },
     ...options.payment };
   const attempts: any[] = [{ id: 12, provider: "STRIPE", status: "PENDING", idempotencyKey: "stable-key",
     checkoutSessionId: options.sessionId ?? null, createdAt: options.attemptCreatedAt ?? new Date() }];
@@ -65,6 +66,16 @@ function mockSetup(options: {
   const db = { payment: tx.payment, paymentAttempt: tx.paymentAttempt, $transaction: async (fn: any) => fn(tx) } as unknown as PrismaClient;
   return { db, stripe, payment, attempts, creates, retrieves, updates };
 }
+
+test("dedicated returns block Checkout before attempt or Stripe activity", async () => {
+  for (const status of ["修理不可返却", "キャンセル返却"]) {
+    const setup = mockSetup({ payment: { repair: { id: 5, status, customerId: 7, publicToken: "repair-token", estimateDocument: { publicToken: "doc-token" }, customer: { type: "individual" } } } });
+    await assert.rejects(startRepairPrepaymentCheckout(setup.db, setup.stripe, 10, "repair-token", "https://example.test"), { status: 409 });
+    assert.equal(setup.creates.length, 0);
+    assert.equal(setup.retrieves.length, 0);
+    assert.equal(setup.updates.length, 0);
+  }
+});
 
 test("Checkout uses only DB payment amount and exact metadata", async () => {
   const { db, stripe, creates } = mockSetup();

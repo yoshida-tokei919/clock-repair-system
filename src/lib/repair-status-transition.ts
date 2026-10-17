@@ -33,6 +33,9 @@ export function getRepairStatusTransition(
     currentStatus: string,
     newStatus: string,
 ): { receptionDate?: Date | null } {
+    if (["修理不可返却", "キャンセル返却"].includes(currentStatus) && ![currentStatus, "納品済み"].includes(newStatus)) {
+        throw new Error("返却処理済みの案件は作業状態へ戻せません。");
+    }
     if (currentStatus === SHIPPING_WAITING_STATUS && newStatus !== RECEPTION_STATUS) {
         throw new Error("送付待ちから進められるのは受付のみです。");
     }

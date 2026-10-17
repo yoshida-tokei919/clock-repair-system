@@ -28,10 +28,11 @@ test("cancelled and actually shipped parcels are excluded from schedule and over
 test("Repair and delivery-note aggregate states retain partial completion", () => {
   const repair = (status: string, deliveryNoteId: number | null) => ({ repair: { status, deliveryNoteId } });
   assert.deepEqual(shipmentRepairSummary([repair("作業完了", 3), repair("作業中", null)]), {
-    total: 2, workCompleted: 1, notesIssued: 1, deliveryNoteState: "一部発行済み",
+    total: 2, outboundReady: 1, notesIssued: 1, deliveryNoteState: "一部発行済み",
   });
   assert.equal(shipmentRepairSummary([repair("作業完了", 3)]).deliveryNoteState, "全件発行済み");
   assert.equal(shipmentRepairSummary([repair("作業中", null)]).deliveryNoteState, "未発行");
+  assert.equal(shipmentRepairSummary([repair("修理不可返却", null), repair("キャンセル返却", null)]).outboundReady, 2);
 });
 
 test("only active location and PhysicalTag assignments supply preparation context", () => {

@@ -3,9 +3,9 @@ import test from "node:test";
 import type { PrismaClient } from "@prisma/client";
 import { createRepairPrepayment, parsePrepaymentInput } from "./repair-prepayment";
 
-function mockDb(options: { type?: string; token?: string | null; documentToken?: string | null; pending?: any; customerId?: number } = {}) {
+function mockDb(options: { type?: string; status?: string; token?: string | null; documentToken?: string | null; pending?: any; customerId?: number } = {}) {
   const writes: any[] = [];
-  const repair = { id: 5, customerId: options.customerId ?? 7, publicToken: options.token === undefined ? "repair-token" : options.token,
+  const repair = { id: 5, status: options.status ?? "作業中", customerId: options.customerId ?? 7, publicToken: options.token === undefined ? "repair-token" : options.token,
     estimateDocument: { publicToken: options.documentToken ?? null }, customer: { type: options.type ?? "individual" } };
   const tx = {
     $queryRaw: async () => [{ id: 5 }],
@@ -24,6 +24,17 @@ test("creates pending card prepayment with server-derived customer and no alloca
   assert.equal(result.reused, false);
   assert.deepEqual(writes[0].data, { kind: "REPAIR_PREPAYMENT", repairId: 5, customerId: 19,
     purpose: "部品前受金", amount: 12000, currency: "JPY", provider: "STRIPE", method: "CARD", status: "PENDING" });
+});
+
+test("dedicated return blocks new and reused pending prepayments without writes", async () => {
+  const pending = { id: 10, customerId: 7, amount: 12000, purpose: "部品前受金", currency: "JPY", provider: "STRIPE", method: "CARD", allocations: [] };
+  for (const status of ["修理不可返却", "キャンセル返却"]) {
+    for (const existing of [undefined, pending]) {
+      const { db, writes } = mockDb({ status, pending: existing });
+      await assert.rejects(createRepairPrepayment(db, 5, { amount: 12000, purpose: "部品前受金" }), { status: 409 });
+      assert.equal(writes.length, 0);
+    }
+  }
 });
 
 test("same pending request is reused and conflicting pending request is rejected", async () => {

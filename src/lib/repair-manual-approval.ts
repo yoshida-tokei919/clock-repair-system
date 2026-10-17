@@ -17,6 +17,7 @@ export async function recordManualApproval(
   });
   if (!current) throw new Error("修理案件が見つかりません。");
   if (current.status === "キャンセル") throw new Error("キャンセル済みの案件は承認できません。");
+  if (["修理不可返却", "キャンセル返却"].includes(current.status)) throw new Error("返却処理済みの案件は承認できません。");
   if (!current.estimate?.items.some((item) => item.itemName.trim() && item.quantity > 0 && item.unitPrice >= 0)) {
     throw new Error("承認前に見積明細を保存してください。");
   }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertSingleCustomerDeliverySelection, canEditDeliveryShipping, validateDeliveryShipping } from "./delivery-shipping";
+import { assertNoDuplicateReturnShipping, assertSingleCustomerDeliverySelection, canEditDeliveryShipping, validateDeliveryShipping } from "./delivery-shipping";
 
 test("shipping requires explicit method, size and customer charge", () => {
   assert.deepEqual(validateDeliveryShipping({ mode: "SHIPPING", carrierCode: "JAPAN_POST", serviceCode: "YU_PACK", size: 80, shippingFee: 0 }),
@@ -27,4 +27,14 @@ test("historical or linked invoice blocks shipping edits", () => {
 test("delivery issue requires one customer group for one shipping decision", () => {
   assert.doesNotThrow(() => assertSingleCustomerDeliverySelection([{ customerId: 1 }, { customerId: 1 }]));
   assert.throws(() => assertSingleCustomerDeliverySelection([{ customerId: 1 }, { customerId: 2 }]), /取引先ごと/);
+});
+
+
+test("embedded return shipping cannot be charged again on the delivery note", () => {
+  for (const status of ["修理不可返却", "キャンセル返却"]) {
+    const returned = [{ status, estimate: { items: [{ itemName: "返送料", unitPrice: 800, quantity: 1 }] } }];
+    assert.doesNotThrow(() => assertNoDuplicateReturnShipping(returned, 0));
+    assert.throws(() => assertNoDuplicateReturnShipping(returned, 800), /納品書の送料は0円/);
+  }
+  assert.doesNotThrow(() => assertNoDuplicateReturnShipping([{ status: "作業完了", estimate: { items: [{ itemName: "返送料", unitPrice: 800, quantity: 1 }] } }], 800));
 });

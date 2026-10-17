@@ -34,6 +34,9 @@ export async function POST(
     if (repair.status === "キャンセル") {
       throw new Error("キャンセル済みの案件は承認できません。");
     }
+    if (["修理不可返却", "キャンセル返却"].includes(repair.status)) {
+      throw new Error("返却処理済みの案件は承認できません。");
+    }
 
     if (repair.customer.type === "individual") {
       try {

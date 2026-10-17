@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ShipmentDirection, ShipmentHandoffMethod, ShipmentStatus, StorageLocationType } from "@prisma/client";
-import { activePhysicalTag, activeStorageLocation, sameCustomerShipmentContext, SCHEDULE_GROUPS, shipmentRepairSummary, shipmentScheduleGroup } from "@/lib/shipment-schedule";
+import { activePhysicalTag, activeStorageLocation, isRepairReadyForOutbound, sameCustomerShipmentContext, SCHEDULE_GROUPS, shipmentRepairSummary, shipmentScheduleGroup } from "@/lib/shipment-schedule";
 import YupuriHistoryPreview from "./YupuriHistoryPreview";
 
 export type ScheduleShipment = {
@@ -154,10 +154,10 @@ export default function ShipmentsClient({ rows, today }: { rows: ScheduleShipmen
                 <td className="p-3"><p className="font-semibold">#{row.id}</p><p>{row.customer.name}</p>
                   <p className="text-gray-600">{row.customer.type === "business" ? "B2B" : row.customer.type === "individual" ? "B2C" : "区分要確認"}</p></td>
                 <td className="p-3">{statusLabels[row.status]}</td>
-                <td className="p-3"><p className="mb-2 font-medium">{summary.total}件中 {summary.workCompleted}件 作業完了</p>{row.repairs.map(({ repair }) => <p key={repair.id} className="mb-1">
+                <td className="p-3"><p className="mb-2 font-medium">{summary.total}件中 {summary.outboundReady}件 発送可能</p>{row.repairs.map(({ repair }) => <p key={repair.id} className="mb-1">
                   <Link className="text-blue-700 hover:underline" href={`/repairs/${repair.id}`}>{repair.inquiryNumber}</Link>
                   <span className="ml-2">{repair.status}</span>
-                  <span className="block text-xs text-gray-600">{repair.status === "作業完了" ? "作業完了" : "作業完了未確認"}</span>
+                  <span className="block text-xs text-gray-600">{repair.status === "作業完了" ? "作業完了" : isRepairReadyForOutbound(repair.status) ? "返却対象" : "発送条件未確認"}</span>
                 </p>)}</td>
                 <td className="p-3">判定不可<br /><span className="text-xs text-gray-600">完了イベント未実装</span></td>
                 <td className="p-3"><p className="mb-2 font-medium">{summary.deliveryNoteState} ({summary.notesIssued}/{summary.total})</p>{row.repairs.map(({ repair }) => <p key={repair.id} className="mb-1">

@@ -80,6 +80,8 @@ function getStatusBandClass(status: string) {
 }
 
 function getStatusMessage(status: string) {
+  if (status === "修理不可返却") return "修理不可のため、お預かり品の返却準備を進めています。";
+  if (status === "キャンセル返却") return "キャンセルに伴い、お預かり品の返却準備を進めています。";
   if (status === "承認待ち") return "お見積内容をご確認ください。";
   if (status.includes("完了")) return "作業が完了しました。";
   if (isApprovedRepairStatus(status)) return "現在の進行状況をご確認いただけます。";
@@ -156,6 +158,8 @@ function photosForCustomerProgress(repair: { status?: string | null; photos?: an
 }
 
 function getCustomerStatus(status: string) {
+  if (status === "修理不可返却") return { label: "修理不可・返却", className: "border-amber-200 bg-amber-50 text-amber-800" };
+  if (status === "キャンセル返却") return { label: "キャンセル・返却", className: "border-amber-200 bg-amber-50 text-amber-800" };
   if (status === "承認待ち") return { label: "見積確認中", className: "border-blue-200 bg-blue-50 text-blue-800" };
   if (status === "見積中") return { label: "見積作成中", className: "border-slate-200 bg-slate-50 text-slate-700" };
   if (status === "保留") return { label: "確認中", className: "border-slate-200 bg-slate-50 text-slate-700" };
@@ -164,6 +168,8 @@ function getCustomerStatus(status: string) {
   if (status === "作業完了" || status === "納品済み") return { label: "完了", className: "border-emerald-200 bg-emerald-50 text-emerald-800" };
   return { label: status || "確認中", className: "border-slate-200 bg-slate-50 text-slate-700" };
 }
+
+const isDedicatedReturnStatus = (status: string) => status === "修理不可返却" || status === "キャンセル返却";
 
 function needsCustomerApproval(repair: any) {
   return repair.approvalStatus === "pending" && repair.status === "承認待ち";
@@ -254,7 +260,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
               <CustomerRepairAccordionItem
                 key={repair.id}
                 index={index}
-                statusBand={<div className="border-b border-slate-100 bg-white px-4 pt-4"><span className={`inline-flex rounded-full border px-3 py-1 text-sm font-bold ${status.className}`}>{status.label}</span></div>}
+                statusBand={<div className="border-b border-slate-100 bg-white px-4 pt-4"><span className={`inline-flex rounded-full border px-3 py-1 text-sm font-bold ${status.className}`}>{status.label}</span>{isDedicatedReturnStatus(repair.status) && <p className="mt-2 text-sm text-slate-600">お預かり品の返却準備を進めています。</p>}</div>}
                 summary={
                   <div className="flex min-w-0 gap-3">
                     {primaryPhotoUrl && <img src={primaryPhotoUrl} alt={`${watchName || "時計"}の写真`} className="h-20 w-20 shrink-0 rounded-xl border border-slate-200 bg-slate-50 object-cover" />}
@@ -267,7 +273,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
                 }
               >
                 <section className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">見積内容</h2>{repair.estimateDocument && readToken && <PdfLinkButton href={`/customer/repairs/${readToken}/estimate.pdf`} />}</div>
+                  <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">{isDedicatedReturnStatus(repair.status) ? "返却・最終精算内容" : "見積内容"}</h2>{repair.estimateDocument && readToken && <PdfLinkButton href={`/customer/repairs/${readToken}/estimate.pdf`} />}</div>
                   <div className="mt-3 divide-y divide-slate-100">{estimateItems.length === 0 ? <p className="py-3 text-sm text-slate-500">見積明細はまだありません。</p> : estimateItems.map((item: any) => <div key={item.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div className="min-w-0 font-medium">{item.type === "part" ? formatPartDisplay({ name: item.itemName, grade: item.partsMaster?.grade, note2: item.partsMaster?.notes2 }) : item.itemName}{item.quantity > 1 && <span className="ml-2 text-slate-500">数量 {item.quantity}</span>}</div><span className="shrink-0 font-mono font-bold">¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}</span></div>)}</div>
                   <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm"><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "課税対象額（税込）" : "税抜小計"}</span><span className="font-mono">¥{(repair.estimate?.pricingTaxMode === "INCLUSIVE" ? total : subtotal).toLocaleString()}</span></div><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "内消費税（10%）" : "消費税（10%）"}</span><span className="font-mono">¥{taxAmount.toLocaleString()}</span></div><div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2"><span className="font-bold">税込合計</span><span className="font-mono text-xl font-bold text-blue-700">¥{total.toLocaleString()}</span></div></div>
                 </section>
@@ -284,7 +290,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
                             <span className="font-mono font-bold">¥{payment.amount.toLocaleString()}</span>
                           </div>
                           <p className="mt-1 text-sm text-slate-600">{PREPAYMENT_STATUS_LABELS[payment.status]}{payment.status === "SUCCEEDED" && payment.paidAt && ` · 入金日: ${payment.paidAt.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}`}</p>
-                          {payment.status === "PENDING" && prepaymentToken && <RepairPrepaymentCheckoutButton token={prepaymentToken} paymentId={payment.id} />}
+                          {payment.status === "PENDING" && prepaymentToken && !isDedicatedReturnStatus(repair.status) && <RepairPrepaymentCheckoutButton token={prepaymentToken} paymentId={payment.id} />}
                         </li>
                       ))}
                     </ul>
@@ -399,7 +405,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
   if (isBusiness) {
     const commentCount = repairs.filter((repair) => repair.customerMessages.length > 0).length;
     const approvedCount = repairs.filter((repair) => isApprovedRepairStatus(repair.status)).length;
-    const pendingCount = repairs.length - approvedCount;
+    const pendingCount = repairs.filter((repair) => !isApprovedRepairStatus(repair.status) && !isDedicatedReturnStatus(repair.status)).length;
     const publicPdfHref = `/customer/repairs/${token}/estimate.pdf`;
 
     return (
@@ -497,7 +503,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                 >
                   <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="-mx-4 -mt-4 mb-4 flex items-center justify-between gap-3 bg-[#f2f7ff] px-4 py-3">
-                      <h2 className="text-lg font-bold text-slate-900">見積内容</h2>
+                      <h2 className="text-lg font-bold text-slate-900">{isDedicatedReturnStatus(repair.status) ? "返却・最終精算内容" : "見積内容"}</h2>
                       {repair.estimateDocument && <PdfLinkButton href={publicPdfHref} />}
                     </div>
 
@@ -562,6 +568,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                     isBusiness={isBusiness}
                     isApproved={repair.approvalStatus === "approved"}
                     inquiryNumber={repair.inquiryNumber}
+                    repairStatus={repair.status}
                     messages={latestMessages}
                     photoPostingOptOut={repair.photoPostingOptOut}
                     customerName={customerName || "取引先"}

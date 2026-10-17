@@ -9,7 +9,7 @@ export class IntakeDeliveryPreferenceError extends Error {
 
 const missing = () => new IntakeDeliveryPreferenceError(404, "回答ページが見つかりません。");
 const unavailable = () => new IntakeDeliveryPreferenceError(409, "この受付の配達希望は現在回答できません。修理状況を更新してください。");
-const complete = (status: string) => status === "作業完了";
+const complete = (status: string) => ["作業完了", "修理不可返却", "キャンセル返却"].includes(status);
 const dateString = (date: Date | null) => date?.toISOString().slice(0, 10) ?? null;
 
 async function context(tx: Prisma.TransactionClient, token: string, validateShipments = true) {
@@ -45,7 +45,7 @@ async function context(tx: Prisma.TransactionClient, token: string, validateShip
       new Set(invite.inquiryWatches.map(w => w.inquiryWatch.promotedRepairId)).size !== ids.size ||
       invite.inquiryWatches.some(w => w.inquiryWatch.inquiryId !== invite.inquiryId || !w.inquiryWatch.promotedRepairId || !ids.has(w.inquiryWatch.promotedRepairId)) ||
       invite.repairs.some(r => r.customerId !== anchor.customerId || r.customer.type !== "individual" ||
-        !r.publicToken || r.publicTokenCreatedAt?.getTime() !== invite.usedAt!.getTime() || r.status.includes("キャンセル"))) throw unavailable();
+        !r.publicToken || r.publicTokenCreatedAt?.getTime() !== invite.usedAt!.getTime() || r.status === "キャンセル")) throw unavailable();
 
   const decision = invite.shippingDecision;
   if (decision && (decision.customerId !== anchor.customerId || decision.requestOutbox.status === "CANCELLED" ||

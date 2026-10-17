@@ -3,7 +3,7 @@ import type { PartsReadiness } from "./repair-parts-readiness";
 
 export const SCHEDULABLE_STATUS = "作業待ち";
 export const SCHEDULE_HORIZON_DAYS = 180;
-const TERMINAL_STATUSES = new Set(["作業完了", "納品済み", "キャンセル"]);
+const TERMINAL_STATUSES = new Set(["作業完了", "納品済み", "修理不可返却", "キャンセル返却", "キャンセル"]);
 
 export type ScheduleRepair = {
   id: number;

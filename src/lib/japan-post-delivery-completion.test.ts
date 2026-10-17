@@ -63,6 +63,17 @@ test("final delivered outbound Shipment marks a completed Repair delivered with 
   assert.deepEqual(f.logs, [{ repairId: 10, status: "納品済み", changedBy: null }]);
 });
 
+test("delivered outbound return Shipment closes dedicated return statuses as delivered", async () => {
+  for (const status of ["修理不可返却", "キャンセル返却"]) {
+    const f = fixture({ status });
+    const result = await finalizeDeliveredShipmentRepairs(f.db, 7);
+    assert.equal(result[0]?.outcome, "UPDATED");
+    assert.equal(f.repair.status, "納品済み");
+    assert.equal(f.repair.deliveryDateActual?.toISOString(), d1.toISOString());
+    assert.deepEqual(f.logs, [{ repairId: 10, status: "納品済み", changedBy: null }]);
+  }
+});
+
 test("Repair waits until every non-cancelled outbound Shipment is delivered", async () => {
   const f = fixture({
     shipments: [

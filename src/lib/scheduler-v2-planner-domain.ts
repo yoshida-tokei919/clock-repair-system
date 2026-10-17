@@ -36,7 +36,7 @@ export type SchedulerV2Day = Pick<PreviewDay, "date" | "grossCapacityMinutes" |
   resultingPlanLoadMinutes: number; remainingCapacityMinutes: number;
 };
 
-const TERMINAL = new Set(["作業完了", "納品済み", "キャンセル"]);
+const TERMINAL = new Set(["作業完了", "納品済み", "修理不可返却", "キャンセル返却", "キャンセル"]);
 const compareDate = (a: string | null, b: string | null) => a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1;
 
 export function classifySchedulerV2FutureApply(repair: SchedulerV2Repair): SchedulerV2FutureApplyAction {

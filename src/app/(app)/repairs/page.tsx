@@ -141,6 +141,8 @@ export default async function RepairsPage({
                         <option value="作業完了">作業完了</option>
                         <option value="納品済み">納品済み</option>
                         <option value="キャンセル">キャンセル</option>
+                        <option value="修理不可返却">修理不可返却</option>
+                        <option value="キャンセル返却">キャンセル返却</option>
                         <option value="保留">保留</option>
                     </select>
 

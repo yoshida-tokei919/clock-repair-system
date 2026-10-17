@@ -14,6 +14,8 @@ export const getStatusBadge = (status: string) => {
         case '作業完了':         return <Badge className="bg-emerald-500 hover:bg-emerald-600">作業完了</Badge>;
         case '納品済み':         return <Badge className="bg-zinc-500 hover:bg-zinc-600">納品済み</Badge>;
         case 'キャンセル':       return <Badge variant="destructive">キャンセル</Badge>;
+        case '修理不可返却':     return <Badge variant="destructive">修理不可返却</Badge>;
+        case 'キャンセル返却':   return <Badge variant="destructive">キャンセル返却</Badge>;
         case '保留':             return <Badge className="bg-gray-400 hover:bg-gray-500">保留</Badge>;
         default:                 return <Badge variant="outline">{status}</Badge>;
     }

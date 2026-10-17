@@ -51,6 +51,8 @@ export function canAllocateRepairParts({
     allowAdvanceFromApproval?: boolean;
 }): boolean {
     if (allowAdvanceFromApproval) return true;
+    // A terminal return must release reservations even if approval is pending.
+    if (status === "修理不可返却" || status === "キャンセル返却") return true;
     if (customerType === "individual" && approvalStatus !== "approved") return false;
     return !PRE_ALLOCATION_REPAIR_STATUSES.has(status);
 }

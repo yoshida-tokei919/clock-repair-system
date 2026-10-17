@@ -42,8 +42,9 @@ export async function suppressLegacyCompletionForIntake(
   const siblings = await db.repair.findMany({
     where: { repairIntakeInviteId, customerId }, select: { status: true },
   });
-  return siblings.length >= 2 && siblings.some(r => r.status === "作業完了") &&
-    siblings.some(r => r.status !== "作業完了");
+  const ready = (status: string) => ["作業完了", "修理不可返却", "キャンセル返却"].includes(status);
+  return siblings.length >= 2 && siblings.some(r => ready(r.status)) &&
+    siblings.some(r => !ready(r.status));
 }
 
 export async function suppressLegacyDeliveryForIntake(
@@ -78,7 +79,7 @@ async function context(db: Pick<Prisma.TransactionClient, "repair" | "repairInta
   const hasOriginatingInquiry = Boolean(promotion && promotion.promotedRepairId === repair.id);
   const hasVerifiedLineDestination = Boolean(hasOriginatingInquiry && chat?.verifiedAt);
   const suppressLegacy = await suppressLegacyCompletionForIntake(db, repair.repairIntakeInviteId, repair.customerId);
-  const eligible = repair.customer.type === "individual" && repair.status === "作業完了" &&
+  const eligible = repair.customer.type === "individual" && ["作業完了", "修理不可返却", "キャンセル返却"].includes(repair.status) &&
     hasOriginatingInquiry && hasVerifiedLineDestination && !suppressLegacy;
   return { repair, promotion, chat, hasOriginatingInquiry, hasVerifiedLineDestination, eligible };
 }
@@ -91,6 +92,7 @@ export async function getRepairCompletionNotice(db: RepairCompletionNoticeDb, re
   });
   return {
     eligible: current.eligible,
+    repairStatus: current.repair.status,
     hasVerifiedLineDestination: current.hasVerifiedLineDestination,
     notice: outbox,
   };
