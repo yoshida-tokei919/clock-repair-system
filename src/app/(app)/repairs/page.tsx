@@ -8,6 +8,7 @@ import { RepairListStatusSelect } from "@/components/repairs/RepairListStatusSel
 import { RepairsTableClient } from "@/components/repairs/RepairsTableClient";
 import { PlusCircle, Search, Filter, LayoutDashboard, FileText } from "lucide-react";
 import { redirect } from "next/navigation";
+import { isR2RepairPhotoKey } from "@/lib/r2-repair-photos";
 export const dynamic = "force-dynamic";
 
 export default async function RepairsPage({
@@ -53,6 +54,7 @@ export default async function RepairsPage({
             invoice:          { select: { id: true, invoiceNumber: true } },
             estimateDocument: { select: { id: true, estimateNumber: true } },
             warranty:         { select: { id: true, warrantyNumber: true } },
+            photos: { orderBy: { id: "desc" }, take: 1, select: { id: true, storageKey: true } },
         },
         take: 50,
     });
@@ -73,10 +75,16 @@ export default async function RepairsPage({
     }
     const unreadMessageByRepairId = new Map(unreadMessages.map((message) => [message.repairId, message]));
     const repairsWithMessages = repairs.map((repair) => {
+        const { photos, ...repairData } = repair;
         const unreadMessage = unreadMessageByRepairId.get(repair.id);
         return {
-            ...repair,
+            ...repairData,
             customerMessages: unreadMessage ? [unreadMessage] : [],
+            photo: isR2RepairPhotoKey(photos[0]?.storageKey)
+                ? `/api/repair-photos/${photos[0].id}`
+                : /^(https?:|data:|blob:)/i.test(photos[0]?.storageKey ?? "")
+                    ? photos[0].storageKey
+                    : null,
         };
     });
 
