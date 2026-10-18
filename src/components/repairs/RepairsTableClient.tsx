@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Repair, Customer, Brand, Model, Watch } from "@prisma/client";
@@ -20,6 +20,7 @@ import { formatIssuedDate } from "@/lib/document-issued-date";
 import { DeliveryIssueDialog } from "@/components/documents/DeliveryIssueDialog";
 import type { DeliveryShippingInput } from "@/lib/delivery-shipping";
 import type { CustomerDefaultShipping } from "@/lib/customer-default-shipping";
+import type { RepairTagReleasePreview } from "@/lib/repair-tag-release";
 
 type RepairWithRelations = Repair & {
     photo: string | null;
@@ -43,6 +44,11 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     const [invoicePreview, setInvoicePreview] = useState<Awaited<ReturnType<typeof previewBulkInvoiceAllocations>> | null>(null);
     const [requestedAllocations, setRequestedAllocations] = useState<Record<number, Record<number, number>>>({});
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [tagPreview, setTagPreview] = useState<RepairTagReleasePreview | null>(null);
+    const [tagBusy, setTagBusy] = useState(false);
+    const tagLocked = useRef(false);
+    const tagSubmitting = useRef(false);
+    const tagSelectedIds = useRef<number[]>([]);
     const deliveryCustomerDefault = useMemo<CustomerDefaultShipping | null>(() => {
         const selectedCustomers = repairs.filter(repair => selectedIds.includes(repair.id)).map(repair => repair.customer);
         const customer = selectedCustomers.length > 0 && selectedCustomers.every(row => row.id === selectedCustomers[0].id)
@@ -69,10 +75,12 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     useAutoRefreshOnReturn();
 
     const toggleSelectAll = (checked: boolean | "indeterminate") => {
+        if (tagLocked.current) return;
         setSelectedIds(checked === true ? repairs.map((r) => r.id) : []);
     };
 
     const setRepairSelected = (id: number, checked: boolean | "indeterminate") => {
+        if (tagLocked.current) return;
         setSelectedIds((prev) => {
             if (checked === true) {
                 return prev.includes(id) ? prev : [...prev, id];
@@ -82,11 +90,63 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     };
 
     const toggleRepairSelected = (id: number) => {
+        if (tagLocked.current) return;
         setSelectedIds((prev) =>
             prev.includes(id)
                 ? prev.filter((selectedId) => selectedId !== id)
                 : [...prev, id]
         );
+    };
+
+    const closeTagPreview = () => {
+        if (tagBusy) return;
+        setTagPreview(null);
+        tagSelectedIds.current = [];
+        tagLocked.current = false;
+    };
+
+    const tagRequest = async (method: "POST" | "PUT", body: unknown) => {
+        const response = await fetch("/api/repairs/physical-tag-release", {
+            method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "NFCタグ割当の解除に失敗しました。");
+        return result;
+    };
+
+    const openTagPreview = async () => {
+        if (tagLocked.current || selectedIds.length === 0) return;
+        tagLocked.current = true;
+        tagSelectedIds.current = [...selectedIds];
+        setTagBusy(true);
+        try {
+            setTagPreview(await tagRequest("POST", { repairIds: tagSelectedIds.current }));
+        } catch (error) {
+            tagLocked.current = false;
+            tagSelectedIds.current = [];
+            toast({ title: "NFCタグの確認に失敗しました", description: error instanceof Error ? error.message : "再読み込みしてください", variant: "destructive" });
+        } finally { setTagBusy(false); }
+    };
+
+    const confirmTagRelease = async () => {
+        if (!tagPreview?.releasable || tagSubmitting.current) return;
+        tagSubmitting.current = true;
+        setTagBusy(true);
+        try {
+            const result = await tagRequest("PUT", { confirmed: true, repairIds: tagSelectedIds.current,
+                snapshot: tagPreview.rows.map(row => ({ repairId: row.repairId, assignmentId: row.assignmentId, physicalTagId: row.physicalTagId })) });
+            toast({ title: "NFCタグ割当を解除しました", description: `${result.releasedCount}件解除、未割当${result.skippedCount}件をスキップしました。` });
+            setTagPreview(null);
+            setSelectedIds([]);
+            tagSelectedIds.current = [];
+            tagLocked.current = false;
+            router.refresh();
+        } catch (error) {
+            toast({ title: "NFCタグ割当の解除に失敗しました", description: error instanceof Error ? error.message : "再確認してください", variant: "destructive" });
+            setTagPreview(null);
+            tagSelectedIds.current = [];
+            tagLocked.current = false;
+        } finally { tagSubmitting.current = false; setTagBusy(false); }
     };
 
     const handleBulkAction = async (type: "delivery" | "estimate" | "invoice" | "warranty", issueDate?: string, allocations?: Record<number, { paymentId: number; allocatedAmount: number }[]>, shipping?: DeliveryShippingInput) => {
@@ -173,20 +233,23 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                 <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-md animate-in fade-in slide-in-from-top-2">
                     <span className="font-bold text-blue-700">{selectedIds.length}件選択中</span>
                     <div className="h-4 w-px bg-blue-300 mx-2" />
-                    <Button size="sm" variant="outline" onClick={() => setIssueType("estimate")} disabled={isGenerating}>
+                    <Button size="sm" variant="outline" onClick={() => setIssueType("estimate")} disabled={isGenerating || tagLocked.current}>
                         <FileText className="mr-2 h-4 w-4" />
                         見積書作成
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => setIssueType("delivery")} disabled={isGenerating}>
+                    <Button size="sm" variant="outline" onClick={() => setIssueType("delivery")} disabled={isGenerating || tagLocked.current}>
                         <Truck className="mr-2 h-4 w-4" />
                         納品書作成
                     </Button>
-                    <Button size="sm" variant="outline" onClick={openInvoicePreview} disabled={isGenerating}>
+                    <Button size="sm" variant="outline" onClick={openInvoicePreview} disabled={isGenerating || tagLocked.current}>
                         <FileText className="mr-2 h-4 w-4" />
                         請求書作成
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => setIssueType("warranty")} disabled={isGenerating}>
+                    <Button size="sm" variant="outline" onClick={() => setIssueType("warranty")} disabled={isGenerating || tagLocked.current}>
                         <FileText className="mr-2 h-4 w-4" />保証書作成
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={openTagPreview} disabled={isGenerating || tagLocked.current}>
+                        NFCタグ割当解除
                     </Button>
                 </div>
             )}
@@ -204,6 +267,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                             >
                                 <Checkbox
                                     checked={repairs.length > 0 && selectedIds.length === repairs.length}
+                                    disabled={tagLocked.current}
                                     onCheckedChange={toggleSelectAll}
                                     className="cursor-pointer"
                                     onClick={(e) => e.stopPropagation()}
@@ -245,6 +309,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                     >
                                         <Checkbox
                                             checked={selectedIds.includes(repair.id)}
+                                            disabled={tagLocked.current}
                                             onCheckedChange={(checked) => setRepairSelected(repair.id, checked)}
                                             className="cursor-pointer"
                                             onClick={(e) => e.stopPropagation()}
@@ -353,6 +418,23 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     </tbody>
                 </table>
             </div>
+            <Dialog open={tagPreview !== null} onOpenChange={open => !open && closeTagPreview()}>
+                <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+                    <DialogHeader><DialogTitle>NFCタグ割当解除の確認</DialogTitle></DialogHeader>
+                    <p className="text-sm">解除対象 {tagPreview?.eligibleCount ?? 0}件 / 未割当スキップ {tagPreview?.skippedCount ?? 0}件</p>
+                    {tagPreview?.rows.some(row => row.status === "INVALID_ASSIGNMENT") &&
+                        <p className="text-sm text-red-700">無効なタグ割当があります。解除できません。</p>}
+                    <ul className="max-h-80 space-y-1 overflow-y-auto text-sm">
+                        {tagPreview?.rows.map(row => <li key={row.repairId} className="rounded border p-2">
+                            {row.inquiryNumber} / {row.shortCode ?? "タグなし"} / {row.status === "READY" ? "解除対象" : row.status === "NO_ACTIVE_ASSIGNMENT" ? "未割当・スキップ" : "確認が必要"}
+                        </li>)}
+                    </ul>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={closeTagPreview} disabled={tagBusy}>戻る</Button>
+                        <Button onClick={confirmTagRelease} disabled={tagBusy || !tagPreview?.releasable}>確認して解除</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <Dialog open={invoicePreview !== null} onOpenChange={(open) => !open && !isGenerating && setInvoicePreview(null)}>
                 <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
                     <DialogHeader><DialogTitle>請求書と前受金の充当を確認</DialogTitle></DialogHeader>
