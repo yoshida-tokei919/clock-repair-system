@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { queueEstimateLineSend, resolveEstimateLineDestination, EstimateLineNotFoundError, EstimateLineUnavailableError } from "./estimate-line-send";
 import { confirmLineManagerSendOutbox, LineManagerSendOutboxError } from "./line-manager-send-outbox";
-import { estimateLineKey, estimateLineKeyPrefix } from "./estimate-line-confirmation";
+import { businessEstimateLineKey, estimateLineKey, estimateLineKeyPrefix } from "./estimate-line-confirmation";
 
 const verifiedAt = new Date("2026-10-04T00:00:00Z");
 function repair(id: number, overrides: Record<string, unknown> = {}) {
@@ -39,24 +39,30 @@ test("estimate destination requires each Repair's own promoted Inquiry and one v
   ]) assert.throws(() => resolveEstimateLineDestination(bad as any, 4), EstimateLineUnavailableError);
 });
 
-function fakeDb() {
-  const rows = [repair(2), repair(3)];
+function fakeDb(business = false) {
+  const rows = business ? [repair(2, { inquiryWatchPromotion: null }), repair(3, { inquiryWatchPromotion: null })] : [repair(2), repair(3)];
   let outbox: any = null;
   let queued = 0;
+  let users = [{ id: 5, linkedCustomerId: 4, lineManagerChat: { id: 6, lineUserId: 5, verifiedAt } }];
+  let inquiry = { id: 8, lineUserId: 5 };
+  let chat = { id: 6, lineUserId: 5, verifiedAt, managerBotId: "bot", managerChatId: "chat" };
   const tx: any = {
     estimateDocument: { findUnique: async () => ({ customerId: 4, id: 11, repairs: rows,
-      currentPdfFile: { storageKey: "pdf-key" } }) },
+      currentPdfFile: { storageKey: "pdf-key", status: "current", estimateDocumentId: 11 } }) },
     $queryRaw: async (parts: TemplateStringsArray) => {
       const sql = parts.join("?");
-      if (sql.includes('FROM "Customer"')) return [{ id: 4 }];
+      if (sql.includes('FROM "Customer"')) return [{ id: 4, type: business ? "business" : "individual" }];
+      if (sql.includes('FROM "LineUser"')) return users.filter((user) => user.id === 5).map(({ linkedCustomerId }) => ({ linkedCustomerId }));
+      if (sql.includes('FROM "LineManagerChat"')) return [chat];
       if (sql.includes('FROM "EstimateDocument"') && sql.includes("FOR UPDATE")) return [{ customerId: 4 }];
       if (sql.includes('FROM "Repair"') && sql.includes("FOR UPDATE")) return rows.map((row) => ({ id: row.id }));
       if (sql.includes('FROM "EstimateDocument"')) return [{ publicToken: "document-token" }];
       if (sql.includes('FROM "Repair"')) return [{ publicToken: "repair-token" }];
       throw new Error(sql);
     },
-    inquiry: { findUnique: async () => ({ id: 8, lineUserId: 5 }) },
-    lineManagerChat: { findUnique: async () => ({ id: 6, lineUserId: 5, managerBotId: "bot", managerChatId: "chat" }) },
+    lineUser: { findMany: async () => users },
+    inquiry: { findUnique: async () => inquiry, findFirst: async () => inquiry },
+    lineManagerChat: { findUnique: async () => chat },
     repair: { findUnique: async () => repair(2) },
     lineManagerSendOutbox: {
       findFirst: async () => outbox,
@@ -67,8 +73,57 @@ function fakeDb() {
     },
   };
   return { db: { ...tx, $transaction: async (fn: (client: any) => Promise<unknown>) => fn(tx) } as any,
-    rows, get counts() { return { queued }; }, get outbox() { return outbox; } };
+    rows, get counts() { return { queued }; }, get outbox() { return outbox; },
+    set users(value: typeof users) { users = value; },
+    set inquiry(value: typeof inquiry) { inquiry = value; },
+    set chat(value: typeof chat) { chat = value; } };
 }
+
+test("business estimate queues one verified recipient without a promoted origin, including a single Repair", async () => {
+  for (const single of [false, true]) {
+    const fixture = fakeDb(true);
+    if (single) fixture.rows.pop();
+    await queueEstimateLineSend(fixture.db, 11, "https://example.com");
+    await queueEstimateLineSend(fixture.db, 11, "https://example.com");
+    assert.equal(fixture.counts.queued, 1);
+    assert.equal(fixture.outbox.sourceRepairId, null);
+    assert.equal(fixture.outbox.inquiryId, 8);
+    assert.deepEqual(fixture.rows.map((row) => row.status), fixture.rows.map(() => "見積中"));
+  }
+});
+
+test("business estimate rejects missing, ambiguous, unverified and changed recipients", async () => {
+  for (const change of [
+    (f: ReturnType<typeof fakeDb>) => { f.users = []; },
+    (f: ReturnType<typeof fakeDb>) => { f.inquiry = null as any; },
+    (f: ReturnType<typeof fakeDb>) => { f.users = [
+      { id: 5, linkedCustomerId: 4, lineManagerChat: { id: 6, lineUserId: 5, verifiedAt } },
+      { id: 7, linkedCustomerId: 4, lineManagerChat: { id: 7, lineUserId: 7, verifiedAt } } ]; },
+    (f: ReturnType<typeof fakeDb>) => { f.chat = { ...f.chat, verifiedAt: null as any }; },
+    (f: ReturnType<typeof fakeDb>) => { f.chat = { ...f.chat, lineUserId: 9 }; },
+    (f: ReturnType<typeof fakeDb>) => { f.users = [{ id: 5, linkedCustomerId: 9, lineManagerChat: { id: 6, lineUserId: 5, verifiedAt } }]; },
+    (f: ReturnType<typeof fakeDb>) => { f.rows[0].customerId = 9; },
+  ]) {
+    const fixture = fakeDb(true); change(fixture);
+    await assert.rejects(queueEstimateLineSend(fixture.db, 11, "https://example.com"), EstimateLineUnavailableError);
+    assert.equal(fixture.counts.queued, 0);
+  }
+  const fixture = fakeDb(true);
+  await queueEstimateLineSend(fixture.db, 11, "https://example.com");
+  fixture.inquiry = { id: 9, lineUserId: 5 };
+  await assert.rejects(queueEstimateLineSend(fixture.db, 11, "https://example.com"), EstimateLineUnavailableError);
+  assert.equal(fixture.counts.queued, 1);
+});
+
+test("business estimate requires a current PDF for the same document", async () => {
+  for (const pdf of [null, { storageKey: "pdf-key", status: "superseded", estimateDocumentId: 11 },
+    { storageKey: "pdf-key", status: "current", estimateDocumentId: 12 }]) {
+    const fixture = fakeDb(true);
+    fixture.db.estimateDocument.findUnique = async () => ({ id: 11, customerId: 4, repairs: fixture.rows, currentPdfFile: pdf });
+    await assert.rejects(queueEstimateLineSend(fixture.db, 11, "https://example.com"), EstimateLineUnavailableError);
+    assert.equal(fixture.counts.queued, 0);
+  }
+});
 
 test("estimate queue is idempotent, preserves share URL and does not call Push API", async () => {
   const fixture = fakeDb();
@@ -135,15 +190,18 @@ test("estimate route has no Messaging API Push transport", () => {
   assert.doesNotMatch(source, /api\.line\.me|message\/push|\bfetch\s*\(/);
 });
 
-function confirmationFixture(idempotencyKey?: string) {
-  const rows = [repair(2), repair(3)];
+function confirmationFixture(idempotencyKey?: string, business = false) {
+  const rows = business ? [repair(2, { inquiryWatchPromotion: null }), repair(3, { inquiryWatchPromotion: null })] : [repair(2), repair(3)];
   const timestamp = new Date("2026-10-04T01:00:00Z");
-  const key = idempotencyKey ?? estimateLineKey(11, 4, rows);
+  const destination = { lineUserId: 5, inquiryId: 8, lineManagerChatId: 6, verifiedAt, managerBotId: "bot", managerChatId: "chat" };
+  const key = idempotencyKey ?? (business ? businessEstimateLineKey(11, 4, rows, destination) : estimateLineKey(11, 4, rows));
   let status = "APPROVED";
   let message: any = null;
   let updates = 0;
   let logs = 0;
   let customerId = 4;
+  let linkedCustomerId = 4;
+  let inquiryId = 8;
   const outbox = {
     id: 20, idempotencyKey: key, sourceRepairId: null, inquiryId: 8, lineManagerChatId: 6,
     text: "estimate", reconciliationToken: "token", managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat",
@@ -152,6 +210,9 @@ function confirmationFixture(idempotencyKey?: string) {
   const tx: any = {
     $queryRaw: async (parts: TemplateStringsArray) => {
       const sql = parts.join("?");
+      if (sql.includes('FROM "Customer"')) return [{ id: customerId, type: business ? "business" : "individual" }];
+      if (sql.includes('FROM "LineUser"')) return [{ linkedCustomerId }];
+      if (sql.includes('FROM "LineManagerChat"')) return [{ id: 6, lineUserId: 5, verifiedAt, managerBotId: "bot", managerChatId: "chat" }];
       if (sql.includes('FROM "EstimateDocument"')) return [{ customerId }];
       if (sql.includes('FROM "Repair"')) return rows.map((row) => ({ id: row.id }));
       throw new Error(sql);
@@ -164,6 +225,9 @@ function confirmationFixture(idempotencyKey?: string) {
         row.status = data.status; updates++; return { count: 1 };
       },
     },
+    estimateDocument: { findUnique: async () => ({ customerId }) },
+    lineUser: { findMany: async () => [{ id: 5, linkedCustomerId, lineManagerChat: { id: 6, lineUserId: 5, verifiedAt } }] },
+    inquiry: { findFirst: async () => ({ id: inquiryId, lineUserId: 5 }) },
     repairStatusLog: { findFirst: async () => null, create: async () => { logs++; } },
     inquiryMessage: {
       findUnique: async () => null,
@@ -187,6 +251,8 @@ function confirmationFixture(idempotencyKey?: string) {
     rows, timestamp,
     set status(value: string) { status = value; },
     set customerId(value: number) { customerId = value; },
+    set linkedCustomerId(value: number) { linkedCustomerId = value; },
+    set inquiryId(value: number) { inquiryId = value; },
     get counts() { return { updates, logs }; },
     input: { id: 20, reconciliationToken: "token", actualMessageId: "actual", text: "estimate",
       timestamp, managerBotId: "bot", managerChatId: "chat" },
@@ -207,6 +273,26 @@ test("only Manager-history confirmation moves eligible estimate Repairs once", a
   assert.deepEqual(fixture.counts, { updates: 2, logs: 2 });
   await confirmLineManagerSendOutbox(fixture.db, fixture.input);
   assert.deepEqual(fixture.counts, { updates: 2, logs: 2 });
+});
+
+test("business confirmation changes status once only after Manager history and skips drift", async () => {
+  const good = confirmationFixture(undefined, true);
+  assert.deepEqual(good.counts, { updates: 0, logs: 0 });
+  good.status = "POST_UNCONFIRMED";
+  await confirmLineManagerSendOutbox(good.db, good.input);
+  await confirmLineManagerSendOutbox(good.db, good.input);
+  assert.deepEqual(good.counts, { updates: 2, logs: 2 });
+  for (const drift of [
+    (f: ReturnType<typeof confirmationFixture>) => { f.rows.push(repair(4, { inquiryWatchPromotion: null })); },
+    (f: ReturnType<typeof confirmationFixture>) => { f.rows[0].customerId = 9; },
+    (f: ReturnType<typeof confirmationFixture>) => { f.linkedCustomerId = 9; },
+    (f: ReturnType<typeof confirmationFixture>) => { f.inquiryId = 9; },
+  ]) {
+    const fixture = confirmationFixture(undefined, true); drift(fixture);
+    fixture.status = "POST_UNCONFIRMED";
+    await confirmLineManagerSendOutbox(fixture.db, fixture.input);
+    assert.deepEqual(fixture.counts, { updates: 0, logs: 0 });
+  }
 });
 
 test("confirmation leaves unrelated outboxes and Repairs in later statuses untouched", async () => {

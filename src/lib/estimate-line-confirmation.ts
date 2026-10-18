@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import type { Prisma } from "@prisma/client";
+import { resolveInvoiceLineDestination } from "./invoice-delivery-routing";
 
 const KEY_PREFIX = "estimate-document-line:";
 const WAITING_FOR_APPROVAL_STATUS = "承認待ち";
@@ -33,6 +34,37 @@ export function estimateLineKey(documentId: number, customerId: number, repairs:
 
 export function estimateLineKeyPrefix(documentId: number) { return `${KEY_PREFIX}${documentId}:`; }
 
+export type BusinessEstimateDestination = {
+  lineUserId: number; inquiryId: number; lineManagerChatId: number;
+  verifiedAt: Date; managerBotId: string; managerChatId: string;
+};
+
+/** Customer is locked by the caller. Lock the chosen user and chat, then check the entire routing decision again. */
+export async function resolveLockedBusinessEstimateDestination(tx: Prisma.TransactionClient, customerId: number) {
+  const first = await resolveInvoiceLineDestination(tx, customerId);
+  if (!first) return null;
+  const users = await tx.$queryRaw<{ linkedCustomerId: number | null }[]>`
+    SELECT "linkedCustomerId" FROM "LineUser" WHERE "id" = ${first.lineUserId} FOR UPDATE`;
+  if (users.length !== 1 || users[0].linkedCustomerId !== customerId) return null;
+  const chats = await tx.$queryRaw<{ id: number; lineUserId: number; verifiedAt: Date | null; managerBotId: string; managerChatId: string }[]>`
+    SELECT "id", "lineUserId", "verifiedAt", "managerBotId", "managerChatId"
+    FROM "LineManagerChat" WHERE "id" = ${first.lineManagerChatId} FOR UPDATE`;
+  const chat = chats[0];
+  if (chats.length !== 1 || chat.lineUserId !== first.lineUserId || !chat.verifiedAt) return null;
+  const current = await resolveInvoiceLineDestination(tx, customerId);
+  if (!current || current.lineUserId !== first.lineUserId || current.inquiryId !== first.inquiryId ||
+      current.lineManagerChatId !== first.lineManagerChatId) return null;
+  return { ...first, verifiedAt: chat.verifiedAt, managerBotId: chat.managerBotId, managerChatId: chat.managerChatId };
+}
+
+export function businessEstimateLineKey(documentId: number, customerId: number,
+  repairs: { id: number; customerId: number }[], destination: BusinessEstimateDestination) {
+  const snapshot = ["business", customerId, repairs.map(({ id, customerId }) => [id, customerId]),
+    destination.lineUserId, destination.inquiryId, destination.lineManagerChatId,
+    destination.verifiedAt.toISOString(), destination.managerBotId, destination.managerChatId];
+  return `${KEY_PREFIX}${documentId}:${crypto.createHash("sha256").update(JSON.stringify(snapshot)).digest("hex")}`;
+}
+
 /** Runs only for estimate intents after the Manager message has been verified. Drift skips the status effect. */
 export async function transitionConfirmedEstimateRepairs(
   tx: Prisma.TransactionClient,
@@ -45,10 +77,15 @@ export async function transitionConfirmedEstimateRepairs(
   if (!Number.isSafeInteger(documentId)) return 0;
 
   // Lock the document and current members so a concurrent edit cannot make the validation stale.
+  const initial = await tx.estimateDocument.findUnique({ where: { id: documentId }, select: { customerId: true } });
+  if (!initial) return 0;
+  const customers = await tx.$queryRaw<{ id: number; type: string }[]>`
+    SELECT "id", "type" FROM "Customer" WHERE "id" = ${initial.customerId} FOR UPDATE`;
+  if (customers.length !== 1) return 0;
   const documents = await tx.$queryRaw<{ customerId: number }[]>`
     SELECT "customerId" FROM "EstimateDocument" WHERE "id" = ${documentId} FOR UPDATE
   `;
-  if (documents.length !== 1) return 0;
+  if (documents.length !== 1 || documents[0].customerId !== initial.customerId) return 0;
   const lockedRepairs = await tx.$queryRaw<{ id: number }[]>`
     SELECT "id" FROM "Repair" WHERE "estimateDocumentId" = ${documentId} ORDER BY "id" FOR UPDATE
   `;
@@ -67,6 +104,14 @@ export async function transitionConfirmedEstimateRepairs(
   });
   const customerId = documents[0].customerId;
   if (!repairs.length || repairs.length !== lockedRepairs.length ||
+      repairs.some((repair, index) => repair.id !== lockedRepairs[index]?.id || repair.customerId !== customerId)) return 0;
+  if (customers[0].type === "business") {
+    if (outbox.sourceRepairId != null) return 0;
+    const destination = await resolveLockedBusinessEstimateDestination(tx, customerId);
+    if (!destination || destination.inquiryId !== outbox.inquiryId ||
+        destination.lineManagerChatId !== outbox.lineManagerChatId ||
+        businessEstimateLineKey(documentId, customerId, repairs, destination) !== outbox.idempotencyKey) return 0;
+  } else if (
       repairs.some((repair, index) => repair.id !== lockedRepairs[index]?.id ||
         repair.customerId !== customerId ||
         repair.inquiryWatchPromotion?.promotedRepairId !== repair.id ||

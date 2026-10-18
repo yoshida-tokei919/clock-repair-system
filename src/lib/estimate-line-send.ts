@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { buildCustomerShareUrl } from "./customer-share-url";
 import { createApprovedLineManagerSendOutbox } from "./line-manager-send-outbox";
-import { estimateLineKey, estimateLineKeyPrefix } from "./estimate-line-confirmation";
+import { businessEstimateLineKey, estimateLineKey, estimateLineKeyPrefix, resolveLockedBusinessEstimateDestination } from "./estimate-line-confirmation";
 
 
 export class EstimateLineNotFoundError extends Error {}
@@ -73,7 +73,7 @@ export async function queueEstimateLineSend(
     // Read the linkage first, then lock Customer -> document -> Repairs in a stable order.
     const initial = await tx.estimateDocument.findUnique({ where: { id: documentId }, select: { customerId: true } });
     if (!initial) throw new EstimateLineNotFoundError("見積書が見つかりません。");
-    const customers = await tx.$queryRaw<{ id: number }[]>`SELECT "id" FROM "Customer" WHERE "id" = ${initial.customerId} FOR UPDATE`;
+    const customers = await tx.$queryRaw<{ id: number; type: string }[]>`SELECT "id", "type" FROM "Customer" WHERE "id" = ${initial.customerId} FOR UPDATE`;
     if (customers.length !== 1) throw new EstimateLineUnavailableError("見積書の顧客を確認できません。");
     const documents = await tx.$queryRaw<{ customerId: number }[]>`SELECT "customerId" FROM "EstimateDocument" WHERE "id" = ${documentId} FOR UPDATE`;
     if (documents.length !== 1 || documents[0].customerId !== initial.customerId) {
@@ -86,7 +86,7 @@ export async function queueEstimateLineSend(
       where: { id: documentId },
       select: {
         id: true, customerId: true,
-        currentPdfFile: { select: { storageKey: true } },
+        currentPdfFile: { select: { storageKey: true, status: true, estimateDocumentId: true } },
         repairs: { orderBy: { id: "asc" }, select: {
           id: true, customerId: true, status: true,
           inquiryWatchPromotion: { select: {
@@ -104,14 +104,27 @@ export async function queueEstimateLineSend(
         document.repairs.some((repair, index) => repair.id !== lockedRepairs[index]?.id)) {
       throw new EstimateLineUnavailableError("見積書の修理案件が変更されました。");
     }
-    const destination = resolveEstimateLineDestination(document.repairs, document.customerId);
-    if (!document.currentPdfFile?.storageKey) throw new EstimateLineUnavailableError("PDF not generated");
+    if (!document.repairs.length || document.repairs.some((repair) => repair.customerId !== document.customerId)) {
+      throw new EstimateLineUnavailableError("見積書の修理案件の顧客が一致しません。");
+    }
+    const business = customers[0].type === "business";
+    const businessDestination = business ? await resolveLockedBusinessEstimateDestination(tx, document.customerId) : null;
+    if (business && !businessDestination) throw new EstimateLineUnavailableError("確認済みのLINE送信先がありません。");
+    const destination = business
+      ? { inquiryId: businessDestination!.inquiryId, lineManagerChatId: businessDestination!.lineManagerChatId }
+      : resolveEstimateLineDestination(document.repairs, document.customerId);
+    if (!document.currentPdfFile?.storageKey || (business &&
+        (document.currentPdfFile.status !== "current" || document.currentPdfFile.estimateDocumentId !== documentId))) {
+      throw new EstimateLineUnavailableError("PDF not generated");
+    }
 
     const publicToken = await ensurePublicToken(tx, "EstimateDocument", documentId);
     for (const repair of document.repairs) await ensurePublicToken(tx, "Repair", repair.id);
     const estimateUrl = buildCustomerShareUrl(`/customer/repairs/${publicToken}`, requestUrl);
     const text = `お見積りができましたので、下記ページよりご確認をお願いいたします。\n\n${estimateUrl}\n\nこの内容で進める場合は、画面上から承認をお願いいたします。\nご不明な点や修正のご希望がございましたら、このLINEからご連絡ください。`;
-    const idempotencyKey = estimateLineKey(documentId, document.customerId, document.repairs);
+    const idempotencyKey = business
+      ? businessEstimateLineKey(documentId, document.customerId, document.repairs, businessDestination!)
+      : estimateLineKey(documentId, document.customerId, document.repairs);
     const existing = await tx.lineManagerSendOutbox.findFirst({
       where: { idempotencyKey: { startsWith: estimateLineKeyPrefix(documentId) } },
       select: { id: true, idempotencyKey: true },
