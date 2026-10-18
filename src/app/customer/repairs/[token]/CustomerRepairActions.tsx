@@ -22,6 +22,7 @@ type Props = {
   inquiryNumber: string;
   repairStatus?: string;
   messages?: CustomerMessage[];
+  focusCommentId?: number;
   customerName?: string;
   photoPostingOptOut?: boolean;
   approvalDisabled?: boolean;
@@ -218,7 +219,7 @@ function getBusinessMessageSenderName(message: CustomerMessage, partnerName?: st
   return `${name || "取引先"} 様`;
 }
 
-export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, repairStatus = "", messages = [], customerName, photoPostingOptOut = false, approvalDisabled = false, approvalDisabledMessage = "", approvalAddress, approvalDialogOpen: controlledApprovalDialogOpen, onApprovalDialogOpenChange, onEditReturnAddress }: Props) {
+export function CustomerRepairActions({ token, isBusiness, isApproved = false, showApproval = true, lineUrl, inquiryNumber, repairStatus = "", messages = [], focusCommentId, customerName, photoPostingOptOut = false, approvalDisabled = false, approvalDisabledMessage = "", approvalAddress, approvalDialogOpen: controlledApprovalDialogOpen, onApprovalDialogOpenChange, onEditReturnAddress }: Props) {
   const router = useRouter();
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
@@ -232,6 +233,12 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
     onApprovalDialogOpenChange?.(open);
   };
   const completeApprovalAddress = isCompleteApprovalAddress(approvalAddress);
+
+  useEffect(() => {
+    if (!focusCommentId) return;
+    const target = document.getElementById(`comment-${focusCommentId}`);
+    target?.scrollIntoView({ block: "center" });
+  }, [focusCommentId]);
 
   const postAction = async (path: string, body?: unknown) => {
     setLoading(path);
@@ -381,7 +388,7 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
         {messages.length > 0 && (
           <div className="mt-3 space-y-2">
             {messages.map((message) => (
-              <div key={message.id} className="rounded-lg border border-blue-100 bg-blue-50/40 p-3 text-sm">
+              <div id={`comment-${message.id}`} key={message.id} className={`scroll-mt-6 rounded-lg border p-3 text-sm ${message.id === focusCommentId ? "border-blue-500 bg-blue-100 ring-2 ring-blue-300" : "border-blue-100 bg-blue-50/40"}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                   <span className="font-bold text-slate-800">{getBusinessMessageSenderName(message, customerName)}</span>
                   <span>{new Date(message.createdAt).toLocaleString("ja-JP")}</span>

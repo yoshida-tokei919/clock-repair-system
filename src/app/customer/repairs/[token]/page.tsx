@@ -22,12 +22,13 @@ import { CustomerB2CApprovalPanel } from "./CustomerB2CApprovalPanel";
 import { RepairPrepaymentCheckoutButton } from "@/components/customer/RepairPrepaymentCheckoutButton";
 import { PREPAYMENT_STATUS_LABELS } from "@/lib/repair-prepayment-display";
 import { publicShipmentViews } from "@/lib/customer-shipment-status";
+import { visibleCustomerCommentTarget } from "@/lib/b2b-repair-comment-notice";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ prepayment?: string | string[] }>;
+  searchParams: Promise<{ prepayment?: string | string[]; comment?: string | string[] }>;
 };
 
 const repairInclude = {
@@ -377,6 +378,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
 
   const primaryRepair = repairs[0];
   const isBusiness = primaryRepair.customer.type === "business";
+  const commentTarget = isBusiness ? visibleCustomerCommentTarget((await searchParams).comment, repairs) : null;
   const customerName = isBusiness
     ? primaryRepair.customer.companyName || primaryRepair.customer.name
     : primaryRepair.customer.name;
@@ -446,7 +448,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
 
           <CustomerShipmentStatusSection shipments={publicShipmentViews(repairs)} />
 
-          <CustomerRepairAccordionRoot>
+          <CustomerRepairAccordionRoot initialOpenIndex={commentTarget?.index ?? 0}>
             {repairs.map((repair, index) => {
               const estimateItems = getEstimateItems(repair);
               const { subtotal, taxAmount, total } = getEstimateAmounts(repair);
@@ -460,7 +462,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
               const brandModelLine = getWatchBrandModelLine(repair);
               const referenceName = repair.watch?.reference?.name || "";
               const serialNumber = repair.watch?.serialNumber || "";
-              const latestMessages = repair.customerMessages.slice(0, 2).map((message: any) => ({
+              const latestMessages = (commentTarget?.index === index ? repair.customerMessages : repair.customerMessages.slice(0, 2)).map((message: any) => ({
                 ...message,
                 createdAt: message.createdAt.toISOString(),
                 readAt: message.readAt ? message.readAt.toISOString() : null,
@@ -570,6 +572,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                     inquiryNumber={repair.inquiryNumber}
                     repairStatus={repair.status}
                     messages={latestMessages}
+                    focusCommentId={commentTarget?.index === index ? commentTarget.id : undefined}
                     photoPostingOptOut={repair.photoPostingOptOut}
                     customerName={customerName || "取引先"}
                   />

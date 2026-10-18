@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-api-auth";
 import { prisma } from "@/lib/prisma";
 import { getRecentRepairComments, getRepairCommentAccess } from "@/lib/repair-comments";
+import { saveRepairComment } from "@/lib/b2b-repair-comment-notice";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -26,9 +27,6 @@ export async function POST(request: Request, context: Context) {
   const input = await request.json().catch(() => null);
   const body = typeof input?.body === "string" ? input.body.trim() : "";
   if (!body || body.length > 500) return NextResponse.json({ error: "コメントは1～500文字で入力してください。" }, { status: 400 });
-  const message = await prisma.repairCustomerMessage.create({
-    data: { repairId, body, senderType: "shop", readAt: new Date() },
-    select: { id: true, body: true, senderType: true, createdAt: true, readAt: true },
-  });
-  return NextResponse.json({ message }, { status: 201 });
+  const result = await saveRepairComment(prisma, repairId, body, request.url);
+  return NextResponse.json({ success: true, ...result }, { status: 201 });
 }

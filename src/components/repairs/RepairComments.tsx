@@ -76,7 +76,9 @@ export function RepairComments({ repairId, focusMessageId }: { repairId: number;
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "コメントを保存できませんでした。");
       setBody("");
-      setNotice("コメントを保存しました。お客様へのLINE通知は未実装です。");
+      setNotice(data.notification === "sent" ? "コメントを保存しました。LINE送信確認済みです。" :
+        data.notification === "pending" ? "コメントを保存し、LINE通知を送信待ちにしました。" :
+        "コメントを保存しました。LINE通知は利用できません（対象外または確認済み宛先なし）。");
       await refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "コメントを保存できませんでした。"); }
     finally { setBusy(false); }
@@ -84,7 +86,7 @@ export function RepairComments({ repairId, focusMessageId }: { repairId: number;
 
   return <section className="space-y-3 p-4" aria-label="修理コメント">
     <div className="flex items-center justify-between gap-2"><h2 className="text-lg font-bold">修理コメント</h2><Button type="button" size="sm" variant="outline" onClick={() => void refresh()} disabled={loading}>更新</Button></div>
-    <p className="text-sm text-amber-800">返信は共有ページに保存されます。お客様へのLINE通知はまだ実装されていません。</p>
+    <p className="text-sm text-amber-800">返信は共有ページに保存されます。B2B案件では確認済みの取引先宛先がある場合にLINE通知が送信待ちになります。</p>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
     <div ref={scrollRef} className="max-h-[36rem] space-y-3 overflow-y-auto rounded border bg-zinc-50 p-3">
