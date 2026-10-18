@@ -8,6 +8,7 @@ import { RepairListStatusSelect } from "@/components/repairs/RepairListStatusSel
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileText, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { repairCommentsUrl } from "@/lib/repair-comments";
 import { useToast } from "@/components/ui/use-toast";
 import { ClickToCopy } from "@/components/ui/click-to-copy";
 import { generateBulkDocument, previewBulkInvoiceAllocations } from "@/actions/document-actions";
@@ -52,8 +53,8 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
             defaultShippingSize: customer.defaultShippingSize, defaultShippingFee: customer.defaultShippingFee,
         } : null;
     }, [repairs, selectedIds]);
-    const [readRepairIds, setReadRepairIds] = useState<number[]>([]);
     const [activeMessage, setActiveMessage] = useState<{
+        id: number;
         repairId: number;
         inquiryNumber: string;
         body: string;
@@ -152,7 +153,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     const handleMarkRead = async () => {
         if (!activeMessage) return;
 
-        const res = await fetch(`/api/repairs/${activeMessage.repairId}/messages/read`, { method: "POST" });
+        const res = await fetch(`/api/repairs/${activeMessage.repairId}/messages/read`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messageIds: [activeMessage.id] }) });
         if (!res.ok) {
             toast({
                 title: "エラー",
@@ -162,7 +163,6 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
             return;
         }
 
-        setReadRepairIds((prev) => [...prev, activeMessage.repairId]);
         setActiveMessage(null);
         router.refresh();
     };
@@ -284,8 +284,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                         {(() => {
                                             const latestMessage = repair.customerMessages?.[0];
-                                            const isRead = readRepairIds.includes(repair.id);
-                                            if (!latestMessage || isRead) {
+                                            if (!latestMessage) {
                                                 return <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-200" aria-label="未読コメントなし" />;
                                             }
 
@@ -294,6 +293,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                                     type="button"
                                                     onClick={() =>
                                                         setActiveMessage({
+                                                            id: latestMessage.id,
                                                             repairId: repair.id,
                                                             inquiryNumber: repair.inquiryNumber,
                                                             body: latestMessage.body,
@@ -415,7 +415,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     )}
                     <DialogFooter>
                         {activeMessage && (
-                            <Link href={`/repairs/${activeMessage.repairId}`}>
+                            <Link href={repairCommentsUrl(activeMessage.repairId, activeMessage.id)}>
                                 <Button variant="outline">詳細を開く</Button>
                             </Link>
                         )}

@@ -67,6 +67,7 @@ export default async function RepairsPage({
             FROM "RepairCustomerMessage"
             WHERE "repairId" IN (${Prisma.join(repairIds)})
               AND "readAt" IS NULL
+              AND "senderType" = 'partner'
             ORDER BY "repairId", "createdAt" DESC
           `;
         } catch (error) {

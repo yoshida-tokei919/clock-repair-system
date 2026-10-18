@@ -12,8 +12,9 @@ import { isApprovalAuditStatus } from "@/lib/repair-approval-audit";
 
 export const dynamic = "force-dynamic";
 
-export default async function RepairDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RepairDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; conversation?: string; messageId?: string }> }) {
     const repairId = parseInt((await params).id);
+    const query = await searchParams;
     if (isNaN(repairId)) return notFound();
 
     const repair = await prisma.repair.findUnique({
@@ -286,7 +287,7 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
                 itemNameSnapshot: item.itemNameSnapshot,
                 estimateDisplayNameSnapshot: item.estimateDisplayNameSnapshot,
             }))} />
-            <RepairEntryForm mode="view" initialData={initialData} />
+            <RepairEntryForm mode="view" initialData={initialData} initialTab={query.tab === "line" ? "line" : "main"} initialConversation={query.conversation === "comments" ? "comments" : "line"} focusMessageId={/^\d+$/.test(query.messageId ?? "") ? Number(query.messageId) : undefined} />
         </div>
     );
 }

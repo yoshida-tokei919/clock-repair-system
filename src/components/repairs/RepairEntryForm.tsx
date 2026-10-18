@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
@@ -60,6 +60,7 @@ import { INTERNAL_REPAIR_WORK_ACTION_KEYS, EXTERNAL_REPAIR_WORK_ACTION_KEYS, isR
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { toast } from "@/components/ui/use-toast";
 import { RepairLineConversation } from "./RepairLineConversation";
+import { RepairComments } from "./RepairComments";
 import {
     photoSharingFallbacks,
     repairPhotoCategories,
@@ -536,6 +537,9 @@ const AdvancedCombobox: React.FC<{
 interface Props {
     initialData?: any;
     mode?: 'create' | 'edit' | 'view';
+    initialTab?: 'main' | 'line';
+    initialConversation?: 'line' | 'comments';
+    focusMessageId?: number;
 }
 
 function getServerStateSyncKey(initialData: any): string {
@@ -555,7 +559,7 @@ function getServerStateSyncKey(initialData: any): string {
     });
 }
 
-export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
+export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'main', initialConversation = 'line', focusMessageId }: Props) {
     const router = useRouter();
     useAutoRefreshOnReturn({ refreshOnFocus: false, refreshOnVisibility: false });
     const [isSaving, setIsSaving] = useState(false);
@@ -1224,18 +1228,6 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [diagnosis, setDiagnosis] = useState(initialData?.workSummary || ""); // Diagnosis/Request details
     const [internalNotes, setInternalNotes] = useState(initialData?.internalNotes || "");
     const [customerNote, setCustomerNote] = useState(initialData?.customerNote || "");
-    const [staffReply, setStaffReply] = useState("");
-    const [isSendingStaffReply, setIsSendingStaffReply] = useState(false);
-    const [showCustomerComments, setShowCustomerComments] = useState(false);
-    const [userTouchedCustomerCommentsToggle, setUserTouchedCustomerCommentsToggle] = useState(false);
-    const customerMessages = initialData?.customerMessages || [];
-    const unreadCustomerMessageCount = customerMessages.filter((message: any) => !message.readAt).length;
-
-    useEffect(() => {
-        if (!userTouchedCustomerCommentsToggle && customerMessages.length > 0) {
-            setShowCustomerComments(true);
-        }
-    }, [customerMessages.length, userTouchedCustomerCommentsToggle]);
 
     // --- 4. PHOTOS ---
     const [photos, setPhotos] = useState<any[]>(initialData?.photos || []);
@@ -1420,7 +1412,18 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
     const [editingDateFor, setEditingDateFor] = useState<string | null>(null);
 
     // --- 8. TABS ---
-    const [activeTab, setActiveTab] = useState<'main' | 'photo' | 'document' | 'line'>('main');
+    const [activeTab, setActiveTab] = useState<'main' | 'photo' | 'document' | 'line'>(initialTab);
+    const [conversation, setConversation] = useState<'line' | 'comments'>(initialConversation);
+    const isBusinessRepair = initialData?.customer?.type === 'business';
+    const selectConversation = (next: 'line' | 'comments') => {
+        setConversation(next);
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', 'line');
+        if (next === 'comments') url.searchParams.set('conversation', 'comments');
+        else url.searchParams.delete('conversation');
+        url.searchParams.delete('messageId');
+        window.history.replaceState(null, '', url);
+    };
 
     // --- 9. PARTS PANEL ---
     const [partsPanelOpen, setPartsPanelOpen] = useState(false);
@@ -2273,51 +2276,6 @@ export function RepairEntryForm({ initialData, mode = 'create' }: Props) {
         }
     };
 
-    const handleStaffReply = async () => {
-        if (!initialData?.id) {
-            toast({ title: "案件保存後に返信できます。" });
-            return;
-        }
-
-        const body = staffReply.trim();
-        if (!body) {
-            toast({ title: "返信内容を入力してください。" });
-            return;
-        }
-
-        setIsSendingStaffReply(true);
-        try {
-            const res = await fetch(`/api/repairs/${initialData.id}/messages`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ body }),
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                throw new Error(json.error || "返信送信に失敗しました。");
-            }
-
-            setStaffReply("");
-            toast({
-                title: json.notification?.sent
-                    ? "返信を送信しました"
-                    : "返信を保存しました",
-                description: json.notification?.sent
-                    ? "LINEで共有ページへの通知を送信しました。"
-                    : "LINE通知は未送信です。共有ページには表示されます。",
-            });
-            router.refresh();
-        } catch (error) {
-            console.error(error);
-            toast({
-                title: "返信送信に失敗しました",
-                description: error instanceof Error ? error.message : undefined,
-            });
-        } finally {
-            setIsSendingStaffReply(false);
-        }
-    };
-
     const uploadPhotoFile = async (file: File) => {
         setIsUploading(true);
         try {
@@ -2863,80 +2821,11 @@ ${shopName}
                 </div>
             </div>
 
-            {initialData?.id && (
-                <div className="bg-white border-b border-zinc-200 px-4 py-2">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2 text-sm">
-                            <span className="font-bold text-zinc-700">共有ページコメント</span>
-                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">
-                                {customerMessages.length}件
-                            </span>
-                            {unreadCustomerMessageCount > 0 && (
-                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
-                                    未読 {unreadCustomerMessageCount}件
-                                </span>
-                            )}
-                        </div>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 px-3 text-xs"
-                            onClick={() => {
-                                setUserTouchedCustomerCommentsToggle(true);
-                                setShowCustomerComments((open) => !open);
-                            }}
-                        >
-                            {showCustomerComments ? "閉じる" : "開く"}
-                            <ChevronDown className={cn("ml-1 h-3.5 w-3.5 transition-transform", showCustomerComments && "rotate-180")} />
-                        </Button>
-                    </div>
-                    {showCustomerComments && (
-                        <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                            {customerMessages.length > 0 ? (
-                                <div className="space-y-2 max-h-32 overflow-y-auto">
-                                    {customerMessages.map((message: any) => (
-                                        <div
-                                            key={message.id}
-                                            className="rounded border border-blue-100 bg-blue-50 px-3 py-2 text-sm"
-                                        >
-                                            <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
-                                                <span className="font-bold text-zinc-600">共有ページコメント</span>
-                                                <span>{new Date(message.createdAt).toLocaleString('ja-JP')}</span>
-                                                {!message.readAt && <span className="font-bold text-blue-600">未読</span>}
-                                            </div>
-                                            <div className="mt-1 whitespace-pre-wrap text-zinc-700">{message.body}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="rounded border border-zinc-100 bg-white px-3 py-2 text-sm text-zinc-500">
-                                    共有ページからのコメントはまだありません。
-                                </div>
-                            )}
-                            <div className="mt-3 flex gap-2">
-                                <Textarea
-                                    value={staffReply}
-                                    onChange={(event) => setStaffReply(event.target.value.slice(0, 500))}
-                                    placeholder="共有ページへ返信する内容を入力..."
-                                    className="min-h-16 text-sm"
-                                    maxLength={500}
-                                />
-                                <Button
-                                    type="button"
-                                    onClick={handleStaffReply}
-                                    disabled={isSendingStaffReply || !staffReply.trim()}
-                                    className="h-auto shrink-0 bg-blue-600 hover:bg-blue-700"
-                                >
-                                    返信する
-                                </Button>
-                            </div>
-                            <div className="mt-1 text-right text-xs text-zinc-400">{staffReply.length}/500</div>
-                        </div>
-                    )}
+            {initialData?.id && !isBusinessRepair && (
+                <div className="border-b bg-white px-4 py-2 text-sm">
+                    <button type="button" className="text-blue-700 underline" onClick={() => { setActiveTab('line'); selectConversation('comments'); }}>共有ページコメントを見る</button>
                 </div>
             )}
-
             {/* --- TAB NAV --- */}
             <div className="bg-white border-b border-zinc-200 flex shrink-0">
                 {([
@@ -2948,7 +2837,13 @@ ${shopName}
                     <button
                         key={tab.id}
                         type="button"
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() => {
+                            setActiveTab(tab.id);
+                            const url = new URL(window.location.href);
+                            if (tab.id === 'line') url.searchParams.set('tab', 'line');
+                            else { url.searchParams.delete('tab'); url.searchParams.delete('conversation'); url.searchParams.delete('messageId'); }
+                            window.history.replaceState(null, '', url);
+                        }}
                         className={cn(
                             "px-8 py-2.5 text-sm font-bold border-b-2 transition-colors",
                             activeTab === tab.id
@@ -3968,7 +3863,15 @@ ${shopName}
                 )}
 
                 </fieldset>
-                {activeTab === 'line' && initialData?.id && <RepairLineConversation repairId={Number(initialData.id)} />}
+                {activeTab === 'line' && initialData?.id && <>
+                    <div className="flex gap-2 border-b bg-white px-4 py-3" aria-label="会話の種類">
+                        <Button type="button" size="sm" variant={conversation === 'line' ? 'default' : 'outline'} onClick={() => selectConversation('line')}>LINEトーク</Button>
+                        <Button type="button" size="sm" variant={conversation === 'comments' ? 'default' : 'outline'} onClick={() => selectConversation('comments')}>共有ページコメント</Button>
+                    </div>
+                    {conversation === 'comments'
+                        ? <RepairComments repairId={Number(initialData.id)} focusMessageId={focusMessageId} />
+                        : <RepairLineConversation repairId={Number(initialData.id)} />}
+                </>}
             </div>
 
             {/* --- DIALOGS --- */}
