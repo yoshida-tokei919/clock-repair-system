@@ -1,15 +1,15 @@
 "use client";
 
 import { useWorkTimer, type WorkTimerStartInput } from "./WorkTimerProvider";
+import { cardKey } from "@/lib/work-timer-cards";
 
 export function WorkTimerStartButton({ input, children }: { input: WorkTimerStartInput; children: React.ReactNode }) {
   const { active, loading, ready, busy, start } = useWorkTimer();
-  const same = active?.activityType === input.activityType &&
-    active.repairId === (input.repairId ?? null) &&
-    active.inquiryId === (input.inquiryId ?? null) &&
-    active.orderRequestId === (input.orderRequestId ?? null) &&
-    (input.repairLineItemId === undefined ||
-      (input.label !== undefined && active.workLabelSnapshot === input.label));
+  const same = ready && active !== null && cardKey(input) === cardKey({
+    activityType: active.activityType, repairId: active.repairId ?? undefined,
+    inquiryId: active.inquiryId ?? undefined, orderRequestId: active.orderRequestId ?? undefined,
+    label: active.workLabelSnapshot ?? undefined,
+  });
 
   return (
     <button type="button" onClick={() => void start(input)} disabled={loading || !ready || busy || same}

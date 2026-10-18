@@ -19,14 +19,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex flex-col min-h-screen">
-      <WorkTimerProvider>
+      <WorkTimerProvider adminEmail={admin.email}>
         <ScanSessionProvider>
           <Sidebar adminEmail={admin.email} />
-          <WorkTimerBar />
           <ScanReceiverBar />
-          <main className="flex-1">
-            <AdminPageArtwork>{children}</AdminPageArtwork>
-          </main>
+          <div className="flex min-h-0 min-w-0 flex-1">
+            <main className="min-w-0 flex-1">
+              <AdminPageArtwork>{children}</AdminPageArtwork>
+            </main>
+            <WorkTimerBar />
+          </div>
         </ScanSessionProvider>
       </WorkTimerProvider>
     </div>

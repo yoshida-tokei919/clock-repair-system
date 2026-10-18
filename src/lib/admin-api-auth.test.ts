@@ -81,6 +81,7 @@ const protectedRoutes: Record<string, string[]> = {
   "work-time-sessions/active": ["GET"],
   "work-time-sessions/start": ["POST"],
   "work-time-sessions/stop": ["POST"],
+  "work-time-sessions/totals": ["POST"],
 };
 
 function load(sourcePath: string, modules: Record<string, unknown>): Record<string, any> {

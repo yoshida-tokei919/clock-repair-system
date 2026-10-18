@@ -87,6 +87,15 @@ test("start without active, atomic switch, stop and idempotent stop", async () =
   assert.equal(fake.locks, 4);
 });
 
+test("stale tab cannot switch or stop another tab's active session", async () => {
+  const fake = fakeDb();
+  const first = await startWorkTimeSession(fake.db, parseStartInput({ activityType: "ADMIN" }), null);
+  const second = await startWorkTimeSession(fake.db, parseStartInput({ activityType: "OTHER" }), first.id);
+  await assert.rejects(() => startWorkTimeSession(fake.db, parseStartInput({ activityType: "INTAKE" }), first.id));
+  await assert.rejects(() => stopWorkTimeSession(fake.db, first.id));
+  assert.equal(fake.rows.filter(row => !row.endedAt && !row.invalidatedAt)[0]?.id, second.id);
+});
+
 test("active invalidate closes it and repeated invalidate is idempotent", async () => {
   const fake = fakeDb();
   const started = await startWorkTimeSession(fake.db, parseStartInput({ activityType: "OTHER" }));

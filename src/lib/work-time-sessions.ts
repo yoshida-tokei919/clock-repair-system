@@ -67,7 +67,7 @@ const lineSelect = {
   detailLabelSnapshot: true,
 } satisfies Prisma.RepairLineItemSelect;
 
-export async function startWorkTimeSession(db: PrismaClient, input: StartInput) {
+export async function startWorkTimeSession(db: PrismaClient, input: StartInput, expectedActiveId?: number | null) {
   const [repair, inquiry, orderRequest, line] = await Promise.all([
     input.repairId ? db.repair.findUnique({ where: { id: input.repairId }, select: repairSelect }) : null,
     input.inquiryId ? db.inquiry.findUnique({ where: { id: input.inquiryId }, select: { id: true } }) : null,
@@ -92,6 +92,8 @@ export async function startWorkTimeSession(db: PrismaClient, input: StartInput) 
   return db.$transaction(async tx => {
     await lockTimer(tx);
     const active = await tx.workTimeSession.findFirst({ where: activeWhere });
+    if (expectedActiveId !== undefined && (active?.id ?? null) !== expectedActiveId)
+      throw new WorkTimeInputError("Active timer changed. Refresh before starting another timer.");
     const now = secondPrecision(new Date());
     const startedAt = active ? closedAt(active.startedAt, now) : now;
     if (active) {
@@ -111,10 +113,12 @@ export async function startWorkTimeSession(db: PrismaClient, input: StartInput) 
 }
 
 export async function stopWorkTimeSessionInTransaction(
-  tx: Prisma.TransactionClient, options?: { repairId?: number },
+  tx: Prisma.TransactionClient, options?: { repairId?: number; expectedActiveId?: number },
 ) {
   await lockTimer(tx);
   const active = await tx.workTimeSession.findFirst({ where: activeWhere });
+  if (options?.expectedActiveId !== undefined && active?.id !== options.expectedActiveId)
+    throw new WorkTimeInputError("Active timer changed. Refresh before stopping it.");
   if (!active || (options?.repairId !== undefined && active.repairId !== options.repairId))
     return { stopped: false, session: null };
   const session = await tx.workTimeSession.update({
@@ -123,8 +127,8 @@ export async function stopWorkTimeSessionInTransaction(
   return { stopped: true, session };
 }
 
-export async function stopWorkTimeSession(db: PrismaClient) {
-  return db.$transaction(tx => stopWorkTimeSessionInTransaction(tx));
+export async function stopWorkTimeSession(db: PrismaClient, expectedActiveId?: number) {
+  return db.$transaction(tx => stopWorkTimeSessionInTransaction(tx, { expectedActiveId }));
 }
 
 export async function correctWorkTimeSession(
