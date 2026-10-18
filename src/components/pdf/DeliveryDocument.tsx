@@ -47,7 +47,7 @@ export interface DeliveryDocumentProps {
             inquiryNumber: string;
             endUserName?: string;
             partnerRef?: string;
-            watch: { brand: string; model: string; ref?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
+            watch: { brand: string; model: string; ref?: string; caseRef?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
             items: { name: string; price: number; quantity?: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
         }[];
         taxRate: number; // 0.1

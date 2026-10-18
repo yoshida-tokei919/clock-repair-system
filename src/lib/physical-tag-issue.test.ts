@@ -147,3 +147,14 @@ test("business label uses partner and end-user fields with Watch caliber fallbac
   assert.equal(label.caliber, "Watch Cal");
   assert.equal(label.qrPayload, "opaque_token_124");
 });
+
+test("physical tag reference omits blank model or case values", () => {
+  const base = { shortCode: "PT-000125", qrToken: "token", inquiryNumber: "B-125",
+    customerType: "business" as const, customerName: "Customer", companyName: null,
+    endUserName: null, partnerRef: null, brand: "Brand", model: "Model",
+    serialNumber: null, movementCaliber: null, watchCaliber: null, receptionDate: null };
+  assert.equal(physicalTagLabel({ ...base, reference: " R1 ", caseReference: " C1 " }).reference, "R1 C1");
+  assert.equal(physicalTagLabel({ ...base, reference: " R1 " }).reference, "R1");
+  assert.equal(physicalTagLabel({ ...base, reference: " ", caseReference: " C1 " }).reference, "C1");
+  assert.equal(physicalTagLabel({ ...base, reference: " ", caseReference: " " }).reference, "");
+});

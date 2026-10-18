@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       customer: true,
       repairs: {
         include: {
-          watch: { include: { brand: true, model: true, reference: true } },
+          watch: { include: { brand: true, model: true, reference: true, caseReference: true } },
           estimate: {
             include: {
               items: {
@@ -106,6 +106,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         timepieceTypeLabel: repair.watch.timepieceTypeLabel,
         model: repair.watch.model?.name || "",
         ref: repair.watch.reference?.name || undefined,
+        caseRef: repair.watch.caseReference?.name || undefined,
         serial: repair.watch.serialNumber || undefined,
       },
       items: estimateItems.map((item) => ({

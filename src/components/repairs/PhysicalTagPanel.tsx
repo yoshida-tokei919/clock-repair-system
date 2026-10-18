@@ -23,6 +23,7 @@ type Props = {
   brand: string;
   model: string;
   reference: string;
+  caseReference: string;
   serialNumber: string | null;
   movementCaliber: string | null;
   watchCaliber: string | null;
@@ -52,7 +53,7 @@ export function PhysicalTagPanel(props: Props) {
       inquiryNumber: props.inquiryNumber, customerType: props.customerType,
       customerName: props.customerName, companyName: props.companyName,
       endUserName: props.endUserName, partnerRef: props.partnerRef,
-      brand: props.brand, model: props.model, reference: props.reference,
+      brand: props.brand, model: props.model, reference: props.reference, caseReference: props.caseReference,
       serialNumber: props.serialNumber,
       movementCaliber: props.movementCaliber, watchCaliber: props.watchCaliber,
       receptionDate: props.receptionDate,

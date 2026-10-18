@@ -1,3 +1,5 @@
+import { formatWatchRef } from "./timepiece-type";
+
 export type PhysicalTagLabel = {
   shortCode: string;
   inquiryNumber: string;
@@ -15,6 +17,7 @@ export type PhysicalTagLabel = {
 };
 
 type LabelInput = Omit<PhysicalTagLabel, "qrPayload" | "customerName" | "caliber"> & {
+  caseReference?: string | null;
   qrToken: string;
   customerName: string;
   companyName: string | null;
@@ -23,9 +26,10 @@ type LabelInput = Omit<PhysicalTagLabel, "qrPayload" | "customerName" | "caliber
 };
 
 export function physicalTagLabel(input: LabelInput): PhysicalTagLabel {
-  const { qrToken, companyName, movementCaliber, watchCaliber, ...display } = input;
+  const { qrToken, companyName, movementCaliber, watchCaliber, caseReference, ...display } = input;
   return {
     ...display,
+    reference: formatWatchRef({ ref: input.reference, caseRef: caseReference }),
     customerName: input.customerType === "business"
       ? companyName?.trim() || input.customerName
       : input.customerName,

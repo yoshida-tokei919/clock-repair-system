@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import path from "node:path";
+import React from "react";
 import { isValidElement, type ReactNode } from "react";
 import { Font, Image, Page, Text, pdf } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { TagDocument, TAG_PAGE_SIZE, TAG_QR_SIZE } from "./TagDocument";
 import type { PhysicalTagLabel } from "@/lib/physical-tag-label";
+import { physicalTagLabel } from "@/lib/physical-tag-label";
 
 const label: PhysicalTagLabel = {
   shortCode: "PT-000123", inquiryNumber: "T-999", customerType: "business",
@@ -77,6 +79,14 @@ test("missing optional fields do not print placeholder rows", () => {
   for (const absent of ["取引先管理番号", "エンドユーザー", "Ref.", "シリアル", "Cal.", "受付日", "—"]) {
     assert.ok(!printed.includes(absent), absent);
   }
+});
+
+test("tag Ref retains its punctuation and prints both reference values", () => {
+  const combined = physicalTagLabel({ ...label, qrToken: label.qrPayload, companyName: "Company",
+    movementCaliber: null, watchCaliber: null, caseReference: " C-1 " });
+  const printed = elements(TagDocument({ label: combined, qrCodeDataUrl: "data:image/png;base64,AA==" }))
+    .filter(node => node.type === Text).map(node => elementsText(node.props.children as ReactNode)).join(" ");
+  assert.ok(printed.includes("Ref. 16233 C-1"));
 });
 
 function elementsText(node: ReactNode): string {

@@ -30,7 +30,7 @@ export async function prepareB2bBatchPhysicalTags(db: PrismaClient, repairIds: n
       watch: { select: {
         modelNameInput: true, serialNumber: true,
         brand: { select: { name: true, nameJp: true } },
-          model: { select: { name: true, nameJp: true } }, reference: { select: { name: true } },
+          model: { select: { name: true, nameJp: true } }, reference: { select: { name: true } }, caseReference: { select: { name: true } },
         caliber: { select: { name: true } },
       } },
     },
@@ -93,7 +93,7 @@ export async function prepareB2bBatchPhysicalTags(db: PrismaClient, repairIds: n
         endUserName: repair.endUserName, partnerRef: repair.partnerRef,
         brand: repair.watch.brand.nameJp || repair.watch.brand.name,
           model: repair.watch.model?.nameJp || repair.watch.model?.name || repair.watch.modelNameInput || "",
-        reference: repair.watch.reference?.name || "", serialNumber: repair.watch.serialNumber,
+        reference: repair.watch.reference?.name || "", caseReference: repair.watch.caseReference?.name || "", serialNumber: repair.watch.serialNumber,
         movementCaliber: repair.movementCaliber?.name ?? null, watchCaliber: repair.watch.caliber?.name ?? null,
         receptionDate: repair.receptionDate?.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) ?? null,
       }),

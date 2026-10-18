@@ -37,7 +37,11 @@ export function timepieceTypePrefix(watch: { timepieceType?: TimepieceType | nul
   return timepieceTypeInputValue(watch);
 }
 
-type WatchInformation = { brand?: string | null; model?: string | null; ref?: string | null; serial?: string | null; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null };
+type WatchInformation = { brand?: string | null; model?: string | null; ref?: string | null; caseRef?: string | null; serial?: string | null; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null };
+
+export function formatWatchRef(watch: Pick<WatchInformation, "ref" | "caseRef">): string {
+  return [watch.ref?.trim(), watch.caseRef?.trim()].filter(Boolean).join(" ");
+}
 
 export function formatWatchHeading(watch: WatchInformation): string {
   const type = timepieceTypePrefix(watch);
@@ -45,12 +49,12 @@ export function formatWatchHeading(watch: WatchInformation): string {
   return type ? [type, name].filter(Boolean).join(" / ") : name;
 }
 
-export function formatWarrantyIdentifiers(watch: Pick<WatchInformation, "ref" | "serial">): string {
-  return [watch.ref?.trim(), watch.serial?.trim()].filter(Boolean).join(" / ");
+export function formatWarrantyIdentifiers(watch: Pick<WatchInformation, "ref" | "caseRef" | "serial">): string {
+  return [formatWatchRef(watch), watch.serial?.trim()].filter(Boolean).join(" / ");
 }
 
 export function formatWatchInformation(watch: WatchInformation, style: "estimate" | "delivery" | "invoice" = "invoice"): string {
-  const ref = watch.ref?.trim();
+  const ref = formatWatchRef(watch);
   const serial = watch.serial?.trim();
   if (style === "estimate") {
     const type = timepieceTypePrefix(watch);

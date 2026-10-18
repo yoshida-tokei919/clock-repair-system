@@ -114,7 +114,7 @@ export interface WarrantyDocumentProps {
         issueDate: string;
         guaranteeStart: string;
         guaranteeEnd: string;
-        watch: { brand: string; model: string; ref?: string; serial: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
+        watch: { brand: string; model: string; ref?: string; caseRef?: string; serial: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
         repairSummary: string; // "Overhaul, Gaskets"
         qrCodeUrl?: string; // Data URL for QR Code image
     }

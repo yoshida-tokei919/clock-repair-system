@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TimepieceType } from "@prisma/client";
-import { formatWarrantyIdentifiers, formatWatchHeading, formatWatchInformation, parseTimepieceType, timepieceTypeInputValue, timepieceTypeUpdateForCreateReuse, TIMEPIECE_TYPE_CHOICES } from "./timepiece-type";
+import { formatWatchRef, formatWarrantyIdentifiers, formatWatchHeading, formatWatchInformation, parseTimepieceType, timepieceTypeInputValue, timepieceTypeUpdateForCreateReuse, TIMEPIECE_TYPE_CHOICES } from "./timepiece-type";
 
 test("operator dropdown has exactly the approved four choices", () => {
   assert.deepEqual(TIMEPIECE_TYPE_CHOICES, ["掛時計", "置時計", "懐中時計", "ホールクロック"]);
@@ -60,4 +60,22 @@ test("B2C invoice retains Ref and Serial labels and warranty heading uses the ty
   assert.equal(formatWarrantyIdentifiers(watch), "R1 / S1");
   assert.equal(formatWarrantyIdentifiers({ ref: "", serial: "S1" }), "S1");
   assert.equal(formatWarrantyIdentifiers({}), "");
+});
+
+test("printed Ref joins model then case with one space, including legacy model-only data", () => {
+  for (const [watch, expected] of [
+    [{ ref: " R1 ", caseRef: " C1 " }, "R1 C1"],
+    [{ ref: " R1 " }, "R1"],
+    [{ ref: "  ", caseRef: " C1 " }, "C1"],
+    [{ ref: "", caseRef: " " }, ""],
+    [{ ref: "R1" }, "R1"],
+  ] as const) {
+    assert.equal(formatWatchRef(watch), expected);
+    const base = { brand: "SEIKO", model: "A", serial: "S1", ...watch };
+    assert.equal(formatWatchInformation(base, "estimate"), `SEIKO\nA${expected ? `\nRef: ${expected}` : ""}\nSer: S1`);
+    assert.equal(formatWatchInformation(base, "delivery"), `SEIKO A\n${expected ? `Ref: ${expected} / ` : ""}Ser: S1`);
+    assert.equal(formatWatchInformation(base, "invoice"), `SEIKO A${expected ? `\nRef: ${expected}` : ""}\nSerial: S1`);
+    assert.equal(formatWarrantyIdentifiers(base), `${expected ? `${expected} / ` : ""}S1`);
+  }
+  assert.equal(formatWarrantyIdentifiers({ ref: " ", caseRef: " " }), "");
 });

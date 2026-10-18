@@ -250,6 +250,7 @@ export default async function RepairDetailPage({ params }: { params: Promise<{ i
                 brand={repair.watch.brand.nameJp || repair.watch.brand.name}
                 model={repair.watch.model?.nameJp || repair.watch.modelNameInput || ""}
                 reference={repair.watch.reference?.name || ""}
+                caseReference={repair.watch.caseReference?.name || ""}
                 serialNumber={repair.watch.serialNumber}
                 movementCaliber={repair.movementCaliber?.name ?? null}
                 watchCaliber={repair.watch.caliber?.name ?? null}

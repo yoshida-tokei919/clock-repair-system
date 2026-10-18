@@ -19,7 +19,7 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
             customer: true,
             repairs: {
                 include: {
-                    watch: { include: { brand: true, model: true, reference: true } },
+                    watch: { include: { brand: true, model: true, reference: true, caseReference: true } },
                     estimate: { include: { items: { include: { partsMaster: { select: { grade: true, notes2: true } } } } } }
                 }
             }
@@ -53,6 +53,7 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
                 timepieceTypeLabel: repair.watch.timepieceTypeLabel,
                 model: repair.watch.model?.name || "",
                 ref: repair.watch.reference?.name || "",
+                caseRef: repair.watch.caseReference?.name || "",
                 serial: repair.watch.serialNumber || ""
             },
             items: estimateItems.map(i => ({

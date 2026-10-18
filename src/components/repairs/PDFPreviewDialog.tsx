@@ -67,6 +67,7 @@ export default function PDFPreviewDialog({ isOpen, onClose, repairData }: PDFPre
             brand: repairData.watch?.brand || repairData.watch?.brandName || "",
             model: repairData.watch?.model || repairData.watch?.modelName || "",
             ref: repairData.watch?.ref || repairData.watch?.refName || "",
+            caseRef: repairData.watch?.caseRef || repairData.watch?.caseReference?.name || "",
             serial: repairData.watch?.serial || repairData.watch?.serialNumber || ""
         },
         items: repairData.estimate?.items?.map((i: any) => ({

@@ -16,7 +16,7 @@ export interface EstimateServerDocumentProps {
       partnerRef?: string;
       endUserName?: string;
       customerNote?: string;
-      watch: { brand: string; model: string; ref?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null };
+      watch: { brand: string; model: string; ref?: string; caseRef?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null };
       subtotalAmount?: number;
       taxAmount?: number;
       totalAmount?: number;

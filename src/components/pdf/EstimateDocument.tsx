@@ -43,7 +43,7 @@ export interface EstimateDocumentProps {
       partnerRef?: string;
       endUserName?: string;
       customerNote?: string;
-      watch: { brand: string; model: string; ref?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
+      watch: { brand: string; model: string; ref?: string; caseRef?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
       items: { name: string; price: number; qty?: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
     }[];
   }

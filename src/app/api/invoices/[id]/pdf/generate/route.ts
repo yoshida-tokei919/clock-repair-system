@@ -105,6 +105,7 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
         timepieceTypeLabel: repair?.watch.timepieceTypeLabel,
         model: repair?.watch.model?.name ?? repair?.watch.modelNameInput ?? "",
         ref: repair?.watch.reference?.name ?? undefined,
+        caseRef: repair?.watch.caseReference?.name ?? undefined,
         serial: repair?.watch.serialNumber ?? undefined,
       },
       workDescriptions: (repair?.estimate?.items ?? []).map(
@@ -147,7 +148,7 @@ function findInvoiceForPdf(invoiceId: number) {
         payment: { select: { kind: true, status: true } } } },
       repairs: {
         include: {
-          watch: { include: { brand: true, model: true, reference: true } },
+          watch: { include: { brand: true, model: true, reference: true, caseReference: true } },
           estimate: { include: { items: true } },
         },
       },

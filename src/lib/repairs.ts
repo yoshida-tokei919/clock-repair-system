@@ -10,7 +10,7 @@ export async function getRepairDataForPDF(id: number) {
         include: {
             customer: true,
             watch: {
-                include: { brand: true, model: true, caliber: true, reference: true }
+                include: { brand: true, model: true, caliber: true, reference: true, caseReference: true }
             },
             estimate: {
                 include: { items: { include: { partsMaster: { select: { grade: true, notes2: true } } } } }
@@ -61,6 +61,7 @@ export async function getRepairDataForPDF(id: number) {
                     timepieceTypeLabel: repair.watch.timepieceTypeLabel,
                     model: repair.watch.model?.name || repair.watch.modelNameInput || "モデル未設定",
                     ref: repair.watch.reference?.name || "",
+                    caseRef: repair.watch.caseReference?.name || "",
                     serial: repair.watch.serialNumber || "",
                 },
                 items: repair.estimate?.items.map(item => ({

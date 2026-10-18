@@ -8,7 +8,7 @@ function repair(id: number, customerId = 7, type = "business") {
     receptionDate: new Date("2026-10-06T00:00:00Z"), customer: { type, name: "Partner", companyName: "Partner Co" },
     movementCaliber: { name: "3135" }, watch: { modelNameInput: null, serialNumber: `SN-${id}`,
       brand: { name: "Rolex", nameJp: "ロレックス" }, model: { nameJp: "" },
-      reference: { name: "16610" }, caliber: { name: "Watch Cal" } } };
+      reference: { name: "16610" }, caseReference: { name: "C-1" }, caliber: { name: "Watch Cal" } } };
 }
 
 function fixture(rows = [repair(10), repair(11)]) {
@@ -85,6 +85,7 @@ test("reuses active tag, issues only missing, preserves order and canonical priv
   assert.equal(first[1].label.qrPayload, "new-token-4");
   assert.equal(first[1].label.customerName, "Partner Co");
   assert.equal(first[1].label.brand, "ロレックス");
+  assert.equal(first[1].label.reference, "16610 C-1");
   assert.equal(first[1].label.caliber, "3135");
   assert.ok(!first[1].label.qrPayload.includes(first[1].label.inquiryNumber));
   assert.ok(!first[1].label.qrPayload.includes(first[1].label.customerName));

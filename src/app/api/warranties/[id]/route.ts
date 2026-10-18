@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         include: {
             repairs: {
                 include: {
-                    watch: { include: { brand: true, model: true, reference: true } },
+                    watch: { include: { brand: true, model: true, reference: true, caseReference: true } },
                     estimate: { include: { items: true } },
                 },
                 take: 1,
@@ -29,6 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const brand = repair?.watch.brand?.nameJp || repair?.watch.brand?.name || "";
     const model = repair?.watch.model?.name || "";
     const ref = repair?.watch.reference?.name || "";
+    const caseRef = repair?.watch.caseReference?.name || "";
     const serial = repair?.watch.serialNumber || "";
 
     return NextResponse.json({
@@ -37,7 +38,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         issuedDate: formatIssuedDate(warranty.issuedDate),
         guaranteeStart: warranty.guaranteeStart.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
         guaranteeEnd: warranty.guaranteeEnd.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
-        watch: { brand, model, ref, serial, timepieceType: repair?.watch.timepieceType, timepieceTypeLabel: repair?.watch.timepieceTypeLabel },
+        watch: { brand, model, ref, caseRef, serial, timepieceType: repair?.watch.timepieceType, timepieceTypeLabel: repair?.watch.timepieceTypeLabel },
         repairSummary: workSummary,
     });
 }

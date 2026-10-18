@@ -35,7 +35,7 @@ export interface InvoiceDocumentProps {
     sourceCustomerName?: string;
     items: { date: string; slipNumber: string; description: string; amount: number }[];
     taxRate: number; pricingTaxMode?: string; subtotalAmount?: number; taxAmount?: number; shippingFeeAmount?: number; grossTotalAmount?: number; prepaymentAppliedAmount?: number; bankInfo?: string;
-    b2cJobs?: { inquiryNumber: string; watch: { brand: string; model: string; ref?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null }; workDescriptions: string[]; amount: number }[];
+    b2cJobs?: { inquiryNumber: string; watch: { brand: string; model: string; ref?: string; caseRef?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null }; workDescriptions: string[]; amount: number }[];
   };
 }
 
