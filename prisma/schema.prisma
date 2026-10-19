@@ -950,6 +950,7 @@ model Repair {
   photos        RepairPhoto[]
   estimate      Estimate?
   estimateOptionSet EstimateOptionSet?
+  estimateOptionApproval EstimateOptionApproval?
   repairLineItems RepairLineItem[]
   orderRequests OrderRequest[]
   partAllocations RepairPartAllocation[]
@@ -1434,6 +1435,30 @@ model EstimateOptionLine {
   sortOrder Int @default(0)
   choice EstimateOptionChoice @relation(fields: [choiceId], references: [id], onDelete: Cascade)
   @@index([choiceId, sortOrder])
+}
+
+// Server-only, immutable record of the first public B2B option approval.
+// Reissue/reapproval requires a separate revision workflow.
+model EstimateOptionApproval {
+  id Int @id @default(autoincrement())
+  repairId Int @unique
+  estimateDocumentId Int
+  pdfFileId Int
+  pdfVersion Int
+  optionSetId Int
+  optionSourceHash String
+  planChoiceId Int?
+  addOnChoiceIds Json
+  lineSnapshot Json
+  approverName String
+  approvalMethod String @default("public-share")
+  grossAmount Int
+  taxAmount Int
+  approvedAt DateTime @default(now())
+  repair Repair @relation(fields: [repairId], references: [id], onDelete: Restrict)
+  estimateDocument EstimateDocument @relation(fields: [estimateDocumentId], references: [id], onDelete: Restrict)
+  pdfFile EstimatePdfFile @relation(fields: [pdfFileId], references: [id], onDelete: Restrict)
+  @@index([estimateDocumentId, pdfFileId])
 }
 
 model EstimateItem {
@@ -2135,6 +2160,7 @@ model EstimateDocument {
 
   repairs         Repair[]
   pdfFiles        EstimatePdfFile[] @relation("EstimateDocumentPdfFiles")
+  optionApprovals EstimateOptionApproval[]
   currentPdfFile  EstimatePdfFile?  @relation("CurrentEstimatePdfFile", fields: [currentPdfFileId], references: [id], onDelete: SetNull)
 
   totalAmount     Int      @default(0)
@@ -2151,6 +2177,7 @@ model EstimatePdfFile {
   contentType        String           @default("application/pdf")
   fileSize           Int?
   hash               String?
+  optionSourceHashes Json?
   version            Int
   status             String           @default("current")
   generatedAt        DateTime         @default(now())
@@ -2162,6 +2189,7 @@ model EstimatePdfFile {
   estimateDocument   EstimateDocument  @relation("EstimateDocumentPdfFiles", fields: [estimateDocumentId], references: [id], onDelete: Cascade)
   currentForDocument EstimateDocument? @relation("CurrentEstimatePdfFile")
   customer           Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  optionApprovals EstimateOptionApproval[]
 
   @@index([estimateDocumentId])
   @@index([customerId])

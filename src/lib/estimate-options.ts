@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { createHash } from "node:crypto";
 import { assertYen, calculateTaxableAmounts, sumCustomerLines, type PricingTaxMode } from "@/lib/pricing-tax";
 
 export type OptionLineInput = {
@@ -96,6 +97,93 @@ export function optionTotals(commonLines: readonly { unitPrice: number; quantity
   return choices.map((choice) => choice.kind === "PLAN"
     ? selectedOptionTotal(commonLines, choice, [], mode)
     : selectedOptionTotal([], null, [choice], mode));
+}
+
+export function commonEstimateAmountMatches(items: readonly { unitPrice: number; quantity: number }[], estimate: { totalAmount: number; taxAmount: number }, mode: PricingTaxMode): boolean {
+  return sumCustomerLines(items) === estimate.totalAmount + (mode === "INCLUSIVE" ? estimate.taxAmount : 0);
+}
+
+type IssuedOptionRepair = {
+  id: number;
+  customerId: number;
+  inquiryNumber?: string;
+  partnerRef?: string | null;
+  endUserName?: string | null;
+  customerNote?: string | null;
+  watch?: { timepieceType: string | null; timepieceTypeLabel: string | null; serialNumber: string | null;
+    brand: { name: string } | null; model: { name: string } | null; reference: { name: string } | null; caseReference: { name: string } | null };
+  estimate: { pricingTaxMode: string; totalAmount: number; taxAmount: number; discountAmount: number; shipping: number; items: { id: number; itemName: string; type: string; unitPrice: number; quantity: number; partsMasterId: number | null; partsMaster?: { grade: string | null; notes2: string | null } | null; sourceAreaSnapshot: string | null; categoryNameSnapshot: string | null; targetPartNameSnapshot: string | null; actionNameSnapshot: string | null; detailLabelSnapshot: string | null; b2cDisplayNameSnapshot: string | null; gradeNameSnapshot: string | null }[] } | null;
+  estimateOptionSet: { id: number; title: string; notes: string | null; isActive: boolean; choices: { id: number; kind: string; name: string; notes: string | null; recommended: boolean; sortOrder: number; lines: { id: number; sortOrder: number; lineType: string; itemNameSnapshot: string; displayNameSnapshot: string | null; notesForCustomerSnapshot: string | null; workTypeSnapshot: string | null; categoryNameSnapshot: string | null; actionNameSnapshot: string | null; targetPartNameSnapshot: string | null; detailLabelSnapshot: string | null; partsMasterId: number | null; pricingRuleId: number | null; repairWorkCategoryId: number | null; repairWorkActionId: number | null; targetPartNameId: string | null; quantity: number; unitPrice: number }[] }[] } | null;
+};
+
+// Stable projection of everything that can affect the issued common and option lines.
+// A pre-C PDF has no hash and must be regenerated before public option approval.
+export function issuedOptionSourceHash(document: { id: number; customerId: number; pricingTaxMode: string; totalAmount: number; taxAmount: number;
+  estimateNumber?: string; issuedDate?: Date; customer?: { type: string; name: string; companyName: string | null; address: string | null } }, repair: IssuedOptionRepair): string {
+  const estimate = repair.estimate;
+  const set = repair.estimateOptionSet;
+  const source = {
+    documentId: document.id, documentCustomerId: document.customerId, documentTaxMode: document.pricingTaxMode,
+    documentTotal: document.totalAmount, documentTax: document.taxAmount,
+    estimateNumber: document.estimateNumber, issuedDate: document.issuedDate?.toISOString(),
+    customer: document.customer && { type: document.customer.type, name: document.customer.name,
+      companyName: document.customer.companyName, address: document.customer.address },
+    repairId: repair.id, repairCustomerId: repair.customerId, estimateTaxMode: estimate?.pricingTaxMode,
+    inquiryNumber: repair.inquiryNumber, partnerRef: repair.partnerRef, endUserName: repair.endUserName,
+    customerNote: repair.customerNote,
+    watch: repair.watch && { timepieceType: repair.watch.timepieceType, timepieceTypeLabel: repair.watch.timepieceTypeLabel,
+      serialNumber: repair.watch.serialNumber, brand: repair.watch.brand?.name, model: repair.watch.model?.name,
+      reference: repair.watch.reference?.name, caseReference: repair.watch.caseReference?.name },
+    estimateTotal: estimate?.totalAmount, estimateTax: estimate?.taxAmount,
+    estimateDiscount: estimate?.discountAmount, estimateShipping: estimate?.shipping,
+    commonLines: estimate?.items.map(item => ({
+      id: item.id, itemName: item.itemName, type: item.type, unitPrice: item.unitPrice, quantity: item.quantity,
+      partsMasterId: item.partsMasterId, partsMaster: item.partsMaster && { grade: item.partsMaster.grade, notes2: item.partsMaster.notes2 },
+      sourceAreaSnapshot: item.sourceAreaSnapshot, categoryNameSnapshot: item.categoryNameSnapshot,
+      targetPartNameSnapshot: item.targetPartNameSnapshot, actionNameSnapshot: item.actionNameSnapshot,
+      detailLabelSnapshot: item.detailLabelSnapshot, b2cDisplayNameSnapshot: item.b2cDisplayNameSnapshot, gradeNameSnapshot: item.gradeNameSnapshot,
+    })).sort((a, b) => a.id - b.id),
+    set: set && { id: set.id, title: set.title, notes: set.notes, isActive: set.isActive,
+      choices: set.choices.map(choice => ({
+        id: choice.id, kind: choice.kind, name: choice.name, notes: choice.notes, recommended: choice.recommended, sortOrder: choice.sortOrder,
+        lines: choice.lines.map(line => ({ ...line })).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id),
+      })).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id),
+    },
+  };
+  return createHash("sha256").update(JSON.stringify(source)).digest("hex");
+}
+
+export function validateOptionSelection<T extends { id: number; kind: string; lines: { unitPrice: number; quantity: number }[] }>(set: { choices: T[] }, planChoiceId: unknown, addOnChoiceIds: unknown) {
+  if (!Array.isArray(addOnChoiceIds) || addOnChoiceIds.length > 30 || addOnChoiceIds.some(id => !Number.isSafeInteger(id) || id < 1)) throw new Error("追加作業の選択が不正です。");
+  const ids = addOnChoiceIds as number[];
+  if (new Set(ids).size !== ids.length) throw new Error("追加作業が重複しています。");
+  const plans = set.choices.filter(choice => choice.kind === "PLAN");
+  if (plans.length && (!Number.isSafeInteger(planChoiceId) || !plans.some(choice => choice.id === planChoiceId))) throw new Error("プランを1つ選択してください。");
+  if (!plans.length && planChoiceId !== null) throw new Error("プランの選択が不正です。");
+  const addOns = set.choices.filter(choice => choice.kind === "ADD_ON" && ids.includes(choice.id));
+  if (addOns.length !== ids.length) throw new Error("追加作業の選択が不正です。");
+  return { plan: plans.find(choice => choice.id === planChoiceId) ?? null, addOns };
+}
+
+export function isIssuedOptionPdfCurrent(pdf: { id: number; estimateDocumentId: number; status: string; storageKey: string; hash: string | null; fileSize: number | null; optionSourceHashes: unknown } | null,
+  documentId: number, repairId: number, expectedPdfId: number, sourceHash: string): boolean {
+  return Boolean(pdf && pdf.id === expectedPdfId && pdf.estimateDocumentId === documentId && pdf.status === "current" &&
+    pdf.storageKey && pdf.hash && pdf.fileSize && typeof pdf.optionSourceHashes === "object" && pdf.optionSourceHashes !== null &&
+    !Array.isArray(pdf.optionSourceHashes) && (pdf.optionSourceHashes as Record<string, unknown>)[String(repairId)] === sourceHash);
+}
+
+export function documentTokenIncludesRepair(document: { customerId: number; repairs: readonly { id: number }[] } | null,
+  repair: { id: number; customerId: number; customerType: string }): boolean {
+  return Boolean(document && repair.customerType === "business" && document.customerId === repair.customerId &&
+    document.repairs.some(member => member.id === repair.id));
+}
+
+export function isSameOptionApproval(previous: { pdfFileId: number; planChoiceId: number | null; addOnChoiceIds: unknown; approverName: string; optionSourceHash: string } | null,
+  attempt: { pdfFileId: number; planChoiceId: unknown; addOnChoiceIds: unknown; approverName: string; optionSourceHash: string }): boolean {
+  return Boolean(previous && previous.pdfFileId === attempt.pdfFileId && previous.planChoiceId === attempt.planChoiceId &&
+    Array.isArray(previous.addOnChoiceIds) && Array.isArray(attempt.addOnChoiceIds) &&
+    JSON.stringify([...previous.addOnChoiceIds].sort((a, b) => a - b)) === JSON.stringify([...attempt.addOnChoiceIds].sort((a, b) => a - b)) &&
+    previous.approverName === attempt.approverName && previous.optionSourceHash === attempt.optionSourceHash);
 }
 
 export async function lockEstimateOptions(tx: Prisma.TransactionClient, repairId: number) {

@@ -15,7 +15,7 @@ import { renderEstimatePdfBuffer } from "@/lib/estimate-pdf-render";
 import { prisma } from "@/lib/prisma";
 import { displayIssuedDate, parseIssuedDate } from "@/lib/document-issued-date";
 import { sumCustomerLines } from "@/lib/pricing-tax";
-import { optionTotals, parseOptionSet } from "@/lib/estimate-options";
+import { issuedOptionSourceHash, optionTotals, parseOptionSet } from "@/lib/estimate-options";
 import { estimatePdfSourceFingerprint } from "@/lib/estimate-pdf-source";
 
 export const runtime = "nodejs";
@@ -70,6 +70,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             },
           },
           estimateOptionSet: { include: { choices: { orderBy: [{ sortOrder: "asc" as const }, { id: "asc" as const }], include: { lines: { orderBy: [{ sortOrder: "asc" as const }, { id: "asc" as const }] } } } } },
+          estimateOptionApproval: { select: { id: true } },
         },
       },
     },
@@ -86,6 +87,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     for (const repair of estimateDocument.repairs) {
       const set = repair.estimateOptionSet;
       if (!set?.isActive) continue;
+      if (repair.approvalStatus !== "pending" || repair.estimateOptionApproval) throw new Error("承認済みの選択肢付き見積は再発行できません。改訂手続きが必要です。");
       if (estimateDocument.customer.type !== "business" || !repair.estimate || repair.estimate.pricingTaxMode !== estimateDocument.pricingTaxMode ||
           estimateDocument.customer.pricingTaxMode !== estimateDocument.pricingTaxMode) throw new Error("選択肢付き見積の取引先・税表示方式を確認してください。");
       parseOptionSet(set);
@@ -202,6 +204,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   let pdfFile: { id: number; version: number } | undefined;
   const sourceFingerprint = estimatePdfSourceFingerprint(estimateDocument);
+  const optionSourceHashes = Object.fromEntries(estimateDocument.repairs.filter(repair => repair.estimateOptionSet?.isActive)
+    .map(repair => [String(repair.id), issuedOptionSourceHash({ ...estimateDocument, issuedDate: requestedDate ?? estimateDocument.issuedDate }, repair)]));
 
   try {
     pdfFile = await prisma.$transaction(async tx => {
@@ -291,6 +295,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
       const current = await tx.estimateDocument.findUnique(documentQuery);
       if (estimatePdfSourceFingerprint(current) !== sourceFingerprint) throw new Error("見積内容が変更されました。再生成してください。");
+      if (current?.repairs.some(repair => repair.estimateOptionSet?.isActive && repair.approvalStatus !== "pending")) throw new Error("承認済みの選択肢付き見積は再発行できません。改訂手続きが必要です。");
       await tx.$executeRaw`
         UPDATE "EstimatePdfFile"
         SET "status" = 'superseded',
@@ -305,6 +310,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         SET "storageKey" = ${uploadResult.storageKey},
             "fileSize" = ${uploadResult.fileSize},
             "hash" = ${hash},
+            "optionSourceHashes" = ${JSON.stringify(optionSourceHashes)}::jsonb,
             "status" = 'current'
         WHERE "id" = ${pdfFile.id}
       `;

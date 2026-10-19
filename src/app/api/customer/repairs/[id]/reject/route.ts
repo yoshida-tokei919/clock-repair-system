@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { addStatusLogIfMissing, findRepairIdByPublicToken } from "../_workflow";
+import { lockEstimateOptions } from "@/lib/estimate-options";
 
 const REJECT_STATUS = "保留";
 
@@ -20,7 +21,10 @@ export async function POST(
     return NextResponse.json({ error: "修理案件が見つかりません。" }, { status: 404 });
   }
 
+  try {
   const result = await prisma.$transaction(async (tx) => {
+    await lockEstimateOptions(tx, repairId);
+    await tx.$queryRaw`SELECT "id" FROM "Repair" WHERE "id" = ${repairId} FOR UPDATE`;
     const repair = await tx.repair.findUnique({
       where: { id: repairId },
       select: { id: true, status: true },
@@ -28,6 +32,9 @@ export async function POST(
 
     if (!repair) {
       throw new Error("修理案件が見つかりません。");
+    }
+    if (await tx.estimateOptionApproval.findUnique({ where: { repairId }, select: { id: true } })) {
+      throw new Error("選択承認済みの見積は差戻しできません。改訂手続きが必要です。");
     }
 
     if (repair.status === "キャンセル") {
@@ -57,4 +64,10 @@ export async function POST(
   });
 
   return NextResponse.json({ success: true, repair: result });
+  } catch (error) {
+    if (error instanceof Error && error.message === "選択承認済みの見積は差戻しできません。改訂手続きが必要です。") {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    throw error;
+  }
 }

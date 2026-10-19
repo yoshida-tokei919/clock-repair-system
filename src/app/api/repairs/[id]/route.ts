@@ -9,6 +9,7 @@ import { mergeWatchRefs, resolvePatchCaseRef, resolvePatchProductRef } from "@/l
 import { parseTimepieceType, TimepieceTypeError } from "@/lib/timepiece-type";
 import { getRepairPartType, isExistingRepairPartLink, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
+import { lockEstimateOptions } from "@/lib/estimate-options";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
 import { calculateTaxableAmounts, effectivePricingTaxMode, repairPartBasePrice, sumCustomerLines } from "@/lib/pricing-tax";
 import {
@@ -48,6 +49,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         // Repair updates can include estimate and parts-master synchronization.
         // Keep the interactive transaction open long enough for those writes.
         const result = await prisma.$transaction(async (tx) => {
+            await lockEstimateOptions(tx, id);
+            await tx.$queryRaw`SELECT "id" FROM "Repair" WHERE "id" = ${id} FOR UPDATE`;
             const repairRecord = await tx.repair.findUnique({
                 where: { id },
                 include: { watch: { include: { brand: true, model: true, caliber: true, reference: true, caseReference: true } } }
@@ -57,6 +60,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 throw new Error("修琁E��録が見つかりません");
             }
             assertGenericRepairPatchAllowed(repairRecord.status);
+            if (body.estimate?.items && await tx.estimateOptionApproval.findUnique({ where: { repairId: id }, select: { id: true } })) {
+                throw new Error("選択承認済みの見積明細は変更できません。改訂手続きが必要です。");
+            }
             const [sourceCustomer, savedEstimate] = await Promise.all([
                 tx.customer.findUniqueOrThrow({ where: { id: repairRecord.customerId }, select: { type: true, pricingTaxMode: true } }),
                 tx.estimate.findUnique({ where: { repairId: id }, select: { pricingTaxMode: true } }),

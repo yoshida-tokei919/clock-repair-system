@@ -23,6 +23,8 @@ import { RepairPrepaymentCheckoutButton } from "@/components/customer/RepairPrep
 import { PREPAYMENT_STATUS_LABELS } from "@/lib/repair-prepayment-display";
 import { publicShipmentViews } from "@/lib/customer-shipment-status";
 import { visibleCustomerCommentTarget } from "@/lib/b2b-repair-comment-notice";
+import { isIssuedOptionPdfCurrent, issuedOptionSourceHash } from "@/lib/estimate-options";
+import { CustomerEstimateOptions } from "./CustomerEstimateOptions";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +40,7 @@ const repairInclude = {
     orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
     select: { id: true, amount: true, purpose: true, status: true, paidAt: true },
   },
-  watch: { include: { brand: true, model: true, reference: true, caliber: true } },
+  watch: { include: { brand: true, model: true, reference: true, caseReference: true, caliber: true } },
   photos: {
     where: { customerVisible: true },
     orderBy: { id: "asc" as const },
@@ -52,7 +54,11 @@ const repairInclude = {
       },
     },
   },
-  estimateDocument: { select: { id: true, estimateNumber: true, issuedDate: true } },
+  estimateOptionSet: { include: { choices: { orderBy: [{ sortOrder: "asc" as const }, { id: "asc" as const }], include: { lines: { orderBy: [{ sortOrder: "asc" as const }, { id: "asc" as const }] } } } } },
+  estimateOptionApproval: true,
+  estimateDocument: { select: { id: true, customerId: true, pricingTaxMode: true, totalAmount: true, taxAmount: true, estimateNumber: true, issuedDate: true,
+    customer: { select: { type: true, name: true, companyName: true, address: true } },
+    currentPdfFile: { select: { id: true, estimateDocumentId: true, status: true, storageKey: true, hash: true, fileSize: true, optionSourceHashes: true } } } },
   customerMessages: {
     orderBy: { createdAt: "desc" as const },
     select: { id: true, body: true, createdAt: true, readAt: true, senderType: true },
@@ -406,8 +412,8 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
 
   if (isBusiness) {
     const commentCount = repairs.filter((repair) => repair.customerMessages.length > 0).length;
-    const approvedCount = repairs.filter((repair) => isApprovedRepairStatus(repair.status)).length;
-    const pendingCount = repairs.filter((repair) => !isApprovedRepairStatus(repair.status) && !isDedicatedReturnStatus(repair.status)).length;
+    const approvedCount = repairs.filter((repair) => repair.approvalStatus === "approved" || isApprovedRepairStatus(repair.status)).length;
+    const pendingCount = repairs.filter((repair) => repair.approvalStatus !== "approved" && !isApprovedRepairStatus(repair.status) && !isDedicatedReturnStatus(repair.status)).length;
     const publicPdfHref = `/customer/repairs/${token}/estimate.pdf`;
 
     return (
@@ -468,6 +474,14 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                 readAt: message.readAt ? message.readAt.toISOString() : null,
                 senderType: message.senderType || "partner",
               }));
+              const activeOptions = repair.customer.type === "business" && repair.estimateOptionSet?.isActive ? repair.estimateOptionSet : null;
+              const optionHash = activeOptions && repair.estimateDocument && repair.estimate
+                ? issuedOptionSourceHash(repair.estimateDocument, repair) : "";
+              const optionPdf = repair.estimateDocument?.currentPdfFile;
+              const optionAvailable = Boolean(activeOptions && !repair.partsAllocationLegacy && repair.customerId === repair.estimateDocument?.customerId &&
+                repair.approvalStatus === "pending" && repair.status === "承認待ち" &&
+                repair.estimateDocument && isIssuedOptionPdfCurrent(optionPdf, repair.estimateDocument.id, repair.id, optionPdf?.id ?? -1, optionHash));
+              const approvedSnapshot = repair.estimateOptionApproval?.lineSnapshot as { commonLines?: { quantity: number; unitPrice: number }[] } | null;
 
               const repairHeader = (
                 <div className="min-w-0 space-y-2">
@@ -505,7 +519,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                 >
                   <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="-mx-4 -mt-4 mb-4 flex items-center justify-between gap-3 bg-[#f2f7ff] px-4 py-3">
-                      <h2 className="text-lg font-bold text-slate-900">{isDedicatedReturnStatus(repair.status) ? "返却・最終精算内容" : "見積内容"}</h2>
+                      <h2 className="text-lg font-bold text-slate-900">{isDedicatedReturnStatus(repair.status) ? "返却・最終精算内容" : activeOptions && repair.approvalStatus === "pending" ? "共通見積内容（選択前）" : "見積内容"}</h2>
                       {repair.estimateDocument && <PdfLinkButton href={publicPdfHref} />}
                     </div>
 
@@ -547,11 +561,27 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                         <div className="font-mono font-medium">¥{taxAmount.toLocaleString()}</div>
                       </div>
                       <div className="flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2 pt-1">
-                        <div className="font-bold text-slate-900">税込合計</div>
+                        <div className="font-bold text-slate-900">{activeOptions && repair.approvalStatus === "pending" ? "共通見積の税込額（選択前）" : "税込合計"}</div>
                         <div className="font-mono text-2xl font-bold text-blue-700">¥{total.toLocaleString()}</div>
                       </div>
                     </div>
                   </section>
+
+                  {activeOptions && <CustomerEstimateOptions
+                    token={repair.publicToken || token} repairId={repair.id} inquiryNumber={repair.inquiryNumber}
+                    title={activeOptions.title} notes={activeOptions.notes}
+                    commonLines={(approvedSnapshot?.commonLines ?? repair.estimate?.items ?? []).map((line: { quantity: number; unitPrice: number }) => ({ quantity: line.quantity, unitPrice: line.unitPrice }))}
+                    choices={activeOptions.choices.map((choice: any) => ({ id: choice.id, kind: choice.kind, name: choice.name,
+                      notes: choice.notes, recommended: choice.recommended, lines: choice.lines.map((line: any) => ({
+                        id: line.id, itemNameSnapshot: line.itemNameSnapshot, displayNameSnapshot: line.displayNameSnapshot,
+                        quantity: line.quantity, unitPrice: line.unitPrice,
+                      })) }))} mode={repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE"}
+                    pdfFileId={optionPdf?.id ?? null} optionSourceHash={optionHash}
+                    available={optionAvailable} approved={Boolean(repair.estimateOptionApproval)}
+                    unavailableMessage={repair.partsAllocationLegacy ? "旧形式の案件はこの画面から選択承認できません。工房へご連絡ください。" : undefined}
+                    approvedPlanId={repair.estimateOptionApproval?.planChoiceId}
+                    approvedAddOnIds={Array.isArray(repair.estimateOptionApproval?.addOnChoiceIds) ? repair.estimateOptionApproval.addOnChoiceIds as number[] : []}
+                  />}
 
                   {explanationText && (
                     <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -568,6 +598,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                   <CustomerRepairActions
                     token={repairActionToken}
                     isBusiness={isBusiness}
+                    showApproval={!activeOptions}
                     isApproved={repair.approvalStatus === "approved"}
                     inquiryNumber={repair.inquiryNumber}
                     repairStatus={repair.status}

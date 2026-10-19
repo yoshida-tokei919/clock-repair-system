@@ -335,8 +335,8 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
             キャンセル・返却処理済みです。返却状況は上部のステータスをご確認ください。
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <button
+          <div className={`grid grid-cols-1 gap-3 ${showApproval ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+            {showApproval && <button
               type="button"
               onClick={handleApprove}
               disabled={approved || !!loading}
@@ -344,15 +344,15 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
             >
               <CheckCircle className="h-5 w-5" />
               <span>{approved ? "承認済み" : "この内容で承認する"}</span>
-            </button>
-            <button
+            </button>}
+            {!(isApproved && !showApproval) && <button
               type="button"
               onClick={handleReject}
               disabled={!!loading}
               className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               <span>修正を依頼する</span>
-            </button>
+            </button>}
             <button
               type="button"
               onClick={() => setCancelReturnDialogOpen(true)}
