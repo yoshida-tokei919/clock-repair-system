@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { getB2bBrandMasters, getB2bModelMasters } from "@/actions/b2b-intake-master-actions";
-import { changeBrand, changeModel, changeRef, filterIntakeChoices, intakeComboboxKeyDecision, matchingModel, modelCacheKey, optionsForRow, shouldPreventB2bBatchEnter, type ModelChoice, type RefChoice, type CaliberChoice, type SearchChoice } from "@/lib/b2b-intake-drilldown";
+import { changeBrand, changeModel, changeRef, filterIntakeChoices, intakeComboboxKeyDecision, matchingModel, modelCacheKey, optionsForRow, shouldPreventB2bBatchEnter, type ModelChoice, type RefChoice, type SearchChoice } from "@/lib/b2b-intake-drilldown";
 import { B2bBatchTagPrinting } from "./B2bBatchTagPrinting";
+import { B2bBatchPhotoCapture } from "./B2bBatchPhotoCapture";
 import { TimepieceTypeCombobox } from "@/components/repairs/TimepieceTypeCombobox";
 
 // Keep the operator-facing cap in sync with the server validation.
@@ -104,9 +105,7 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [modelsByBrand, setModelsByBrand] = useState<Record<number, ModelChoice[]>>({});
-  const [calibersByBrand, setCalibersByBrand] = useState<Record<number, CaliberChoice[]>>({});
   const [refsByModel, setRefsByModel] = useState<Record<string, RefChoice[]>>({});
-  const [calibersByModel, setCalibersByModel] = useState<Record<string, CaliberChoice[]>>({});
   const requestedBrands = useRef(new Set<number>());
   const requestedModels = useRef(new Set<string>());
 
@@ -115,9 +114,8 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
       const brandId = Number(row.brandId);
       if (!brandId || requestedBrands.current.has(brandId)) continue;
       requestedBrands.current.add(brandId);
-      getB2bBrandMasters(brandId).then(({ models, calibers }) => {
+      getB2bBrandMasters(brandId).then(({ models }) => {
         setModelsByBrand((current) => ({ ...current, [brandId]: models }));
-        setCalibersByBrand((current) => ({ ...current, [brandId]: calibers }));
       }).catch(() => {
         requestedBrands.current.delete(brandId);
         setError("時計マスター候補を取得できませんでした。手入力で続けられます。ブランドを選び直すと再試行します。");
@@ -134,9 +132,8 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
       if (requestedModels.current.has(cacheKey)) continue;
       requestedModels.current.add(cacheKey);
       getB2bModelMasters(brandId, model.id)
-        .then(({ refs, calibers }) => {
+        .then(({ refs }) => {
           setRefsByModel((current) => ({ ...current, [cacheKey]: refs }));
-          setCalibersByModel((current) => ({ ...current, [cacheKey]: calibers }));
         })
         .catch(() => {
           requestedModels.current.delete(cacheKey);
@@ -220,6 +217,7 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
           <Link className="text-blue-700 underline" href={`/repairs/${repair.id}`}>{repair.inquiryNumber} — 案件を開く</Link>
         </li>)}
       </ul>
+      <B2bBatchPhotoCapture repairs={result.repairs} />
       <B2bBatchTagPrinting result={result} onReset={() => {
         setResult(null); setPartnerId(""); setRows([newRow()]); setError("");
       }} />
@@ -240,7 +238,7 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
       </div>
 
       {rows.map((row, index) => {
-        const { models, refs, calibers } = optionsForRow(row, modelsByBrand, refsByModel, calibersByBrand, calibersByModel);
+        const { models, refs } = optionsForRow(row, modelsByBrand, refsByModel, {}, {});
         const movementOptions = movementCalibers.filter((caliber) => row.movementMakerId
           ? caliber.brandId === Number(row.movementMakerId) : !row.movementMaker ? caliber.brandId === null : false);
         const baseOptions = movementCalibers.filter((caliber) => row.baseMovementMakerId
@@ -271,10 +269,6 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
             onChange={(value) => updateWatchField(row.key, "ref", value)} disabled={busy || uncertain || !row.brandName}
             placeholder="既存候補から選択、または入力" /></label>
           <label className="text-sm">シリアル<input className={`${inputClass} mt-1`} maxLength={200} value={row.serial} onChange={(e) => updateRow(row.key, "serial", e.target.value)} disabled={busy || uncertain} /></label>
-          <label className="text-sm">時計 Cal<IntakeCombobox value={row.caliber}
-            choices={calibers.map((caliber) => ({ value: caliber.name, label: caliber.name }))}
-            onChange={(value) => updateRow(row.key, "caliber", value)} disabled={busy || uncertain || !row.brandName}
-            placeholder="既存候補から選択、または入力" /></label>
           <label className="text-sm">Calメーカー<IntakeCombobox value={row.movementMaker} choices={brandChoices(movementMakers)}
             onChange={(value) => updateMaker(row.key, "movementMaker", value)}
             onSelect={(choice) => updateMaker(row.key, "movementMaker", choice.value, String(choice.id))}
