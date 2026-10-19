@@ -7,6 +7,8 @@ import { getB2bBrandMasters, getB2bModelMasters } from "@/actions/b2b-intake-mas
 import { changeBrand, changeModel, changeRef, filterIntakeChoices, intakeComboboxKeyDecision, matchingModel, modelCacheKey, optionsForRow, shouldPreventB2bBatchEnter, type ModelChoice, type RefChoice, type SearchChoice } from "@/lib/b2b-intake-drilldown";
 import { B2bBatchTagPrinting } from "./B2bBatchTagPrinting";
 import { B2bBatchPhotoCapture } from "./B2bBatchPhotoCapture";
+import { B2bPreIntakeCamera, type CapturedPhoto } from "./B2bPreIntakeCamera";
+import { mapBatchRepairs, uploadOutcome } from "@/lib/b2b-preintake-photos";
 import { TimepieceTypeCombobox } from "@/components/repairs/TimepieceTypeCombobox";
 
 // Keep the operator-facing cap in sync with the server validation.
@@ -104,10 +106,73 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
   const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
+  const [registeredRows, setRegisteredRows] = useState<Array<{ rowKey: number; id: number; inquiryNumber: string }>>([]);
+  const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const photosRef = useRef<CapturedPhoto[]>([]);
+  const uploadBusy = useRef(false);
   const [modelsByBrand, setModelsByBrand] = useState<Record<number, ModelChoice[]>>({});
   const [refsByModel, setRefsByModel] = useState<Record<string, RefChoice[]>>({});
   const requestedBrands = useRef(new Set<number>());
   const requestedModels = useRef(new Set<string>());
+
+  function updatePhotos(next: CapturedPhoto[] | ((current: CapturedPhoto[]) => CapturedPhoto[])) {
+    const value = typeof next === "function" ? next(photosRef.current) : next;
+    photosRef.current = value;
+    setPhotos(value);
+  }
+  function discardPhotos(predicate: (photo: CapturedPhoto) => boolean) {
+    const removed = photosRef.current.filter(predicate);
+    updatePhotos((current) => current.filter((photo) => !predicate(photo)));
+    removed.forEach((photo) => URL.revokeObjectURL(photo.url));
+  }
+  useEffect(() => () => { photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.url)); }, []);
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (photosRef.current.some((photo) => photo.status !== "success")) { event.preventDefault(); event.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
+
+  async function uploadOne(photo: CapturedPhoto, repairId: number) {
+    updatePhotos((current) => current.map((item) => item.key === photo.key ? { ...item, status: "uploading", error: undefined } : item));
+    try {
+      const data = new FormData();
+      data.append("file", photo.file);
+      data.append("repairId", String(repairId));
+      data.append("category", "FRONT");
+      data.append("stage", "RECEPTION");
+      const response = await fetch("/api/upload", { method: "POST", body: data });
+      const body: unknown = await response.json().catch(() => null);
+      const status = uploadOutcome(response.status, body, repairId);
+      updatePhotos((current) => current.map((item) => item.key === photo.key ? { ...item, status,
+        error: status === "failed" ? "保存されませんでした。この写真だけ再試行できます。" : status === "unknown" ? "保存結果が不明です。案件画面で確認し、必要なら手動で追加してください。" : undefined } : item));
+    } catch {
+      updatePhotos((current) => current.map((item) => item.key === photo.key ? { ...item, status: "unknown", error: "通信結果が不明です。案件画面で確認し、必要なら手動で追加してください。" } : item));
+    }
+  }
+
+  async function uploadPending(mapping: Array<{ rowKey: number; id: number }>, captured: CapturedPhoto[]) {
+    if (uploadBusy.current) return;
+    uploadBusy.current = true;
+    setUploading(true);
+    try {
+      for (const photo of captured) {
+        if (photosRef.current.find((item) => item.key === photo.key)?.status !== "pending") continue;
+        const repair = mapping.find((item) => item.rowKey === photo.rowKey);
+        if (repair) await uploadOne(photo, repair.id);
+      }
+    } finally { uploadBusy.current = false; setUploading(false); }
+  }
+
+  async function retryPhoto(photo: CapturedPhoto, repairId: number) {
+    if (uploadBusy.current || photosRef.current.find((item) => item.key === photo.key)?.status !== "failed") return;
+    uploadBusy.current = true;
+    setUploading(true);
+    try { await uploadOne(photo, repairId); }
+    finally { uploadBusy.current = false; setUploading(false); }
+  }
 
   useEffect(() => {
     for (const row of rows) {
@@ -173,12 +238,15 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
     if (busy || uncertain || result) return;
     setBusy(true);
     setError("");
+    const submittedRows = rows.map((row) => ({ ...row }));
+    const rowKeys = submittedRows.map((row) => row.key);
+    const captured = [...photosRef.current];
     try {
       const response = await fetch("/api/repairs/b2b-intake", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           partnerId: Number(partnerId),
-          rows: rows.map(({ key: _key, brandId, movementMakerId: _movementMakerId,
+          rows: submittedRows.map(({ key: _key, brandId, movementMakerId: _movementMakerId,
             baseMovementMakerId: _baseMovementMakerId, ...rest }) => ({ ...rest, brandId: brandId ? Number(brandId) : null })),
         }),
       });
@@ -188,13 +256,16 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
         setError(body.error || "一括受付に失敗しました。");
         return;
       }
-      if (!Array.isArray(body.repairs) || body.repairs.length !== rows.length) {
+      const mapping = mapBatchRepairs(rowKeys, body.repairs);
+      if (!mapping) {
         setUncertain(true);
         setError("登録結果を確認できません。案件一覧で確認してください。同じバッチを再送しないでください。");
         return;
       }
       setResult(body as Result);
+      setRegisteredRows(mapping);
       router.refresh();
+      void uploadPending(mapping, captured);
     } catch {
       setUncertain(true);
       setError("通信結果を確認できません。案件一覧で確認してください。同じバッチを再送しないでください。");
@@ -205,7 +276,9 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
 
   return <div className="mx-auto max-w-5xl space-y-6 p-8">
     <div>
-      <Link href="/repairs" className="text-sm text-blue-700 hover:underline">← 修理案件一覧</Link>
+      <Link href="/repairs" className="text-sm text-blue-700 hover:underline" onClick={(event) => {
+        if (photosRef.current.some((photo) => photo.status !== "success") && !window.confirm("未保存・保存結果不明の撮影写真は、この画面を離れると失われます。案件画面で確認しましたか？")) event.preventDefault();
+      }}>← 修理案件一覧</Link>
       <h1 className="mt-2 text-3xl font-bold">B2B一括受付</h1>
       <p className="mt-2 text-sm text-muted-foreground">現物を確認し、同じ取引先の時計をまとめて登録します。最大{B2B_BATCH_LIMIT}本。</p>
     </div>
@@ -214,11 +287,34 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
       <h2 className="text-lg font-semibold">{result.repairs.length}本の受付が完了しました</h2>
       <ul className="mt-3 space-y-1">
         {result.repairs.map((repair) => <li key={repair.id}>
-          <Link className="text-blue-700 underline" href={`/repairs/${repair.id}`}>{repair.inquiryNumber} — 案件を開く</Link>
+          <Link className="text-blue-700 underline" href={`/repairs/${repair.id}`} onClick={(event) => {
+            if (photosRef.current.some((photo) => photo.status !== "success") && !window.confirm("未保存・保存結果不明の撮影写真は、この画面を離れると失われます。続けますか？")) event.preventDefault();
+          }}>{repair.inquiryNumber} — 案件を開く</Link>
         </li>)}
       </ul>
+      {photos.length > 0 && <section className="mt-4 rounded border bg-white p-3 text-sm">
+        <h3 className="font-semibold">登録前に撮影した写真：{photos.filter((photo) => photo.status === "success").length}/{photos.length}枚保存確認済み
+          {uploading ? "（順次保存中）" : ""}</h3>
+        <p>未保存 {photos.filter((photo) => photo.status === "pending" || photo.status === "uploading").length}枚 / 保存失敗 {photos.filter((photo) => photo.status === "failed").length}枚 / 結果不明 {photos.filter((photo) => photo.status === "unknown").length}枚</p>
+        {registeredRows.map((repair) => {
+          const items = photos.filter((photo) => photo.rowKey === repair.rowKey);
+          return items.length > 0 && <div key={repair.rowKey} className="mt-3 border-t pt-2">
+            <p className="font-medium">{repair.inquiryNumber}：{items.filter((photo) => photo.status === "success").length}/{items.length}枚保存確認済み</p>
+            <div className="mt-2 flex flex-wrap gap-3">{items.map((photo) => <div key={photo.key} className="w-36">
+              <img src={photo.url} alt={`${repair.inquiryNumber} の登録前撮影写真`} className="h-24 w-36 rounded object-cover" />
+              <p>{photo.status === "success" ? "保存済み" : photo.status === "uploading" ? "保存中" : photo.status === "pending" ? "保存待ち" : photo.status === "failed" ? "保存失敗" : "保存結果不明"}</p>
+              {photo.error && <p className="text-red-700">{photo.error}</p>}
+              {photo.status === "failed" && <button type="button" className="text-blue-700 underline disabled:opacity-40" disabled={uploading}
+                onClick={() => void retryPhoto(photo, repair.id)}>この写真だけ再試行</button>}
+            </div>)}</div>
+          </div>;
+        })}
+      </section>}
       <B2bBatchPhotoCapture repairs={result.repairs} />
       <B2bBatchTagPrinting result={result} onReset={() => {
+        if (uploadBusy.current) return;
+        if (photosRef.current.some((photo) => photo.status !== "success") && !window.confirm("未保存・保存結果不明の撮影写真は破棄されます。案件画面で確認してから続けますか？")) return;
+        discardPhotos(() => true); setRegisteredRows([]);
         setResult(null); setPartnerId(""); setRows([newRow()]); setError("");
       }} />
     </section> : <form ref={formRef} onSubmit={(event) => event.preventDefault()}
@@ -250,8 +346,11 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
         return <section key={row.key} className="rounded-lg border bg-white p-4">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">時計 {index + 1}</h2>
-          <button type="button" className="text-sm text-red-700 disabled:opacity-40" disabled={rows.length === 1 || busy || uncertain} onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}>この行を削除</button>
+          <button type="button" className="text-sm text-red-700 disabled:opacity-40" disabled={rows.length === 1 || busy || uncertain} onClick={() => { discardPhotos((photo) => photo.rowKey === row.key); setRows((current) => current.filter((item) => item.key !== row.key)); }}>この行を削除</button>
         </div>
+        <B2bPreIntakeCamera rowKey={row.key} watchNumber={index + 1} photos={photos.filter((photo) => photo.rowKey === row.key)} disabled={busy || uncertain}
+          onAdd={(photo) => updatePhotos((current) => [...current, photo])}
+          onDelete={(key) => discardPhotos((photo) => photo.key === key)} />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <label className="text-sm">取引先管理番号<input className={`${inputClass} mt-1`} maxLength={200} value={row.partnerRef} onChange={(e) => updateRow(row.key, "partnerRef", e.target.value)} disabled={busy || uncertain} /></label>
           <label className="text-sm">エンドユーザー名<input className={`${inputClass} mt-1`} maxLength={200} value={row.endUserName} onChange={(e) => updateRow(row.key, "endUserName", e.target.value)} disabled={busy || uncertain} /></label>
@@ -288,6 +387,7 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
         </div>
       </section>})}
 
+      {photos.length > 0 && <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">撮影写真は登録・保存完了までこのブラウザのメモリにあります。再読み込みや画面を閉じると失われます。</p>}
       {error && <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       <div className="flex gap-3">
         <button type="button" className="rounded-md border px-4 py-2 text-sm disabled:opacity-40" disabled={rows.length >= B2B_BATCH_LIMIT || busy || uncertain} onClick={() => setRows((current) => [...current, newRow()])}>時計を追加</button>
