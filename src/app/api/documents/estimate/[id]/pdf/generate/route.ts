@@ -15,6 +15,8 @@ import { renderEstimatePdfBuffer } from "@/lib/estimate-pdf-render";
 import { prisma } from "@/lib/prisma";
 import { displayIssuedDate, parseIssuedDate } from "@/lib/document-issued-date";
 import { sumCustomerLines } from "@/lib/pricing-tax";
+import { optionTotals, parseOptionSet } from "@/lib/estimate-options";
+import { estimatePdfSourceFingerprint } from "@/lib/estimate-pdf-source";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,27 +51,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
   }
 
-  const estimateDocument = await prisma.estimateDocument.findUnique({
+  const documentQuery = {
     where: { id: estimateDocumentId },
     include: {
       customer: true,
       repairs: {
+        orderBy: { id: "asc" as const },
         include: {
           watch: { include: { brand: true, model: true, reference: true, caseReference: true } },
           estimate: {
             include: {
               items: {
+                orderBy: { id: "asc" as const },
                 include: {
                   partsMaster: { select: { grade: true, notes2: true } },
                 },
               },
             },
           },
-          estimateOptionSet: { select: { isActive: true } },
+          estimateOptionSet: { include: { choices: { orderBy: [{ sortOrder: "asc" as const }, { id: "asc" as const }], include: { lines: { orderBy: [{ sortOrder: "asc" as const }, { id: "asc" as const }] } } } } },
         },
       },
     },
-  });
+  };
+  const estimateDocument = await prisma.estimateDocument.findUnique(documentQuery);
 
   if (!estimateDocument) {
     return NextResponse.json(
@@ -77,8 +82,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       { status: 404 }
     );
   }
-  if (estimateDocument.repairs.some(repair => repair.estimateOptionSet?.isActive)) {
-    return NextResponse.json({ ok: false, error: "選択肢が未回答の案件を通常見積PDFにできません。" }, { status: 409 });
+  try {
+    for (const repair of estimateDocument.repairs) {
+      const set = repair.estimateOptionSet;
+      if (!set?.isActive) continue;
+      if (estimateDocument.customer.type !== "business" || !repair.estimate || repair.estimate.pricingTaxMode !== estimateDocument.pricingTaxMode ||
+          estimateDocument.customer.pricingTaxMode !== estimateDocument.pricingTaxMode) throw new Error("選択肢付き見積の取引先・税表示方式を確認してください。");
+      parseOptionSet(set);
+    }
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "選択肢が不正です。" }, { status: 409 });
   }
   if (sumCustomerLines(estimateDocument.repairs.flatMap(repair => repair.estimate?.items ?? [])) !== estimateDocument.totalAmount +
       (estimateDocument.pricingTaxMode === "INCLUSIVE" ? estimateDocument.taxAmount : 0)) {
@@ -95,6 +108,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const jobs = estimateDocument.repairs.map((repair) => {
     const estimateItems = repair.estimate?.items || [];
 
+    const set = repair.estimateOptionSet;
+    const choices = set?.isActive ? set.choices : [];
+    const totals = optionTotals(estimateItems, choices, estimateDocument.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE");
     return {
       id: String(repair.id),
       inquiryNumber: repair.inquiryNumber,
@@ -129,6 +145,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               })
             : item.itemName,
       })),
+      options: set?.isActive ? {
+        title: set.title,
+        notes: set.notes,
+        choices: choices.map((choice, index) => ({
+          kind: choice.kind as "PLAN" | "ADD_ON",
+          name: choice.name,
+          notes: choice.notes,
+          recommended: choice.recommended,
+          lines: choice.lines.map(line => ({
+            name: line.displayNameSnapshot || line.itemNameSnapshot,
+            price: line.unitPrice,
+            quantity: line.quantity,
+            notes: line.notesForCustomerSnapshot,
+          })),
+          deltaAmount: choice.kind === "PLAN" ? totals[index].planAmount : totals[index].addOnAmount,
+          totalAmount: totals[index].commonAmount + totals[index].planAmount,
+        })),
+      } : undefined,
     };
   });
 
@@ -167,9 +201,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const generatedBy = session?.user?.email ?? session?.user?.name ?? null;
 
   let pdfFile: { id: number; version: number } | undefined;
+  const sourceFingerprint = estimatePdfSourceFingerprint(estimateDocument);
 
   try {
-    [pdfFile] = await prisma.$queryRaw<{ id: number; version: number }[]>`
+    pdfFile = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT "id" FROM "EstimateDocument" WHERE "id" = ${estimateDocument.id} FOR UPDATE`;
+      const [created] = await tx.$queryRaw<{ id: number; version: number }[]>`
       WITH next_version AS (
         SELECT COALESCE(MAX("version"), 0) + 1 AS "version"
         FROM "EstimatePdfFile"
@@ -194,7 +231,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         ${generatedBy}
       FROM next_version
       RETURNING "id", "version"
-    `;
+      `;
+      return created;
+    });
   } catch (error) {
     console.error("Estimate PDF record creation failed", {
       estimateDocumentId: estimateDocument.id,
@@ -226,11 +265,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     uploaded = true;
 
     await prisma.$transaction(async (tx) => {
-      const [locked] = await tx.$queryRaw<{ issuedDate: Date }[]>`
-        SELECT "issuedDate" FROM "EstimateDocument" WHERE "id" = ${estimateDocument.id} FOR UPDATE`;
-      if (!locked || locked.issuedDate.getTime() !== estimateDocument.issuedDate.getTime()) {
-        throw new Error("発行日が変更されました。再読み込みしてください");
+      await tx.$queryRaw`SELECT "id" FROM "EstimateDocument" WHERE "id" = ${estimateDocument.id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${estimateDocument.customerId} FOR UPDATE`;
+      for (const repair of estimateDocument.repairs) {
+        await tx.$queryRaw`SELECT "id" FROM "Repair" WHERE "id" = ${repair.id} FOR UPDATE`;
+        await tx.$queryRaw`SELECT "id" FROM "Watch" WHERE "id" = ${repair.watchId} FOR UPDATE`;
+        if (repair.estimate) {
+          await tx.$queryRaw`SELECT "id" FROM "Estimate" WHERE "id" = ${repair.estimate.id} FOR UPDATE`;
+          for (const item of repair.estimate.items) {
+            await tx.$queryRaw`SELECT "id" FROM "EstimateItem" WHERE "id" = ${item.id} FOR UPDATE`;
+            if (item.partsMasterId) await tx.$queryRaw`SELECT "id" FROM "PartsMaster" WHERE "id" = ${item.partsMasterId} FOR UPDATE`;
+          }
+        }
+        if (repair.estimateOptionSet) {
+          await tx.$queryRaw`SELECT "id" FROM "EstimateOptionSet" WHERE "id" = ${repair.estimateOptionSet.id} FOR UPDATE`;
+          for (const choice of repair.estimateOptionSet.choices) {
+            await tx.$queryRaw`SELECT "id" FROM "EstimateOptionChoice" WHERE "id" = ${choice.id} FOR UPDATE`;
+            for (const line of choice.lines) await tx.$queryRaw`SELECT "id" FROM "EstimateOptionLine" WHERE "id" = ${line.id} FOR UPDATE`;
+          }
+        }
+        if (repair.watch.brandId) await tx.$queryRaw`SELECT "id" FROM "Brand" WHERE "id" = ${repair.watch.brandId} FOR UPDATE`;
+        if (repair.watch.modelId) await tx.$queryRaw`SELECT "id" FROM "Model" WHERE "id" = ${repair.watch.modelId} FOR UPDATE`;
+        if (repair.watch.referenceId) await tx.$queryRaw`SELECT "id" FROM "WatchReference" WHERE "id" = ${repair.watch.referenceId} FOR UPDATE`;
+        if (repair.watch.caseReferenceId) await tx.$queryRaw`SELECT "id" FROM "WatchReference" WHERE "id" = ${repair.watch.caseReferenceId} FOR UPDATE`;
       }
+      const current = await tx.estimateDocument.findUnique(documentQuery);
+      if (estimatePdfSourceFingerprint(current) !== sourceFingerprint) throw new Error("見積内容が変更されました。再生成してください。");
       await tx.$executeRaw`
         UPDATE "EstimatePdfFile"
         SET "status" = 'superseded',
@@ -301,8 +361,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     return NextResponse.json(
-      { ok: false, error: "Estimate PDF generation failed" },
-      { status: 500 }
+      { ok: false, error: error instanceof Error && error.message === "見積内容が変更されました。再生成してください。" ? error.message : "Estimate PDF generation failed" },
+      { status: error instanceof Error && error.message === "見積内容が変更されました。再生成してください。" ? 409 : 500 }
     );
   }
 }

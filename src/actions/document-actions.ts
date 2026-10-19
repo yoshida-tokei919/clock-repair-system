@@ -16,7 +16,7 @@ import { b2bPaymentDueDate, billingMonthBounds, billingMonthFromDate, isB2BBilli
 import { getAdminApiIdentity } from "@/lib/admin-api-auth";
 import { resolveIssuedDate } from "@/lib/document-issued-date";
 import { calculateTaxableAmounts, commonEstimateMode, sumCustomerLines } from "@/lib/pricing-tax";
-import { assertNoUnansweredAlternatives, lockEstimateOptions } from "@/lib/estimate-options";
+import { lockEstimateOptions, parseOptionSet } from "@/lib/estimate-options";
 
 export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     if (!await getAdminApiIdentity()) throw new Error("認証が必要です");
@@ -61,13 +61,13 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
             include: {
                 customer: true,
                 estimate: { include: { items: true } },
-                estimateOptionSet: { select: { isActive: true } },
+                estimateOptionSet: { include: { choices: { include: { lines: true } } } },
                 deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true, shippingFee: true, pricingTaxMode: true } },
             }
         });
 
         if (repairs.length === 0) return { success: false, error: "Repairs not found" };
-        if (type === "estimate" && repairs.some(repair => repair.estimateOptionSet?.isActive)) {
+        if (type === "estimate" && repairs.some(repair => repair.estimateOptionSet?.isActive && repair.customer.type !== "business")) {
             return { success: false, error: "選択肢が未回答の案件を通常見積書として発行できません。" };
         }
         if (type === "delivery") {
@@ -214,10 +214,42 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                 docNumber = `${prefix}E-${String(seq).padStart(3, '0')}`;
 
                 const estimateDoc = await prisma.$transaction(async (tx) => {
+                  await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${customerId} FOR UPDATE`;
                   for (const repairId of customerRepairs.map(r => r.id).sort((a, b) => a - b)) {
                     await lockEstimateOptions(tx, repairId);
                     await tx.$queryRaw`SELECT "id" FROM "Repair" WHERE "id" = ${repairId} FOR UPDATE`;
-                    await assertNoUnansweredAlternatives(tx, repairId);
+                    const previous = customerRepairs.find(r => r.id === repairId)!;
+                    if (previous.estimate) {
+                      await tx.$queryRaw`SELECT "id" FROM "Estimate" WHERE "id" = ${previous.estimate.id} FOR UPDATE`;
+                      for (const item of previous.estimate.items) await tx.$queryRaw`SELECT "id" FROM "EstimateItem" WHERE "id" = ${item.id} FOR UPDATE`;
+                    }
+                    if (previous.estimateOptionSet) {
+                      await tx.$queryRaw`SELECT "id" FROM "EstimateOptionSet" WHERE "id" = ${previous.estimateOptionSet.id} FOR UPDATE`;
+                      for (const choice of previous.estimateOptionSet.choices) {
+                        await tx.$queryRaw`SELECT "id" FROM "EstimateOptionChoice" WHERE "id" = ${choice.id} FOR UPDATE`;
+                        for (const line of choice.lines) await tx.$queryRaw`SELECT "id" FROM "EstimateOptionLine" WHERE "id" = ${line.id} FOR UPDATE`;
+                      }
+                    }
+                  }
+                  const fresh = await tx.repair.findMany({ where: { id: { in: customerRepairs.map(r => r.id) } }, include: {
+                    customer: true, estimate: { include: { items: true } },
+                    estimateOptionSet: { include: { choices: { include: { lines: true } } } },
+                  } });
+                  const relevant = (r: Pick<typeof customerRepairs[number], "id" | "customerId" | "estimateDocumentId" | "customer" | "estimate" | "estimateOptionSet">) => ({
+                    id: r.id, customerId: r.customerId, estimateDocumentId: r.estimateDocumentId,
+                    customer: { type: r.customer.type, pricingTaxMode: r.customer.pricingTaxMode },
+                    estimate: r.estimate && { ...r.estimate, items: [...r.estimate.items].sort((a, b) => a.id - b.id) },
+                    estimateOptionSet: r.estimateOptionSet && { ...r.estimateOptionSet, choices: [...r.estimateOptionSet.choices]
+                      .sort((a, b) => a.id - b.id).map(c => ({ ...c, lines: [...c.lines].sort((a, b) => a.id - b.id) })) },
+                  });
+                  if (fresh.length !== customerRepairs.length || JSON.stringify(fresh.map(relevant).sort((a, b) => a.id - b.id)) !==
+                      JSON.stringify(customerRepairs.map(relevant).sort((a, b) => a.id - b.id))) {
+                    throw new Error("見積内容が変更されました。再読み込みしてください");
+                  }
+                  for (const repair of fresh) if (repair.estimateOptionSet?.isActive) {
+                    if (repair.customer.type !== "business" || !repair.estimate || repair.estimate.pricingTaxMode !== pricingTaxMode ||
+                        repair.customer.pricingTaxMode !== pricingTaxMode) throw new Error("選択肢付き見積の取引先・税表示方式を確認してください");
+                    parseOptionSet(repair.estimateOptionSet);
                   }
                   const created = await tx.estimateDocument.create({
                     data: {

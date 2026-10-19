@@ -29,6 +29,19 @@ export interface EstimateServerDocumentProps {
         note2?: string;
         displayName?: string;
       }[];
+      options?: {
+        title: string;
+        notes?: string | null;
+        choices: {
+          kind: "PLAN" | "ADD_ON";
+          name: string;
+          notes?: string | null;
+          recommended: boolean;
+          lines: { name: string; price: number; quantity: number; notes?: string | null }[];
+          deltaAmount: number;
+          totalAmount: number;
+        }[];
+      };
     }[];
   };
 }
@@ -206,7 +219,9 @@ export function createEstimateServerDocumentElement(
 
           return el(
             View,
-            { key: job.id || index, style: [styles.row, { minHeight: 30 }] },
+            { key: job.id || index, wrap: job.options &&
+                job.items.length + job.options.choices.reduce((count, choice) => count + choice.lines.length + 3, 2) <= 25
+                ? false : undefined, style: [styles.row, { minHeight: 30 }] },
             el(
               View,
               { style: styles.mainRow },
@@ -238,9 +253,23 @@ export function createEstimateServerDocumentElement(
               el(
                 Text,
                 { style: { width: columns.total, textAlign: "right" } },
-                `¥${jobTotal.toLocaleString()}`
+                job.options ? `共通 ¥${jobTotal.toLocaleString()}` : `¥${jobTotal.toLocaleString()}`
               )
             ),
+            job.options ? el(View, { style: { marginTop: 5, paddingLeft: 5, fontSize: 8 } },
+              el(Text, { style: { fontWeight: "bold" } }, job.options.title || "選択肢"),
+              job.options.notes ? el(Text, null, `全体条件: ${job.options.notes}`) : null,
+              job.options.choices.map((choice, choiceIndex) => el(View, { key: choiceIndex, style: { marginTop: 4 } },
+                el(Text, { style: { fontWeight: "bold" } },
+                  `${choice.kind === "PLAN" ? "プラン" : "追加作業"}: ${choice.name}${choice.recommended ? "【推奨】" : ""}`),
+                choice.notes ? el(Text, null, `条件: ${choice.notes}`) : null,
+                choice.lines.map((line, lineIndex) => el(Text, { key: lineIndex },
+                  `・${line.name} ×${line.quantity}  ¥${line.price.toLocaleString()}${line.notes ? ` (${line.notes})` : ""}`)),
+                el(Text, { style: { textAlign: "right", fontWeight: "bold" } },
+                  choice.kind === "PLAN"
+                    ? `差額 ¥${choice.deltaAmount.toLocaleString()} / 共通＋このプラン ¥${choice.totalAmount.toLocaleString()}${inclusive ? "(税込)" : "(税抜)"}`
+                    : `追加額 ¥${choice.deltaAmount.toLocaleString()}${inclusive ? "(税込)" : "(税抜)"}`)
+              ))) : null,
             job.customerNote
               ? el(Text, { style: styles.note }, `ご連絡事項: ${job.customerNote}`)
               : null
