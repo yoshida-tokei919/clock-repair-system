@@ -12,6 +12,7 @@ import Link from "next/link";
 import { toast } from "@/components/ui/use-toast";
 import { B2BCompanySettings } from "@/components/customers/B2BCompanySettings";
 import { InvoiceRecipientSettings } from "@/components/customers/InvoiceRecipientSettings";
+import { LineContactSettings } from "@/components/customers/LineContactSettings";
 
 export default function CustomerEditPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = React.use(params);
@@ -299,6 +300,7 @@ export default function CustomerEditPage({ params }: { params: Promise<{ id: str
       </form>
 
       {data.type === "business" && <InvoiceRecipientSettings customerId={id} />}
+      {data.type === "business" && <LineContactSettings customerId={id} />}
       {data.type === "business" && <B2BCompanySettings customerId={id} />}
 
       <div className="pt-12 border-t">

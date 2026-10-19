@@ -39,19 +39,20 @@ test("estimate destination requires each Repair's own promoted Inquiry and one v
   ]) assert.throws(() => resolveEstimateLineDestination(bad as any, 4), EstimateLineUnavailableError);
 });
 
-function fakeDb(business = false) {
+function fakeDb(business = false, proxy = false) {
   const rows = business ? [repair(2, { inquiryWatchPromotion: null }), repair(3, { inquiryWatchPromotion: null })] : [repair(2), repair(3)];
   let outbox: any = null;
   let queued = 0;
-  let users = [{ id: 5, linkedCustomerId: 4, lineManagerChat: { id: 6, lineUserId: 5, verifiedAt } }];
+  let users = [{ id: 5, linkedCustomerId: proxy ? 9 : 4, lineManagerChat: { id: 6, lineUserId: 5, verifiedAt } }];
   let inquiry = { id: 8, lineUserId: 5 };
   let chat = { id: 6, lineUserId: 5, verifiedAt, managerBotId: "bot", managerChatId: "chat" };
   const tx: any = {
+    customer: { findUnique: async () => ({ type: business ? "business" : "individual", lineContactCustomerId: proxy ? 9 : null }) },
     estimateDocument: { findUnique: async () => ({ customerId: 4, id: 11, repairs: rows,
       currentPdfFile: { storageKey: "pdf-key", status: "current", estimateDocumentId: 11 } }) },
-    $queryRaw: async (parts: TemplateStringsArray) => {
+    $queryRaw: async (parts: TemplateStringsArray, id?: number) => {
       const sql = parts.join("?");
-      if (sql.includes('FROM "Customer"')) return [{ id: 4, type: business ? "business" : "individual" }];
+      if (sql.includes('FROM "Customer"')) return [{ id: id ?? 4, type: business ? "business" : "individual", lineContactCustomerId: id === 9 ? null : proxy ? 9 : null }];
       if (sql.includes('FROM "LineUser"')) return users.filter((user) => user.id === 5).map(({ linkedCustomerId }) => ({ linkedCustomerId }));
       if (sql.includes('FROM "LineManagerChat"')) return [chat];
       if (sql.includes('FROM "EstimateDocument"') && sql.includes("FOR UPDATE")) return [{ customerId: 4 }];
@@ -90,6 +91,16 @@ test("business estimate queues one verified recipient without a promoted origin,
     assert.equal(fixture.outbox.inquiryId, 8);
     assert.deepEqual(fixture.rows.map((row) => row.status), fixture.rows.map(() => "見積中"));
   }
+});
+
+test("proxy estimate keeps source document and repair IDs while routing to the delegate", async () => {
+  const f = fakeDb(true, true);
+  await queueEstimateLineSend(f.db, 11, "https://example.com");
+  assert.equal(f.outbox.inquiryId, 8);
+  assert.equal(f.outbox.sourceRepairId, null);
+  assert.equal(f.outbox.idempotencyKey, businessEstimateLineKey(11, 4, f.rows,
+    { lineUserId: 5, inquiryId: 8, lineManagerChatId: 6, verifiedAt, managerBotId: "bot", managerChatId: "chat" }, 9));
+  assert.match(f.outbox.text, /customer\/repairs\/document-token/);
 });
 
 test("business estimate rejects missing, ambiguous, unverified and changed recipients", async () => {
@@ -208,9 +219,10 @@ function confirmationFixture(idempotencyKey?: string, business = false) {
     inquiry: { lineUserId: 5 }, lineManagerChat: { lineUserId: 5, managerBotId: "bot", managerChatId: "chat" },
   };
   const tx: any = {
+    customer: { findUnique: async () => ({ type: business ? "business" : "individual", lineContactCustomerId: null }) },
     $queryRaw: async (parts: TemplateStringsArray) => {
       const sql = parts.join("?");
-      if (sql.includes('FROM "Customer"')) return [{ id: customerId, type: business ? "business" : "individual" }];
+      if (sql.includes('FROM "Customer"')) return [{ id: customerId, type: business ? "business" : "individual", lineContactCustomerId: null }];
       if (sql.includes('FROM "LineUser"')) return [{ linkedCustomerId }];
       if (sql.includes('FROM "LineManagerChat"')) return [{ id: 6, lineUserId: 5, verifiedAt, managerBotId: "bot", managerChatId: "chat" }];
       if (sql.includes('FROM "EstimateDocument"')) return [{ customerId }];
@@ -290,7 +302,9 @@ test("business confirmation changes status once only after Manager history and s
   ]) {
     const fixture = confirmationFixture(undefined, true); drift(fixture);
     fixture.status = "POST_UNCONFIRMED";
-    await confirmLineManagerSendOutbox(fixture.db, fixture.input);
+    // The POST already happened: reconcile genuine send evidence even after routing drift,
+    // but do not apply a stale repair-status transition.
+    await assert.doesNotReject(confirmLineManagerSendOutbox(fixture.db, fixture.input));
     assert.deepEqual(fixture.counts, { updates: 0, logs: 0 });
   }
 });

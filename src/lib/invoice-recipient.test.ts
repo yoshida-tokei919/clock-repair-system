@@ -67,7 +67,10 @@ test("individual conversion guards configured and issued alternate recipients un
   let issued = 0;
   const tx = {
     $queryRaw: async () => { calls.push("lock"); return [{ id: 22, type: "business" }]; },
-    customer: { count: async () => { calls.push("configured"); return configured; } },
+    customer: { findUnique: async () => ({ lineContactCustomerId: null }), count: async (args: any) => {
+      calls.push(args.where.invoiceRecipientCustomerId === 22 ? "configured" : "line-contact");
+      return args.where.invoiceRecipientCustomerId === 22 ? configured : 0;
+    } },
     invoice: { count: async () => { calls.push("issued"); return issued; } },
   } as unknown as Prisma.TransactionClient;
   await assert.rejects(assertCustomerCanBecomeIndividual(tx, 22), /他の法人の請求先/);

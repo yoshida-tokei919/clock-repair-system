@@ -3,6 +3,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { buildCustomerShareUrl } from "./customer-share-url";
 import { createApprovedLineManagerSendOutbox } from "./line-manager-send-outbox";
 import { businessEstimateLineKey, estimateLineKey, estimateLineKeyPrefix, resolveLockedBusinessEstimateDestination } from "./estimate-line-confirmation";
+import { resolveLockedLineContact } from "./line-contact";
 
 
 export class EstimateLineNotFoundError extends Error {}
@@ -73,8 +74,10 @@ export async function queueEstimateLineSend(
     // Read the linkage first, then lock Customer -> document -> Repairs in a stable order.
     const initial = await tx.estimateDocument.findUnique({ where: { id: documentId }, select: { customerId: true } });
     if (!initial) throw new EstimateLineNotFoundError("見積書が見つかりません。");
-    const customers = await tx.$queryRaw<{ id: number; type: string }[]>`SELECT "id", "type" FROM "Customer" WHERE "id" = ${initial.customerId} FOR UPDATE`;
-    if (customers.length !== 1) throw new EstimateLineUnavailableError("見積書の顧客を確認できません。");
+    const observedCustomer = await tx.customer.findUnique({ where: { id: initial.customerId }, select: { type: true } });
+    const contact = observedCustomer?.type === "business" ? await resolveLockedLineContact(tx, initial.customerId) : null;
+    const customers = contact ? [contact.source] : await tx.$queryRaw<{ id: number; type: string }[]>`SELECT "id", "type" FROM "Customer" WHERE "id" = ${initial.customerId} FOR UPDATE`;
+    if (customers.length !== 1 || customers[0].type !== observedCustomer?.type) throw new EstimateLineUnavailableError("見積書の顧客を確認できません。");
     const documents = await tx.$queryRaw<{ customerId: number }[]>`SELECT "customerId" FROM "EstimateDocument" WHERE "id" = ${documentId} FOR UPDATE`;
     if (documents.length !== 1 || documents[0].customerId !== initial.customerId) {
       throw new EstimateLineUnavailableError("見積書の顧客が変更されました。");
@@ -108,7 +111,7 @@ export async function queueEstimateLineSend(
       throw new EstimateLineUnavailableError("見積書の修理案件の顧客が一致しません。");
     }
     const business = customers[0].type === "business";
-    const businessDestination = business ? await resolveLockedBusinessEstimateDestination(tx, document.customerId) : null;
+    const businessDestination = business ? await resolveLockedBusinessEstimateDestination(tx, contact!.contactCustomerId) : null;
     if (business && !businessDestination) throw new EstimateLineUnavailableError("確認済みのLINE送信先がありません。");
     const destination = business
       ? { inquiryId: businessDestination!.inquiryId, lineManagerChatId: businessDestination!.lineManagerChatId }
@@ -123,7 +126,7 @@ export async function queueEstimateLineSend(
     const estimateUrl = buildCustomerShareUrl(`/customer/repairs/${publicToken}`, requestUrl);
     const text = `お見積りができましたので、下記ページよりご確認をお願いいたします。\n\n${estimateUrl}\n\nこの内容で進める場合は、画面上から承認をお願いいたします。\nご不明な点や修正のご希望がございましたら、このLINEからご連絡ください。`;
     const idempotencyKey = business
-      ? businessEstimateLineKey(documentId, document.customerId, document.repairs, businessDestination!)
+      ? businessEstimateLineKey(documentId, document.customerId, document.repairs, businessDestination!, contact!.contactCustomerId)
       : estimateLineKey(documentId, document.customerId, document.repairs);
     const existing = await tx.lineManagerSendOutbox.findFirst({
       where: { idempotencyKey: { startsWith: estimateLineKeyPrefix(documentId) } },

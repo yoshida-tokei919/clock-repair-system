@@ -5,17 +5,18 @@ import test from "node:test";
 import type { PrismaClient } from "@prisma/client";
 import { b2bRepairCommentNoticeKey, customerCommentUrl, saveRepairComment, visibleCustomerCommentTarget } from "./b2b-repair-comment-notice";
 
-function fixture(users: unknown[], type = "business") {
+function fixture(users: unknown[], type = "business", proxy = false) {
   let saved = false;
   let queues = 0;
   const locks: string[] = [];
   const tx = {
+    customer: { findUnique: async () => ({ type, lineContactCustomerId: proxy ? 9 : null }) },
     repair: { findUnique: async () => ({ customerId: 7 }) },
-    $queryRaw: async (parts: TemplateStringsArray) => {
+    $queryRaw: async (parts: TemplateStringsArray, id?: number) => {
       const sql = parts.join("?");
-      if (sql.includes('FROM "Customer"')) { locks.push("customer"); return [{ id: 7, type }]; }
+      if (sql.includes('FROM "Customer"')) { locks.push("customer"); return [{ id: id ?? 7, type, lineContactCustomerId: id === 9 ? null : proxy ? 9 : null }]; }
       if (sql.includes('FROM "Repair"')) { locks.push("repair"); assert.match(sql, /"inquiryNumber"/); return [{ id: 3, customerId: 7, publicToken: "repair-token", inquiryNumber: "K-002" }]; }
-      if (sql.includes('FROM "LineUser"')) { locks.push("line-user"); return [{ linkedCustomerId: 7 }]; }
+      if (sql.includes('FROM "LineUser"')) { locks.push("line-user"); return [{ linkedCustomerId: proxy ? 9 : 7 }]; }
       if (sql.includes('FROM "LineManagerChat"')) { locks.push("chat"); return [{ id: 11, lineUserId: 5, verifiedAt: new Date(), managerBotId: "bot", managerChatId: "chat" }]; }
       return [];
     },
@@ -26,15 +27,16 @@ function fixture(users: unknown[], type = "business") {
   const db = { $transaction: async (fn: (client: typeof tx) => Promise<unknown>) => {
     try { return await fn(tx); } catch (error) { saved = false; throw error; }
   } } as unknown as PrismaClient;
-  const createApproved = (async (_tx: unknown, input: { idempotencyKey: string; text: string; inquiryId: number; lineManagerChatId: number }) => {
+  const createApproved = (async (_tx: unknown, input: { idempotencyKey: string; text: string; inquiryId: number; lineManagerChatId: number; sourceRepairId: number }) => {
     queues++;
     assert.equal(saved, true);
-    assert.deepEqual(locks, ["customer", "repair", "line-user", "chat"]);
+    assert.deepEqual(locks, proxy ? ["customer", "customer", "repair", "line-user", "chat"] : ["customer", "repair", "line-user", "chat"]);
     assert.equal(input.idempotencyKey, b2bRepairCommentNoticeKey(99));
     assert.equal(input.text, "修理案件 K-002 にコメントを返信しました。\n以下のページからご確認ください。\nhttps://app.test/customer/repairs/repair-token?comment=99#comment-99");
     assert.doesNotMatch(input.text, /本文はLINEに出さない/);
     assert.equal(input.inquiryId, 21);
     assert.equal(input.lineManagerChatId, 11);
+    assert.equal(input.sourceRepairId, proxy ? 3 : undefined);
     return { status: "APPROVED" };
   }) as unknown as Parameters<typeof saveRepairComment>[4];
   return { db, createApproved, get saved() { return saved; }, get queues() { return queues; } };
@@ -45,6 +47,13 @@ const valid = { id: 5, linkedCustomerId: 7, lineManagerChat: { id: 11, lineUserI
 test("verified unique B2B destination queues a short notice and URL without comment body", async () => {
   const f = fixture([valid]);
   const result = await saveRepairComment(f.db, 3, "本文はLINEに出さない", "https://app.test/repairs/3", f.createApproved);
+  assert.equal(result.notification, "pending");
+  assert.equal(f.queues, 1);
+});
+
+test("proxy comment retains the source repair and its own share URL", async () => {
+  const f = fixture([{ ...valid, linkedCustomerId: 9 }], "business", true);
+  const result = await saveRepairComment(f.db, 3, "private body", "https://app.test/repairs/3", f.createApproved);
   assert.equal(result.notification, "pending");
   assert.equal(f.queues, 1);
 });

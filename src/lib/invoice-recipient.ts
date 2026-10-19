@@ -75,8 +75,12 @@ export async function resolveInvoiceRecipientForIssue(tx: Prisma.TransactionClie
 export async function assertCustomerCanBecomeIndividual(tx: Prisma.TransactionClient, customerId: number) {
   const customer = (await lockInvoiceRecipientCustomers(tx, [customerId])).get(customerId)!;
   if (customer.type !== "business") return;
+  const ownContact = await tx.customer.findUnique({ where: { id: customerId }, select: { lineContactCustomerId: true } });
+  if (ownContact?.lineContactCustomerId !== null) throw new Error("LINE代理連絡先を解除してから個人顧客へ変更してください。");
   const configured = await tx.customer.count({ where: { id: { not: customerId }, invoiceRecipientCustomerId: customerId } });
   if (configured > 0) throw new Error("他の法人の請求先に設定されているため、個人顧客へ変更できません。");
+  const lineContacts = await tx.customer.count({ where: { id: { not: customerId }, lineContactCustomerId: customerId } });
+  if (lineContacts > 0) throw new Error("他の法人のLINE連絡先に設定されているため、個人顧客へ変更できません。");
   const issued = await tx.invoice.count({ where: { customerId: { not: customerId }, billingCustomerId: customerId } });
   if (issued > 0) throw new Error("発行済み請求書の請求先であるため、個人顧客へ変更できません。");
 }

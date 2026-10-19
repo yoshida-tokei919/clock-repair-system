@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { buildCustomerShareUrl } from "./customer-share-url";
 import { resolveLockedBusinessEstimateDestination } from "./estimate-line-confirmation";
+import { resolveLockedLineContact } from "./line-contact";
 import { createApprovedLineManagerSendOutbox } from "./line-manager-send-outbox";
 
 export const b2bRepairCommentNoticeKey = (messageId: number) => `b2b-repair-comment-notice:${messageId}`;
@@ -28,16 +29,18 @@ export async function saveRepairComment(
   return db.$transaction(async (tx) => {
     const initial = await tx.repair.findUnique({ where: { id: repairId }, select: { customerId: true } });
     if (!initial) throw new Error("修理案件が見つかりません。");
-    const customers = await tx.$queryRaw<{ id: number; type: string }[]>`
+    const observedCustomer = await tx.customer.findUnique({ where: { id: initial.customerId }, select: { type: true } });
+    const contact = observedCustomer?.type === "business" ? await resolveLockedLineContact(tx, initial.customerId) : null;
+    const customers = contact ? [contact.source] : await tx.$queryRaw<{ id: number; type: string }[]>`
       SELECT "id", "type" FROM "Customer" WHERE "id" = ${initial.customerId} FOR UPDATE`;
-    if (customers.length !== 1) throw new Error("顧客を確認できません。");
+    if (customers.length !== 1 || customers[0].type !== observedCustomer?.type) throw new Error("顧客を確認できません。");
     const repairs = await tx.$queryRaw<{ id: number; customerId: number; publicToken: string | null; inquiryNumber: string }[]>`
       SELECT "id", "customerId", "publicToken", "inquiryNumber" FROM "Repair" WHERE "id" = ${repairId} FOR UPDATE`;
     const repair = repairs[0];
     if (repairs.length !== 1 || repair.customerId !== initial.customerId) throw new Error("修理案件の顧客が変更されました。");
 
     const business = customers[0].type === "business";
-    const destination = business ? await resolveLockedBusinessEstimateDestination(tx, repair.customerId) : null;
+    const destination = business ? await resolveLockedBusinessEstimateDestination(tx, contact!.contactCustomerId) : null;
     const message = await tx.repairCustomerMessage.create({
       data: { repairId, body, senderType: "shop", readAt: new Date() },
       select: { id: true, body: true, senderType: true, createdAt: true, readAt: true },
@@ -56,6 +59,7 @@ export async function saveRepairComment(
     const outbox = await createApproved(tx, {
       inquiryId: destination.inquiryId,
       lineManagerChatId: destination.lineManagerChatId,
+      ...(contact!.contactCustomerId !== repair.customerId ? { sourceRepairId: repairId } : {}),
       text: `修理案件 ${repair.inquiryNumber} にコメントを返信しました。\n以下のページからご確認ください。\n${url}`,
       idempotencyKey: b2bRepairCommentNoticeKey(message.id),
     });

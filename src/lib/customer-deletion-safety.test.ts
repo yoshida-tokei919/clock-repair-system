@@ -18,7 +18,7 @@ function fixture(options: { exists?: boolean; repairCount?: number; linkedUserId
       pendingQuery = query;
       return options.pending ? { id: 1 } : null;
     } },
-    customer: { delete: async () => { calls.push("delete-customer"); } },
+    customer: { count: async () => { calls.push("check-line-delegates"); return 0; }, delete: async () => { calls.push("delete-customer"); } },
   };
   const db = { $transaction: async (fn: (value: any) => Promise<void>) => fn(tx) } as unknown as PrismaClient;
   return { db, calls, get pendingQuery() { return pendingQuery; } };
@@ -27,7 +27,7 @@ function fixture(options: { exists?: boolean; repairCount?: number; linkedUserId
 test("locks Customer before checking repairs, linked users and all nonterminal outboxes", async () => {
   const f = fixture({ linkedUserIds: [5, 6] });
   await deleteCustomerSafely(f.db, 7);
-  assert.deepEqual(f.calls, ["lock-customer", "count-repairs", "read-linked-users", "check-outboxes", "delete-customer"]);
+  assert.deepEqual(f.calls, ["lock-customer", "check-line-delegates", "count-repairs", "read-linked-users", "check-outboxes", "delete-customer"]);
   assert.deepEqual(f.pendingQuery.where.status.in, ["APPROVED", "CLAIMED", "PRE_SEND_FAILED", "POST_UNCONFIRMED"]);
   assert.deepEqual(f.pendingQuery.where.OR, [
     { inquiry: { lineUserId: { in: [5, 6] } } },
@@ -39,7 +39,7 @@ test("locks Customer before checking repairs, linked users and all nonterminal o
 test("any nonterminal outbox blocks deletion before LineUser can detach", async () => {
   const f = fixture({ pending: true });
   await assert.rejects(deleteCustomerSafely(f.db, 7), CustomerDeletionBlockedError);
-  assert.deepEqual(f.calls, ["lock-customer", "count-repairs", "read-linked-users", "check-outboxes"]);
+  assert.deepEqual(f.calls, ["lock-customer", "check-line-delegates", "count-repairs", "read-linked-users", "check-outboxes"]);
 });
 
 test("CONFIRMED or CANCELLED outboxes do not block deletion", async () => {

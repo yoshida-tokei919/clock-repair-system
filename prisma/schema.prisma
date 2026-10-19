@@ -56,6 +56,9 @@ model Customer {
   invoiceRecipientCustomerId Int?
   invoiceRecipientCustomer Customer? @relation("DefaultInvoiceRecipient", fields: [invoiceRecipientCustomerId], references: [id], onDelete: Restrict)
   invoiceRecipientFor Customer[] @relation("DefaultInvoiceRecipient")
+  lineContactCustomerId Int?
+  lineContactCustomer Customer? @relation("BusinessLineContact", fields: [lineContactCustomerId], references: [id], onDelete: Restrict)
+  lineContactFor Customer[] @relation("BusinessLineContact")
 
   watches           Watch[]
   repairs           Repair[]
@@ -78,6 +81,7 @@ model Customer {
   consolidatedBillingDestinations ConsolidatedInvoice[] @relation("ConsolidatedBillingDestination")
 
   @@index([invoiceRecipientCustomerId])
+  @@index([lineContactCustomerId])
 }
 
 // Explicit B2B billing group. Repair, DeliveryNote, Invoice and Shipment keep their store Customer.

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import type { Prisma } from "@prisma/client";
 import { resolveInvoiceLineDestination } from "./invoice-delivery-routing";
+import { resolveLockedLineContact } from "./line-contact";
 
 const KEY_PREFIX = "estimate-document-line:";
 const WAITING_FOR_APPROVAL_STATUS = "承認待ち";
@@ -58,8 +59,9 @@ export async function resolveLockedBusinessEstimateDestination(tx: Prisma.Transa
 }
 
 export function businessEstimateLineKey(documentId: number, customerId: number,
-  repairs: { id: number; customerId: number }[], destination: BusinessEstimateDestination) {
-  const snapshot = ["business", customerId, repairs.map(({ id, customerId }) => [id, customerId]),
+  repairs: { id: number; customerId: number }[], destination: BusinessEstimateDestination, contactCustomerId = customerId) {
+  const snapshot = ["business", customerId, ...(contactCustomerId === customerId ? [] : [contactCustomerId]),
+    repairs.map(({ id, customerId }) => [id, customerId]),
     destination.lineUserId, destination.inquiryId, destination.lineManagerChatId,
     destination.verifiedAt.toISOString(), destination.managerBotId, destination.managerChatId];
   return `${KEY_PREFIX}${documentId}:${crypto.createHash("sha256").update(JSON.stringify(snapshot)).digest("hex")}`;
@@ -79,9 +81,11 @@ export async function transitionConfirmedEstimateRepairs(
   // Lock the document and current members so a concurrent edit cannot make the validation stale.
   const initial = await tx.estimateDocument.findUnique({ where: { id: documentId }, select: { customerId: true } });
   if (!initial) return 0;
-  const customers = await tx.$queryRaw<{ id: number; type: string }[]>`
+  const customerType = await tx.customer.findUnique({ where: { id: initial.customerId }, select: { type: true } });
+  const contact = customerType?.type === "business" ? await resolveLockedLineContact(tx, initial.customerId) : null;
+  const customers = contact ? [contact.source] : await tx.$queryRaw<{ id: number; type: string }[]>`
     SELECT "id", "type" FROM "Customer" WHERE "id" = ${initial.customerId} FOR UPDATE`;
-  if (customers.length !== 1) return 0;
+  if (customers.length !== 1 || customers[0].type !== customerType?.type) return 0;
   const documents = await tx.$queryRaw<{ customerId: number }[]>`
     SELECT "customerId" FROM "EstimateDocument" WHERE "id" = ${documentId} FOR UPDATE
   `;
@@ -107,10 +111,12 @@ export async function transitionConfirmedEstimateRepairs(
       repairs.some((repair, index) => repair.id !== lockedRepairs[index]?.id || repair.customerId !== customerId)) return 0;
   if (customers[0].type === "business") {
     if (outbox.sourceRepairId != null) return 0;
-    const destination = await resolveLockedBusinessEstimateDestination(tx, customerId);
+    const contactCustomerId = contact?.contactCustomerId;
+    if (!contactCustomerId) return 0;
+    const destination = await resolveLockedBusinessEstimateDestination(tx, contactCustomerId);
     if (!destination || destination.inquiryId !== outbox.inquiryId ||
         destination.lineManagerChatId !== outbox.lineManagerChatId ||
-        businessEstimateLineKey(documentId, customerId, repairs, destination) !== outbox.idempotencyKey) return 0;
+        businessEstimateLineKey(documentId, customerId, repairs, destination, contactCustomerId) !== outbox.idempotencyKey) return 0;
   } else if (
       repairs.some((repair, index) => repair.id !== lockedRepairs[index]?.id ||
         repair.customerId !== customerId ||

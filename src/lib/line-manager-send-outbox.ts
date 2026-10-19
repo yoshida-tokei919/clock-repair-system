@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { reconcileInquiryMessageRepairLinks } from "./inquiry-message-repair-links";
 import { lockLineUserInquiryTransaction } from "./inquiry-transaction-lock";
 import { transitionConfirmedEstimateRepairs } from "./estimate-line-confirmation";
+import { assertLineContactOutboxCurrent, LineContactDestinationInvalidError } from "./line-contact-outbox";
 
 export type LineManagerSendOutboxDb = Pick<
   PrismaClient,
@@ -66,13 +67,17 @@ export async function createApprovedLineManagerSendOutbox(
   input: { inquiryId: number; lineManagerChatId: number; text: string; idempotencyKey: string; sourceRepairId?: number; approvedAt?: Date },
 ) {
   if (input.sourceRepairId !== undefined && (!Number.isSafeInteger(input.sourceRepairId) || input.sourceRepairId <= 0)) throw new LineManagerSendOutboxError("Invalid source Repair ID");
-  const [inquiry, chat, sourceRepair] = await Promise.all([
+  const commentMatch = /^b2b-repair-comment-notice:([1-9]\d*)$/.exec(input.idempotencyKey);
+  const [inquiry, chat, sourceRepair, comment] = await Promise.all([
     db.inquiry.findUnique({ where: { id: input.inquiryId }, select: { id: true, lineUserId: true } }),
     db.lineManagerChat.findUnique({ where: { id: input.lineManagerChatId }, select: { id: true, lineUserId: true, managerBotId: true, managerChatId: true } }),
     input.sourceRepairId === undefined ? Promise.resolve(null) : db.repair.findUnique({ where: { id: input.sourceRepairId }, select: { id: true, inquiryWatchPromotion: { select: { inquiryId: true, promotedRepairId: true } } } }),
+    commentMatch ? (db as Prisma.TransactionClient).repairCustomerMessage.findUnique({ where: { id: Number(commentMatch[1]) }, select: { repairId: true } }) : Promise.resolve(null),
   ]);
   if (!inquiry || !chat || inquiry.lineUserId !== chat.lineUserId) throw new LineManagerSendOutboxError("Inquiry and verified LINE Manager chat do not belong to the same LINE user");
-  if (input.sourceRepairId !== undefined && (!sourceRepair || sourceRepair.inquiryWatchPromotion?.inquiryId !== input.inquiryId || sourceRepair.inquiryWatchPromotion.promotedRepairId !== sourceRepair.id)) {
+  if (input.sourceRepairId !== undefined && (!sourceRepair || (commentMatch
+      ? comment?.repairId !== sourceRepair.id
+      : sourceRepair.inquiryWatchPromotion?.inquiryId !== input.inquiryId || sourceRepair.inquiryWatchPromotion.promotedRepairId !== sourceRepair.id))) {
     throw new LineManagerSendOutboxError("Source Repair does not belong to the originating Inquiry");
   }
   const approvedAt = nowOr(input.approvedAt);
@@ -112,6 +117,22 @@ async function withNoUnresolvedPost<T>(db: LineManagerSendOutboxDb, action: (tx:
 export async function safeClaimLineManagerSendOutbox(db: LineManagerSendOutboxDb, input: { id: number; now?: Date; leaseMs?: number }) {
   const now = nowOr(input.now); const token = randomUUID(); const expires = new Date(now.getTime() + (input.leaseMs ?? CLAIM_LEASE_MS));
   return withNoUnresolvedPost(db, async (tx) => {
+    const candidate = await tx.lineManagerSendOutbox.findUnique({ where: { id: input.id }, select: { idempotencyKey: true, inquiryId: true, lineManagerChatId: true, sourceRepairId: true } });
+    if (candidate) {
+      try {
+        await assertLineContactOutboxCurrent(tx, candidate);
+      } catch (error) {
+        if (!(error instanceof LineContactDestinationInvalidError)) throw error;
+        // Permanently quarantine this unsent intent for explicit admin handling.
+        // Unlike an exception, this never blocks unrelated LINE sender candidates.
+        await tx.lineManagerSendOutbox.updateMany({
+          where: { id: input.id, ...lineManagerSendCandidateWhere(now) },
+          data: { status: "PRE_SEND_FAILED", sendAttemptCount: MAX_SEND_ATTEMPTS,
+            lastAttemptAt: now, lastError: errorText(error), claimToken: null, claimLeaseExpiresAt: null },
+        });
+        return null;
+      }
+    }
     const result = await tx.lineManagerSendOutbox.updateMany({ where: { id: input.id, ...lineManagerSendCandidateWhere(now) }, data: { status: "CLAIMED", claimToken: token, claimLeaseExpiresAt: expires, claimedAt: now, sendAttemptCount: { increment: 1 }, lastAttemptAt: now, lastError: null } });
     if (result.count !== 1) return null;
     const row = await tx.lineManagerSendOutbox.findUnique({ where: { id: input.id } });
@@ -126,7 +147,11 @@ export async function markLineManagerPreSendFailed(db: LineManagerSendOutboxDb, 
 
 /** Mandatory durable fence: a sender may POST only after this returns true. */
 export async function fenceLineManagerPostAttempt(db: LineManagerSendOutboxDb, input: { id: number; claimToken: string; now?: Date }) {
-  const result = await withNoUnresolvedPost(db, async (tx) => tx.lineManagerSendOutbox.updateMany({ where: { id: input.id, status: "CLAIMED", claimToken: input.claimToken, sendAttemptCount: { lte: MAX_SEND_ATTEMPTS } }, data: { status: "POST_UNCONFIRMED", postAttemptedAt: nowOr(input.now), claimToken: null, claimLeaseExpiresAt: null, lastError: null } }));
+  const result = await withNoUnresolvedPost(db, async (tx) => {
+    const candidate = await tx.lineManagerSendOutbox.findUnique({ where: { id: input.id }, select: { idempotencyKey: true, inquiryId: true, lineManagerChatId: true, sourceRepairId: true } });
+    if (candidate) await assertLineContactOutboxCurrent(tx, candidate);
+    return tx.lineManagerSendOutbox.updateMany({ where: { id: input.id, status: "CLAIMED", claimToken: input.claimToken, sendAttemptCount: { lte: MAX_SEND_ATTEMPTS } }, data: { status: "POST_UNCONFIRMED", postAttemptedAt: nowOr(input.now), claimToken: null, claimLeaseExpiresAt: null, lastError: null } });
+  });
   return result?.count === 1;
 }
 
@@ -172,11 +197,13 @@ export async function confirmLineManagerSendOutbox(
       throw new LineManagerSendOutboxError("Confirmed outbox conflicts with history evidence");
     }
     if (outbox.status !== "POST_UNCONFIRMED" || outbox.reconciliationToken !== input.reconciliationToken) throw new LineManagerSendOutboxError("Reconciliation claim is no longer current");
+    // The durable POST fence already checked the active delegate before sending.
+    // Reconciliation must use the frozen destination evidence even if routing changes after POST.
     if (outbox.text !== input.text) throw new LineManagerSendOutboxError("LINE Manager history text does not match approved outbox text");
     if (input.managerBotId !== outbox.managerBotIdSnapshot || input.managerChatId !== outbox.managerChatIdSnapshot) throw new LineManagerSendOutboxError("LINE Manager history destination does not match the frozen snapshot");
     if (outbox.inquiry.lineUserId !== outbox.lineManagerChat.lineUserId || outbox.managerBotIdSnapshot !== outbox.lineManagerChat.managerBotId || outbox.managerChatIdSnapshot !== outbox.lineManagerChat.managerChatId) throw new LineManagerSendOutboxError("Verified chat mapping no longer matches this outbox destination");
     let sourceInquiryWatchId: number | null = null;
-    if (outbox.sourceRepairId != null) {
+    if (outbox.sourceRepairId != null && !/^b2b-repair-comment-notice:[1-9]\d*$/.test(outbox.idempotencyKey)) {
       const sourceRepair = await tx.repair.findUnique({ where: { id: outbox.sourceRepairId }, select: { inquiryWatchPromotion: { select: { id: true, inquiryId: true, promotedRepairId: true } } } });
       const promotion = sourceRepair?.inquiryWatchPromotion;
       if (!promotion || promotion.inquiryId !== outbox.inquiryId || promotion.promotedRepairId !== outbox.sourceRepairId) throw new LineManagerSendOutboxError("Source Repair no longer belongs to the originating Inquiry");

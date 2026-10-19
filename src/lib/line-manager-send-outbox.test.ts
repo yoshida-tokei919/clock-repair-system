@@ -19,7 +19,8 @@ function guardedDb(outbox: any, unresolved = false): any {
       assert.equal(strings.join(""), "SELECT pg_advisory_xact_lock(203, 5)");
       return 1;
     },
-    lineManagerSendOutbox: { ...outbox, findFirst: async () => unresolved ? { id: 99 } : null },
+    lineManagerSendOutbox: { ...outbox, findFirst: async () => unresolved ? { id: 99 } : null,
+      findUnique: outbox.findUnique ?? (async () => null) },
   };
   return { lineManagerSendOutbox: tx.lineManagerSendOutbox, $transaction: async (fn: any) => fn(tx) };
 }
@@ -86,6 +87,25 @@ test("mapping and outbox upserts converge concurrent equal requests and fail clo
   assert.equal(mappingCreates, 2); assert.equal(outboxCreates, 2);
   db.lineManagerSendOutbox.upsert = async () => ({ inquiryId: 99, lineManagerChatId: 2, text: "hello", managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat" });
   await assert.rejects(createApprovedLineManagerSendOutbox(db, { inquiryId: 1, lineManagerChatId: 2, text: "hello", idempotencyKey: "conflict" }));
+});
+
+test("B2B comment outbox retains its source Repair despite delegate Inquiry", async () => {
+  const db: any = {
+    inquiry: { findUnique: async () => ({ id: 21, lineUserId: 5 }) },
+    lineManagerChat: { findUnique: async () => ({ id: 11, lineUserId: 5, managerBotId: "bot", managerChatId: "chat" }) },
+    repair: { findUnique: async ({ where }: any) => ({ id: where.id, inquiryWatchPromotion: null }) },
+    repairCustomerMessage: { findUnique: async () => ({ repairId: 3 }) },
+    lineManagerSendOutbox: { upsert: async ({ create }: any) => create },
+  };
+  const saved = await createApprovedLineManagerSendOutbox(db, {
+    inquiryId: 21, lineManagerChatId: 11, sourceRepairId: 3,
+    text: "source case link", idempotencyKey: "b2b-repair-comment-notice:99",
+  });
+  assert.equal(saved.sourceRepairId, 3);
+  await assert.rejects(createApprovedLineManagerSendOutbox(db, {
+    inquiryId: 21, lineManagerChatId: 11, sourceRepairId: 4,
+    text: "wrong case", idempotencyKey: "b2b-repair-comment-notice:99",
+  }));
 });
 
 test("concurrent send claims permit exactly one worker", async () => {
@@ -213,4 +233,22 @@ test("Repair confirmation classifies with MANUAL WATCHES and preserves human MAN
     await confirmLineManagerSendOutbox(db, input);
     assert.equal(watchCreates, initialSource === "MANUAL" ? 0 : 1);
   }
+});
+
+test("stale delegated LINE notice is quarantined before send instead of blocking the worker", async () => {
+  const seen: { quarantine?: Record<string, unknown> } = {};
+  const tx = {
+    $executeRaw: async () => 1,
+    estimateDocument: { findUnique: async () => null },
+    lineManagerSendOutbox: {
+      findFirst: async () => null,
+      findUnique: async () => ({ idempotencyKey: `estimate-document-line:91:${"a".repeat(64)}`, inquiryId: 7, lineManagerChatId: 8, sourceRepairId: null }),
+      updateMany: async ({ data }: { data: Record<string, unknown> }) => { seen.quarantine = data; return { count: 1 }; },
+    },
+  };
+  const db = { $transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx) };
+  assert.equal(await safeClaimLineManagerSendOutbox(db as never, { id: 91 }), null);
+  assert.equal(seen.quarantine?.status, "PRE_SEND_FAILED");
+  assert.equal(seen.quarantine?.sendAttemptCount, 5);
+  assert.match(String(seen.quarantine?.lastError), /LINE送信元/);
 });

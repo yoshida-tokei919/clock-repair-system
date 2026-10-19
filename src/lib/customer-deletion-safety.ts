@@ -14,6 +14,9 @@ export async function deleteCustomerSafely(db: PrismaClient, customerId: number)
       SELECT "id" FROM "Customer" WHERE "id" = ${customerId} FOR UPDATE
     `;
     if (customers.length !== 1) throw new CustomerDeletionBlockedError("顧客が見つかりません。");
+    if (await tx.customer.count({ where: { lineContactCustomerId: customerId } }) > 0) {
+      throw new CustomerDeletionBlockedError("他の法人のLINE連絡先に設定されているため、この顧客は削除できません。");
+    }
 
     const repairCount = await tx.repair.count({ where: { customerId } });
     if (repairCount > 0) throw new CustomerDeletionBlockedError("修理履歴がある顧客は削除できません。");
