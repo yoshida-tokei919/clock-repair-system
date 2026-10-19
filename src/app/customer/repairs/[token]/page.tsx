@@ -469,7 +469,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
               const brandModelLine = getWatchBrandModelLine(repair);
               const referenceName = repair.watch?.reference?.name || "";
               const serialNumber = repair.watch?.serialNumber || "";
-              const latestMessages = (commentTarget?.index === index ? repair.customerMessages : repair.customerMessages.slice(0, 2)).map((message: any) => ({
+              const messages = repair.customerMessages.map((message: any) => ({
                 ...message,
                 createdAt: message.createdAt.toISOString(),
                 readAt: message.readAt ? message.readAt.toISOString() : null,
@@ -603,7 +603,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                     isApproved={repair.approvalStatus === "approved"}
                     inquiryNumber={repair.inquiryNumber}
                     repairStatus={repair.status}
-                    messages={latestMessages}
+                    messages={messages}
                     focusCommentId={commentTarget?.index === index ? commentTarget.id : undefined}
                     photoPostingOptOut={repair.photoPostingOptOut}
                     customerName={customerName || "取引先"}

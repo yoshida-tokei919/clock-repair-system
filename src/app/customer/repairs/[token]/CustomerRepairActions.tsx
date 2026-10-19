@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Clipboard, Copy, FileText, Share2, X } from "lucide-react";
+import { CheckCircle, Clipboard, Copy, FileText, MessageCircle, Share2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type CustomerMessage = {
@@ -227,6 +227,12 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
   const [postingOptOut, setPostingOptOut] = useState(photoPostingOptOut);
   const [uncontrolledApprovalDialogOpen, setUncontrolledApprovalDialogOpen] = useState(false);
   const [cancelReturnDialogOpen, setCancelReturnDialogOpen] = useState(false);
+  const [commentDialogOpen, setCommentDialogOpen] = useState(Boolean(focusCommentId));
+  const [commentPrompt, setCommentPrompt] = useState("");
+  const [correctionMode, setCorrectionMode] = useState(false);
+  const [visibleMessageCount, setVisibleMessageCount] = useState(() => Math.max(30, messages.findIndex((message) => message.id === focusCommentId) + 1));
+  const focusedCommentRef = useRef<HTMLDivElement>(null);
+  const messageEndRef = useRef<HTMLDivElement>(null);
   const approvalDialogOpen = controlledApprovalDialogOpen ?? uncontrolledApprovalDialogOpen;
   const setApprovalDialogOpen = (open: boolean) => {
     if (controlledApprovalDialogOpen === undefined) setUncontrolledApprovalDialogOpen(open);
@@ -236,9 +242,17 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
 
   useEffect(() => {
     if (!focusCommentId) return;
-    const target = document.getElementById(`comment-${focusCommentId}`);
-    target?.scrollIntoView({ block: "center" });
-  }, [focusCommentId]);
+    setVisibleMessageCount((count) => Math.max(count, messages.findIndex((message) => message.id === focusCommentId) + 1));
+    setCommentDialogOpen(true);
+  }, [focusCommentId, messages]);
+
+  useEffect(() => {
+    if (!commentDialogOpen) return;
+    const frame = requestAnimationFrame(() => {
+      (focusCommentId ? focusedCommentRef.current : messageEndRef.current)?.scrollIntoView({ block: focusCommentId ? "center" : "end" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [commentDialogOpen, focusCommentId, messages]);
 
   const postAction = async (path: string, body?: unknown) => {
     setLoading(path);
@@ -266,8 +280,10 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
     try {
       await postAction("messages", { body: comment });
       setComment("");
+      setCommentPrompt("");
       router.refresh();
-      alert("コメントを送信しました。");
+      if (isBusiness) setCommentPrompt("コメントを送信しました。");
+      else alert("コメントを送信しました。");
     } catch (error) {
       alert(error instanceof Error ? error.message : "コメント送信に失敗しました。");
     }
@@ -288,14 +304,23 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
 
   const handleReject = async () => {
     if (!comment.trim()) {
-      alert(isBusiness ? "差戻し理由をコメント欄に入力してください。" : "相談・修正をご希望の内容を入力してください。");
+      if (isBusiness) {
+        setCommentPrompt("修正を依頼する内容を入力してください。");
+        setCommentDialogOpen(true);
+      } else {
+        alert("相談・修正をご希望の内容を入力してください。");
+      }
       return;
     }
     try {
       await postAction("reject", { body: comment });
       setComment("");
+      setCommentPrompt("");
       router.refresh();
-      alert(isBusiness ? "差戻しを送信しました。" : "相談内容を送信しました。");
+      if (isBusiness) {
+        setCorrectionMode(false);
+        setCommentPrompt("修正依頼を送信しました。");
+      } else alert("相談内容を送信しました。");
     } catch (error) {
       alert(isBusiness ? (error instanceof Error ? error.message : "差戻しに失敗しました。") : "相談内容の送信に失敗しました。");
     }
@@ -324,6 +349,7 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
   };
 
   if (isBusiness) {
+    const chronologicalMessages = messages.slice(0, visibleMessageCount).reverse();
     return (
       <section className="rounded-xl border border-blue-100 bg-[#f8fbff] p-4 shadow-sm">
         <div className="mb-3 border-b border-blue-100 pb-3">
@@ -347,7 +373,7 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
             </button>}
             {!(isApproved && !showApproval) && <button
               type="button"
-              onClick={handleReject}
+              onClick={() => { setCorrectionMode(true); setCommentPrompt(""); setCommentDialogOpen(true); }}
               disabled={!!loading}
               className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
@@ -381,41 +407,49 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
           </DialogContent>
         </Dialog>
 
-        <div className="mt-5">
-          <h2 className="text-base font-bold text-slate-900">コメント</h2>
-        </div>
+        <button type="button" onClick={() => { setCorrectionMode(false); setCommentPrompt(""); setCommentDialogOpen(true); }} className="mt-5 flex w-full items-center gap-3 rounded-lg border border-blue-100 bg-white px-3 py-3 text-left hover:bg-blue-50" aria-label={`${inquiryNumber}のチャットを開く`}>
+          <MessageCircle className="h-5 w-5 shrink-0 text-blue-600" />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2 text-sm font-bold text-slate-900">コメント <span className="font-normal text-slate-500">{messages.length}件</span></span>
+            {messages.slice(0, 2).map((message) => <span key={message.id} className="mt-1 block truncate text-sm text-slate-600">{getBusinessMessageSenderName(message, customerName)}: {message.body}</span>)}
+            {messages.length === 0 && <span className="mt-1 block text-sm text-slate-600">コメントを入力できます</span>}
+          </span>
+          <span className="shrink-0 text-xs font-bold text-blue-700">チャットを開く</span>
+        </button>
 
-        {messages.length > 0 && (
-          <div className="mt-3 space-y-2">
-            {messages.map((message) => (
-              <div id={`comment-${message.id}`} key={message.id} className={`scroll-mt-6 rounded-lg border p-3 text-sm ${message.id === focusCommentId ? "border-blue-500 bg-blue-100 ring-2 ring-blue-300" : "border-blue-100 bg-blue-50/40"}`}>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                  <span className="font-bold text-slate-800">{getBusinessMessageSenderName(message, customerName)}</span>
-                  <span>{new Date(message.createdAt).toLocaleString("ja-JP")}</span>
-                </div>
-                <div className="mt-1 whitespace-pre-wrap leading-6 text-slate-800">{message.body}</div>
+        <Dialog open={commentDialogOpen} onOpenChange={(open) => { if (!loading) { setCommentDialogOpen(open); if (!open) setCorrectionMode(false); } }}>
+          <DialogContent className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-[#e9f1f7] p-0 sm:h-[min(85dvh,700px)] sm:max-h-[700px] sm:w-[min(92vw,640px)] sm:rounded-xl">
+            <DialogHeader className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 pr-12 text-left">
+              <DialogTitle>{correctionMode ? "修正を依頼する" : "コメントチャット"}</DialogTitle>
+              <DialogDescription>{inquiryNumber} · {messages.length}件のやりとり</DialogDescription>
+            </DialogHeader>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-5" role="log" aria-label="コメント履歴">
+              {messages.length > visibleMessageCount && <div className="text-center"><button type="button" onClick={() => setVisibleMessageCount((count) => count + 30)} className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700">以前のコメントを表示</button></div>}
+              {messages.length === 0 && <p className="text-center text-sm text-slate-600">まだコメントはありません。</p>}
+              {chronologicalMessages.map((message) => {
+                const fromPartner = message.senderType !== "shop";
+                return <div key={message.id} id={`comment-${message.id}`} ref={message.id === focusCommentId ? focusedCommentRef : undefined} className={`flex flex-col ${fromPartner ? "items-end" : "items-start"}`}>
+                  <span className="mb-1 px-1 text-xs text-slate-600">{getBusinessMessageSenderName(message, customerName)}</span>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-6 shadow-sm ${fromPartner ? "rounded-tr-sm bg-[#d7f5c8] text-slate-900" : "rounded-tl-sm bg-white text-slate-900"} ${message.id === focusCommentId ? "ring-2 ring-blue-500" : ""}`}>
+                    <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.body}</p>
+                  </div>
+                  <time className="mt-1 px-1 text-[11px] text-slate-500" dateTime={new Date(message.createdAt).toISOString()}>{new Date(message.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</time>
+                </div>;
+              })}
+              <div ref={messageEndRef} />
+            </div>
+            <div className="shrink-0 border-t border-slate-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              {commentPrompt && <p role="status" className="mb-2 text-xs text-slate-600">{commentPrompt}</p>}
+              {correctionMode && <p className="mb-2 text-sm text-slate-700">修正してほしい内容を入力してください。送信すると見積は保留になります。</p>}
+              <label htmlFor={`comment-input-${inquiryNumber}`} className="sr-only">{correctionMode ? "修正依頼の内容" : "コメントを入力"}</label>
+              <textarea id={`comment-input-${inquiryNumber}`} value={comment} onChange={(event) => setComment(event.target.value.slice(0, 500))} className="max-h-32 min-h-12 w-full resize-y rounded-lg border border-slate-300 p-2 text-base leading-6 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder={correctionMode ? "修正してほしい内容を入力" : "コメントを入力してください"} maxLength={500} />
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-xs text-slate-500">{comment.length}/500文字</span>
+                <button type="button" onClick={() => void (correctionMode ? handleReject() : handleComment())} disabled={!!loading || !comment.trim()} className="min-h-10 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50">{loading ? "送信中..." : correctionMode ? "修正依頼を送信" : "コメント送信"}</button>
               </div>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_11rem]">
-          <textarea
-            value={comment}
-            onChange={(event) => setComment(event.target.value.slice(0, 500))}
-            className="min-h-11 rounded-lg border border-slate-300 p-3 text-sm leading-6 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            placeholder="コメントを入力してください（任意）"
-            maxLength={500}
-          />
-          <button
-            type="button"
-            onClick={handleComment}
-            disabled={!!loading}
-            className="h-11 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            コメント送信
-          </button>
-        </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </section>
     );
   }
