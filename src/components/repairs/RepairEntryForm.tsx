@@ -1228,6 +1228,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
     const [diagnosis, setDiagnosis] = useState(initialData?.workSummary || ""); // Diagnosis/Request details
     const [internalNotes, setInternalNotes] = useState(initialData?.internalNotes || "");
     const [customerNote, setCustomerNote] = useState(initialData?.customerNote || "");
+    const originalCustomerNoteRef = useRef<string | null>(initialData?.customerNote ?? null);
 
     // --- 4. PHOTOS ---
     const [photos, setPhotos] = useState<any[]>(initialData?.photos || []);
@@ -2161,6 +2162,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
                     accessories: accessories.split(',').map(s => s.trim()).filter(Boolean),
                     endUserName
                 },
+                originalCustomerNote: originalCustomerNoteRef.current,
                 estimate: {
                     items: lineItems.map(i => ({
                         type: i.category.includes('part') ? 'part' : 'labor',
@@ -2221,6 +2223,9 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
             if (mode === 'create') {
                 router.push(`/repairs/${json.repair.id}`);
             } else {
+                const persistedCustomerNote = json.repair?.customerNote ?? null;
+                originalCustomerNoteRef.current = persistedCustomerNote;
+                setCustomerNote((current: string) => current === customerNote ? persistedCustomerNote ?? "" : current);
                 const savedStatus = typeof json.repair?.status === "string" ? json.repair.status : nextStatus;
                 if (savedStatus !== nextStatus) {
                     alert(`在庫・発注状況により、ステータスは「${savedStatus}」で保存されました。`);

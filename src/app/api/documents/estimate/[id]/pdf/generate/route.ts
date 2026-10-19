@@ -17,6 +17,7 @@ import { displayIssuedDate, parseIssuedDate } from "@/lib/document-issued-date";
 import { sumCustomerLines } from "@/lib/pricing-tax";
 import { issuedOptionSourceHash, optionTotals, parseOptionSet } from "@/lib/estimate-options";
 import { estimatePdfSourceFingerprint } from "@/lib/estimate-pdf-source";
+import { manualOnlyEstimateContactNote } from "@/lib/estimate-option-contact-text";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,7 +122,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       totalAmount: (repair.estimate?.totalAmount ?? 0) + (repair.estimate?.taxAmount ?? 0),
       partnerRef: repair.partnerRef || undefined,
       endUserName: repair.endUserName || undefined,
-      customerNote: repair.customerNote || "",
+      customerNote: manualOnlyEstimateContactNote(repair.customerNote),
       watch: {
         brand: repair.watch.brand?.name || "",
         timepieceType: repair.watch.timepieceType,

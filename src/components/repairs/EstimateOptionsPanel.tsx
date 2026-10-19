@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { displayEstimateOptionContactNote } from "@/lib/estimate-option-contact-text";
 
 type Line = {
   lineType: "LABOR" | "PART"; itemNameSnapshot: string; displayNameSnapshot: string;
@@ -27,18 +28,25 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [contactText, setContactText] = useState<string | null>(null);
+  const [savedDraft, setSavedDraft] = useState("");
+  const [copyMessage, setCopyMessage] = useState("");
+  const hasUnsavedDraft = JSON.stringify(draft) !== savedDraft;
+  useEffect(() => { setCopyMessage(""); }, [draft]);
   useEffect(() => {
     let live = true;
     fetch(`/api/repairs/${repairId}/estimate-options`).then(async (response) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "読込に失敗しました。");
       if (!live) return;
-      setDraft(data.set ? { title: data.set.title, notes: data.set.notes ?? "", isActive: data.set.isActive,
+      const nextDraft: SetDraft = data.set ? { title: data.set.title, notes: data.set.notes ?? "", isActive: data.set.isActive,
         choices: data.set.choices.map((choice: Choice) => ({ ...choice, notes: choice.notes ?? "", lines: choice.lines.map((line: Line) => ({ ...line,
           displayNameSnapshot: line.displayNameSnapshot ?? "", notesForCustomerSnapshot: line.notesForCustomerSnapshot ?? "",
           categoryNameSnapshot: line.categoryNameSnapshot ?? "", actionNameSnapshot: line.actionNameSnapshot ?? "",
           targetPartNameSnapshot: line.targetPartNameSnapshot ?? "", detailLabelSnapshot: line.detailLabelSnapshot ?? "",
-        })) })) } : { title: "", notes: "", isActive: false, choices: [] });
+        })) })) } : { title: "", notes: "", isActive: false, choices: [] };
+      setDraft(nextDraft); setSavedDraft(JSON.stringify(nextDraft));
+      setContactText(typeof data.contactText === "string" ? data.contactText : null);
       setEditable(data.editable); setMode(data.pricingTaxMode); setCommonAmount(data.commonAmount); setLoaded(true);
     }).catch((cause) => { if (live) setError(cause.message); });
     return () => { live = false; };
@@ -54,19 +62,44 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
     return mode === "INCLUSIVE" ? subtotal : subtotal + tax;
   };
   const save = async () => {
-    setSaving(true); setError("");
+    setSaving(true); setError(""); setCopyMessage("");
     try {
       const response = await fetch(`/api/repairs/${repairId}/estimate-options`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "保存に失敗しました。");
       setCommonAmount(data.commonAmount); setEditable(data.editable);
+      setContactText(typeof data.contactText === "string" ? data.contactText : null);
+      setSavedDraft(JSON.stringify(draft)); setCopyMessage("");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "保存に失敗しました。"); }
     finally { setSaving(false); }
+  };
+  const refreshContactText = async () => {
+    try {
+      const response = await fetch(`/api/repairs/${repairId}/estimate-options`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "再読込に失敗しました。");
+      setContactText(typeof data.contactText === "string" ? data.contactText : null);
+      setCopyMessage("保存済みの連絡文を再読込しました。");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "再読込に失敗しました。"); }
+  };
+  const visibleContactText = displayEstimateOptionContactNote(contactText);
+  const copyContactText = async () => {
+    if (!visibleContactText || hasUnsavedDraft || saving) return;
+    try { await navigator.clipboard.writeText(visibleContactText); setCopyMessage("保存済みの連絡文全体をコピーしました。"); }
+    catch { setCopyMessage("コピーできませんでした。"); }
   };
   return <section className="m-3 rounded border bg-white p-4" aria-label="見積選択肢">
     <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">見積選択肢（ドラフト）</h2><span className="text-xs text-zinc-600">共通明細 {yen(common)} ／ {mode === "INCLUSIVE" ? "税込" : "税抜"}入力</span></div>
     <p className="mt-1 text-xs text-zinc-600">選択肢は見積明細、発注、帳票には反映されません。承認は選択機能の提供まで保留されます。</p>
     {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
+    {loaded && contactText !== null && <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-3"><strong>取引先向け連絡文（保存済みメモ全体）</strong>
+        <button type="button" className="text-blue-700 underline disabled:opacity-50" disabled={!visibleContactText || hasUnsavedDraft || saving} onClick={copyContactText}>全文をコピー</button>
+        <button type="button" className="text-blue-700 underline" onClick={refreshContactText}>再読込</button></div>
+      <p className="mt-1 text-xs text-zinc-600">この欄は自動送信されません。別の編集画面でメモを保存した後は再読込してください。{hasUnsavedDraft ? "編集中の選択肢を保存するまでコピーできません。" : ""}</p>
+      <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded bg-white p-2 font-sans">{visibleContactText || "保存済みの連絡文はありません。選択肢と共通見積を保存してください。"}</pre>
+      {copyMessage && <p role="status" className="mt-1 text-blue-800">{copyMessage}</p>}
+    </div>}
     {!loaded ? null : <fieldset disabled={!editable || saving} className="mt-3 space-y-3 disabled:opacity-70">
       {!editable && <p className="text-sm text-amber-800">承認済みまたは見積書発行済みのため編集できません。</p>}
       <div className="flex flex-wrap gap-2"><input aria-label="見積案タイトル" placeholder="見積案タイトル" className="rounded border p-2 text-sm" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />

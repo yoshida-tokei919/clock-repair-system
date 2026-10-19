@@ -25,6 +25,7 @@ import { publicShipmentViews } from "@/lib/customer-shipment-status";
 import { visibleCustomerCommentTarget } from "@/lib/b2b-repair-comment-notice";
 import { isIssuedOptionPdfCurrent, issuedOptionSourceHash } from "@/lib/estimate-options";
 import { CustomerEstimateOptions } from "./CustomerEstimateOptions";
+import { displayEstimateOptionContactNote } from "@/lib/estimate-option-contact-text";
 
 export const dynamic = "force-dynamic";
 
@@ -261,7 +262,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
               repair.watch?.reference?.name && `Ref. ${repair.watch.reference.name}`,
               repair.watch?.caliber?.name && `Cal. ${repair.watch.caliber.name}`,
             ].filter(Boolean);
-            const explanationText = repair.customerNote?.trim() || "";
+            const explanationText = displayEstimateOptionContactNote(repair.customerNote);
 
             return (
               <CustomerRepairAccordionItem
@@ -405,7 +406,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
       serialNumber: repair.watch?.serialNumber || "",
       shopEstimate: getEstimateTotal(repair),
       customerEstimate: "",
-      explanation: repair.customerNote?.trim() || "",
+      explanation: displayEstimateOptionContactNote(repair.customerNote),
       privateMemo: "",
     };
   });
@@ -458,7 +459,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
             {repairs.map((repair, index) => {
               const estimateItems = getEstimateItems(repair);
               const { subtotal, taxAmount, total } = getEstimateAmounts(repair);
-              const explanationText = repair.customerNote?.trim() || "";
+              const explanationText = displayEstimateOptionContactNote(repair.customerNote);
               const repairActionToken = repair.publicToken || token;
               const amountToken = repair.publicToken || `${token}:${repair.id}`;
               const privateMemoToken = repair.publicToken || `${token}:${repair.id}`;
@@ -658,7 +659,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
           const estimateItems = getEstimateItems(repair);
           const total = getEstimateTotal(repair);
           const watchName = [repair.watch?.brand?.name, repair.watch?.model?.name].filter(Boolean).join(" ");
-          const explanationText = repair.customerNote?.trim() || "";
+          const explanationText = displayEstimateOptionContactNote(repair.customerNote);
           const repairActionToken = repair.publicToken || token;
 
           return (

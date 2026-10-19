@@ -9,6 +9,7 @@ import { mergeWatchRefs, resolvePatchCaseRef, resolvePatchProductRef } from "@/l
 import { parseTimepieceType, TimepieceTypeError } from "@/lib/timepiece-type";
 import { getRepairPartType, isExistingRepairPartLink, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
 import { estimateItemSnapshots } from "@/lib/estimate-item-snapshots";
+import { buildEstimateOptionContactText, getGeneratedSectionText, isTargetEstimateCustomer, replaceOrRemoveGeneratedSection, TARGET_COMPANY_NAME_PART } from "@/lib/estimate-option-contact-text";
 import { lockEstimateOptions } from "@/lib/estimate-options";
 import { syncPricingRulesFromRepairLineItems } from "@/lib/pricing-rules";
 import { calculateTaxableAmounts, effectivePricingTaxMode, repairPartBasePrice, sumCustomerLines } from "@/lib/pricing-tax";
@@ -64,9 +65,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 throw new Error("選択承認済みの見積明細は変更できません。改訂手続きが必要です。");
             }
             const [sourceCustomer, savedEstimate] = await Promise.all([
-                tx.customer.findUniqueOrThrow({ where: { id: repairRecord.customerId }, select: { type: true, pricingTaxMode: true } }),
+                tx.customer.findUniqueOrThrow({ where: { id: repairRecord.customerId }, select: { type: true, prefix: true, companyName: true, pricingTaxMode: true } }),
                 tx.estimate.findUnique({ where: { repairId: id }, select: { pricingTaxMode: true } }),
             ]);
+            const isContactQuoteCustomer = isTargetEstimateCustomer(sourceCustomer, TARGET_COMPANY_NAME_PART);
+            if (isContactQuoteCustomer &&
+                (!Object.prototype.hasOwnProperty.call(body, "originalCustomerNote") ||
+                    (typeof body.originalCustomerNote !== "string" && body.originalCustomerNote !== null) ||
+                    body.originalCustomerNote !== repairRecord.customerNote)) {
+                throw new Error("CUSTOMER_NOTE_CONFLICT");
+            }
             const pricingTaxMode = savedEstimate?.pricingTaxMode === "INCLUSIVE"
                 ? "INCLUSIVE" : savedEstimate ? "EXCLUSIVE" : effectivePricingTaxMode(sourceCustomer);
 
@@ -230,6 +238,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             const photoPostingOptOut = typeof body.photoPostingOptOut === "boolean"
                 ? body.photoPostingOptOut
                 : repairRecord.photoPostingOptOut;
+            const customerNote = isContactQuoteCustomer
+                ? replaceOrRemoveGeneratedSection(
+                    body.request?.customerNote === undefined ? repairRecord.customerNote : body.request.customerNote,
+                    getGeneratedSectionText(repairRecord.customerNote),
+                )
+                : body.request?.customerNote ?? null;
 
             let updatedRepair = await tx.repair.update({
                 where: { id },
@@ -244,7 +258,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                     accessories: JSON.stringify(body.request?.accessories || []),
                     workSummary: body.request?.diagnosis || null,
                     internalNotes: body.request?.internalNotes || null,
-                    customerNote: body.request?.customerNote ?? null,
+                    customerNote,
                     endUserName,
                     photoPostingOptOut,
                 }
@@ -431,6 +445,35 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 }
             }
 
+            if (isContactQuoteCustomer && body.estimate?.items) {
+                const optionSet = await tx.estimateOptionSet.findUnique({ where: { repairId: id }, include: {
+                    choices: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }], include: {
+                        lines: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+                    } },
+                } });
+                if (optionSet) {
+                    const estimate = await tx.estimate.findUnique({ where: { repairId: id }, include: {
+                        items: { orderBy: { id: "asc" }, select: { itemName: true, quantity: true, unitPrice: true } },
+                    } });
+                    const commonLines = estimate?.items ?? [];
+                    const mode = estimate?.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE";
+                    if (optionSet.isActive && estimate &&
+                        sumCustomerLines(commonLines) !== estimate.totalAmount + (mode === "INCLUSIVE" ? estimate.taxAmount : 0)) {
+                        throw new Error("共通見積の保存額と明細額が一致しないため、連絡文を生成できません。");
+                    }
+                    const quote = optionSet.isActive && estimate ? buildEstimateOptionContactText({
+                        inquiryNumber: repairRecord.inquiryNumber, title: optionSet.title, notes: optionSet.notes, mode,
+                        commonLines: commonLines.map(line => ({ itemName: line.itemName, quantity: line.quantity, unitPrice: line.unitPrice })),
+                        choices: optionSet.choices.map(choice => ({ kind: choice.kind, name: choice.name, notes: choice.notes,
+                            lines: choice.lines.map(line => ({ itemName: line.displayNameSnapshot || line.itemNameSnapshot, quantity: line.quantity, unitPrice: line.unitPrice })) })),
+                    }) : null;
+                    const nextCustomerNote = replaceOrRemoveGeneratedSection(updatedRepair.customerNote, quote);
+                    if (nextCustomerNote !== (updatedRepair.customerNote ?? "")) {
+                        updatedRepair = await tx.repair.update({ where: { id }, data: { customerNote: nextCustomerNote } });
+                    }
+                }
+            }
+
             // Existing photos are updated in place and newly uploaded storage
             // objects are registered. Omitted photos are deliberately retained:
             // deleting a database record must remain an explicit future action.
@@ -487,6 +530,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
         return NextResponse.json({ success: true, repair: result });
     } catch (error: any) {
+        if (error?.message === "CUSTOMER_NOTE_CONFLICT") {
+            return NextResponse.json({ error: "お客様連絡が他の画面で更新されました。再読込してから保存してください。" }, { status: 409 });
+        }
         if (error instanceof TimepieceTypeError) return NextResponse.json({ error: error.message }, { status: 400 });
         if (error instanceof RepairPartValidationError) {
             return NextResponse.json({ error: error.message }, { status: error.status });

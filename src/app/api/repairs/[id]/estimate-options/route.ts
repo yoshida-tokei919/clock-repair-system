@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getAdminApiIdentity } from "@/lib/admin-api-auth";
 import { prisma } from "@/lib/prisma";
 import { canEditEstimateOptions, lockEstimateOptions, optionTotals, parseOptionSet } from "@/lib/estimate-options";
-import { sumCustomerLines } from "@/lib/pricing-tax";
+import { effectivePricingTaxMode, sumCustomerLines } from "@/lib/pricing-tax";
+import { buildEstimateOptionContactText, isTargetEstimateCustomer, replaceOrRemoveGeneratedSection, TARGET_COMPANY_NAME_PART } from "@/lib/estimate-option-contact-text";
 
 const repairIdFrom = async (params: Promise<{ id: string }>) => {
   const id = Number((await params).id);
@@ -15,7 +16,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   try {
     const repairId = await repairIdFrom(params);
     const repair = await prisma.repair.findUnique({ where: { id: repairId }, select: {
-      status: true, approvalStatus: true, estimateDocumentId: true,
+      status: true, approvalStatus: true, estimateDocumentId: true, customerNote: true,
+      customer: { select: { type: true, prefix: true, companyName: true } },
       estimate: { select: { pricingTaxMode: true, items: { select: { unitPrice: true, quantity: true } } } },
       estimateOptionSet: { include: { choices: { orderBy: { sortOrder: "asc" }, include: { lines: { orderBy: { sortOrder: "asc" } } } } } },
     } });
@@ -24,6 +26,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const mode = repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE";
     const commonLines = repair.estimate?.items ?? [];
     return NextResponse.json({ set, editable: canEditEstimateOptions(repair), commonAmount: sumCustomerLines(commonLines),
+      ...(isTargetEstimateCustomer(repair.customer, TARGET_COMPANY_NAME_PART) ? { contactText: repair.customerNote ?? "" } : {}),
       pricingTaxMode: mode, totals: set ? optionTotals(commonLines, set.choices, mode) : [] });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "読込に失敗しました。" }, { status: 400 }); }
 }
@@ -38,7 +41,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       await lockEstimateOptions(tx, repairId);
       await tx.$queryRaw`SELECT "id" FROM "Repair" WHERE "id" = ${repairId} FOR UPDATE`;
       const repair = await tx.repair.findUnique({ where: { id: repairId }, select: {
-        status: true, approvalStatus: true, estimateDocumentId: true,
+        status: true, approvalStatus: true, estimateDocumentId: true, inquiryNumber: true, customerNote: true,
+        customer: { select: { type: true, prefix: true, companyName: true, pricingTaxMode: true } },
+        estimate: { select: { pricingTaxMode: true, totalAmount: true, taxAmount: true,
+          items: { orderBy: { id: "asc" }, select: { itemName: true, quantity: true, unitPrice: true } } } },
         estimateDocument: { select: { currentPdfFileId: true, pdfFiles: { select: { id: true }, take: 1 } } },
       } });
       if (!repair) throw new Error("案件が見つかりません。");
@@ -63,6 +69,26 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         await tx.estimateOptionChoice.create({ data: { setId: set.id, kind: choice.kind, name: choice.name, notes: choice.notes, recommended: choice.recommended, sortOrder,
           lines: { create: choice.lines.map((line, index) => ({ ...line, sortOrder: index })) },
         } });
+      }
+      if (isTargetEstimateCustomer(repair.customer, TARGET_COMPANY_NAME_PART)) {
+        const estimate = repair.estimate;
+        const mode = estimate ? estimate.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE" : effectivePricingTaxMode(repair.customer);
+        const commonLines = estimate?.items ?? [];
+        if (input.isActive && estimate &&
+            sumCustomerLines(commonLines) !== estimate!.totalAmount + (mode === "INCLUSIVE" ? estimate!.taxAmount : 0)) {
+          throw new Error("共通見積の保存額と明細額が一致しないため、連絡文を生成できません。");
+        }
+        const savedSet = await tx.estimateOptionSet.findUniqueOrThrow({ where: { id: set.id }, include: {
+          choices: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }], include: { lines: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } } },
+        } });
+        const quote = input.isActive ? buildEstimateOptionContactText({
+          inquiryNumber: repair.inquiryNumber, title: savedSet.title, notes: savedSet.notes, mode,
+          commonLines: commonLines.map(line => ({ itemName: line.itemName, quantity: line.quantity, unitPrice: line.unitPrice })),
+          choices: savedSet.choices.map(choice => ({ kind: choice.kind, name: choice.name, notes: choice.notes,
+            lines: choice.lines.map(line => ({ itemName: line.displayNameSnapshot || line.itemNameSnapshot, quantity: line.quantity, unitPrice: line.unitPrice })) })),
+        }) : null;
+        const customerNote = replaceOrRemoveGeneratedSection(repair.customerNote, quote);
+        if (customerNote !== (repair.customerNote ?? "")) await tx.repair.update({ where: { id: repairId }, data: { customerNote } });
       }
     });
     return GET(request, { params: Promise.resolve({ id: String(repairId) }) });
