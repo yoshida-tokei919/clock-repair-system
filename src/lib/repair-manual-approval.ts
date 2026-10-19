@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { approvalAuditStatus, APPROVAL_EVENT_PREFIX } from "@/lib/repair-approval-audit";
 import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { assertApprovalReturnAddress } from "@/lib/return-address";
+import { assertNoUnansweredAlternatives } from "@/lib/estimate-options";
 
 export async function recordManualApproval(
   tx: Prisma.TransactionClient,
@@ -16,6 +17,7 @@ export async function recordManualApproval(
     include: { customer: { select: { type: true } }, estimate: { include: { items: true } } },
   });
   if (!current) throw new Error("修理案件が見つかりません。");
+  await assertNoUnansweredAlternatives(tx, repairId);
   if (current.status === "キャンセル") throw new Error("キャンセル済みの案件は承認できません。");
   if (["修理不可返却", "キャンセル返却"].includes(current.status)) throw new Error("返却処理済みの案件は承認できません。");
   if (!current.estimate?.items.some((item) => item.itemName.trim() && item.quantity > 0 && item.unitPrice >= 0)) {

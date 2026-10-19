@@ -65,6 +65,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               },
             },
           },
+          estimateOptionSet: { select: { isActive: true } },
         },
       },
     },
@@ -75,6 +76,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       { ok: false, error: "Estimate document not found" },
       { status: 404 }
     );
+  }
+  if (estimateDocument.repairs.some(repair => repair.estimateOptionSet?.isActive)) {
+    return NextResponse.json({ ok: false, error: "選択肢が未回答の案件を通常見積PDFにできません。" }, { status: 409 });
   }
   if (sumCustomerLines(estimateDocument.repairs.flatMap(repair => repair.estimate?.items ?? [])) !== estimateDocument.totalAmount +
       (estimateDocument.pricingTaxMode === "INCLUSIVE" ? estimateDocument.taxAmount : 0)) {

@@ -20,6 +20,7 @@ function fixture(customerType: "business" | "individual" = "business") {
   };
   const logs = [{ id: 1, repairId: 8, status: "見積中", changedAt: new Date("2026-10-01T00:00:00Z"), changedBy: null as number | null }];
   const tx = {
+    estimateOptionSet: { findUnique: async () => null as null | { isActive: boolean; choices: { id: number }[] } },
     repair: {
       findUnique: async () => ({ ...repair }),
       findUniqueOrThrow: async () => ({ ...repair }),
@@ -96,6 +97,21 @@ test("approval from existing work status still records actor without changing wo
   assert.equal(f.getReconcileCalls(), 0);
   assert.equal(f.logs[0].changedAt.toISOString(), "2026-10-01T00:00:00.000Z");
   assert.equal(f.logs[1].changedBy, 42);
+});
+
+test("active unanswered plans block manual approval before any status or allocation write", async () => {
+  const f = fixture();
+  f.tx.estimateOptionSet.findUnique = async () => ({ isActive: true, choices: [{ id: 1 }, { id: 2 }] });
+  await assert.rejects(recordManualApproval(f.tx as never, 8, new Date(), 42, f.reconcile as never), /見積選択肢/);
+  assert.equal(f.repair.approvalStatus, "pending");
+  assert.equal(f.getReconcileCalls(), 0);
+});
+
+test("active add-on only blocks manual approval", async () => {
+  const f = fixture();
+  f.tx.estimateOptionSet.findUnique = async () => ({ isActive: true, choices: [] });
+  await assert.rejects(recordManualApproval(f.tx as never, 8, new Date(), 42, f.reconcile as never), /見積選択肢/);
+  assert.equal(f.repair.approvalStatus, "pending");
 });
 
 test("unsaved estimate, watch, customer or status draft blocks approval", () => {

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { RepairEntryForm } from "@/components/repairs/RepairEntryForm";
+import { EstimateOptionsPanel } from "@/components/repairs/EstimateOptionsPanel";
 import { RepairSchedulePanel } from "@/components/repairs/RepairSchedulePanel";
 import { RepairWorkTimerPanel } from "@/components/repairs/RepairWorkTimerPanel";
 import { RepairPlanningPanel } from "@/components/repairs/RepairPlanningPanel";
@@ -287,6 +288,7 @@ export default async function RepairDetailPage({ params, searchParams }: { param
                 itemNameSnapshot: item.itemNameSnapshot,
                 estimateDisplayNameSnapshot: item.estimateDisplayNameSnapshot,
             }))} />
+            <EstimateOptionsPanel repairId={repair.id} />
             <RepairEntryForm mode="view" initialData={initialData} initialTab={query.tab === "line" ? "line" : "main"} initialConversation={query.conversation === "comments" ? "comments" : "line"} focusMessageId={/^\d+$/.test(query.messageId ?? "") ? Number(query.messageId) : undefined} />
         </div>
     );

@@ -16,6 +16,7 @@ import { b2bPaymentDueDate, billingMonthBounds, billingMonthFromDate, isB2BBilli
 import { getAdminApiIdentity } from "@/lib/admin-api-auth";
 import { resolveIssuedDate } from "@/lib/document-issued-date";
 import { calculateTaxableAmounts, commonEstimateMode, sumCustomerLines } from "@/lib/pricing-tax";
+import { assertNoUnansweredAlternatives, lockEstimateOptions } from "@/lib/estimate-options";
 
 export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     if (!await getAdminApiIdentity()) throw new Error("認証が必要です");
@@ -60,11 +61,15 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
             include: {
                 customer: true,
                 estimate: { include: { items: true } },
+                estimateOptionSet: { select: { isActive: true } },
                 deliveryNote: { select: { id: true, slipNumber: true, issuedDate: true, customerId: true, shippingFee: true, pricingTaxMode: true } },
             }
         });
 
         if (repairs.length === 0) return { success: false, error: "Repairs not found" };
+        if (type === "estimate" && repairs.some(repair => repair.estimateOptionSet?.isActive)) {
+            return { success: false, error: "選択肢が未回答の案件を通常見積書として発行できません。" };
+        }
         if (type === "delivery") {
             assertNoDuplicateReturnShipping(repairs, shipping!.shippingFee);
             if (repairs.length !== uniqueRepairIds.length) return { success: false, error: "納品書の対象案件を再確認してください" };
@@ -208,7 +213,13 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                     : 1;
                 docNumber = `${prefix}E-${String(seq).padStart(3, '0')}`;
 
-                const estimateDoc = await prisma.estimateDocument.create({
+                const estimateDoc = await prisma.$transaction(async (tx) => {
+                  for (const repairId of customerRepairs.map(r => r.id).sort((a, b) => a - b)) {
+                    await lockEstimateOptions(tx, repairId);
+                    await tx.$queryRaw`SELECT "id" FROM "Repair" WHERE "id" = ${repairId} FOR UPDATE`;
+                    await assertNoUnansweredAlternatives(tx, repairId);
+                  }
+                  const created = await tx.estimateDocument.create({
                     data: {
                         estimateNumber: docNumber,
                         issuedDate,
@@ -218,8 +229,10 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                         pricingTaxMode,
                         repairs: { connect: customerRepairs.map(r => ({ id: r.id })) }
                     }
-                });
-                await prisma.customer.update({ where: { id: customerId }, data: { seqEstimate: seq } });
+                  });
+                  await tx.customer.update({ where: { id: customerId }, data: { seqEstimate: seq } });
+                  return created;
+                }, { timeout: 20000 });
                 documentId = estimateDoc.id;
             } else if (type === 'warranty') {
                 const lastWarranty = await prisma.warranty.findFirst({

@@ -949,6 +949,7 @@ model Repair {
   customerMessages RepairCustomerMessage[]
   photos        RepairPhoto[]
   estimate      Estimate?
+  estimateOptionSet EstimateOptionSet?
   repairLineItems RepairLineItem[]
   orderRequests OrderRequest[]
   partAllocations RepairPartAllocation[]
@@ -1383,6 +1384,56 @@ model Estimate {
   
   repair         Repair         @relation(fields: [repairId], references: [id])
   items          EstimateItem[]
+}
+
+// Draft choices only. No relation to authoritative EstimateItem or RepairLineItem.
+model EstimateOptionSet {
+  id        Int      @id @default(autoincrement())
+  repairId  Int      @unique
+  title     String   @default("")
+  notes     String?
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  repair    Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  choices   EstimateOptionChoice[]
+}
+
+model EstimateOptionChoice {
+  id        Int      @id @default(autoincrement())
+  setId     Int
+  kind      String   // PLAN (mutually exclusive) or ADD_ON (independent)
+  name      String
+  notes     String?
+  recommended Boolean @default(false)
+  sortOrder Int      @default(0)
+  set       EstimateOptionSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  lines     EstimateOptionLine[]
+  @@index([setId, kind, sortOrder])
+}
+
+model EstimateOptionLine {
+  id        Int      @id @default(autoincrement())
+  choiceId  Int
+  lineType  RepairLineItemType
+  itemNameSnapshot String
+  displayNameSnapshot String?
+  notesForCustomerSnapshot String?
+  workTypeSnapshot RepairWorkType?
+  categoryNameSnapshot String?
+  actionNameSnapshot String?
+  targetPartNameSnapshot String?
+  detailLabelSnapshot String?
+  partsMasterId Int?
+  pricingRuleId Int?
+  repairWorkCategoryId Int?
+  repairWorkActionId Int?
+  targetPartNameId String?
+  quantity Int
+  unitPrice Int
+  sortOrder Int @default(0)
+  choice EstimateOptionChoice @relation(fields: [choiceId], references: [id], onDelete: Cascade)
+  @@index([choiceId, sortOrder])
 }
 
 model EstimateItem {
