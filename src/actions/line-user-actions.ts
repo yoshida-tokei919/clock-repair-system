@@ -2,12 +2,30 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { lineDestinationReadiness } from "@/lib/line-destination-readiness";
 
 export async function getLineUsers() {
-  return prisma.lineUser.findMany({
-    include: { linkedCustomer: { select: { id: true, name: true, companyName: true, type: true } } },
+  const users = await prisma.lineUser.findMany({
+    include: {
+      linkedCustomer: { select: { id: true, name: true, companyName: true, type: true } },
+      lineManagerChat: { select: { lineUserId: true, verifiedAt: true } },
+      inquiries: { select: { id: true }, take: 1 },
+    },
     orderBy: [{ linkedCustomerId: "asc" }, { lastReceivedAt: "desc" }],
   });
+  const linkedCounts = new Map<number, number>();
+  for (const user of users) {
+    if (user.linkedCustomerId !== null) linkedCounts.set(user.linkedCustomerId, (linkedCounts.get(user.linkedCustomerId) ?? 0) + 1);
+  }
+  return users.map(({ lineManagerChat, inquiries, ...user }) => ({
+    ...user,
+    readiness: user.linkedCustomer?.type === "business" ? lineDestinationReadiness({
+      customerId: user.linkedCustomerId!, linkedUserCount: linkedCounts.get(user.linkedCustomerId!) ?? 0,
+      lineUserId: user.id, linkedCustomerId: user.linkedCustomerId,
+      chatLineUserId: lineManagerChat?.lineUserId ?? null, chatVerifiedAt: lineManagerChat?.verifiedAt ?? null,
+      hasInquiry: inquiries.length > 0,
+    }) : null,
+  }));
 }
 
 export async function searchCustomersForLineUser(query: string) {
