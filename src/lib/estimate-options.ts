@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
-import { assertYen, calculateTaxableAmounts, sumCustomerLines, type PricingTaxMode } from "@/lib/pricing-tax";
+import { assertYen, sumCustomerLines, type PricingTaxMode } from "@/lib/pricing-tax";
+import { selectedOptionTotal } from "@/lib/estimate-option-totals";
+export { selectedOptionTotal } from "@/lib/estimate-option-totals";
 
 export type OptionLineInput = {
   lineType: "LABOR" | "PART";
@@ -78,19 +80,6 @@ export function parseOptionSet(value: unknown): OptionSetInput {
   if (raw.isActive && (choices.length === 0 || plans.length === 1)) throw new Error("有効な選択肢には2案以上のプラン、または1件以上の追加作業が必要です。");
   if (plans.filter((choice) => choice.recommended).length > 1) throw new Error("推奨プランは1つだけ指定できます。");
   return { title: shortText(raw.title, "見積案タイトル") ?? "", notes: shortText(raw.notes, "全体条件"), isActive: raw.isActive, choices };
-}
-
-export function selectedOptionTotal(
-  commonLines: readonly { unitPrice: number; quantity: number }[],
-  plan: { lines: readonly { unitPrice: number; quantity: number }[] } | null,
-  addOns: readonly { lines: readonly { unitPrice: number; quantity: number }[] }[],
-  mode: PricingTaxMode,
-) {
-  const commonAmount = sumCustomerLines(commonLines);
-  const planAmount = plan ? sumCustomerLines(plan.lines) : 0;
-  const addOnAmount = addOns.reduce((sum, addOn) => assertYen(sum + sumCustomerLines(addOn.lines)), 0);
-  return { commonAmount, planAmount, addOnAmount,
-    ...calculateTaxableAmounts(assertYen(commonAmount + planAmount + addOnAmount), mode) };
 }
 
 export function optionTotals(commonLines: readonly { unitPrice: number; quantity: number }[], choices: readonly { kind: string; lines: readonly { unitPrice: number; quantity: number }[] }[], mode: PricingTaxMode) {

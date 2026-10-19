@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { selectedOptionTotal } from "@/lib/estimate-options";
+import { selectedOptionTotal } from "@/lib/estimate-option-totals";
 import type { PricingTaxMode } from "@/lib/pricing-tax";
 
 type Line = { id: number; itemNameSnapshot: string; displayNameSnapshot: string | null; quantity: number; unitPrice: number };
