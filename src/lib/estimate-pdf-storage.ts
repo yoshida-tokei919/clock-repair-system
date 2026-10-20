@@ -3,16 +3,10 @@ import "server-only";
 import crypto from "crypto";
 
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+export { buildEstimatePdfStorageKey } from "@/lib/estimate-pdf-storage-key";
 
 const DOCUMENTS_BUCKET = "documents";
 const PDF_CONTENT_TYPE = "application/pdf";
-
-export function buildEstimatePdfStorageKey(params: {
-  estimateDocumentId: number;
-  pdfFileId: number;
-}) {
-  return `estimates/${params.estimateDocumentId}/${params.pdfFileId}.pdf`;
-}
 
 export async function uploadEstimatePdf(params: {
   storageKey: string;
