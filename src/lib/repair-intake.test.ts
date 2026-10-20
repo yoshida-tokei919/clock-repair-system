@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   REPAIR_INTAKE_STATUS,
   REPAIR_INTAKE_INVITE_TTL_DAYS,
+  REPAIR_INTAKE_TRANSACTION_TIMEOUT_MS,
   RepairIntakeError,
   createCustomerRepairIntakeInvite,
   createInquiryRepairIntakeInvite,
@@ -342,6 +343,23 @@ test("rejects a revoked intake token through the existing invite state validatio
 
 test("keeps a used-token POST response as HTTP 409", () => {
   assert.equal(repairIntakeErrorResponse(new RepairIntakeError("USED_TOKEN", "already used"))?.status, 409);
+});
+
+test("known intake responses never expose raw internal validation messages", () => {
+  const response = repairIntakeErrorResponse(new RepairIntakeError("INVALID_INPUT", "customer.postalCode must be seven digits."));
+  assert.deepEqual(response, { status: 400, body: { code: "INVALID_INPUT", error: "入力内容を確認して、もう一度お試しください。" } });
+});
+
+test("submission configures a longer interactive transaction without changing its boundary", async () => {
+  const sentinel = new Error("transaction started");
+  let options: unknown;
+  const db = { $transaction: async (_callback: unknown, received: unknown) => {
+    options = received;
+    throw sentinel;
+  } };
+  await assert.rejects(() => submitRepairIntake("test", {}, db as never), (error) => error === sentinel);
+  assert.equal(REPAIR_INTAKE_TRANSACTION_TIMEOUT_MS, 15_000);
+  assert.deepEqual(options, { timeout: REPAIR_INTAKE_TRANSACTION_TIMEOUT_MS });
 });
 
 function requestedInquiryWatch(id: number, overrides: Record<string, unknown> = {}) {

@@ -6,6 +6,7 @@ import {
   submitRepairIntake,
 } from "@/lib/repair-intake";
 import { getRepairIntakeShippingAddress } from "@/lib/repair-intake-shipping";
+import { INTAKE_LOAD_ERROR, INTAKE_SUBMIT_ERROR } from "@/lib/repair-intake-customer-messages";
 
 type Context = { params: Promise<{ token: string }> };
 
@@ -17,7 +18,7 @@ export async function GET(_: Request, { params }: Context) {
     const response = repairIntakeErrorResponse(error);
     if (response) return NextResponse.json(response.body, { status: response.status });
     console.error("Repair intake validation failed", error);
-    return NextResponse.json({ error: "Unable to validate intake link." }, { status: 500 });
+    return NextResponse.json({ error: INTAKE_LOAD_ERROR }, { status: 500 });
   }
 }
 
@@ -30,6 +31,6 @@ export async function POST(request: Request, { params }: Context) {
     const response = repairIntakeErrorResponse(error);
     if (response) return NextResponse.json(response.body, { status: response.status });
     console.error("Repair intake submission failed", error);
-    return NextResponse.json({ error: "Unable to submit repair intake." }, { status: 500 });
+    return NextResponse.json({ error: INTAKE_SUBMIT_ERROR }, { status: 500 });
   }
 }

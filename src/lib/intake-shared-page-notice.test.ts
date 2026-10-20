@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Prisma } from "@prisma/client";
 import { intakeSharedPageNoticeKey, queueIntakeSharedPageNotice } from "./intake-shared-page-notice";
 import { verifyLineManagerMapping } from "./line-manager-mapping-internal";
 
@@ -51,6 +52,25 @@ test("missing mapping defers the notice; later verification can queue it once", 
   invite.lineUser.lineManagerChat = { id: 3, verifiedAt: new Date() };
   await queueIntakeSharedPageNotice(tx, 9, "https://example.com");
   assert.equal(rows.size, 1);
+});
+
+test("queue failures log only the error class and Prisma code and still fail closed", async () => {
+  const { tx } = fixture();
+  const secret = "private-token-and-address";
+  tx.lineManagerSendOutbox.upsert = async () => {
+    throw new Prisma.PrismaClientKnownRequestError(secret, { code: "P2002", clientVersion: "test" });
+  };
+  const logged: unknown[][] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => { logged.push(args); };
+  try {
+    await assert.rejects(() => queueIntakeSharedPageNotice(tx, 9, "https://example.com"),
+      /Intake shared-page notice could not be queued/);
+  } finally {
+    console.error = original;
+  }
+  assert.deepEqual(logged, [["Intake shared-page notice queue failed", { errorClass: "PrismaClientKnownRequestError", prismaCode: "P2002" }]]);
+  assert.doesNotMatch(JSON.stringify(logged), /private-token-and-address|anchor-token|example.com/);
 });
 
 test("mapping verification reconciles a used intake in the same transaction", async () => {

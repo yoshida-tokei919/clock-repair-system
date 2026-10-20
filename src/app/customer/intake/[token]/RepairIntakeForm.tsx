@@ -3,6 +3,7 @@
 import { FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { getWatchBrands } from "@/actions/master-actions";
+import { INTAKE_LOAD_ERROR, INTAKE_SUBMIT_ERROR, repairIntakeCustomerMessage } from "@/lib/repair-intake-customer-messages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -81,12 +82,6 @@ const driveOptions = [
   ["UNKNOWN", "わからない"],
 ] as const;
 
-function messageForTokenError(code?: string) {
-  if (code === "EXPIRED_TOKEN") return "この送付受付リンクの有効期限が切れています。LINEから新しいリンクをご依頼ください。";
-  if (code === "USED_TOKEN") return "この送付受付リンクは使用済みです。受付は完了しているため、新たに送信しないでください。";
-  return "この送付受付リンクは利用できません。LINEからご確認ください。";
-}
-
 export function RepairIntakeForm({ token }: { token: string }) {
   const [customer, setCustomer] = useState<CustomerForm>(EMPTY_CUSTOMER);
   const [returnAddressSameAsCustomer, setReturnAddressSameAsCustomer] = useState(true);
@@ -97,7 +92,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
   const [watches, setWatches] = useState<WatchForm[]>([newWatch()]);
   const [inquiryWatches, setInquiryWatches] = useState<Array<{ id: number; position: number; label: string | null; brand: string | null; model: string | null; reference: string | null }>>([]);
   const [brands, setBrands] = useState<IntakeBrandOption[]>([]);
-  const [pageState, setPageState] = useState<"loading" | "ready" | "invalid" | "expired" | "used" | "complete">("loading");
+  const [pageState, setPageState] = useState<"loading" | "ready" | "invalid" | "expired" | "used" | "error" | "complete">("loading");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedRepairs, setCompletedRepairs] = useState<Array<{ id: number; inquiryNumber: string }>>([]);
@@ -114,9 +109,9 @@ export function RepairIntakeForm({ token }: { token: string }) {
       if (!active) return;
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        const code = body.code as string | undefined;
-        setPageState(code === "EXPIRED_TOKEN" ? "expired" : code === "USED_TOKEN" ? "used" : "invalid");
-        setError(messageForTokenError(code));
+        const code = typeof body.code === "string" ? body.code : undefined;
+        setPageState(code === "EXPIRED_TOKEN" ? "expired" : code === "USED_TOKEN" ? "used" : code === "INVALID_TOKEN" || code === "REVOKED_TOKEN" ? "invalid" : "error");
+        setError(repairIntakeCustomerMessage(code, INTAKE_LOAD_ERROR));
         return;
       }
       const state = await response.json() as TokenState;
@@ -143,8 +138,8 @@ export function RepairIntakeForm({ token }: { token: string }) {
       setPageState("ready");
     }).catch(() => {
       if (!active) return;
-      setPageState("invalid");
-      setError("ページの読み込みに失敗しました。通信状態を確認して、もう一度お試しください。");
+      setPageState("error");
+      setError(INTAKE_LOAD_ERROR);
     });
     return () => { active = false; };
   }, [token]);
@@ -179,7 +174,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
     try {
       const response = await fetch(`/api/postal-code?zipcode=${postalCode}`);
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "住所を取得できませんでした。");
+      if (!response.ok) throw new Error("住所を取得できませんでした。");
       const shouldRefreshAddress = customerAddressPostalCode.current !== postalCode;
       setCustomer((current) => ({
         ...current,
@@ -191,7 +186,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
       customerAddressPostalCode.current = postalCode;
       setPostalLookupMessage("住所を自動入力しました。");
     } catch (lookupError) {
-      setPostalLookupMessage(lookupError instanceof Error ? lookupError.message : "住所を自動入力できませんでした。");
+      setPostalLookupMessage("住所を自動入力できませんでした。時間をおいて、もう一度お試しください。");
     }
   }
 
@@ -202,7 +197,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
     try {
       const response = await fetch(`/api/postal-code?zipcode=${postalCode}`);
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "住所を取得できませんでした。");
+      if (!response.ok) throw new Error("住所を取得できませんでした。");
       const shouldRefreshAddress = returnAddressPostalCode.current !== postalCode;
       setReturnAddress((current) => ({
         ...current, postalCode,
@@ -213,7 +208,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
       returnAddressPostalCode.current = postalCode;
       setReturnPostalLookupMessage("住所を自動入力しました。");
     } catch (lookupError) {
-      setReturnPostalLookupMessage(lookupError instanceof Error ? lookupError.message : "住所を取得できませんでした。");
+      setReturnPostalLookupMessage("住所を自動入力できませんでした。時間をおいて、もう一度お試しください。");
     }
   }
 
@@ -249,7 +244,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const code = body.code as string | undefined;
+        const code = typeof body.code === "string" ? body.code : undefined;
         if (code === "USED_TOKEN") {
           const stateResponse = await fetch(`/api/customer/intake/${encodeURIComponent(token)}`, { cache: "no-store" });
           const state = await stateResponse.json().catch(() => ({}));
@@ -262,23 +257,23 @@ export function RepairIntakeForm({ token }: { token: string }) {
           setPageState("used");
         }
         else if (code === "EXPIRED_TOKEN") setPageState("expired");
-        const serverMessage = typeof body.error === "string" ? body.error : null;
-        setError(code ? messageForTokenError(code) : serverMessage || "送信に失敗しました。");
+        else if (code === "INVALID_TOKEN" || code === "REVOKED_TOKEN") setPageState("invalid");
+        setError(repairIntakeCustomerMessage(code, INTAKE_SUBMIT_ERROR));
         return;
       }
       setCompletedRepairs(body.repairs || []);
       setShippingAddress(body.shippingAddress || null);
       setPageState("complete");
     } catch {
-      setError("送信に失敗しました。通信状態を確認して、もう一度お試しください。");
+      setError(INTAKE_SUBMIT_ERROR);
     } finally {
       setIsSubmitting(false);
     }
   }
 
   if (pageState === "loading") return <PageFrame><p className="py-12 text-center text-sm text-zinc-500">送付受付を準備しています…</p></PageFrame>;
-  if (pageState === "invalid" || pageState === "expired" || pageState === "used") {
-    return <PageFrame><section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950"><h1 className="text-lg font-bold">送付受付リンクについて</h1><p className="mt-2">{error}</p></section></PageFrame>;
+  if (pageState === "invalid" || pageState === "expired" || pageState === "used" || pageState === "error") {
+    return <PageFrame><section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950"><h1 className="text-lg font-bold">{pageState === "error" ? "送付受付について" : "送付受付リンクについて"}</h1><p className="mt-2">{error}</p></section></PageFrame>;
   }
   if (pageState === "complete") {
     return <PageFrame><section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950"><h1 className="text-xl font-bold">送付受付が完了しました</h1><p className="mt-2 text-sm">時計を発送する際は、下記の受付番号を控えてください。</p><p className="mt-2 text-sm">時計点数: {completedRepairs.length}点</p><ul className="mt-4 space-y-2">{completedRepairs.map((repair) => <li key={repair.id} className="rounded-md bg-white px-3 py-2 font-mono font-bold">{repair.inquiryNumber}</li>)}</ul></section>{shippingAddress && <ShippingAddress address={shippingAddress} />}</PageFrame>;

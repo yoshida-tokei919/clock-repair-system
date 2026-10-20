@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { buildCustomerShareUrl } from "./customer-share-url";
 import { createApprovedLineManagerSendOutbox } from "./line-manager-send-outbox";
 
@@ -34,8 +34,8 @@ export async function queueIntakeSharedPageNotice(
       new Set(invite.inquiryWatches.map(({ inquiryWatch }) => inquiryWatch.promotedRepairId)).size !== repairIds.size) return null;
 
   // The mapping worker has an internal origin, so never use request.url as its fallback.
-  if (!appUrl) throw new Error("Public application URL is unavailable for intake notice");
   try {
+    if (!appUrl) throw new Error("Public application URL is unavailable for intake notice");
     const url = buildCustomerShareUrl(`/customer/repairs/${invite.repairs[0].publicToken}`, appUrl, appUrl);
     return await createApprovedLineManagerSendOutbox(tx, {
       inquiryId: invite.inquiryId,
@@ -43,8 +43,13 @@ export async function queueIntakeSharedPageNotice(
       idempotencyKey: intakeSharedPageNoticeKey(invite.id),
       text: `受付が完了しました。\n今後の修理状況やお見積りの確認はこちらのページからご覧いただけます。\n${url}`,
     });
-  } catch {
-    // The intake route logs unexpected errors; never allow a URL/token into that log.
+  } catch (error) {
+    // Log only the error class and Prisma code; messages can contain the URL/token or customer data.
+    const errorClass = error instanceof Error && /^[A-Za-z][A-Za-z0-9_]*$/.test(error.constructor.name)
+      ? error.constructor.name : "Unknown";
+    const prismaCode = error instanceof Prisma.PrismaClientKnownRequestError && /^P\d{4}$/.test(error.code)
+      ? error.code : null;
+    console.error("Intake shared-page notice queue failed", { errorClass, prismaCode });
     throw new Error("Intake shared-page notice could not be queued");
   }
 }

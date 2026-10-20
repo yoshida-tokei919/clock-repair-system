@@ -7,9 +7,11 @@ import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
 import { hasSameInquiryWatchIdSet, reconcileInquiryClosure, reconcileInquiryRepairIntakeInvites } from "@/lib/inquiry-lifecycle";
 import { validateInquiryWatchPromotionEligibility } from "@/lib/inquiry-promotion";
 import { queueIntakeSharedPageNotice } from "@/lib/intake-shared-page-notice";
+import { INTAKE_SUBMIT_ERROR, repairIntakeCustomerMessage } from "@/lib/repair-intake-customer-messages";
 
 export const REPAIR_INTAKE_STATUS = "送付待ち";
 export const REPAIR_INTAKE_INVITE_TTL_DAYS = 7;
+export const REPAIR_INTAKE_TRANSACTION_TIMEOUT_MS = 15_000;
 const INTAKE_TOKEN_BYTES = 32;
 const REPAIR_PUBLIC_TOKEN_BYTES = 24;
 
@@ -603,11 +605,11 @@ export async function submitRepairIntake(
     }
 
     return { customerId: customer.id, repairs: repairs.map((repair) => ({ id: repair.id, inquiryNumber: repair.inquiryNumber })) };
-  });
+  }, { timeout: REPAIR_INTAKE_TRANSACTION_TIMEOUT_MS });
 }
 
 export function repairIntakeErrorResponse(error: unknown) {
   if (!(error instanceof RepairIntakeError)) return null;
   const status = error.code === "USED_TOKEN" ? 409 : error.code === "INVALID_INPUT" || error.code === "INVALID_BRAND" || error.code === "INQUIRY_NOT_READY" || error.code === "B2B_CUSTOMER" ? 400 : 404;
-  return { status, body: { error: error.message, code: error.code } };
+  return { status, body: { error: repairIntakeCustomerMessage(error.code, INTAKE_SUBMIT_ERROR), code: error.code } };
 }
