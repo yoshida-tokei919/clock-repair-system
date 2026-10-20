@@ -373,7 +373,7 @@ export async function getRepairIntakeInviteState(token: string, db: DbClient = p
         select: { id: true, inquiryNumber: true },
         orderBy: { id: "asc" },
       },
-      inquiryWatches: { orderBy: { inquiryWatch: { position: "asc" } }, select: { inquiryWatch: { select: { id: true, position: true, label: true, brand: { select: { nameJp: true, nameEn: true, name: true } }, model: { select: { nameJp: true, nameEn: true, name: true } }, reference: { select: { name: true } } } } } },
+      inquiryWatches: { orderBy: { inquiryWatch: { position: "asc" } }, select: { inquiryWatch: { select: { id: true, position: true, brand: { select: { nameJp: true, nameEn: true, name: true } }, model: { select: { nameJp: true, nameEn: true, name: true } }, reference: { select: { name: true } } } } } },
     },
   });
   if (!invite) throw new RepairIntakeError("INVALID_TOKEN", "This intake link is invalid.");
@@ -406,7 +406,7 @@ export async function getRepairIntakeInviteState(token: string, db: DbClient = p
       email: customer.email,
     } : null,
     inquiryWatches: invite.inquiryWatches.map(({ inquiryWatch }) => ({
-      id: inquiryWatch.id, position: inquiryWatch.position, label: inquiryWatch.label,
+      id: inquiryWatch.id, position: inquiryWatch.position,
       brand: inquiryWatch.brand ? inquiryWatch.brand.nameJp || inquiryWatch.brand.nameEn || inquiryWatch.brand.name : null,
       model: inquiryWatch.model ? inquiryWatch.model.nameJp || inquiryWatch.model.nameEn || inquiryWatch.model.name : null,
       reference: inquiryWatch.reference?.name ?? null,

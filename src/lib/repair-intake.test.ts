@@ -269,6 +269,38 @@ test("accepts only an unused, unexpired intake invite", async () => {
   });
 });
 
+test("returns only structured watch names for a multiwatch inquiry invite", async () => {
+  let selectedWatches: unknown;
+  const db = {
+    repairIntakeInvite: {
+      findUnique: async (args: { select: { inquiryWatches: unknown } }) => {
+        selectedWatches = args.select.inquiryWatches;
+        return {
+          expiresAt: new Date(Date.now() + 60_000), usedAt: null, revokedAt: null,
+          customerId: null, lineUserId: 7, inquiryId: 70,
+          customer: null, lineUser: { linkedCustomer: null }, repairs: [],
+          inquiryWatches: [
+            { inquiryWatch: { id: 1, position: 1, label: "ROLEX デイトジャスト系（推定）", brand: { nameJp: "ロレックス", nameEn: "ROLEX", name: "Rolex" }, model: { nameJp: "デイトジャスト", nameEn: "Datejust", name: "Datejust" }, reference: { name: "126234" } } },
+            { inquiryWatch: { id: 2, position: 2, label: "オメガ系？", brand: { nameJp: "オメガ", nameEn: "OMEGA", name: "Omega" }, model: null, reference: null } },
+            { inquiryWatch: { id: 3, position: 3, label: "型番不明（AI推定）", brand: null, model: null, reference: null } },
+          ],
+        };
+      },
+    },
+  };
+
+  const result = await getRepairIntakeInviteState("inquiry-token", db as never);
+  assert.deepEqual(result.inquiryWatches, [
+    { id: 1, position: 1, brand: "ロレックス", model: "デイトジャスト", reference: "126234" },
+    { id: 2, position: 2, brand: "オメガ", model: null, reference: null },
+    { id: 3, position: 3, brand: null, model: null, reference: null },
+  ]);
+  assert.equal(JSON.stringify(result).includes("label"), false);
+  assert.equal(JSON.stringify(result).includes("推定"), false);
+  assert.equal(JSON.stringify(result).includes("？"), false);
+  assert.equal(JSON.stringify(selectedWatches).includes('"label"'), false);
+});
+
 test("does not infer structured prefill fields from a legacy address string", async () => {
   const db = {
     repairIntakeInvite: {
