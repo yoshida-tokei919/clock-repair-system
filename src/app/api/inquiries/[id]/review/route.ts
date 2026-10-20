@@ -41,6 +41,8 @@ async function getReviewPayload(inquiryId: number) {
             caseReferenceId: true,
             caliberId: true,
             baseCaliberId: true,
+            timepieceType: true,
+            timepieceTypeLabel: true,
             promotedAt: true,
             promotedRepairId: true,
             decision: true,
@@ -191,8 +193,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (watch.promotedAt) throw new InquiryWatchReviewInputError("昇格済みの時計は編集できません。");
 
       await validateMasterSelections(tx, watch, patch.masterSelections);
-      if (Object.keys(patch.masterSelections).length > 0) {
-        await tx.inquiryWatch.update({ where: { id: watch.id }, data: patch.masterSelections });
+      if (Object.keys(patch.masterSelections).length > 0 || patch.timepieceClassification) {
+        await tx.inquiryWatch.update({ where: { id: watch.id }, data: { ...patch.masterSelections, ...patch.timepieceClassification } });
       }
 
       const now = new Date();

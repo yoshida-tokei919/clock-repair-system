@@ -36,6 +36,8 @@ function promotionWatch(id: number, position: number, promoted: boolean) {
     caseReferenceId: null,
     caliberId: null,
     baseCaliberId: null,
+    timepieceType: null,
+    timepieceTypeLabel: null,
     promotedWatchId: promoted ? 100 + id : null,
     promotedRepairId: promoted ? 200 + id : null,
     promotedAt: promoted ? new Date("2026-09-20T00:00:00.000Z") : null,
@@ -159,6 +161,18 @@ test("B2C promotion gives two watches consecutive shared numbers", async () => {
 
   const result = await promoteInquiryWatches(tx, { inquiryId: 7, customerId: 12, watchIds: [1, 2] });
   assert.deepEqual(result.promotions.map((item) => item.inquiryNumber), ["C-1001", "C-1002"]);
+});
+
+test("promotion copies null and custom timepiece classification to formal watches", async () => {
+  const custom = { ...promotionWatch(1, 1, false), timepieceType: "OTHER", timepieceTypeLabel: "ホールクロック" };
+  const old = promotionWatch(2, 2, false);
+  const { tx } = promotionTx([custom, old]);
+  const created: any[] = [];
+  tx.brand = { findUnique: async () => ({ id: 1 }) };
+  tx.watch.create = async (args: any) => { created.push(args.data); return { id: 100 + created.length }; };
+  tx.repair.create = async () => ({ id: 200 + created.length });
+  await promoteInquiryWatches(tx, { inquiryId: 7, customerId: 12, watchIds: [1, 2] });
+  assert.deepEqual(created.map((watch) => [watch.timepieceType, watch.timepieceTypeLabel]), [["OTHER", "ホールクロック"], [null, null]]);
 });
 
 test("B2B promotion retains its customer sequence and three-digit padding", async () => {

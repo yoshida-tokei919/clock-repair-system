@@ -315,6 +315,7 @@ export async function createInquiryRepairIntakeInvite(
       select: {
         id: true, position: true, inquiryId: true, brandId: true, modelId: true, referenceId: true,
         caseReferenceId: true, caliberId: true, baseCaliberId: true, promotedWatchId: true,
+        timepieceType: true, timepieceTypeLabel: true,
         promotedRepairId: true, promotedAt: true,
         fieldValues: { select: { field: true, value: true, confirmationStatus: true } },
       },
@@ -430,6 +431,7 @@ export async function submitRepairIntake(
               select: {
                 id: true, position: true, inquiryId: true, decision: true, brandId: true, modelId: true,
                 referenceId: true, caseReferenceId: true, caliberId: true, baseCaliberId: true,
+                timepieceType: true, timepieceTypeLabel: true,
                 promotedWatchId: true, promotedRepairId: true, promotedAt: true,
                 fieldValues: { select: { field: true, value: true, confirmationStatus: true } },
               },
@@ -544,7 +546,7 @@ export async function submitRepairIntake(
         data: {
           customerId: customer!.id,
           brandId: watchInput.brandId!,
-          ...(inquiryBound ? { modelId: watchInput.modelId, referenceId: watchInput.referenceId, caseReferenceId: watchInput.caseReferenceId, caliberId: watchInput.caliberId, baseCaliberId: watchInput.baseCaliberId } : { modelNameInput: watchInput.modelName, timepieceType: watchInput.timepieceType, driveType: watchInput.driveType }),
+          ...(inquiryBound ? { modelId: watchInput.modelId, referenceId: watchInput.referenceId, caseReferenceId: watchInput.caseReferenceId, caliberId: watchInput.caliberId, baseCaliberId: watchInput.baseCaliberId, timepieceType: watchInput.timepieceType, timepieceTypeLabel: watchInput.timepieceTypeLabel } : { modelNameInput: watchInput.modelName, timepieceType: watchInput.timepieceType, driveType: watchInput.driveType }),
         },
       });
       const repair = await tx.repair.create({

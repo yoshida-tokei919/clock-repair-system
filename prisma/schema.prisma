@@ -653,6 +653,9 @@ model InquiryWatch {
   caliberId       Int?
   baseCaliberId   Int?
 
+  timepieceType TimepieceType?
+  timepieceTypeLabel String? @db.VarChar(100)
+
   // P3-3 will populate these in the same transaction that creates a formal
   // Watch and Repair. Their one-to-one shape prevents ambiguous promotion.
   promotedWatchId Int?     @unique

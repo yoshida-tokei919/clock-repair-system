@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { TimepieceType } from "@prisma/client";
 import { Check, ChevronDown, ChevronUp, Clipboard, Link as LinkIcon, Plus, RefreshCw, Save, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TIMEPIECE_TYPE_CHOICES, TIMEPIECE_TYPE_MAX_LENGTH } from "@/lib/timepiece-type";
 import { WorkTimerStartButton } from "@/components/work-time/WorkTimerStartButton";
 import {
   INQUIRY_WATCH_FIELDS,
@@ -55,6 +57,8 @@ type ReviewWatch = {
   caseReferenceId: number | null;
   caliberId: number | null;
   baseCaliberId: number | null;
+  timepieceType: TimepieceType | null;
+  timepieceTypeLabel: string | null;
   promotedAt: string | null;
   promotedRepairId: number | null;
   decision: "PENDING" | "REQUESTED" | "DECLINED";
@@ -154,6 +158,8 @@ type PromotionCustomer = {
 type FieldDraft = { value: string; confirmationStatus: InquiryWatchConfirmationStatus; source: "AI_CANDIDATE" | "MANUAL" };
 type WatchDraft = {
   fields: Partial<Record<InquiryWatchFieldName, FieldDraft>>;
+  timepieceType: TimepieceType | null;
+  timepieceTypeLabel: string | null;
   masterSelections: {
     brandId: number | null;
     modelId: number | null;
@@ -221,6 +227,8 @@ function watchDraft(watch: ReviewWatch, options: ReviewPayload["masterOptions"])
   const caliber = options.calibers.find((item) => item.id === watch.caliberId);
   const baseCaliber = options.calibers.find((item) => item.id === watch.baseCaliberId);
   return {
+    timepieceType: watch.timepieceType,
+    timepieceTypeLabel: watch.timepieceTypeLabel,
     fields: Object.fromEntries(watch.fieldValues.map((value) => [value.field, {
       value: value.value,
       confirmationStatus: value.confirmationStatus,
@@ -405,7 +413,7 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
       const response = await fetch(`/api/inquiries/${inquiryId}/review`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ watchId: watch.id, fieldValues, masterSelections: draft.masterSelections }),
+        body: JSON.stringify({ watchId: watch.id, fieldValues, masterSelections: draft.masterSelections, timepieceType: draft.timepieceType, timepieceTypeLabel: draft.timepieceType === "OTHER" ? draft.timepieceTypeLabel : null }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "保存できませんでした。");
@@ -737,6 +745,19 @@ ${intakeUrl}` : "";
 
                     <section className="space-y-4">
                       <h2 className="font-semibold text-zinc-800">時計情報</h2>
+                      <div className="space-y-2">
+                        <Label htmlFor={`timepiece-type-${watch.id}`}>時計の種類</Label>
+                        <select id={`timepiece-type-${watch.id}`} className="flex h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm" value={draft.timepieceType === "OTHER" && draft.timepieceTypeLabel === TIMEPIECE_TYPE_CHOICES[3] ? "HALL_CLOCK" : draft.timepieceType ?? ""} disabled={Boolean(watch.promotedAt)} onChange={(event) => updateDraft(watch.id, (current) => ({ ...current, timepieceType: event.target.value === "HALL_CLOCK" ? "OTHER" : (event.target.value || null) as TimepieceType | null, timepieceTypeLabel: event.target.value === "HALL_CLOCK" ? TIMEPIECE_TYPE_CHOICES[3] : event.target.value === "OTHER" ? "" : null }))}>
+                          <option value="">未選択</option>
+                          <option value="WRISTWATCH">腕時計</option>
+                          <option value="WALL_CLOCK">{TIMEPIECE_TYPE_CHOICES[0]}</option>
+                          <option value="TABLE_CLOCK">{TIMEPIECE_TYPE_CHOICES[1]}</option>
+                          <option value="POCKET_WATCH">{TIMEPIECE_TYPE_CHOICES[2]}</option>
+                          <option value="HALL_CLOCK">{TIMEPIECE_TYPE_CHOICES[3]}</option>
+                          <option value="OTHER">その他の時計</option>
+                        </select>
+                        {draft.timepieceType === "OTHER" && draft.timepieceTypeLabel !== TIMEPIECE_TYPE_CHOICES[3] && <Input aria-label="その他の時計の種類" placeholder={TIMEPIECE_TYPE_CHOICES[3]} maxLength={TIMEPIECE_TYPE_MAX_LENGTH} value={draft.timepieceTypeLabel ?? ""} disabled={Boolean(watch.promotedAt)} onChange={(event) => updateDraft(watch.id, (current) => ({ ...current, timepieceTypeLabel: event.target.value }))} />}
+                      </div>
                       <div className="grid gap-4 lg:grid-cols-2">
                         <div className="space-y-2"><MasterSelect label="ブランド（既存master）" value={draft.masterSelections.brandId} options={options.brands.map((brand) => ({ id: brand.id, label: masterLabel(brand) }))} onChange={(id) => {
                           const item = options.brands.find((brand) => brand.id === id);

@@ -366,6 +366,7 @@ function requestedInquiryWatch(id: number, overrides: Record<string, unknown> = 
   return {
     id, position: id, inquiryId: 70, decision: "REQUESTED", brandId: 10, modelId: 20,
     referenceId: 30, caseReferenceId: 31, caliberId: 40, baseCaliberId: 41,
+    timepieceType: null, timepieceTypeLabel: null,
     promotedWatchId: null, promotedRepairId: null, promotedAt: null,
     fieldValues: [
       { field: "BRAND", value: "10", confirmationStatus: "CONFIRMED" },
@@ -497,13 +498,20 @@ test("submits an Inquiry-bound invite without customer watch fields and promotes
   const result = await submitRepairIntake("bound-token", { customer: customerInput, returnAddressSameAsCustomer: true }, fixture.db as never);
 
   assert.deepEqual(result.repairs, [{ id: 300, inquiryNumber: "C-1001" }]);
-  assert.deepEqual(fixture.createdWatches, [{ data: { customerId: 12, brandId: 10, modelId: 20, referenceId: 30, caseReferenceId: 31, caliberId: 40, baseCaliberId: 41 } }]);
+  assert.deepEqual(fixture.createdWatches, [{ data: { customerId: 12, brandId: 10, modelId: 20, referenceId: 30, caseReferenceId: 31, caliberId: 40, baseCaliberId: 41, timepieceType: null, timepieceTypeLabel: null } }]);
   const createdRepairData = (fixture.createdRepairs[0] as { data: { status: string; publicToken: string; publicTokenCreatedAt: Date } }).data;
   assert.equal(createdRepairData.status, REPAIR_INTAKE_STATUS);
   assert.match(createdRepairData.publicToken, /^[A-Za-z0-9_-]{32}$/);
   assert.ok(createdRepairData.publicTokenCreatedAt instanceof Date);
   assert.equal((fixture.updatedInquiryWatches[0] as { where: { id: number } }).where.id, 1);
   assert.deepEqual(fixture.updatedInquiries, [{ where: { id: 70 }, data: { status: "CLOSED" } }]);
+});
+
+test("Inquiry-bound intake copies custom hall clock classification", async () => {
+  const fixture = inquirySubmitDb(requestedInquiryWatch(1, { timepieceType: "OTHER", timepieceTypeLabel: "ホールクロック" }));
+  await submitRepairIntake("bound-token", { customer: customerInput, returnAddressSameAsCustomer: true }, fixture.db as never);
+  assert.deepEqual((fixture.createdWatches[0] as { data: { timepieceType: string; timepieceTypeLabel: string } }).data.timepieceType, "OTHER");
+  assert.equal((fixture.createdWatches[0] as { data: { timepieceTypeLabel: string } }).data.timepieceTypeLabel, "ホールクロック");
 });
 
 test("rejects an Inquiry-bound invite when a bound watch is no longer requested", async () => {

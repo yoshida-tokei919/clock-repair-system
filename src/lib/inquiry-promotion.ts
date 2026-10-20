@@ -1,4 +1,4 @@
-import type { InquiryWatchField, Prisma } from "@prisma/client";
+import type { InquiryWatchField, Prisma, TimepieceType } from "@prisma/client";
 import { reconcileInquiryRepairMessageLinks } from "@/lib/inquiry-message-repair-links";
 import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
 import { nextB2cInquiryNumber } from "@/lib/b2c-inquiry-number";
@@ -22,6 +22,8 @@ type PromotionWatch = {
   caseReferenceId: number | null;
   caliberId: number | null;
   baseCaliberId: number | null;
+  timepieceType: TimepieceType | null;
+  timepieceTypeLabel: string | null;
   promotedWatchId: number | null;
   promotedRepairId: number | null;
   promotedAt: Date | null;
@@ -144,6 +146,7 @@ export async function promoteInquiryWatches(
     select: {
       id: true, position: true, inquiryId: true, brandId: true, modelId: true,
       referenceId: true, caseReferenceId: true, caliberId: true, baseCaliberId: true,
+      timepieceType: true, timepieceTypeLabel: true,
       promotedWatchId: true, promotedRepairId: true, promotedAt: true,
       fieldValues: { select: { field: true, value: true, confirmationStatus: true } },
     },
@@ -226,6 +229,8 @@ export async function promoteInquiryWatches(
         caseReferenceId: draft.caseReferenceId,
         caliberId: draft.caliberId,
         baseCaliberId: draft.baseCaliberId,
+        timepieceType: draft.timepieceType,
+        timepieceTypeLabel: draft.timepieceTypeLabel,
       },
     });
     const inquiryNumber = business

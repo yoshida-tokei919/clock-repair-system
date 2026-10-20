@@ -1,3 +1,6 @@
+import type { TimepieceType } from "@prisma/client";
+import { TIMEPIECE_TYPE_MAX_LENGTH } from "@/lib/timepiece-type";
+
 export const INQUIRY_WATCH_FIELDS = [
   "BRAND",
   "MODEL",
@@ -32,6 +35,7 @@ export type InquiryWatchFieldChange = {
 export type InquiryWatchReviewPatch = {
   fieldValues: InquiryWatchFieldChange[];
   masterSelections: Partial<Record<InquiryWatchMasterSelectionKey, number | null>>;
+  timepieceClassification?: { timepieceType: TimepieceType | null; timepieceTypeLabel: string | null };
 };
 
 export class InquiryWatchReviewInputError extends Error {}
@@ -95,7 +99,27 @@ export function parseInquiryWatchReviewPatch(input: unknown): InquiryWatchReview
     }
   }
 
-  return { fieldValues, masterSelections };
+  let timepieceClassification: InquiryWatchReviewPatch["timepieceClassification"];
+  if (Object.prototype.hasOwnProperty.call(body, "timepieceType") || Object.prototype.hasOwnProperty.call(body, "timepieceTypeLabel")) {
+    const type = body.timepieceType;
+    const rawLabel = body.timepieceTypeLabel;
+    if (type !== null && type !== "WRISTWATCH" && type !== "POCKET_WATCH" && type !== "WALL_CLOCK" && type !== "TABLE_CLOCK" && type !== "OTHER") {
+      throw new InquiryWatchReviewInputError("timepieceType is invalid");
+    }
+    if (rawLabel !== null && typeof rawLabel !== "string") {
+      throw new InquiryWatchReviewInputError("timepieceTypeLabel is invalid");
+    }
+    const label = typeof rawLabel === "string" ? rawLabel.trim() : null;
+    if (label && label.length > TIMEPIECE_TYPE_MAX_LENGTH) {
+      throw new InquiryWatchReviewInputError("timepieceTypeLabel is too long");
+    }
+    if (type === "OTHER" ? !label : label !== null) {
+      throw new InquiryWatchReviewInputError("timepieceTypeLabel does not match timepieceType");
+    }
+    timepieceClassification = { timepieceType: type, timepieceTypeLabel: label };
+  }
+
+  return { fieldValues, masterSelections, ...(timepieceClassification ? { timepieceClassification } : {}) };
 }
 
 type ExistingFieldValue = {
