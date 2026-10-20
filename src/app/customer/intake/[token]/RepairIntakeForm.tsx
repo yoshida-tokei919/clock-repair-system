@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 
 import { getWatchBrands } from "@/actions/master-actions";
 import { INTAKE_LOAD_ERROR, INTAKE_SUBMIT_ERROR, repairIntakeCustomerMessage } from "@/lib/repair-intake-customer-messages";
@@ -276,7 +277,7 @@ export function RepairIntakeForm({ token }: { token: string }) {
     return <PageFrame><section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950"><h1 className="text-lg font-bold">{pageState === "error" ? "送付受付について" : "送付受付リンクについて"}</h1><p className="mt-2">{error}</p></section></PageFrame>;
   }
   if (pageState === "complete") {
-    return <PageFrame><section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950"><h1 className="text-xl font-bold">送付受付が完了しました</h1><p className="mt-2 text-sm">時計を発送する際は、下記の受付番号を控えてください。</p><p className="mt-2 text-sm">時計点数: {completedRepairs.length}点</p><ul className="mt-4 space-y-2">{completedRepairs.map((repair) => <li key={repair.id} className="rounded-md bg-white px-3 py-2 font-mono font-bold">{repair.inquiryNumber}</li>)}</ul></section>{shippingAddress && <ShippingAddress address={shippingAddress} />}</PageFrame>;
+    return <PageFrame><section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950"><h1 className="text-xl font-bold">送付受付が完了しました</h1><p className="mt-2 text-sm">時計を発送する際は、下記の受付番号を控えてください。</p><p className="mt-2 text-sm">時計点数: {completedRepairs.length}点</p><ul className="mt-4 space-y-2">{completedRepairs.map((repair) => <li key={repair.id} className="rounded-md bg-white px-3 py-2 font-mono font-bold">{repair.inquiryNumber}</li>)}</ul></section><ShippingGuidance address={shippingAddress} /></PageFrame>;
   }
 
   return <PageFrame>
@@ -307,5 +308,32 @@ function Field({ label, required, children }: { label: string; required?: boolea
 function ReturnAddressFields({ sameAsCustomer, setSameAsCustomer, address, setAddress, lookupMessage, onLookup }: { sameAsCustomer: boolean; setSameAsCustomer: (value: boolean) => void; address: CustomerForm; setAddress: (value: CustomerForm) => void; lookupMessage: string | null; onLookup: () => void }) {
   return <section className="rounded-xl border border-zinc-200 p-4"><h2 className="text-lg font-bold text-zinc-900">返送先情報</h2><label className="mt-3 flex items-center gap-2 text-sm font-medium text-zinc-700"><input type="checkbox" checked={sameAsCustomer} onChange={(event) => setSameAsCustomer(event.target.checked)} />返送先は上記住所と同じ</label>{!sameAsCustomer && <div className="mt-4"><p className="text-xs text-zinc-500">時計ごとの返送先として保存されます。</p><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="お名前" required><Input value={address.name} onChange={(e) => setAddress({ ...address, name: e.target.value })} autoComplete="shipping name" /></Field><Field label="電話番号" required><Input value={address.phone} onChange={(e) => setAddress({ ...address, phone: e.target.value })} autoComplete="shipping tel" inputMode="tel" /></Field><Field label="郵便番号" required><Input value={address.postalCode} onChange={(e) => setAddress({ ...address, postalCode: e.target.value })} onBlur={onLookup} placeholder="1234567" autoComplete="shipping postal-code" inputMode="numeric" />{lookupMessage && <p className="mt-1 text-xs text-zinc-500">{lookupMessage}</p>}</Field><Field label="都道府県" required><Input value={address.prefecture} onChange={(e) => setAddress({ ...address, prefecture: e.target.value })} autoComplete="shipping address-level1" /></Field><Field label="市区町村" required><Input value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} autoComplete="shipping address-level2" /></Field><Field label="町名・番地" required><Input value={address.street} onChange={(e) => setAddress({ ...address, street: e.target.value })} autoComplete="shipping address-line1" /></Field></div><div className="mt-4"><Field label="建物名・部屋番号"><Input value={address.building} onChange={(e) => setAddress({ ...address, building: e.target.value })} autoComplete="shipping address-line2" /></Field></div></div>}</section>;
 }
-function ShippingAddress({ address }: { address: ShippingAddress }) { return <section className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950"><h2 className="font-bold">発送先</h2><p className="mt-2 font-medium">{address.recipient}</p><p className="whitespace-pre-wrap">{address.address}</p><p className="mt-3 text-xs">時計と受付番号が分かるメモを同封して発送してください。</p></section>; }
+function ShippingGuidance({ address }: { address: ShippingAddress | null }) {
+  const [copyStatus, setCopyStatus] = useState("");
+
+  async function copyAddress() {
+    if (!address) return;
+    try {
+      await navigator.clipboard.writeText(`${address.recipient}\n${address.address}`);
+      setCopyStatus("宛名と住所をコピーしました");
+    } catch {
+      setCopyStatus("コピーできませんでした。住所を選択してコピーしてください。");
+    }
+  }
+
+  return <section className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-950">
+    <h2 className="text-lg font-bold">発送先</h2>
+    {address ? <>
+      <p className="mt-3 font-medium">宛名: {address.recipient}</p>
+      <p className="mt-1 whitespace-pre-wrap break-words">{address.address}</p>
+      <button type="button" onClick={() => void copyAddress()} className="mt-3 rounded-md border border-blue-300 bg-white px-3 py-2 font-medium hover:bg-blue-100">宛名と住所をコピー</button>
+      <p role="status" className="mt-1 text-xs">{copyStatus}</p>
+      <p className="mt-3">時計と受付番号が分かるメモを同封して発送してください。</p>
+    </> : <p className="mt-3">発送先住所を確認できません。発送前に公式LINEでお問い合わせください。</p>}
+    <div className="mt-5 border-t border-blue-200 pt-5">
+      <Image src="/img/watch-shipping-packaging-guide.png" alt="時計を発送する際の梱包方法のイラスト" width={941} height={1672} className="h-auto w-full rounded-md" />
+      <a href="/packing-guide" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block font-medium text-blue-800 underline underline-offset-2">時計の梱包方法を見る</a>
+    </div>
+  </section>;
+}
 function PageFrame({ children }: { children: ReactNode }) { return <main className="min-h-screen bg-zinc-50 px-4 py-6 sm:px-6 sm:py-10"><div className="mx-auto max-w-2xl rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200 sm:p-8">{children}</div><style jsx global>{`.form-select { width: 100%; height: 2.25rem; border: 1px solid hsl(var(--input)); border-radius: 0.375rem; background: white; padding: 0 0.75rem; font-size: 0.875rem; } .form-select:focus { outline: none; box-shadow: 0 0 0 1px hsl(var(--ring)); }`}</style></main>; }
