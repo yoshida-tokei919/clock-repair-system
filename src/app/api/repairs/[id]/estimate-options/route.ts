@@ -18,14 +18,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const repair = await prisma.repair.findUnique({ where: { id: repairId }, select: {
       status: true, approvalStatus: true, estimateDocumentId: true, customerNote: true,
       customer: { select: { type: true, prefix: true, companyName: true } },
-      estimate: { select: { pricingTaxMode: true, items: { select: { unitPrice: true, quantity: true } } } },
+      estimate: { select: { pricingTaxMode: true, items: { select: { itemName: true, unitPrice: true, quantity: true } } } },
       estimateOptionSet: { include: { choices: { orderBy: { sortOrder: "asc" }, include: { lines: { orderBy: { sortOrder: "asc" } } } } } },
     } });
     if (!repair) return NextResponse.json({ error: "案件が見つかりません。" }, { status: 404 });
     const set = repair.estimateOptionSet;
     const mode = repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE";
     const commonLines = repair.estimate?.items ?? [];
-    return NextResponse.json({ set, editable: canEditEstimateOptions(repair), commonAmount: sumCustomerLines(commonLines),
+    return NextResponse.json({ set, editable: canEditEstimateOptions(repair), commonLines, commonAmount: sumCustomerLines(commonLines),
       ...(isTargetEstimateCustomer(repair.customer, TARGET_COMPANY_NAME_PART) ? { contactText: repair.customerNote ?? "" } : {}),
       pricingTaxMode: mode, totals: set ? optionTotals(commonLines, set.choices, mode) : [] });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "読込に失敗しました。" }, { status: 400 }); }
