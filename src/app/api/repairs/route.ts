@@ -2,6 +2,7 @@ import { requireAdminApi } from "@/lib/admin-api-auth";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { nextB2cInquiryNumber } from "@/lib/b2c-inquiry-number";
 import { addConfirmedRepairStatusLog, canAllocateRepairParts, reconcileRepairPartAllocations, syncExistingPendingRepairOrders } from "@/lib/repair-part-allocation";
 import { findOrCreateBrand, findOrCreateCaliber, findOrCreateWatchReference, resolveBrand } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
@@ -139,7 +140,7 @@ export async function POST(req: Request) {
                                 name: name,
                                 prefix: 'C',
                                 isPartner: false,
-                                currentSeq: 9999,
+                                currentSeq: 0,
                                 rank: 1,
                                 phone: phone || null,
                                 lineId: body.customer.lineId || null,
@@ -314,24 +315,28 @@ export async function POST(req: Request) {
             if (!customerPrefix) {
                 throw new Error("業者登録ではプレフィックスを入力してください。");
             }
-            const existingRepairsForPrefix = await tx.repair.findMany({
-                where: { inquiryNumber: { startsWith: `${customerPrefix}-` } },
-                select: { inquiryNumber: true },
-            });
-            const maxExistingSeq = existingRepairsForPrefix.reduce(
-                (max, repair) => Math.max(max, extractInquirySequence(repair.inquiryNumber, customerPrefix)),
-                0
-            );
-            const nextSeq = Math.max(customer.currentSeq || 0, maxExistingSeq) + 1;
-            inquiryNumber = `${customerPrefix}-${String(nextSeq).padStart(3, '0')}`;
+            if (customer.type === 'individual') {
+                inquiryNumber = await nextB2cInquiryNumber(tx, customer.id);
+            } else {
+                const existingRepairsForPrefix = await tx.repair.findMany({
+                    where: { inquiryNumber: { startsWith: `${customerPrefix}-` } },
+                    select: { inquiryNumber: true },
+                });
+                const maxExistingSeq = existingRepairsForPrefix.reduce(
+                    (max, repair) => Math.max(max, extractInquirySequence(repair.inquiryNumber, customerPrefix)),
+                    0
+                );
+                const nextSeq = Math.max(customer.currentSeq || 0, maxExistingSeq) + 1;
+                inquiryNumber = `${customerPrefix}-${String(nextSeq).padStart(3, '0')}`;
 
-            await tx.customer.update({
-                where: { id: customer.id },
-                data: {
-                    currentSeq: nextSeq,
-                    prefix: customer.prefix || customerPrefix,
-                }
-            });
+                await tx.customer.update({
+                    where: { id: customer.id },
+                    data: {
+                        currentSeq: nextSeq,
+                        prefix: customer.prefix || customerPrefix,
+                    }
+                });
+            }
 
             // 4. Create Repair
             const hasEstimateItems = Array.isArray(body.estimate?.items) && body.estimate.items.length > 0;

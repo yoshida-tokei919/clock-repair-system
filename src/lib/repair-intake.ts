@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { BrandKind, Prisma, TimepieceType, WatchDriveType, type PrismaClient } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { nextB2cInquiryNumber } from "@/lib/b2c-inquiry-number";
 import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
 import { hasSameInquiryWatchIdSet, reconcileInquiryClosure, reconcileInquiryRepairIntakeInvites } from "@/lib/inquiry-lifecycle";
 import { validateInquiryWatchPromotionEligibility } from "@/lib/inquiry-promotion";
@@ -175,36 +176,6 @@ export function parseRepairIntakePayload(payload: unknown) {
     returnAddress: body.returnAddressSameAsCustomer ? customer : parseCustomerInput(body.returnAddress),
     watches: parseWatchInputs(body?.watches),
   };
-}
-
-function extractInquirySequence(inquiryNumber: string, prefix: string) {
-  const prefixWithSeparator = `${prefix}-`;
-  if (!inquiryNumber.startsWith(prefixWithSeparator)) return 0;
-  const sequence = Number(inquiryNumber.slice(prefixWithSeparator.length));
-  return Number.isSafeInteger(sequence) && sequence > 0 ? sequence : 0;
-}
-
-async function nextB2cInquiryNumber(tx: Prisma.TransactionClient, customerId: number) {
-  // The legacy C-* namespace is shared by every B2C customer. Serialize only this sequence.
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(163)`;
-  await tx.$queryRaw<{ id: number }[]>`SELECT "id" FROM "Customer" WHERE "id" = ${customerId} FOR UPDATE`;
-
-  const existingRepairs = await tx.repair.findMany({
-    where: { inquiryNumber: { startsWith: "C-" } },
-    select: { inquiryNumber: true },
-  });
-  const maxSequence = existingRepairs.reduce(
-    (max, repair) => Math.max(max, extractInquirySequence(repair.inquiryNumber, "C")),
-    0,
-  );
-  const nextSequence = maxSequence + 1;
-
-  await tx.customer.update({
-    where: { id: customerId },
-    data: { currentSeq: nextSequence, prefix: "C" },
-  });
-
-  return `C-${String(nextSequence).padStart(3, "0")}`;
 }
 
 function inviteState(invite: { expiresAt: Date; usedAt: Date | null }, now: Date) {

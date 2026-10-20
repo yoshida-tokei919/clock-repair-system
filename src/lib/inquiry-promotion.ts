@@ -1,6 +1,7 @@
 import type { InquiryWatchField, Prisma } from "@prisma/client";
 import { reconcileInquiryRepairMessageLinks } from "@/lib/inquiry-message-repair-links";
 import { lockLineUserInquiryTransaction } from "@/lib/inquiry-transaction-lock";
+import { nextB2cInquiryNumber } from "@/lib/b2c-inquiry-number";
 
 const MASTER_FIELDS = {
   BRAND: "brandId",
@@ -200,13 +201,13 @@ export async function promoteInquiryWatches(
   const prefix = customer.type === "individual" ? "C" : customer.prefix?.trim().toUpperCase();
   if (!prefix) throw new InquiryPromotionInputError("Business Customer requires a prefix before promotion.");
 
-  // Lock the Customer row before reading its sequence so concurrent promotions
-  // cannot issue the same business/customer repair number.
+  // Lock Customer before the shared B2C advisory lock. B2B keeps its customer sequence lock.
   await tx.customer.update({ where: { id: customer.id }, data: { currentSeq: customer.currentSeq } });
-  const existing = await tx.repair.findMany({
+  const business = customer.type === "business";
+  const existing = business ? await tx.repair.findMany({
     where: { inquiryNumber: { startsWith: `${prefix}-` } },
     select: { inquiryNumber: true },
-  });
+  }) : [];
   let sequence = Math.max(
     customer.currentSeq,
     ...existing.map((repair) => inquirySequence(repair.inquiryNumber, prefix)),
@@ -215,7 +216,7 @@ export async function promoteInquiryWatches(
   const promotedAt = new Date();
   const results: Array<{ inquiryWatchId: number; watchId: number; repairId: number; inquiryNumber: string }> = [];
   for (const draft of watches) {
-    sequence += 1;
+    if (business) sequence += 1;
     const formalWatch = await tx.watch.create({
       data: {
         customerId: customer.id,
@@ -227,7 +228,9 @@ export async function promoteInquiryWatches(
         baseCaliberId: draft.baseCaliberId,
       },
     });
-    const inquiryNumber = `${prefix}-${String(sequence).padStart(3, "0")}`;
+    const inquiryNumber = business
+      ? `${prefix}-${String(sequence).padStart(3, "0")}`
+      : await nextB2cInquiryNumber(tx, customer.id);
     // Cal / Base Cal belong to the formal Watch. They are deliberately not
     // copied into Repair's movement fields, whose semantics are different.
     const repair = await tx.repair.create({
@@ -247,7 +250,7 @@ export async function promoteInquiryWatches(
     });
     results.push({ inquiryWatchId: draft.id, watchId: formalWatch.id, repairId: repair.id, inquiryNumber });
   }
-  await tx.customer.update({ where: { id: customer.id }, data: { currentSeq: sequence, prefix } });
+  if (business) await tx.customer.update({ where: { id: customer.id }, data: { currentSeq: sequence, prefix } });
   await reconcileInquiryRepairMessageLinks(tx, inquiry.id);
   return { customerId: customer.id, promotedAt, promotions: results, deduplicated: false };
 }

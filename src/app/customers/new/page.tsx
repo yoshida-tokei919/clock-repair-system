@@ -175,7 +175,7 @@ function NewCustomerForm() {
                                             <div className="p-3 bg-green-50 rounded-md border border-green-100">
                                                 <Label className="text-xs font-bold text-green-700">自動割り当てプレフィックス:</Label>
                                                 <div className="text-xl font-mono font-bold text-green-800">C</div>
-                                                <p className="text-[10px] text-green-600/70 mt-1 italic">※一般のお客様は一律「C-001」形式の番号となります</p>
+                                                <p className="text-[10px] text-green-600/70 mt-1 italic">※一般のお客様は「C-1001」以降の共通連番となります</p>
                                             </div>
                                         </div>
                                     )}

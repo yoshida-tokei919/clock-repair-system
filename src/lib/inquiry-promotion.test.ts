@@ -48,6 +48,7 @@ function promotionTx(watches: any[], repairs: any[] = []) {
   const tx: any = {
     inquiry: { findUnique: async () => ({ id: 7, lineUserId: 3 }) },
     $executeRaw: async () => undefined,
+    $queryRaw: async () => [{ id: 12 }],
     customer: {
       findUnique: async () => ({ id: 12, type: "individual", prefix: "C", currentSeq: 2 }),
       update: async () => { writes.push("customer-update"); },
@@ -143,6 +144,33 @@ test("promotion reconciles links after markers update in the supplied transactio
   const result = await promoteInquiryWatches(tx, { inquiryId: 7, customerId: 12, watchIds: [1] });
   assert.equal(result.deduplicated, false);
   assert.ok(writes.indexOf("link-create") > writes.indexOf("inquiry-watch-update"));
+});
+
+test("B2C promotion gives two watches consecutive shared numbers", async () => {
+  const { tx } = promotionTx([promotionWatch(1, 1, false), promotionWatch(2, 2, false)]);
+  const existing = [{ inquiryNumber: "C-001" }];
+  tx.brand = { findUnique: async () => ({ id: 1 }) };
+  tx.watch.create = async () => ({ id: 100 + existing.length });
+  tx.repair.findMany = async () => existing;
+  tx.repair.create = async ({ data }: any) => {
+    existing.push({ inquiryNumber: data.inquiryNumber });
+    return { id: 200 + existing.length };
+  };
+
+  const result = await promoteInquiryWatches(tx, { inquiryId: 7, customerId: 12, watchIds: [1, 2] });
+  assert.deepEqual(result.promotions.map((item) => item.inquiryNumber), ["C-1001", "C-1002"]);
+});
+
+test("B2B promotion retains its customer sequence and three-digit padding", async () => {
+  const { tx } = promotionTx([promotionWatch(1, 1, false)]);
+  tx.customer.findUnique = async () => ({ id: 12, type: "business", prefix: "T", currentSeq: 1 });
+  tx.brand = { findUnique: async () => ({ id: 1 }) };
+  tx.watch.create = async () => ({ id: 101 });
+  tx.repair.findMany = async () => [{ inquiryNumber: "T-002" }];
+  tx.repair.create = async ({ data }: any) => ({ id: 201, inquiryNumber: data.inquiryNumber });
+
+  const result = await promoteInquiryWatches(tx, { inquiryId: 7, customerId: 12, watchIds: [1] });
+  assert.equal(result.promotions[0].inquiryNumber, "T-003");
 });
 
 test("fully promoted retry repairs missing links without formal-record writes", async () => {

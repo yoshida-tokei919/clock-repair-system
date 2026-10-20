@@ -22,8 +22,8 @@ Do not use `Customer.isPartner` to decide whether a customer is B2B or B2C.
 For B2C customers:
 
 - The prefix is always `C`.
-- The first sequence number is `10000`.
-- Example: `C-10000`, `C-10001`, `C-10002`.
+- The first sequence number is `1001`.
+- Example: `C-1001`, `C-1002`, `C-1003`.
 - The prefix `C` is shared by B2C customers, so duplicate `C` prefixes are allowed.
 - Reason: if `C-001` is visible to an individual customer, it may make the business look as if it has just started.
 
@@ -52,7 +52,7 @@ If the B2B prefix is empty, registration must stop with a validation error. Do n
 
 `Customer.currentSeq` stores the latest issued sequence number for that customer record.
 
-It is used to issue the next `Repair.inquiryNumber` for the customer.
+For B2B, it is used to issue the next `Repair.inquiryNumber` for the customer. For B2C, numbering uses the maximum valid `C-*` Repair sequence across all customers, with a floor of `1000`; `currentSeq` records the sequence issued to that customer but does not determine the next B2C number.
 
 Example:
 
@@ -60,11 +60,11 @@ Example:
 - Current sequence: `2`
 - Next repair inquiry number: `T-003`
 
-The sequence is managed per customer record. It is not a global repair count.
+The B2B sequence is managed per customer record. B2C uses one shared `C-*` namespace, not a global repair count.
 
 The prefix is the visible label used in `Repair.inquiryNumber`. Because duplicate B2B prefixes would create confusing or colliding repair numbers, B2B prefixes must be treated as unique in real operation.
 
-For new B2C customer records, initialize `Customer.currentSeq` to `9999` so the first issued `Repair.inquiryNumber` becomes `C-10000` when the system increments by one.
+For new B2C customer records, initialize `Customer.currentSeq` to `0`. A higher historical value on another Customer does not advance the B2C sequence.
 
 ## Customer.isPartner
 
@@ -74,7 +74,7 @@ Do not use `isPartner` for:
 
 - B2B/B2C checks
 - Prefix numbering eligibility
-- Deciding whether to issue `C-10000` or `T-001`
+- Deciding whether to issue `C-1001` or `T-001`
 
 `isPartner` may remain for existing compatibility or partner-related screens, but new implementation should primarily use:
 
@@ -88,14 +88,11 @@ B2C customers must not be marked `isPartner: true` just to make prefix numbering
 
 `Repair.inquiryNumber` is Yoshida's internal repair case number.
 
-It is issued from:
-
-- `Customer.prefix`
-- `Customer.currentSeq`
+It is issued from the Customer's type and prefix, and either the shared B2C `C-*` sequence or the B2B sequence for that prefix.
 
 Examples:
 
-- B2C customer: `C-10000`
+- B2C customer: `C-1001`
 - TRUST partner: `T-001`
 - じゅえりー工房 partner: `J-001`
 
@@ -152,7 +149,7 @@ Do not implement any of the following:
 When fixing the current implementation, update the code in small steps:
 
 1. Make B2B/B2C branching use `Customer.type`.
-2. Make inquiry number generation use `Customer.prefix` and `Customer.currentSeq`.
+2. Use the shared `C-*` Repair sequence for B2C and `Customer.prefix` / `Customer.currentSeq` for B2B.
 3. Remove any dependency on `isPartner` for numbering.
 4. Stop sending a hardcoded `P` prefix from repair registration.
 5. Keep existing data compatibility in mind, but do not carry forward the semantic confusion.

@@ -470,7 +470,7 @@ function inquirySubmitDb(
     lineUser: { update: async () => undefined },
     repair: {
       findMany: async () => [],
-      create: async (args: unknown) => { createdRepairs.push(args); return { id: 300, inquiryNumber: "C-001" }; },
+      create: async (args: any) => { createdRepairs.push(args); return { id: 300, inquiryNumber: args.data.inquiryNumber }; },
     },
     watch: { create: async (args: unknown) => { createdWatches.push(args); return { id: 200 }; } },
     repairStatusLog: { create: async () => undefined },
@@ -496,7 +496,7 @@ test("submits an Inquiry-bound invite without customer watch fields and promotes
   const fixture = inquirySubmitDb(requestedInquiryWatch(1));
   const result = await submitRepairIntake("bound-token", { customer: customerInput, returnAddressSameAsCustomer: true }, fixture.db as never);
 
-  assert.deepEqual(result.repairs, [{ id: 300, inquiryNumber: "C-001" }]);
+  assert.deepEqual(result.repairs, [{ id: 300, inquiryNumber: "C-1001" }]);
   assert.deepEqual(fixture.createdWatches, [{ data: { customerId: 12, brandId: 10, modelId: 20, referenceId: 30, caseReferenceId: 31, caliberId: 40, baseCaliberId: 41 } }]);
   const createdRepairData = (fixture.createdRepairs[0] as { data: { status: string; publicToken: string; publicTokenCreatedAt: Date } }).data;
   assert.equal(createdRepairData.status, REPAIR_INTAKE_STATUS);
