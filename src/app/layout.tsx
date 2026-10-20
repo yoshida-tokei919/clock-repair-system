@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { Providers } from "@/components/Providers"
 import { QRScannerListener } from "@/components/QRScannerListener"
 import Sidebar from "@/components/layout/Sidebar"
+import { PublicAnalytics } from "@/components/analytics/PublicAnalytics"
 
 export default function RootLayout({
     children,
@@ -29,6 +30,7 @@ export default function RootLayout({
             <body className={cn(inter.className, "antialiased min-h-screen bg-neutral-50")}>
                 <Providers>
                     <QRScannerListener />
+                    <PublicAnalytics />
                     {children}
                     <Toaster />
                 </Providers>
