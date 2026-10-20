@@ -321,7 +321,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         SET "currentPdfFileId" = ${pdfFile.id}, "issuedDate" = ${requestedDate ?? estimateDocument.issuedDate}
         WHERE "id" = ${estimateDocument.id}
       `;
-    });
+    }, { timeout: 30000, maxWait: 10000 });
 
     return NextResponse.json({
       ok: true,
