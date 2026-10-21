@@ -99,3 +99,14 @@ test('LINE clicks recognize only HTTPS LINE hosts', () => {
     assert.equal(isLineConsultationHref(href), false, href);
   }
 });
+
+test('pre-load gtag stub queues native Arguments objects', () => {
+  const source = readFileSync(join(process.cwd(), 'src/components/analytics/PublicAnalytics.tsx'), 'utf8');
+  const stub = source.match(/browser\.gtag = function \(\) \{ browser\.dataLayer\?\.push\(arguments\); \};/);
+  assert.ok(stub, 'gtag stub must push its native arguments object');
+  const browser = { dataLayer: [] };
+  new Function('browser', stub[0])(browser);
+  browser.gtag('event', 'page_view');
+  assert.equal(Object.prototype.toString.call(browser.dataLayer[0]), '[object Arguments]');
+  assert.deepEqual(Array.from(browser.dataLayer[0]), ['event', 'page_view']);
+});

@@ -10,7 +10,7 @@ import {
 } from "@/lib/public-analytics";
 
 type Gtag = (...args: unknown[]) => void;
-type AnalyticsWindow = Window & { dataLayer?: unknown[][]; gtag?: Gtag };
+type AnalyticsWindow = Window & { dataLayer?: IArguments[]; gtag?: Gtag };
 
 function disableLoadedTag() {
   (window as unknown as Record<string, unknown>)[`ga-disable-${GA4_MEASUREMENT_ID}`] = true;
@@ -35,7 +35,7 @@ function tag(payload: NonNullable<ReturnType<typeof publicAnalyticsPayload>>): G
   const browser = window as AnalyticsWindow;
   if (!browser.gtag) {
     browser.dataLayer = [];
-    browser.gtag = (...args: unknown[]) => { browser.dataLayer?.push(args); };
+    browser.gtag = function () { browser.dataLayer?.push(arguments); };
     browser.gtag("js", new Date());
     browser.gtag("set", payload);
     browser.gtag("config", GA4_MEASUREMENT_ID, {
