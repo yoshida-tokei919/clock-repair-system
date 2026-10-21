@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildEstimateOptionContactText, CONTACT_QUOTE_BEGIN, displayEstimateOptionContactNote, manualOnlyEstimateContactNote, getGeneratedSectionText, isTargetEstimateCustomer, replaceOrRemoveGeneratedSection, TARGET_COMPANY_NAME_PART } from "./estimate-option-contact-text";
+import { buildEstimateContactText, buildEstimateOptionContactText, CONTACT_QUOTE_BEGIN, displayEstimateOptionContactNote, manualOnlyEstimateContactNote, getGeneratedSectionText, isTargetEstimateCustomer, replaceOrRemoveGeneratedSection, TARGET_COMPANY_NAME_PART } from "./estimate-option-contact-text";
 
 const quote = (mode: "INCLUSIVE" | "EXCLUSIVE") => buildEstimateOptionContactText({
   inquiryNumber: "A-002", commonLines: [{ itemName: "共通作業", quantity: 1, unitPrice: 17000 }], mode,
@@ -40,14 +40,52 @@ test("active plans produce a quote with no common estimate lines", () => {
 test("marked replacement is idempotent and preserves handwritten communication verbatim", () => {
   const handwritten = "納期は要相談。\nA-002 の連絡事項。";
   const once = replaceOrRemoveGeneratedSection(handwritten, quote("INCLUSIVE"));
-  assert.equal(once.startsWith(handwritten), true);
+  assert.equal(once.endsWith(handwritten), true);
   assert.equal(getGeneratedSectionText(once), quote("INCLUSIVE"));
   assert.equal(replaceOrRemoveGeneratedSection(once, quote("INCLUSIVE")), once);
   assert.equal((once.match(/【見積選択肢・自動生成ここから】/g) ?? []).length, 1);
-  assert.equal(replaceOrRemoveGeneratedSection(once, null).startsWith(handwritten), true);
+  assert.equal(replaceOrRemoveGeneratedSection(once, null), handwritten);
   assert.equal(getGeneratedSectionText(replaceOrRemoveGeneratedSection(once, null)), null);
   const staleEditor = "更新後の手入力メモ";
   assert.equal(getGeneratedSectionText(replaceOrRemoveGeneratedSection(staleEditor, getGeneratedSectionText(once))), quote("INCLUSIVE"));
+});
+
+test("normal estimate includes persisted identity, item amounts, inclusive total, then manual note", () => {
+  const generated = buildEstimateContactText({
+    endUserName: "山田様", inquiryNumber: "A-002", mode: "EXCLUSIVE",
+    watch: { brand: { name: "SEIKO" }, model: { name: "Grand Seiko" }, reference: { name: "SBGX" }, caseReference: { name: "9F" }, serialNumber: "12345" },
+    commonLines: [{ itemName: "分解掃除", quantity: 2, unitPrice: 10000 }],
+  })!;
+  assert.match(generated, /^山田様\nSEIKO Grand Seiko\nモデルRef：SBGX\nケースRef：9F\nシリアル番号：12345/);
+  assert.match(generated, /分解掃除 ×2：20,000円/);
+  assert.match(generated, /税込合計：22,000円/);
+  const saved = replaceOrRemoveGeneratedSection("納期3週間", generated);
+  assert.match(displayEstimateOptionContactNote(saved), /【お客様への連絡】\n\n納期3週間$/);
+  assert.equal(manualOnlyEstimateContactNote(saved), "納期3週間");
+  assert.equal(replaceOrRemoveGeneratedSection(saved, generated), saved);
+  assert.equal(replaceOrRemoveGeneratedSection(saved.replace("納期3週間", "納期4週間"), generated).endsWith("納期4週間"), true);
+});
+
+test("legacy appended quote moves ahead of manual notes without duplication", () => {
+  const old = `納期3週間\n\n${CONTACT_QUOTE_BEGIN}\n旧見積\n【見積選択肢・自動生成ここまで】`;
+  const updated = replaceOrRemoveGeneratedSection(old, "新見積");
+  assert.equal(updated.endsWith("納期3週間"), true);
+  assert.equal((updated.match(/納期3週間/g) ?? []).length, 1);
+  assert.equal(replaceOrRemoveGeneratedSection(updated, "新見積"), updated);
+  assert.throws(() => replaceOrRemoveGeneratedSection(`${updated}\n${CONTACT_QUOTE_BEGIN}`, "新見積"), /保存を中止/);
+});
+
+test("inclusive normal estimate and option plans retain correct totals without an upfront single total", () => {
+  const base = { endUserName: null, watch: {}, commonLines: [{ itemName: "共通作業", quantity: 1, unitPrice: 17000 }], mode: "INCLUSIVE" as const };
+  assert.match(buildEstimateContactText(base)!, /税込合計：17,000円/);
+  const withOptions = buildEstimateContactText({ ...base, optionSet: { isActive: true, choices: [
+    { kind: "PLAN", name: "通常", lines: [{ itemName: "通常修理", quantity: 1, unitPrice: 44000 }] },
+    { kind: "PLAN", name: "FIT", lines: [{ itemName: "FIT修理", quantity: 1, unitPrice: 9900 }] },
+  ] } })!;
+  assert.match(withOptions, /61,000円/);
+  assert.match(withOptions, /26,900円/);
+  assert.doesNotMatch(withOptions, /^税込合計：/m);
+  assert.equal(buildEstimateContactText({ ...base, commonLines: [] }), null);
 });
 
 test("empty quote and malformed markers fail safely", () => {
@@ -69,6 +107,20 @@ test("production Ashiya customer identity matches only the intended customer", (
   const customer = { type: "business", prefix: "A", companyName: "TRUST（\u3042\u3057\u3084\u6642\u8a08\u5b9d\u77f3\u4fee\u7406\u7814\u7a76\u6240）" };
   assert.equal(isTargetEstimateCustomer(customer, TARGET_COMPANY_NAME_PART), true);
   assert.equal(isTargetEstimateCustomer({ ...customer, companyName: "TRUST" }, TARGET_COMPANY_NAME_PART), false);
+});
+
+test("customer identity transitions retain manual notes and generate only for the persisted target", () => {
+  const target = { type: "business", prefix: "A", companyName: `TRUST（${TARGET_COMPANY_NAME_PART}）` };
+  const other = { ...target, companyName: "TRUST" };
+  const text = buildEstimateContactText({ watch: {}, commonLines: [{ itemName: "修理", quantity: 1, unitPrice: 1000 }], mode: "INCLUSIVE" })!;
+  const manual = "納期3週間\nご連絡ください。";
+  const saved = replaceOrRemoveGeneratedSection(manual, text);
+  assert.equal(isTargetEstimateCustomer(other, TARGET_COMPANY_NAME_PART), false);
+  assert.equal(replaceOrRemoveGeneratedSection(saved, null), manual);
+  assert.throws(() => replaceOrRemoveGeneratedSection(`${saved}\n${CONTACT_QUOTE_BEGIN}`, null), /保存を中止/);
+  assert.equal(isTargetEstimateCustomer(target, TARGET_COMPANY_NAME_PART), true);
+  assert.equal(replaceOrRemoveGeneratedSection(manual, text), saved);
+  assert.equal(replaceOrRemoveGeneratedSection(saved, text), saved);
 });
 
 test("outward-facing copy strips internal markers while retaining both manual note sections", () => {

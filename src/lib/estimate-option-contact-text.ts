@@ -1,5 +1,5 @@
 import { selectedOptionTotal } from "@/lib/estimate-option-totals";
-import { sumCustomerLines, type PricingTaxMode } from "@/lib/pricing-tax";
+import { calculateTaxableAmounts, sumCustomerLines, type PricingTaxMode } from "@/lib/pricing-tax";
 
 export const CONTACT_QUOTE_BEGIN = "【見積選択肢・自動生成ここから】";
 export const CONTACT_QUOTE_END = "【見積選択肢・自動生成ここまで】";
@@ -34,8 +34,47 @@ export function replaceOrRemoveGeneratedSection(existingNote: string | null, tex
   const range = markedRange(note);
   if (text?.includes(CONTACT_QUOTE_BEGIN) || text?.includes(CONTACT_QUOTE_END)) throw new Error("見積案に区切り文字を含められません。");
   if (!range && !text) return note;
-  if (!range) return `${note}${note ? "\n\n" : ""}${CONTACT_QUOTE_BEGIN}\n${text}\n${CONTACT_QUOTE_END}`;
-  return `${note.slice(0, range.start)}${text ? `${CONTACT_QUOTE_BEGIN}\n${text}\n${CONTACT_QUOTE_END}` : ""}${note.slice(range.end)}`;
+  const section = text ? `${CONTACT_QUOTE_BEGIN}\n${text}\n${CONTACT_QUOTE_END}` : "";
+  if (!range) return `${section}${note ? `${section ? "\n\n" : ""}${note}` : ""}`;
+  const before = note.slice(0, range.start).replace(/\n\n$/, "");
+  const after = note.slice(range.end).replace(/^\n\n/, "");
+  const manual = before && after ? `${before}\n\n${after}` : before || after;
+  return `${section}${manual ? `${section ? "\n\n" : ""}${manual}` : ""}`;
+}
+
+type WatchDetails = {
+  brand?: { name: string } | null; model?: { name: string } | null;
+  reference?: { name: string } | null; caseReference?: { name: string } | null;
+  serialNumber?: string | null;
+};
+
+export function buildEstimateContactText(input: {
+  endUserName?: string | null; watch: WatchDetails; inquiryNumber?: string | null;
+  commonLines: Line[]; mode: PricingTaxMode;
+  optionSet?: { isActive: boolean; title?: string | null; notes?: string | null; choices: Choice[] } | null;
+}): string | null {
+  const { commonLines, mode, optionSet } = input;
+  const hasChoices = Boolean(optionSet?.isActive && optionSet.choices.length);
+  if (!hasChoices && commonLines.length === 0) return null;
+  const name = input.endUserName?.trim().replace(/(?:様|さま)+$/, "") || "";
+  const watch = input.watch;
+  const identity = [
+    name ? `${name}様` : null,
+    [watch.brand?.name, watch.model?.name].filter(Boolean).join(" ") || null,
+    watch.reference?.name ? `モデルRef：${watch.reference.name}` : null,
+    watch.caseReference?.name ? `ケースRef：${watch.caseReference.name}` : null,
+    watch.serialNumber?.trim() ? `シリアル番号：${watch.serialNumber.trim()}` : null,
+  ].filter((value): value is string => Boolean(value));
+  const quote = hasChoices ? buildEstimateOptionContactText({
+    inquiryNumber: input.inquiryNumber, title: optionSet!.title, notes: optionSet!.notes,
+    commonLines, choices: optionSet!.choices, mode,
+  }) : [
+    input.inquiryNumber ? `案件番号：${input.inquiryNumber}` : null,
+    "【お見積明細】",
+    ...commonLines.map(line => `${line.itemName} ×${line.quantity}：${sumCustomerLines([line]).toLocaleString("ja-JP")}円`),
+    `税込合計：${calculateTaxableAmounts(sumCustomerLines(commonLines), mode).grossAmount.toLocaleString("ja-JP")}円`,
+  ].filter(Boolean).join("\n");
+  return [...identity, quote, "【お客様への連絡】"].join("\n");
 }
 
 export function buildEstimateOptionContactText(input: {
