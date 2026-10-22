@@ -13,7 +13,7 @@ const quote = (mode: "INCLUSIVE" | "EXCLUSIVE") => buildEstimateOptionContactTex
 
 test("inclusive proposal has 61,000 and 26,900 yen plan totals, common work and separate add-on", () => {
   const text = quote("INCLUSIVE")!;
-  assert.match(text, /案件番号：A-002/);
+  assert.doesNotMatch(text, /案件番号：/);
   assert.match(text, /通常修理 ×1：44,000円\n共通作業を含む税込合計：61,000円/);
   assert.match(text, /FIT修理 ×1：9,900円\n共通作業を含む税込合計：26,900円/);
   assert.match(text, /任意の追加作業（プランと組み合わせ可能）/);
@@ -56,7 +56,8 @@ test("normal estimate includes persisted identity, item amounts, inclusive total
     watch: { brand: { name: "SEIKO" }, model: { name: "Grand Seiko" }, reference: { name: "SBGX" }, caseReference: { name: "9F" }, serialNumber: "12345" },
     commonLines: [{ itemName: "分解掃除", quantity: 2, unitPrice: 10000 }],
   })!;
-  assert.match(generated, /^山田様\nSEIKO Grand Seiko\nモデルRef：SBGX\nケースRef：9F\nシリアル番号：12345/);
+  assert.match(generated, /^山田様\nSEIKO Grand Seiko\nRef：SBGX 9F\nシリアル番号：12345/);
+  assert.doesNotMatch(generated, /案件番号：/);
   assert.match(generated, /分解掃除 ×2：20,000円/);
   assert.match(generated, /税込合計：22,000円/);
   const saved = replaceOrRemoveGeneratedSection("納期3週間", generated);
@@ -64,6 +65,21 @@ test("normal estimate includes persisted identity, item amounts, inclusive total
   assert.equal(manualOnlyEstimateContactNote(saved), "納期3週間");
   assert.equal(replaceOrRemoveGeneratedSection(saved, generated), saved);
   assert.equal(replaceOrRemoveGeneratedSection(saved.replace("納期3週間", "納期4週間"), generated).endsWith("納期4週間"), true);
+});
+
+test("Ref line uses available model and case references without extra spaces", () => {
+  const base = { inquiryNumber: "A-001", commonLines: [{ itemName: "修理", quantity: 1, unitPrice: 1000 }], mode: "INCLUSIVE" as const };
+  for (const [watch, expected] of [
+    [{ reference: { name: "SBGX" }, caseReference: { name: "9F" } }, "Ref：SBGX 9F"],
+    [{ reference: { name: "SBGX" } }, "Ref：SBGX"],
+    [{ caseReference: { name: "9F" } }, "Ref：9F"],
+    [{ reference: { name: "  SBGX " }, caseReference: { name: " " } }, "Ref：SBGX"],
+    [{}, null],
+  ] as const) {
+    const text = buildEstimateContactText({ ...base, watch })!;
+    assert.equal(text.split("\n").find(line => line.startsWith("Ref：")) ?? null, expected);
+    assert.doesNotMatch(text, /案件番号：|モデルRef：|ケースRef：/);
+  }
 });
 
 test("legacy appended quote moves ahead of manual notes without duplication", () => {
@@ -78,12 +94,13 @@ test("legacy appended quote moves ahead of manual notes without duplication", ()
 test("inclusive normal estimate and option plans retain correct totals without an upfront single total", () => {
   const base = { endUserName: null, watch: {}, commonLines: [{ itemName: "共通作業", quantity: 1, unitPrice: 17000 }], mode: "INCLUSIVE" as const };
   assert.match(buildEstimateContactText(base)!, /税込合計：17,000円/);
-  const withOptions = buildEstimateContactText({ ...base, optionSet: { isActive: true, choices: [
+  const withOptions = buildEstimateContactText({ ...base, inquiryNumber: "A-001", optionSet: { isActive: true, choices: [
     { kind: "PLAN", name: "通常", lines: [{ itemName: "通常修理", quantity: 1, unitPrice: 44000 }] },
     { kind: "PLAN", name: "FIT", lines: [{ itemName: "FIT修理", quantity: 1, unitPrice: 9900 }] },
   ] } })!;
   assert.match(withOptions, /61,000円/);
   assert.match(withOptions, /26,900円/);
+  assert.doesNotMatch(withOptions, /案件番号：/);
   assert.doesNotMatch(withOptions, /^税込合計：/m);
   assert.equal(buildEstimateContactText({ ...base, commonLines: [] }), null);
 });
@@ -160,7 +177,8 @@ const historicalRepair = {
 
 test("historical A-001 generates the current normal quote at read time", () => {
   const explanation = sharedEstimateExplanation(historicalRepair, ashiya);
-  assert.match(explanation, /^山田様\nSEIKO Grand Seiko\nモデルRef：SBGX\nケースRef：9F\nシリアル番号：12345/);
+  assert.match(explanation, /^山田様\nSEIKO Grand Seiko\nRef：SBGX 9F\nシリアル番号：12345/);
+  assert.doesNotMatch(explanation, /案件番号：/);
   assert.match(explanation, /分解掃除 ×1：17,000円\n税込合計：17,000円\n【お客様への連絡】\n\n納期は要相談。$/);
   assert.doesNotMatch(explanation, /自動生成ここから|自動生成ここまで/);
   assert.equal(historicalRepair.customerNote, "納期は要相談。");
@@ -177,6 +195,7 @@ test("old A-002 quote is regenerated once with separate option totals and manual
   assert.match(explanation, /通常修理 ×1：44,000円\n共通作業を含む税込合計：61,000円/);
   assert.match(explanation, /FIT修理 ×1：9,900円\n共通作業を含む税込合計：26,900円/);
   assert.match(explanation, /【お客様への連絡】\n\n手入力の連絡事項。$/);
+  assert.doesNotMatch(explanation, /案件番号：/);
   assert.equal((explanation.match(/手入力の連絡事項。/g) ?? []).length, 1);
   assert.doesNotMatch(explanation, /99,999円|自動生成ここから|自動生成ここまで|税込合計：87,900円/);
   assert.equal(sharedEstimateExplanation(repair, ashiya), explanation); // Card and export consume this same value.

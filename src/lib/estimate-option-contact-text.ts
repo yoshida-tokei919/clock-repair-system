@@ -58,18 +58,17 @@ export function buildEstimateContactText(input: {
   if (!hasChoices && commonLines.length === 0) return null;
   const name = input.endUserName?.trim().replace(/(?:様|さま)+$/, "") || "";
   const watch = input.watch;
+  const reference = [watch.reference?.name, watch.caseReference?.name].map(value => value?.trim()).filter(Boolean).join(" ");
   const identity = [
     name ? `${name}様` : null,
     [watch.brand?.name, watch.model?.name].filter(Boolean).join(" ") || null,
-    watch.reference?.name ? `モデルRef：${watch.reference.name}` : null,
-    watch.caseReference?.name ? `ケースRef：${watch.caseReference.name}` : null,
+    reference ? `Ref：${reference}` : null,
     watch.serialNumber?.trim() ? `シリアル番号：${watch.serialNumber.trim()}` : null,
   ].filter((value): value is string => Boolean(value));
   const quote = hasChoices ? buildEstimateOptionContactText({
     inquiryNumber: input.inquiryNumber, title: optionSet!.title, notes: optionSet!.notes,
     commonLines, choices: optionSet!.choices, mode,
   }) : [
-    input.inquiryNumber ? `案件番号：${input.inquiryNumber}` : null,
     "【お見積明細】",
     ...commonLines.map(line => `${line.itemName} ×${line.quantity}：${sumCustomerLines([line]).toLocaleString("ja-JP")}円`),
     `税込合計：${calculateTaxableAmounts(sumCustomerLines(commonLines), mode).grossAmount.toLocaleString("ja-JP")}円`,
@@ -85,7 +84,6 @@ export function buildEstimateOptionContactText(input: {
   const money = (amount: number) => `${amount.toLocaleString("ja-JP")}円`;
   const common = input.commonLines.map(line => `${line.itemName} ×${line.quantity}：${money(sumCustomerLines([line]))}`);
   const lines = [
-    input.inquiryNumber ? `案件番号：${input.inquiryNumber}` : null,
     input.title?.trim() || "お見積案",
     "【共通作業】", ...common,
     `共通作業 ${input.mode === "INCLUSIVE" ? "税込" : "税抜"}：${money(sumCustomerLines(input.commonLines))}`,
