@@ -6,13 +6,14 @@ import { parsePhysicalTagIdentifier, PhysicalTagIdentifierError } from "./physic
 
 type Element = { type: unknown; props: Record<string, any> };
 
-function harness(initialNfcUid: string | null = null) {
+function harness(initialNfcUid: string | null = null, reuseMode = false) {
   const states: any[] = [];
   const refs: Array<{ current: any }> = [];
   let index = 0;
   let writes = 0;
   let response: (() => void) | null = null;
   let onBound = "";
+  let onReused: unknown = null;
   const react = {
     useState: (initial: unknown) => {
       const slot = index++;
@@ -43,7 +44,8 @@ function harness(initialNfcUid: string | null = null) {
     return modules[name];
   }, compiled);
   const props = { physicalTagId: 5, repairId: 10, shortCode: "PT-000005", inquiryNumber: "T-001",
-    initialNfcUid, onBound: (uid: string) => { onBound = uid; } };
+    initialNfcUid, onBound: (uid: string) => { onBound = uid; },
+    ...(reuseMode ? { onReused: (value: unknown) => { onReused = value; } } : {}) };
   const render = (): Element => { index = 0; return compiled.exports.PhysicalTagNfcBinding(props); };
   const all = (root: any): Element[] => {
     if (Array.isArray(root)) return root.flatMap(all);
@@ -68,7 +70,22 @@ function harness(initialNfcUid: string | null = null) {
   };
   const html = (root: Element) => JSON.stringify(root, (_key, value) => typeof value === "function" ? undefined : value);
   return { render, button, input, form, html,
-    get writes() { return writes; }, get onBound() { return onBound; },
+    get writes() { return writes; }, get onBound() { return onBound; }, get onReused() { return onReused; },
+    setReuseFetch(status: "REUSABLE" | "ASSIGNED" | "RETIRED") {
+      const previous = globalThis.fetch;
+      const calls: string[] = [];
+      globalThis.fetch = (async (url: string, init: RequestInit) => {
+        calls.push(`${init.method} ${url}`);
+        const body = JSON.parse(String(init.body));
+        assert.deepEqual({ physicalTagId: body.physicalTagId, repairId: body.repairId, nfcUid: body.nfcUid },
+          { physicalTagId: 5, repairId: 10, nfcUid: "04333F" });
+        return { ok: true, json: async () => init.method === "POST"
+          ? { status, ...(status === "REUSABLE" ? { physicalTagId: 18, shortCode: "PT-000018" } : {}) }
+          : { physicalTagId: 18, repairId: 10, nfcUid: "04333F", shortCode: "PT-000018",
+            retiredPhysicalTagId: 5 } } as Response;
+      }) as typeof fetch;
+      return { calls, restore: () => { globalThis.fetch = previous; } };
+    },
     setFetch() {
       const previous = globalThis.fetch;
       globalThis.fetch = (async (_url: string, init: RequestInit) => {
@@ -90,6 +107,39 @@ test("unregistered tag shows registration; registered tag hides it", () => {
   assert.match(bound.html(bound.render()), /NFC UID: /);
   assert.match(bound.html(bound.render()), /04333F/);
   assert.doesNotMatch(bound.html(bound.render()), /NFCタグを登録/);
+});
+
+test("batch reuse preflight blocks assigned and retired tags", async () => {
+  for (const status of ["ASSIGNED", "RETIRED"] as const) {
+    const ui = harness(null, true);
+    const fetch = ui.setReuseFetch(status);
+    try {
+      ui.button(ui.render(), "NFCタグを登録").props.onClick();
+      ui.input(ui.render()).props.onChange({ target: { value: "04:33:3f" } });
+      ui.form(ui.render()).props.onSubmit({ preventDefault() {} });
+      await new Promise(resolve => setImmediate(resolve));
+      assert.match(ui.html(ui.render()), status === "ASSIGNED" ? /割当中/ : /退役済み/);
+      assert.doesNotMatch(ui.html(ui.render()), /再割当し/);
+      assert.deepEqual(fetch.calls, ["POST /api/physical-tags/b2b-nfc-reuse"]);
+    } finally { fetch.restore(); }
+  }
+});
+
+test("batch reuse requires visible confirmation and reports new tag to parent", async () => {
+  const ui = harness(null, true);
+  const fetch = ui.setReuseFetch("REUSABLE");
+  try {
+    ui.button(ui.render(), "NFCタグを登録").props.onClick();
+    ui.input(ui.render()).props.onChange({ target: { value: "04:33:3f" } });
+    ui.form(ui.render()).props.onSubmit({ preventDefault() {} });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.match(ui.html(ui.render()), /印刷済みの旧QRラベルは使用せず/);
+    assert.deepEqual(fetch.calls, ["POST /api/physical-tags/b2b-nfc-reuse"]);
+    ui.button(ui.render(), "再割当し").props.onClick();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(fetch.calls, ["POST /api/physical-tags/b2b-nfc-reuse", "PUT /api/physical-tags/b2b-nfc-reuse"]);
+    assert.deepEqual(ui.onReused, { physicalTagId: 18, shortCode: "PT-000018", nfcUid: "04333F" });
+  } finally { fetch.restore(); }
 });
 
 test("HID Enter stages a normalized candidate, cancel discards it without saving", () => {
