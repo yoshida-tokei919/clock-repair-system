@@ -17,6 +17,8 @@ function fixture() {
     customerType: "business", customerId: 4, token: null as string | null,
     repairs: [{ id: 2, customerId: 4 }, { id: 3, customerId: 4 }],
     lockedRepairIds: [2, 3],
+    repairTokens: { 2: null, 3: null } as Record<number, string | null>,
+    repairWriteIds: [] as number[], repairUpdateFailureId: null as number | null,
     pdf: { status: "current", storageKey: "pdf-key", estimateDocumentId: 5 } as
       { status: string; storageKey: string; estimateDocumentId: number } | null,
     writes: 0, lineWrites: 0, attempts: 0, conflicts: 0,
@@ -32,11 +34,18 @@ function fixture() {
       const sql = parts.join("?");
       if (sql.includes('FROM "Customer"')) return [{ id: state.customerId, type: state.customerType }];
       if (sql.includes('FROM "EstimateDocument"')) return [{ customerId: state.customerId, publicToken: state.token }];
-      if (sql.includes('FROM "Repair"')) return state.lockedRepairIds.map((id) => ({ id }));
+      if (sql.includes('FROM "Repair"')) return state.lockedRepairIds.map((id) => ({ id, publicToken: state.repairTokens[id] }));
       throw new Error(`Unexpected query: ${sql}`);
     },
-    $executeRaw: async (_parts: TemplateStringsArray, token: string) => {
+    $executeRaw: async (parts: TemplateStringsArray, token: string, id?: number) => {
       state.writes++;
+      if (parts.join("?").includes('UPDATE "Repair"')) {
+        assert.ok(id !== undefined);
+        state.repairWriteIds.push(id);
+        if (state.repairUpdateFailureId === id || state.repairTokens[id]) return 0;
+        state.repairTokens[id] = token;
+        return 1;
+      }
       if (state.token) return 0;
       state.token = token;
       return 1;
@@ -59,24 +68,40 @@ function fixture() {
   return { state, db: db as any };
 }
 
-test("new token is a 24-byte base64url URL, without LINE writes", async () => {
+test("new document and linked repairs receive 24-byte base64url tokens, without LINE writes", async () => {
   const f = fixture();
   const result = await issueEstimateShareUrl(f.db, 5, "https://evil.test/api/documents/estimate/5/share-url", testOrigin);
   assert.match(result.url, /^https:\/\/example\.test\/customer\/repairs\/[A-Za-z0-9_-]{32}$/);
   assert.equal(result.url.split("/").at(-1), f.state.token);
-  assert.equal(f.state.writes, 1);
+  for (const token of Object.values(f.state.repairTokens)) assert.match(token!, /^[A-Za-z0-9_-]{32}$/);
+  assert.deepEqual(f.state.repairWriteIds, [2, 3]);
+  assert.equal(f.state.writes, 3);
   assert.equal(f.state.lineWrites, 0);
   assert.equal(f.state.options?.timeout, 30000);
   assert.equal(f.state.options?.maxWait, 10000);
 });
 
-test("existing token is reused without a write, including simultaneous requests", async () => {
+test("existing document and repair tokens are reused without a write, including simultaneous requests", async () => {
   const f = fixture();
   f.state.token = "existing-token";
+  f.state.repairTokens[2] = "existing-repair-2";
+  f.state.repairTokens[3] = "existing-repair-3";
   const results = await Promise.all(Array.from({ length: 8 }, () =>
     issueEstimateShareUrl(f.db, 5, "https://evil.test/request", testOrigin)));
   assert.deepEqual(results, Array(8).fill({ url: "https://example.test/customer/repairs/existing-token" }));
   assert.equal(f.state.writes, 0);
+});
+
+test("an existing document token still issues only missing repair tokens", async () => {
+  const f = fixture();
+  f.state.token = "existing-token";
+  f.state.repairTokens[2] = "existing-repair-2";
+  const result = await issueEstimateShareUrl(f.db, 5, "https://evil.test/request", testOrigin);
+  assert.equal(result.url, `${testOrigin}/customer/repairs/existing-token`);
+  assert.equal(f.state.repairTokens[2], "existing-repair-2");
+  assert.match(f.state.repairTokens[3]!, /^[A-Za-z0-9_-]{32}$/);
+  assert.deepEqual(f.state.repairWriteIds, [3]);
+  assert.equal(f.state.writes, 1);
 });
 
 test("simultaneous first requests issue once and reuse one token", async () => {
@@ -84,7 +109,14 @@ test("simultaneous first requests issue once and reuse one token", async () => {
   const results = await Promise.all(Array.from({ length: 8 }, () =>
     issueEstimateShareUrl(f.db, 5, "https://evil.test/request", testOrigin)));
   assert.equal(new Set(results.map((result) => result.url)).size, 1);
-  assert.equal(f.state.writes, 1);
+  assert.equal(f.state.writes, 3);
+  assert.deepEqual(f.state.repairWriteIds, [2, 3]);
+});
+
+test("a failed conditional repair token update does not return the document URL", async () => {
+  const f = fixture();
+  f.state.repairUpdateFailureId = 3;
+  await assert.rejects(issueEstimateShareUrl(f.db, 5, "https://evil.test/request", testOrigin), EstimateShareUnavailableError);
 });
 
 test("missing document, non-business customer, repair mismatch or empty set, and invalid PDF fail closed", async () => {
@@ -124,6 +156,8 @@ test("only a strict public origin is accepted; request host cannot receive the t
 test("transient P2034 re-reads a committed token and arbitrary errors are not retried", async () => {
   const f = fixture();
   f.state.token = "committed-token";
+  f.state.repairTokens[2] = "committed-repair-2";
+  f.state.repairTokens[3] = "committed-repair-3";
   f.state.conflicts = 1;
   const result = await issueEstimateShareUrl(f.db, 5, "https://hostile.test", testOrigin);
   assert.equal(result.url, `${testOrigin}/customer/repairs/committed-token`);

@@ -53,8 +53,8 @@ export async function issueEstimateShareUrl(
     if (documents.length !== 1 || documents[0].customerId !== initial.customerId) {
       throw new EstimateShareUnavailableError("見積書の顧客が変更されました。");
     }
-    const lockedRepairs = await tx.$queryRaw<{ id: number }[]>`
-      SELECT "id" FROM "Repair" WHERE "estimateDocumentId" = ${documentId} ORDER BY "id" FOR UPDATE
+    const lockedRepairs = await tx.$queryRaw<{ id: number; publicToken: string | null }[]>`
+      SELECT "id", "publicToken" FROM "Repair" WHERE "estimateDocumentId" = ${documentId} ORDER BY "id" FOR UPDATE
     `;
     const document = await tx.estimateDocument.findUnique({
       where: { id: documentId },
@@ -82,6 +82,15 @@ export async function issueEstimateShareUrl(
       const updated = await tx.$executeRaw`
         UPDATE "EstimateDocument" SET "publicToken" = ${token}, "publicTokenCreatedAt" = NOW()
         WHERE "id" = ${documentId} AND "publicToken" IS NULL
+      `;
+      if (updated !== 1) throw new EstimateShareUnavailableError("共有URLを準備できませんでした。");
+    }
+    for (const repair of lockedRepairs) {
+      if (repair.publicToken) continue;
+      const repairToken = crypto.randomBytes(24).toString("base64url");
+      const updated = await tx.$executeRaw`
+        UPDATE "Repair" SET "publicToken" = ${repairToken}, "publicTokenCreatedAt" = NOW()
+        WHERE "id" = ${repair.id} AND "publicToken" IS NULL
       `;
       if (updated !== 1) throw new EstimateShareUnavailableError("共有URLを準備できませんでした。");
     }
