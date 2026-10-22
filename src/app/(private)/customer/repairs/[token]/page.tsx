@@ -25,7 +25,7 @@ import { publicShipmentViews } from "@/lib/customer-shipment-status";
 import { visibleCustomerCommentTarget } from "@/lib/b2b-repair-comment-notice";
 import { isIssuedOptionPdfCurrent, issuedOptionSourceHash } from "@/lib/estimate-options";
 import { CustomerEstimateOptions } from "./CustomerEstimateOptions";
-import { displayEstimateOptionContactNote } from "@/lib/estimate-option-contact-text";
+import { displayEstimateOptionContactNote, sharedEstimateExplanation } from "@/lib/estimate-option-contact-text";
 
 export const dynamic = "force-dynamic";
 
@@ -390,7 +390,10 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
     ? primaryRepair.customer.companyName || primaryRepair.customer.name
     : primaryRepair.customer.name;
   const pageTotal = repairs.reduce((sum, repair) => sum + getEstimateTotal(repair), 0);
-  const exportRepairs = repairs.map((repair) => {
+  const explanations = isBusiness
+    ? repairs.map(repair => sharedEstimateExplanation(repair, repair.customer))
+    : repairs.map(repair => displayEstimateOptionContactNote(repair.customerNote));
+  const exportRepairs = repairs.map((repair, index) => {
     const amountToken = repair.publicToken || `${token}:${repair.id}`;
     const repairActionToken = repair.publicToken || token;
     const privateMemoToken = repair.publicToken || `${token}:${repair.id}`;
@@ -406,7 +409,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
       serialNumber: repair.watch?.serialNumber || "",
       shopEstimate: getEstimateTotal(repair),
       customerEstimate: "",
-      explanation: displayEstimateOptionContactNote(repair.customerNote),
+      explanation: explanations[index],
       privateMemo: "",
     };
   });
@@ -459,7 +462,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
             {repairs.map((repair, index) => {
               const estimateItems = getEstimateItems(repair);
               const { subtotal, taxAmount, total } = getEstimateAmounts(repair);
-              const explanationText = displayEstimateOptionContactNote(repair.customerNote);
+              const explanationText = explanations[index];
               const repairActionToken = repair.publicToken || token;
               const amountToken = repair.publicToken || `${token}:${repair.id}`;
               const privateMemoToken = repair.publicToken || `${token}:${repair.id}`;

@@ -144,3 +144,65 @@ export function manualOnlyEstimateContactNote(existingNote: string | null | unde
   if (!range) return note.trim();
   return [note.slice(0, range.start).trim(), note.slice(range.end).trim()].filter(Boolean).join("\n\n");
 }
+
+type PersistedEstimateRepair = {
+  customerNote?: string | null;
+  endUserName?: string | null;
+  inquiryNumber?: string | null;
+  watch: WatchDetails;
+  estimate?: { pricingTaxMode: string; totalAmount: number; taxAmount: number; items: Line[] } | null;
+  estimateOptionSet?: { isActive: boolean; title?: string | null; notes?: string | null; choices: {
+    kind: string; name: string; notes?: string | null; lines: {
+      displayNameSnapshot?: string | null; itemNameSnapshot: string; quantity: number; unitPrice: number;
+    }[];
+  }[] } | null;
+};
+
+/** Read-only shared-page projection from persisted estimate data. */
+export function sharedEstimateExplanation(
+  repair: PersistedEstimateRepair,
+  customer: { type: string; prefix: string | null; companyName: string | null },
+): string {
+  if (!isTargetEstimateCustomer(customer, TARGET_COMPANY_NAME_PART)) {
+    return displayEstimateOptionContactNote(repair.customerNote);
+  }
+
+  // A damaged generated section has no trustworthy manual/generated boundary.
+  try {
+    getGeneratedSectionText(repair.customerNote ?? null);
+  } catch {
+    return "";
+  }
+  const manual = manualOnlyEstimateContactNote(repair.customerNote);
+  const estimate = repair.estimate;
+  if (!estimate) return manual;
+
+  try {
+    if (estimate.pricingTaxMode !== "INCLUSIVE" && estimate.pricingTaxMode !== "EXCLUSIVE") return manual;
+    const mode = estimate.pricingTaxMode;
+    const amounts = calculateTaxableAmounts(sumCustomerLines(estimate.items), mode);
+    if (amounts.totalAmount !== estimate.totalAmount || amounts.taxAmount !== estimate.taxAmount) return manual;
+    const optionSet = repair.estimateOptionSet;
+    if (optionSet?.isActive && optionSet.choices.some(choice => choice.kind !== "PLAN" && choice.kind !== "ADD_ON")) return manual;
+    const quote = buildEstimateContactText({
+      endUserName: repair.endUserName,
+      watch: repair.watch,
+      inquiryNumber: repair.inquiryNumber,
+      commonLines: estimate.items,
+      mode,
+      optionSet: optionSet && {
+        isActive: optionSet.isActive, title: optionSet.title, notes: optionSet.notes,
+        choices: optionSet.choices.map(choice => ({
+          kind: choice.kind, name: choice.name, notes: choice.notes,
+          lines: choice.lines.map(line => ({
+            itemName: line.displayNameSnapshot || line.itemNameSnapshot,
+            quantity: line.quantity, unitPrice: line.unitPrice,
+          })),
+        })),
+      },
+    });
+    return displayEstimateOptionContactNote(replaceOrRemoveGeneratedSection(manual, quote));
+  } catch {
+    return manual;
+  }
+}

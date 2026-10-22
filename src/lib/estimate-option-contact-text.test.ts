@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildEstimateContactText, buildEstimateOptionContactText, CONTACT_QUOTE_BEGIN, displayEstimateOptionContactNote, manualOnlyEstimateContactNote, getGeneratedSectionText, isTargetEstimateCustomer, replaceOrRemoveGeneratedSection, TARGET_COMPANY_NAME_PART } from "./estimate-option-contact-text";
+import { buildEstimateContactText, buildEstimateOptionContactText, CONTACT_QUOTE_BEGIN, displayEstimateOptionContactNote, manualOnlyEstimateContactNote, getGeneratedSectionText, isTargetEstimateCustomer, replaceOrRemoveGeneratedSection, sharedEstimateExplanation, TARGET_COMPANY_NAME_PART } from "./estimate-option-contact-text";
 
 const quote = (mode: "INCLUSIVE" | "EXCLUSIVE") => buildEstimateOptionContactText({
   inquiryNumber: "A-002", commonLines: [{ itemName: "共通作業", quantity: 1, unitPrice: 17000 }], mode,
@@ -147,4 +147,53 @@ test("damaged delimiters are never exposed by outward-facing projections", () =>
   const damaged = `private text\n${CONTACT_QUOTE_BEGIN}\npartial quote`;
   assert.equal(displayEstimateOptionContactNote(damaged), "");
   assert.equal(manualOnlyEstimateContactNote(damaged), "");
+});
+
+const ashiya = { type: "business", prefix: "A", companyName: `TRUST（${TARGET_COMPANY_NAME_PART}）` };
+const historicalRepair = {
+  endUserName: "山田", inquiryNumber: "A-001", customerNote: "納期は要相談。",
+  watch: { brand: { name: "SEIKO" }, model: { name: "Grand Seiko" }, reference: { name: "SBGX" },
+    caseReference: { name: "9F" }, serialNumber: "12345" },
+  estimate: { pricingTaxMode: "INCLUSIVE", totalAmount: 15455, taxAmount: 1545,
+    items: [{ itemName: "分解掃除", quantity: 1, unitPrice: 17000 }] },
+};
+
+test("historical A-001 generates the current normal quote at read time", () => {
+  const explanation = sharedEstimateExplanation(historicalRepair, ashiya);
+  assert.match(explanation, /^山田様\nSEIKO Grand Seiko\nモデルRef：SBGX\nケースRef：9F\nシリアル番号：12345/);
+  assert.match(explanation, /分解掃除 ×1：17,000円\n税込合計：17,000円\n【お客様への連絡】\n\n納期は要相談。$/);
+  assert.doesNotMatch(explanation, /自動生成ここから|自動生成ここまで/);
+  assert.equal(historicalRepair.customerNote, "納期は要相談。");
+});
+
+test("old A-002 quote is regenerated once with separate option totals and manual note", () => {
+  const old = replaceOrRemoveGeneratedSection("手入力の連絡事項。", "旧形式の見積 99,999円");
+  const repair = { ...historicalRepair, inquiryNumber: "A-002", customerNote: old,
+    estimateOptionSet: { isActive: true, title: "修理プラン", choices: [
+      { kind: "PLAN", name: "通常", lines: [{ displayNameSnapshot: "通常修理", itemNameSnapshot: "旧名", quantity: 1, unitPrice: 44000 }] },
+      { kind: "PLAN", name: "FIT", lines: [{ displayNameSnapshot: null, itemNameSnapshot: "FIT修理", quantity: 1, unitPrice: 9900 }] },
+    ] } };
+  const explanation = sharedEstimateExplanation(repair, ashiya);
+  assert.match(explanation, /通常修理 ×1：44,000円\n共通作業を含む税込合計：61,000円/);
+  assert.match(explanation, /FIT修理 ×1：9,900円\n共通作業を含む税込合計：26,900円/);
+  assert.match(explanation, /【お客様への連絡】\n\n手入力の連絡事項。$/);
+  assert.equal((explanation.match(/手入力の連絡事項。/g) ?? []).length, 1);
+  assert.doesNotMatch(explanation, /99,999円|自動生成ここから|自動生成ここまで|税込合計：87,900円/);
+  assert.equal(sharedEstimateExplanation(repair, ashiya), explanation); // Card and export consume this same value.
+  assert.equal(repair.customerNote, old);
+});
+
+test("other customers keep their saved explanation", () => {
+  const note = replaceOrRemoveGeneratedSection("手入力", "保存済みの説明");
+  assert.equal(sharedEstimateExplanation({ ...historicalRepair, customerNote: note }, { ...ashiya, companyName: "別会社" }),
+    displayEstimateOptionContactNote(note));
+});
+
+test("malformed markers and inconsistent or missing estimates fail closed", () => {
+  const damaged = `${CONTACT_QUOTE_BEGIN}\n旧見積`;
+  assert.equal(sharedEstimateExplanation({ ...historicalRepair, customerNote: damaged }, ashiya), "");
+  const old = replaceOrRemoveGeneratedSection("手入力", "旧見積 99,999円");
+  assert.equal(sharedEstimateExplanation({ ...historicalRepair, customerNote: old, estimate: null }, ashiya), "手入力");
+  assert.equal(sharedEstimateExplanation({ ...historicalRepair, customerNote: old,
+    estimate: { ...historicalRepair.estimate, totalAmount: 99999 } }, ashiya), "手入力");
 });
