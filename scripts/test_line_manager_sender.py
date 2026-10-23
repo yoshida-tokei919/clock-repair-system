@@ -5,6 +5,7 @@ import os
 import shutil
 import unittest
 from unittest.mock import patch
+from LINELib.exceptions import InteractiveLoginRequired
 
 from line_manager_sender import HistoryMessage, LINELibAdapter, ReconciliationCandidate, SendCandidate, SendEvidence, WorkerError, parse_lineoa_history, process_reconciliation_once, process_send_once, reconcile_history, safe_error, text_v2_payload
 
@@ -95,6 +96,7 @@ class HistoryParserTests(unittest.TestCase):
         parsed=LINELibAdapter(client).get_raw_history("bot","chat")
         self.assertEqual(client.calls,[(('bot','chat'),{'limit':100})])
         self.assertEqual(parsed,[HistoryMessage("actual","chat","text",datetime.fromtimestamp(1_790_000_123_456 / 1000,tz=timezone.utc),True,"send")])
+        self.assertFalse(LINELibAdapter(client).auth_expired)
 
 class SenderTests(unittest.TestCase):
     def setUp(self):
@@ -111,6 +113,23 @@ class SenderTests(unittest.TestCase):
         api = FakeApi()
         self.send(api, FakeAdapter(history_error=RuntimeError("cookie=value; secret; manager-id")))
         self.assertEqual(api.calls[-1], ("pre", "pre-send history/evidence failed"))
+    def test_typed_live_auth_expiry_acknowledges_pre_send_without_fence_or_post(self):
+        class Client:
+            _chat_service, _session, _xsrf_token = object(), object(), "xsrf"
+            def get_chat_messages(self, *args, **kwargs): raise InteractiveLoginRequired("secret")
+        api, adapter = FakeApi(), LINELibAdapter(Client())
+        self.assertEqual(self.send(api, adapter), "pre-send history/evidence failed")
+        self.assertTrue(adapter.auth_expired)
+        self.assertEqual(api.calls, ["claim", ("pre", "pre-send history/evidence failed")])
+
+    def test_generic_live_history_failure_does_not_mark_auth_expired(self):
+        class Client:
+            _chat_service, _session, _xsrf_token = object(), object(), "xsrf"
+            def get_chat_messages(self, *args, **kwargs): raise OSError("network down")
+        api, adapter = FakeApi(), LINELibAdapter(Client())
+        self.assertEqual(self.send(api, adapter), "pre-send history/evidence failed")
+        self.assertFalse(adapter.auth_expired)
+        self.assertEqual(api.calls, ["claim", ("pre", "pre-send history/evidence failed")])
     def test_no_post_without_fence(self):
         api,adapter=FakeApi(fence=False),FakeAdapter(); self.send(api,adapter); self.assertEqual(adapter.posts,[])
     def test_fence_error_does_not_post(self):

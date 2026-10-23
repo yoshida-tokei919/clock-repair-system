@@ -17,6 +17,7 @@ from line_manager_sender import (
 )
 
 OPERATION_LOCK_TIMEOUT_SECONDS = 5
+MAX_WORKER_LIFETIME_SECONDS = 60 * 60
 
 
 def fixed_storage_path() -> Path:
@@ -101,13 +102,32 @@ def main(argv: list[str] | None = None) -> int:
         with single_instance():
             api = HttpInternalApi(PRODUCTION_ORIGIN, token)
             adapter = None
+            recovery_attempted = False
+            started_at = time.monotonic()
             while True:
+                cycle_completed = False
                 try:
                     if adapter is None:
                         with lineoa_operation(timeout_seconds=OPERATION_LOCK_TIMEOUT_SECONDS):
                             adapter = LINELibAdapter.from_storage(fixed_storage_path())
                     with lineoa_operation(timeout_seconds=OPERATION_LOCK_TIMEOUT_SECONDS):
                         result = process_cycle(api, adapter, allow_send=args.allow_send)
+                        cycle_completed = True
+                    if getattr(adapter, "auth_expired", False):
+                        adapter = None
+                        if recovery_attempted:
+                            print("status=auth recovery unavailable", flush=True)
+                            return 1
+                        recovery_attempted = True
+                        # The cycle lock has been released. Bootstrap holds the same
+                        # shared lock while refreshing the dedicated auth storage.
+                        try:
+                            with lineoa_operation(timeout_seconds=OPERATION_LOCK_TIMEOUT_SECONDS):
+                                from line_manager_auth_storage import bootstrap
+                                bootstrap()
+                        except LineoaOperationBusy:
+                            print("status=auth recovery unavailable", flush=True)
+                            return 1
                 except LineoaOperationBusy:
                     result = "lineoa operation busy; retry next cycle"
                     if args.once:
@@ -116,6 +136,8 @@ def main(argv: list[str] | None = None) -> int:
                 # Only fixed status strings leave the worker; no messages, IDs, or credentials.
                 print(f"status={result}", flush=True)
                 if args.once:
+                    return 0
+                if cycle_completed and time.monotonic() - started_at >= MAX_WORKER_LIFETIME_SECONDS:
                     return 0
                 time.sleep(args.poll_seconds)
     except Exception:

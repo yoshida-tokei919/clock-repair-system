@@ -171,6 +171,7 @@ class LINELibAdapter:
     def __init__(self, client: Any):
         if not all(hasattr(client, name) for name in ("get_chat_messages", "_chat_service", "_session", "_xsrf_token")): raise WorkerError("Authenticated lineoa 7.7.18 client is required")
         self._client = client
+        self.auth_expired = False
     @classmethod
     def from_storage(cls, storage_path: str | os.PathLike[str]) -> "LINELibAdapter":
         path = Path(storage_path)
@@ -180,7 +181,12 @@ class LINELibAdapter:
             return cls(LINELib(storage=str(path)))
         except Exception as error: raise WorkerError("Unable to initialize authenticated LINELib client") from error
     def get_raw_history(self, manager_bot_id: str, manager_chat_id: str) -> Sequence[HistoryMessage]:
-        raw = self._client.get_chat_messages(manager_bot_id, manager_chat_id, limit=100)
+        from LINELib.exceptions import InteractiveLoginRequired
+        try:
+            raw = self._client.get_chat_messages(manager_bot_id, manager_chat_id, limit=100)
+        except InteractiveLoginRequired:
+            self.auth_expired = True
+            raise
         return parse_lineoa_history(raw, manager_chat_id)
     def post_text_v2(self, manager_bot_id: str, manager_chat_id: str, payload: dict[str, str], *, allow_send: bool) -> None:
         if not allow_send: raise WorkerError("Explicit allow_send=True is required")

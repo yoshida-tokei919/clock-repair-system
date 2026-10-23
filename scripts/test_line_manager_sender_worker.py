@@ -2,13 +2,14 @@ from pathlib import Path
 from contextlib import contextmanager
 from contextlib import redirect_stdout
 from io import StringIO
+from types import SimpleNamespace
 from uuid import uuid4
 import unittest
 from unittest.mock import call, patch
 
 from line_manager_sender import WorkerError
 from line_manager_sender_worker import (
-    LineoaOperationBusy, OPERATION_LOCK_TIMEOUT_SECONDS, fixed_storage_path,
+    LineoaOperationBusy, MAX_WORKER_LIFETIME_SECONDS, OPERATION_LOCK_TIMEOUT_SECONDS, fixed_storage_path,
     lineoa_operation, main, process_cycle, single_instance,
 )
 
@@ -94,6 +95,136 @@ class WorkerTests(unittest.TestCase):
                  patch("line_manager_sender_worker.time.sleep", side_effect=between_cycles):
                 self.assertEqual(main(["--allow-send"]), 1)
             self.assertTrue((root / "lineoa-operation.lock").is_file())
+
+    def test_lifetime_exit_only_after_completed_cycle(self):
+        self.assertEqual(MAX_WORKER_LIFETIME_SECONDS, 3600)
+        with lock_root() as root:
+            output = StringIO()
+            with patch.dict("line_manager_sender_worker.os.environ", {"N8N_INTERNAL_TOKEN": "test-only"}), \
+                 patch("line_manager_sender_worker.evidence_directory", return_value=root), \
+                 patch("line_manager_sender_worker.HttpInternalApi"), \
+                 patch("line_manager_sender_worker.fixed_storage_path", return_value=root / "storage"), \
+                 patch("line_manager_sender_worker.LINELibAdapter.from_storage", return_value=object()), \
+                 patch("line_manager_sender_worker.single_instance", side_effect=lambda: available_operation()), \
+                 patch("line_manager_sender_worker.lineoa_operation", side_effect=lambda **kwargs: available_operation()), \
+                 patch("line_manager_sender_worker.process_cycle", return_value="no send candidate") as cycle, \
+                 patch("line_manager_sender_worker.time.monotonic", side_effect=[0, 3600]), \
+                 patch("line_manager_sender_worker.time.sleep") as sleep, redirect_stdout(output):
+                self.assertEqual(main(["--allow-send"]), 0)
+            cycle.assert_called_once()
+            sleep.assert_not_called()
+            self.assertEqual(output.getvalue(), "status=no send candidate\n")
+
+    def test_lifetime_does_not_exit_on_busy_cycle(self):
+        with lock_root() as root:
+            with patch.dict("line_manager_sender_worker.os.environ", {"N8N_INTERNAL_TOKEN": "test-only"}), \
+                 patch("line_manager_sender_worker.evidence_directory", return_value=root), \
+                 patch("line_manager_sender_worker.HttpInternalApi"), \
+                 patch("line_manager_sender_worker.lineoa_operation", return_value=busy_operation()), \
+                 patch("line_manager_sender_worker.LINELibAdapter.from_storage") as bootstrap, \
+                 patch("line_manager_sender_worker.time.monotonic", side_effect=[0]), \
+                 patch("line_manager_sender_worker.time.sleep", side_effect=RuntimeError("stop test")):
+                self.assertEqual(main([]), 1)
+            bootstrap.assert_not_called()
+
+    def test_typed_history_expiry_recovers_once_under_reacquired_operation_lock(self):
+        events = []
+        @contextmanager
+        def operation(**kwargs):
+            events.append("lock")
+            try: yield
+            finally: events.append("unlock")
+        stale = SimpleNamespace(auth_expired=False)
+        fresh = SimpleNamespace(auth_expired=False)
+        def cycle(api, adapter, **kwargs):
+            events.append("cycle")
+            if adapter is stale:
+                stale.auth_expired = True
+                return "pre-send history/evidence failed"
+            return "no send candidate"
+        def bootstrap():
+            events.append("bootstrap")
+            self.assertEqual(events[-2], "lock")
+        with patch.dict("line_manager_sender_worker.os.environ", {"N8N_INTERNAL_TOKEN": "test-only"}), \
+             patch("line_manager_sender_worker.single_instance", side_effect=lambda: available_operation()), \
+             patch("line_manager_sender_worker.lineoa_operation", side_effect=operation), \
+             patch("line_manager_sender_worker.HttpInternalApi"), \
+             patch("line_manager_sender_worker.fixed_storage_path", return_value=Path("storage")), \
+             patch("line_manager_sender_worker.LINELibAdapter.from_storage", side_effect=[stale, fresh]) as restore, \
+             patch("line_manager_sender_worker.process_cycle", side_effect=cycle), \
+             patch("line_manager_auth_storage.bootstrap", side_effect=bootstrap) as recover, \
+             patch("line_manager_sender_worker.time.sleep", side_effect=[None, RuntimeError("stop test")]), \
+             redirect_stdout(StringIO()):
+            self.assertEqual(main(["--allow-send"]), 1)
+        self.assertEqual(recover.call_count, 1)
+        self.assertEqual(restore.call_count, 2)
+        self.assertEqual(events[:6], ["lock", "unlock", "lock", "cycle", "unlock", "lock"])
+        self.assertEqual(events[6:9], ["bootstrap", "unlock", "lock"])
+
+    def test_generic_history_and_unknown_post_outcome_never_bootstrap(self):
+        for result in ("pre-send history/evidence failed", "history unavailable; reconciliation remains pending",
+                       "post outcome unknown; reconciliation required"):
+            with self.subTest(result=result), \
+                 patch.dict("line_manager_sender_worker.os.environ", {"N8N_INTERNAL_TOKEN": "test-only"}), \
+                 patch("line_manager_sender_worker.single_instance", side_effect=lambda: available_operation()), \
+                 patch("line_manager_sender_worker.lineoa_operation", side_effect=lambda **kwargs: available_operation()), \
+                 patch("line_manager_sender_worker.HttpInternalApi"), \
+                 patch("line_manager_sender_worker.fixed_storage_path", return_value=Path("storage")), \
+                 patch("line_manager_sender_worker.LINELibAdapter.from_storage", return_value=SimpleNamespace(auth_expired=False)), \
+                 patch("line_manager_sender_worker.process_cycle", return_value=result), \
+                 patch("line_manager_auth_storage.bootstrap") as recover, redirect_stdout(StringIO()):
+                self.assertEqual(main(["--once", "--allow-send"]), 0)
+                recover.assert_not_called()
+
+    def test_challenge_during_typed_expiry_recovery_fails_closed(self):
+        adapter = SimpleNamespace(auth_expired=True)
+        output = StringIO()
+        with patch.dict("line_manager_sender_worker.os.environ", {"N8N_INTERNAL_TOKEN": "test-only"}), \
+             patch("line_manager_sender_worker.single_instance", side_effect=lambda: available_operation()), \
+             patch("line_manager_sender_worker.lineoa_operation", side_effect=lambda **kwargs: available_operation()), \
+             patch("line_manager_sender_worker.HttpInternalApi"), \
+             patch("line_manager_sender_worker.fixed_storage_path", return_value=Path("storage")), \
+             patch("line_manager_sender_worker.LINELibAdapter.from_storage", return_value=adapter), \
+             patch("line_manager_sender_worker.process_cycle", return_value="history unavailable; reconciliation remains pending"), \
+             patch("line_manager_auth_storage.bootstrap", side_effect=RuntimeError("secret challenge")) as recover, \
+             redirect_stdout(output):
+            self.assertEqual(main(["--once", "--allow-send"]), 1)
+        recover.assert_called_once()
+        self.assertEqual(output.getvalue(), "status=failed\n")
+
+    def test_second_expiry_does_not_repeat_bootstrap(self):
+        first = SimpleNamespace(auth_expired=True)
+        second = SimpleNamespace(auth_expired=True)
+        output = StringIO()
+        with patch.dict("line_manager_sender_worker.os.environ", {"N8N_INTERNAL_TOKEN": "test-only"}), \
+             patch("line_manager_sender_worker.single_instance", side_effect=lambda: available_operation()), \
+             patch("line_manager_sender_worker.lineoa_operation", side_effect=lambda **kwargs: available_operation()), \
+             patch("line_manager_sender_worker.HttpInternalApi"), \
+             patch("line_manager_sender_worker.fixed_storage_path", return_value=Path("storage")), \
+             patch("line_manager_sender_worker.LINELibAdapter.from_storage", side_effect=[first, second]), \
+             patch("line_manager_sender_worker.process_cycle", return_value="pre-send history/evidence failed") as cycle, \
+             patch("line_manager_auth_storage.bootstrap") as recover, \
+             patch("line_manager_sender_worker.time.sleep", return_value=None), redirect_stdout(output):
+            self.assertEqual(main(["--allow-send"]), 1)
+        self.assertEqual(cycle.call_count, 2)
+        recover.assert_called_once()
+        self.assertEqual(output.getvalue(),
+                         "status=pre-send history/evidence failed\nstatus=auth recovery unavailable\n")
+
+    def test_recovery_lock_busy_stops_without_bootstrap_or_retry(self):
+        output = StringIO()
+        with patch.dict("line_manager_sender_worker.os.environ", {"N8N_INTERNAL_TOKEN": "test-only"}), \
+             patch("line_manager_sender_worker.single_instance", side_effect=lambda: available_operation()), \
+             patch("line_manager_sender_worker.lineoa_operation", side_effect=[available_operation(), available_operation(), busy_operation()]), \
+             patch("line_manager_sender_worker.HttpInternalApi"), \
+             patch("line_manager_sender_worker.fixed_storage_path", return_value=Path("storage")), \
+             patch("line_manager_sender_worker.LINELibAdapter.from_storage", return_value=SimpleNamespace(auth_expired=True)) as restore, \
+             patch("line_manager_sender_worker.process_cycle", return_value="pre-send history/evidence failed"), \
+             patch("line_manager_auth_storage.bootstrap") as recover, redirect_stdout(output):
+            self.assertEqual(main(["--allow-send"]), 1)
+        restore.assert_called_once()
+        recover.assert_not_called()
+        self.assertEqual(output.getvalue(), "status=auth recovery unavailable\n")
 
     def test_bootstrap_busy_blocks_linelib_and_once_fails(self):
         self.assertEqual(OPERATION_LOCK_TIMEOUT_SECONDS, 5)
