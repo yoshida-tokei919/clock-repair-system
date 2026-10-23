@@ -97,6 +97,17 @@ test("business estimate queues one verified recipient without a promoted origin,
   }
 });
 
+test("estimate LINE queue allows the established interactive transaction budget", async () => {
+  const fixture = fakeDb(true);
+  const transaction = fixture.db.$transaction;
+  fixture.db.$transaction = async (fn: (client: any) => Promise<unknown>, options: unknown) => {
+    assert.deepEqual(options, { isolationLevel: "Serializable", timeout: 30_000, maxWait: 10_000 });
+    return transaction(fn, options);
+  };
+  await queueEstimateLineSend(fixture.db, 11, "https://example.com");
+  assert.equal(fixture.counts.queued, 1);
+});
+
 test("proxy estimate keeps source document and repair IDs while routing to the delegate", async () => {
   const f = fakeDb(true, true);
   await queueEstimateLineSend(f.db, 11, "https://example.com");

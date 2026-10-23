@@ -142,5 +142,5 @@ export async function queueEstimateLineSend(
     });
     if (outbox.status === "CANCELLED") throw new EstimateLineUnavailableError("この見積書のLINE送信は取り消されています。");
     return { updatedRepairCount: 0, outboxStatus: outbox.status };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000, maxWait: 10_000 });
 }
