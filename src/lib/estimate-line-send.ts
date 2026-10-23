@@ -124,7 +124,9 @@ export async function queueEstimateLineSend(
     const publicToken = await ensurePublicToken(tx, "EstimateDocument", documentId);
     for (const repair of document.repairs) await ensurePublicToken(tx, "Repair", repair.id);
     const estimateUrl = buildCustomerShareUrl(`/customer/repairs/${publicToken}`, requestUrl);
-    const text = `お見積りができましたので、下記ページよりご確認をお願いいたします。\n\n${estimateUrl}\n\nこの内容で進める場合は、画面上から承認をお願いいたします。\nご不明な点や修正のご希望がございましたら、このLINEからご連絡ください。`;
+    const text = business
+      ? `いつもお世話になっております。\n\nお見積りができましたので、下記ページよりご確認をお願いいたします。\n\n【お見積り確認ページ】\n${estimateUrl}\n\nお見積り内容で問題がなければ、ページ内の「承認」ボタンよりご承認をお願いいたします。\n\nご不明な点や変更のご希望がございましたら、共有ページ内のコメント欄よりご連絡ください。\n\nよろしくお願いいたします。`
+      : `お見積りができましたので、下記ページよりご確認をお願いいたします。\n\n${estimateUrl}\n\nこの内容で進める場合は、画面上から承認をお願いいたします。\nご不明な点や修正のご希望がございましたら、このLINEからご連絡ください。`;
     const idempotencyKey = business
       ? businessEstimateLineKey(documentId, document.customerId, document.repairs, businessDestination!, contact!.contactCustomerId)
       : estimateLineKey(documentId, document.customerId, document.repairs);

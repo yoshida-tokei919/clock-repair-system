@@ -6,6 +6,9 @@ import { confirmLineManagerSendOutbox, LineManagerSendOutboxError } from "./line
 import { businessEstimateLineKey, estimateLineKey, estimateLineKeyPrefix } from "./estimate-line-confirmation";
 
 const verifiedAt = new Date("2026-10-04T00:00:00Z");
+const estimateUrl = "https://example.com/customer/repairs/document-token";
+const businessText = `いつもお世話になっております。\n\nお見積りができましたので、下記ページよりご確認をお願いいたします。\n\n【お見積り確認ページ】\n${estimateUrl}\n\nお見積り内容で問題がなければ、ページ内の「承認」ボタンよりご承認をお願いいたします。\n\nご不明な点や変更のご希望がございましたら、共有ページ内のコメント欄よりご連絡ください。\n\nよろしくお願いいたします。`;
+const individualText = `お見積りができましたので、下記ページよりご確認をお願いいたします。\n\n${estimateUrl}\n\nこの内容で進める場合は、画面上から承認をお願いいたします。\nご不明な点や修正のご希望がございましたら、このLINEからご連絡ください。`;
 function repair(id: number, overrides: Record<string, unknown> = {}) {
   return {
     id, customerId: 4, status: "見積中",
@@ -89,6 +92,7 @@ test("business estimate queues one verified recipient without a promoted origin,
     assert.equal(fixture.counts.queued, 1);
     assert.equal(fixture.outbox.sourceRepairId, null);
     assert.equal(fixture.outbox.inquiryId, 8);
+    assert.equal(fixture.outbox.text, businessText);
     assert.deepEqual(fixture.rows.map((row) => row.status), fixture.rows.map(() => "見積中"));
   }
 });
@@ -100,7 +104,7 @@ test("proxy estimate keeps source document and repair IDs while routing to the d
   assert.equal(f.outbox.sourceRepairId, null);
   assert.equal(f.outbox.idempotencyKey, businessEstimateLineKey(11, 4, f.rows,
     { lineUserId: 5, inquiryId: 8, lineManagerChatId: 6, verifiedAt, managerBotId: "bot", managerChatId: "chat" }, 9));
-  assert.match(f.outbox.text, /customer\/repairs\/document-token/);
+  assert.equal(f.outbox.text, businessText);
 });
 
 test("business estimate rejects missing, ambiguous, unverified and changed recipients", async () => {
@@ -152,6 +156,7 @@ test("estimate queue is idempotent, preserves share URL and does not call Push A
     assert.equal(fixture.outbox.inquiryId, 8);
     assert.equal(fixture.outbox.lineManagerChatId, 6);
     assert.match(fixture.outbox.text, /https:\/\/example\.com\/customer\/repairs\/document-token/);
+    assert.equal(fixture.outbox.text, individualText);
     assert.equal(fetches, 0);
   } finally { globalThis.fetch = priorFetch; }
 });
