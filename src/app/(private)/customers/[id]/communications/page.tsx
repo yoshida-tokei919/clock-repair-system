@@ -41,7 +41,7 @@ export default async function CustomerCommunicationsPage({ params }: { params: P
       <div>
         <Link className="text-sm text-blue-700 hover:underline" href="/customers">← 顧客一覧</Link>
         <h1 className="mt-3 text-2xl font-bold text-zinc-900">{displayName} のやり取り</h1>
-        <p className="mt-1 text-sm text-zinc-600">確認済みLINE履歴・{hub.messages.length}件</p>
+        <p className="mt-1 text-sm text-zinc-600">保存済みLINE履歴・{hub.messages.length}件</p>
       </div>
 
       {hub.inquirySummaries.length > 0 && <section className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
@@ -108,14 +108,15 @@ export default async function CustomerCommunicationsPage({ params }: { params: P
       ) : (
         <ol className="space-y-3">
           {hub.messages.map((message) => (
-            <li key={message.id} className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
+            <li key={`${message.sourceKind}:${message.id}`} className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-600">
                 <span className="font-semibold text-zinc-900">
-                  {message.direction === "INBOUND" ? "受信" : "送信済み"}
+                  {message.sourceKind === "LINE_MANAGER_HISTORY" ? "送信履歴" : message.direction === "INBOUND" ? "受信" : "送信済み"}
                 </span>
                 <time dateTime={message.occurredAt.toISOString()}>{formatDate(message.occurredAt)}</time>
                 <span>{message.channel} · {userNames.get(message.lineUserId)}</span>
                 <span>{message.messageType}</span>
+                {message.sourceKind === "LINE_MANAGER_HISTORY" && <span>LINE管理画面履歴から取得</span>}
               </div>
               {message.body && <p className="mt-3 whitespace-pre-wrap break-words text-sm text-zinc-900">{message.body}</p>}
               {message.files.filter((file) => file.uploadStatus === "STORED").map((file) => {
@@ -137,11 +138,11 @@ export default async function CustomerCommunicationsPage({ params }: { params: P
               {message.messageType !== "TEXT" && !message.body && !message.files.some((file) => file.uploadStatus === "STORED") && (
                 <p className="mt-3 text-sm text-zinc-500">本文・保存済み添付ファイルはありません。</p>
               )}
-              <div className="mt-3 border-t pt-2 text-xs text-zinc-600">
+              {message.inquiryId !== null && <div className="mt-3 border-t pt-2 text-xs text-zinc-600">
                 <Link className="text-blue-700 hover:underline" href={`/inquiries/${message.inquiryId}/review`}>
                   Inquiry #{message.inquiryId}（{message.inquiryStatus}）を開く
                 </Link>
-              </div>
+              </div>}
             </li>
           ))}
         </ol>

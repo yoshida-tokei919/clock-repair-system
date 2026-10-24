@@ -126,6 +126,7 @@ model LineUser {
   inquiries           Inquiry[]
   inquiryMessages     InquiryMessage[]
   lineManagerChat     LineManagerChat?
+  observedManagerOutbounds LineManagerObservedOutbound[]
 
   @@index([linkedCustomerId])
   @@index([lastReceivedAt])
@@ -486,9 +487,37 @@ model LineManagerChat {
   lineUser        LineUser                @relation(fields: [lineUserId], references: [id], onDelete: Restrict)
   evidenceMessage InquiryMessage          @relation("LineManagerChatEvidence", fields: [evidenceInquiryMessageId], references: [id], onDelete: Restrict)
   sendOutboxes    LineManagerSendOutbox[]
+  observedOutbounds LineManagerObservedOutbound[]
 
   @@unique([managerBotId, managerChatId])
   @@unique([managerBotId, evidenceManagerMessageId])
+  @@unique([id, lineUserId])
+}
+
+// Verified Manager history is independent of Inquiry and is never a send confirmation.
+model LineManagerObservedOutbound {
+  id                    Int                @id @default(autoincrement())
+  lineUserId            Int
+  lineManagerChatId     Int
+  managerBotIdSnapshot  String
+  managerChatIdSnapshot String
+  externalMessageId     String
+  messageType           InquiryMessageType @default(TEXT)
+  body                  String
+  sentAt                DateTime
+  observedAt            DateTime
+  verifiedAt            DateTime
+  sourceKind            String             @default("LINE_MANAGER_HISTORY")
+  evidenceDigest        String?            @db.VarChar(64)
+  verifierVersion       String?            @db.VarChar(64)
+  createdAt             DateTime           @default(now())
+
+  lineUser        LineUser        @relation(fields: [lineUserId], references: [id], onDelete: Restrict)
+  lineManagerChat LineManagerChat @relation(fields: [lineManagerChatId, lineUserId], references: [id, lineUserId], onDelete: Restrict)
+
+  @@unique([managerBotIdSnapshot, externalMessageId])
+  @@index([lineUserId, sentAt, id])
+  @@index([lineManagerChatId])
 }
 
 // Durable send intent. A real LINE message id is recorded only after history reconciliation.

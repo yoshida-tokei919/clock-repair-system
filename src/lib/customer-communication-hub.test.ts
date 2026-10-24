@@ -43,8 +43,12 @@ test("reads the newest 500 messages across linked users and CLOSED/open Inquirie
     ]; } },
     inquiryMessage: { findMany: async (query: any) => {
       queries.push(query);
-      return query.take === 501 ? rows : [];
+      if (query.take !== 501) return [];
+      return rows.filter((row) => row.direction === query.where.direction &&
+        (row.direction === "INBOUND" ? (row.receivedAt !== null) === (query.where.receivedAt !== null) :
+          (row.sentAt !== null) === (query.where.sentAt !== null)));
     } },
+    lineManagerObservedOutbound: { findMany: async (query: any) => { queries.push(query); return []; } },
     lineManagerSendOutbox: { findMany: async () => [] },
   } as unknown as CustomerCommunicationDb;
 
@@ -53,10 +57,10 @@ test("reads the newest 500 messages across linked users and CLOSED/open Inquirie
   assert.equal(hub?.lineUsers.length, 2);
   assert.equal(hub?.messages.length, 500);
   assert.equal(hub?.hasEarlierMessages, true);
-  assert.equal(hub?.messages.some((message) => message.id === 1), false);
-  assert.equal(hub?.messages[0].id, 2);
+  assert.equal(hub?.messages.some((message) => message.id === 2), false);
+  assert.equal(hub?.messages[0].id, 4);
   assert.equal(hub?.messages[0].channel, "LINE");
-  assert.equal(hub?.messages[1].id, 4);
+  assert.equal(hub?.messages[1].id, 6);
   assert.equal(hub?.messages.at(-1)?.inquiryStatus, "CLOSED");
   assert.equal(hub?.messages.every((message) => message.channel === "LINE"), true);
   assert.deepEqual(queries[0].where, { linkedCustomerId: 7 });
@@ -67,18 +71,22 @@ test("reads the newest 500 messages across linked users and CLOSED/open Inquirie
       lineUserId: { in: [1, 2] },
       lineUser: { linkedCustomerId: 7 },
     },
+    direction: "INBOUND", receivedAt: { not: null },
   });
   assert.equal(queries[1].take, 501);
-  assert.deepEqual(queries[1].orderBy, [{ createdAt: "desc" }, { id: "desc" }]);
+  assert.deepEqual(queries[1].orderBy, [{ receivedAt: "desc" }, { id: "desc" }]);
+  assert.deepEqual(queries[2].orderBy, [{ sentAt: "desc" }, { id: "desc" }]);
+  assert.deepEqual(queries[3].orderBy, [{ createdAt: "desc" }, { id: "desc" }]);
+  assert.deepEqual(queries[4].orderBy, [{ createdAt: "desc" }, { id: "desc" }]);
   assert.deepEqual(hub?.inquirySummaries.map((item) => [item.inquiryId, item.status, item.summary, item.analysisCompletedAt?.toISOString()]), [
     [20, "OPEN", "Current summary", "2026-01-02T12:00:00.000Z"],
     [10, "CLOSED", "Older summary", "2025-12-02T12:00:00.000Z"],
   ]);
   assert.equal(hub?.hasEarlierInquirySummaries, false);
-  assert.equal(queries.length, 5);
-  assert.equal(queries[3].take, 200);
-  assert.equal(queries[2].take, 21);
-  assert.equal(queries[4].take, 200);
+  assert.equal(queries.length, 9);
+  assert.equal(queries[7].take, 200);
+  assert.equal(queries[6].take, 21);
+  assert.equal(queries[8].take, 200);
   assert.equal(typeof hub?.routingRevision, "string");
 });
 
@@ -98,6 +106,7 @@ test("legacy Inquiry summaries show only the newest 20 and flag earlier history"
       return query.take === 21 ? [...summaries].reverse().slice(0, query.take) : summaries;
     } },
     inquiryMessage: { findMany: async () => [] },
+    lineManagerObservedOutbound: { findMany: async () => [] },
     lineManagerSendOutbox: { findMany: async () => [] },
   } as unknown as CustomerCommunicationDb;
   const first = (await getCustomerCommunicationHub(db, 7))!;
@@ -161,6 +170,7 @@ test("missing customer returns null; customer without linked LINE users has an e
       ? { id: 2, type: "individual", name: "Customer", companyName: null } : null },
     lineUser: { findMany: async () => [] },
     inquiryMessage: { findMany: async () => { messageQueries++; return []; } },
+    lineManagerObservedOutbound: { findMany: async () => [] },
     lineManagerSendOutbox: { findMany: async () => [] },
   } as unknown as CustomerCommunicationDb;
   assert.equal(await getCustomerCommunicationHub(db, 1), null);
@@ -180,6 +190,7 @@ test("verified destinations include multiple linked users and only existing anch
     ] },
     inquiry: { findFirst: async ({ where }: any) => where.lineUserId === 5 ? { id: 1 } : null, findMany: async () => [] },
     inquiryMessage: { findMany: async () => [] },
+    lineManagerObservedOutbound: { findMany: async () => [] },
     lineManagerSendOutbox: { findMany: async () => [] },
   } as unknown as CustomerCommunicationDb;
   const hub = await getCustomerCommunicationHub(db, 7);
@@ -195,6 +206,7 @@ test("one verified linked user is the sole sendable destination", async () => {
     lineUser: { findMany: async () => [{ id: 5, displayName: "First", lineManagerChat: { verifiedAt: date("2026-01-01T00:00:00Z") } }] },
     inquiry: { findFirst: async () => ({ id: 21 }), findMany: async () => [] },
     inquiryMessage: { findMany: async () => [] },
+    lineManagerObservedOutbound: { findMany: async () => [] },
     lineManagerSendOutbox: { findMany: async () => [] },
   } as unknown as CustomerCommunicationDb;
   const hub = await getCustomerCommunicationHub(db, 7);
@@ -214,6 +226,7 @@ test("pending projection checks both LINE user identities and excludes terminal 
     lineUser: { findMany: async () => [{ id: 5, displayName: "A", lineManagerChat: null }] },
     inquiry: { findMany: async () => [] },
     inquiryMessage: { findMany: async () => [] },
+    lineManagerObservedOutbound: { findMany: async () => [] },
     lineManagerSendOutbox: { findMany: async (query: any) => {
       if (query.take === 20) pendingQuery = query;
       return [makeRow(1, 5, 5), makeRow(2, 5, 6), makeRow(3, 6, 6), makeRow(4, 5, 5, "POST_UNCONFIRMED"),
@@ -250,7 +263,10 @@ test("adding or removing a routing association older than the visible 500 change
     customer: { findUnique: async () => ({ id: 7, type: "individual", name: "A", companyName: null }) },
     lineUser: { findMany: async () => [{ id: 5, displayName: "A", lineManagerChat: null }] },
     inquiry: { findMany: async () => [] },
-    inquiryMessage: { findMany: async (query: any) => query.take === 501 ? visibleRows : [routingRow()] },
+    inquiryMessage: { findMany: async (query: any) => query.take === 501
+      ? query.where.direction === "INBOUND" && query.where.receivedAt === null ? visibleRows : []
+      : [routingRow()] },
+    lineManagerObservedOutbound: { findMany: async () => [] },
     lineManagerSendOutbox: { findMany: async () => [] },
   } as unknown as CustomerCommunicationDb;
   const first = await getCustomerCommunicationHub(db, 7);
@@ -263,4 +279,150 @@ test("adding or removing a routing association older than the visible 500 change
   repairIds = [11];
   const third = await getCustomerCommunicationHub(db, 7);
   assert.notEqual(second?.routingRevision, third?.routingRevision);
+});
+
+test("observed Manager history is customer scoped, inquiry free, and suppresses only the exact confirmed source", async () => {
+  const when = date("2026-10-24T04:00:00Z");
+  const chat = (lineUserId: number, bot: string) => ({ id: lineUserId, lineUserId, managerBotId: bot,
+    managerChatId: `chat-${lineUserId}`, verifiedAt: when, evidenceInquiryMessageId: 1, updatedAt: when });
+  const observed = (id: number, lineUserId: number, bot: string, externalMessageId: string) => ({
+    id, lineUserId, lineManagerChatId: lineUserId, managerBotIdSnapshot: bot,
+    managerChatIdSnapshot: `chat-${lineUserId}`, externalMessageId, messageType: "TEXT", body: `observed ${id}`,
+    sentAt: date(`2026-10-24T04:0${id}:00Z`), verifiedAt: when, sourceKind: "LINE_MANAGER_HISTORY",
+    lineManagerChat: chat(lineUserId, bot),
+  });
+  const queries: any[] = [];
+  const db = {
+    customer: { findUnique: async () => ({ id: 7, type: "individual", name: "A", companyName: null }) },
+    lineUser: { findMany: async () => [
+      { id: 5, displayName: "A", lineManagerChat: chat(5, "bot-a") },
+      { id: 6, displayName: "B", lineManagerChat: chat(6, "bot-b") },
+    ] },
+    inquiry: { findFirst: async () => null, findMany: async () => [] },
+    inquiryMessage: { findMany: async (query: any) => {
+      return query.where.direction === "OUTBOUND" && query.where.sentAt?.not === null
+        ? [{ id: 10, externalMessageId: "duplicate", inquiryId: 100, lineUserId: 5,
+        direction: "OUTBOUND", messageType: "TEXT", body: "confirmed", receivedAt: null,
+        sentAt: when, createdAt: when, inquiry: { status: "OPEN", lineUserId: 5 }, files: [],
+        classification: null, postIntakeRouting: null }] : [];
+    } },
+    lineManagerObservedOutbound: { findMany: async (query: any) => {
+      queries.push(query);
+      return [observed(1, 5, "bot-a", "duplicate"), observed(2, 6, "bot-b", "duplicate"),
+        observed(3, 5, "bot-a", "unique"),
+        { ...observed(4, 5, "bot-a", "stale"), managerChatIdSnapshot: "old-chat" },
+        { ...observed(5, 99, "bot-a", "foreign"), lineManagerChat: chat(99, "bot-a") }];
+    } },
+    lineManagerSendOutbox: { findMany: async (query: any) => {
+      if (query.where.status !== "CONFIRMED") return [];
+      queries.push(query);
+      return [{ managerBotIdSnapshot: "bot-a", confirmedManagerMessageId: "duplicate",
+        inquiry: { lineUserId: 5 }, confirmedInquiryMessage: { externalMessageId: "duplicate", lineUserId: 5 } }];
+    } },
+  } as unknown as CustomerCommunicationDb;
+  const hub = (await getCustomerCommunicationHub(db, 7))!;
+  assert.deepEqual(hub.messages.map((message) => [message.sourceKind, message.id, message.inquiryId]), [
+    ["INQUIRY_MESSAGE", 10, 100], ["LINE_MANAGER_HISTORY", 2, null], ["LINE_MANAGER_HISTORY", 3, null],
+  ]);
+  assert.equal(hub.messages[1].classification, null);
+  assert.equal(hub.messages[1].files.length, 0);
+  assert.equal(hub.messages[1].sourceKind === "LINE_MANAGER_HISTORY" && hub.messages[1].verifiedAt.toISOString(), when.toISOString());
+  assert.deepEqual(queries[0].where.lineUser, { linkedCustomerId: 7 });
+  assert.deepEqual(queries[0].where.lineManagerChat.lineUser, { linkedCustomerId: 7 });
+  assert.equal(queries[1].where.status, "CONFIRMED");
+  assert.equal(queries[1].where.confirmedInquiryMessage.is.status, "sent");
+  assert.deepEqual(queries[1].where.confirmedInquiryMessage.is.inquiry.lineUser, { linkedCustomerId: 7 });
+  const fingerprint = resolveCustomerCommunicationAiContext(7, hub);
+  assert.equal(fingerprint.context.messages[1].sourceKind, "LINE_MANAGER_HISTORY");
+  assert.equal(fingerprint.context.messages[1].verifiedAt, when.toISOString());
+});
+
+test("observed rows share the 500 message cap and flag truncated history", async () => {
+  const base = date("2026-10-24T00:00:00Z");
+  const chat = { id: 5, lineUserId: 5, managerBotId: "bot", managerChatId: "chat", verifiedAt: base,
+    evidenceInquiryMessageId: 1, updatedAt: base };
+  const rows = Array.from({ length: 501 }, (_, index) => ({
+    id: index + 1, lineUserId: 5, lineManagerChatId: 5, managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat",
+    externalMessageId: `manager-${index + 1}`, messageType: "TEXT", body: "text", sourceKind: "LINE_MANAGER_HISTORY",
+    sentAt: new Date(base.getTime() + index * 1000), verifiedAt: base, lineManagerChat: chat,
+  })).reverse();
+  const db = {
+    customer: { findUnique: async () => ({ id: 7, type: "individual", name: "A", companyName: null }) },
+    lineUser: { findMany: async () => [{ id: 5, displayName: "A", lineManagerChat: chat }] },
+    inquiry: { findFirst: async () => null, findMany: async () => [] },
+    inquiryMessage: { findMany: async () => [] },
+    lineManagerObservedOutbound: { findMany: async () => rows },
+    lineManagerSendOutbox: { findMany: async () => [] },
+  } as unknown as CustomerCommunicationDb;
+  const hub = (await getCustomerCommunicationHub(db, 7))!;
+  assert.equal(hub.messages.length, 500);
+  assert.equal(hub.hasEarlierMessages, true);
+  assert.equal(hub.messages[0].id, 2);
+  assert.equal(hub.messages.at(-1)?.id, 501);
+});
+
+test("bot change with a colliding provider ID does not suppress a different bot's observation", async () => {
+  const when = date("2026-10-24T00:00:00Z");
+  const chat = { id: 1, lineUserId: 5, managerBotId: "new-bot", managerChatId: "new-chat", verifiedAt: when,
+    evidenceInquiryMessageId: 20, updatedAt: when };
+  let confirmedBot: string | null = "old-bot";
+  const db = {
+    customer: { findUnique: async () => ({ id: 7, type: "individual", name: "A", companyName: null }) },
+    lineUser: { findMany: async () => [{ id: 5, displayName: "A", lineManagerChat: chat }] },
+    inquiry: { findFirst: async () => null, findMany: async () => [] },
+    inquiryMessage: { findMany: async () => [] },
+    lineManagerObservedOutbound: { findMany: async () => [{
+      id: 2, lineUserId: 5, lineManagerChatId: 1, managerBotIdSnapshot: "new-bot",
+      managerChatIdSnapshot: "new-chat", externalMessageId: "collision", messageType: "TEXT",
+      body: "new bot event", sentAt: when, verifiedAt: when, sourceKind: "LINE_MANAGER_HISTORY",
+      lineManagerChat: chat,
+    }] },
+    lineManagerSendOutbox: { findMany: async (query: any) => query.where.status === "CONFIRMED" && confirmedBot ? [{
+      managerBotIdSnapshot: confirmedBot, confirmedManagerMessageId: "collision",
+      inquiry: { lineUserId: 5 }, confirmedInquiryMessage: { lineUserId: 5, externalMessageId: "collision" },
+    }] : [] },
+  } as unknown as CustomerCommunicationDb;
+  const collision = (await getCustomerCommunicationHub(db, 7))!;
+  assert.deepEqual(collision.messages.map((message) => message.id), [2]);
+  confirmedBot = "new-bot";
+  const exact = (await getCustomerCommunicationHub(db, 7))!;
+  assert.deepEqual(exact.messages, []);
+  confirmedBot = null;
+  const noImmutableEvidence = (await getCustomerCommunicationHub(db, 7))!;
+  assert.deepEqual(noImmutableEvidence.messages.map((message) => message.id), [2]);
+});
+
+test("late inserted old events cannot displace newer event times, including null-time fallback", async () => {
+  const base = date("2026-01-01T00:00:00Z");
+  const newTime = date("2026-10-24T00:00:00Z");
+  const old = Array.from({ length: 501 }, (_, index) => ({
+    id: index + 1, externalMessageId: `old-${index}`, inquiryId: 10, lineUserId: 5,
+    direction: "INBOUND", messageType: "TEXT", body: "old", receivedAt: new Date(base.getTime() + index * 1000),
+    sentAt: null, createdAt: new Date(newTime.getTime() + index * 1000),
+    inquiry: { status: "OPEN", lineUserId: 5 }, files: [], classification: null, postIntakeRouting: null,
+  }));
+  const recent = { ...old[0], id: 900, externalMessageId: "recent", body: "recent", receivedAt: newTime, createdAt: base };
+  const fallback = { ...old[0], id: 901, externalMessageId: "fallback", body: "fallback", receivedAt: null, createdAt: new Date(newTime.getTime() + 1000) };
+  const db = {
+    customer: { findUnique: async () => ({ id: 7, type: "individual", name: "A", companyName: null }) },
+    lineUser: { findMany: async () => [{ id: 5, displayName: "A", lineManagerChat: null }] },
+    inquiry: { findMany: async () => [] },
+    inquiryMessage: { findMany: async (query: any) => {
+      if (query.take !== 501) return [];
+      const field: "receivedAt" | "sentAt" = query.where.direction === "INBOUND" ? "receivedAt" : "sentAt";
+      const nonNull = query.where[field] !== null;
+      return [...old, recent, fallback].filter((row) => row.direction === query.where.direction &&
+        (row[field] !== null) === nonNull)
+        .sort((a, b) => (b[field] ?? b.createdAt).getTime() - (a[field] ?? a.createdAt).getTime() || b.id - a.id)
+        .slice(0, query.take);
+    } },
+    lineManagerObservedOutbound: { findMany: async () => [] },
+    lineManagerSendOutbox: { findMany: async () => [] },
+  } as unknown as CustomerCommunicationDb;
+  const hub = (await getCustomerCommunicationHub(db, 7))!;
+  assert.equal(hub.messages.length, 500);
+  assert.equal(hub.hasEarlierMessages, true);
+  assert.equal(hub.messages.at(-1)?.id, 901);
+  assert.equal(hub.messages.at(-2)?.id, 900);
+  assert.equal(hub.messages.some((message) => message.id === 1), false);
 });

@@ -137,6 +137,8 @@ function customerSnapshot(targetId: number, hub: NonNullable<Awaited<ReturnType<
     })),
     messages: hub.messages.map((message) => ({
       id: message.id,
+      sourceKind: message.sourceKind,
+      verifiedAt: message.sourceKind === "LINE_MANAGER_HISTORY" ? iso(message.verifiedAt) : null,
       inquiryId: message.inquiryId,
       inquiryStatus: message.inquiryStatus,
       direction: message.direction,

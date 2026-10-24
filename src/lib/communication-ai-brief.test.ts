@@ -208,6 +208,7 @@ test("recreated verified mapping for the same LINE user changes Customer fingerp
     } }] },
     inquiry: { findFirst: async () => ({ id: 2 }), findMany: async () => [] },
     inquiryMessage: { findMany: async () => [] },
+    lineManagerObservedOutbound: { findMany: async () => [] },
     lineManagerSendOutbox: { findMany: async () => [] },
   };
   const first = resolveCustomerCommunicationAiContext(7, (await getCustomerCommunicationHub(db, 7))!);
