@@ -1,11 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { importObservedBatch, listObservedMappings, parseObservedBatch, verifyObservedSignature } from "./line-manager-observed-sync";
+import { importObservedBatch, listObservedMappings, parseObservedBatch, parseObservedStartAt, verifyObservedSignature } from "./line-manager-observed-sync";
 
 const now = new Date("2026-10-24T00:00:00.000Z");
+const startAt = "2026-10-23T22:00:00.000Z";
+process.env.LINE_MANAGER_SYNC_START_AT = startAt;
 const event = { messageId: "message", chatId: "chat", text: "hello", timestamp: "2026-10-23T23:00:00.000Z", verifiedAt: now.toISOString(), sendId: null };
-const batch = { mappingId: 1, managerBotId: "bot", managerChatId: "chat", events: [event] };
+const batch = { mappingId: 1, managerBotId: "bot", managerChatId: "chat", startAt, events: [event] };
 const mapping = { id: 1, lineUserId: 2, managerBotId: "bot", managerChatId: "chat", evidenceInquiryMessageId: 3, evidenceManagerMessageId: "inbound",
   lineUser: { linkedCustomerId: 4 }, evidenceMessage: { id: 3, direction: "INBOUND", lineUserId: 2, externalMessageId: "inbound", inquiry: { lineUserId: 2 } } };
 
@@ -23,7 +25,7 @@ test("signature requires configured key, current timestamp and exact raw body", 
 });
 
 test("parser bounds, strict timestamp, and duplicate IDs", () => {
-  assert.equal(parseObservedBatch(batch, now.getTime()).events.length, 1);
+  assert.equal(parseObservedBatch(batch, now.getTime(), startAt).events.length, 1);
   assert.throws(() => parseObservedBatch({ ...batch, events: [event, event] }, now.getTime()));
   assert.throws(() => parseObservedBatch({ ...batch, events: [] }, now.getTime()));
   assert.throws(() => parseObservedBatch({ ...batch, unexpected: true }, now.getTime()));
@@ -31,6 +33,22 @@ test("parser bounds, strict timestamp, and duplicate IDs", () => {
   assert.throws(() => parseObservedBatch({ ...batch, events: [{ ...event, timestamp: "1999-01-01T00:00:00.000Z" }] }, now.getTime()));
   assert.throws(() => parseObservedBatch({ ...batch, events: [{ ...event, timestamp: "2026-10-23T23:00:00Z" }] }, now.getTime()));
   assert.throws(() => parseObservedBatch({ ...batch, events: [{ ...event, chatId: "other" }] }, now.getTime()));
+});
+
+test("start cutoff rejects missing, invalid, future, and boundary events before any transaction", async () => {
+  for (const value of [undefined, "2026-10-23T22:00:00Z", "2026-02-30T00:00:00.000Z", "2026-10-25T00:00:00.000Z"]) {
+    assert.throws(() => parseObservedStartAt(value, now.getTime()));
+  }
+  const { db, writes } = fakeDb();
+  for (const changed of [{ ...batch, startAt: "2026-10-23T21:00:00.000Z" }, { mappingId: batch.mappingId, managerBotId: batch.managerBotId, managerChatId: batch.managerChatId, events: batch.events }]) {
+    await assert.rejects(importObservedBatch(db as never, changed, now, startAt));
+  }
+  for (const timestamp of ["2026-10-23T21:59:59.999Z", startAt]) {
+    await assert.rejects(importObservedBatch(db as never, { ...batch, events: [{ ...event, timestamp }] }, now, startAt));
+  }
+  assert.equal(writes.length, 0);
+  await assert.rejects(importObservedBatch(db as never, { ...batch, events: [event, { ...event, messageId: "older", timestamp: startAt }] }, now, startAt));
+  assert.equal(writes.length, 0);
 });
 
 test("mapping list validates immutable inbound evidence and linked customer", async () => {

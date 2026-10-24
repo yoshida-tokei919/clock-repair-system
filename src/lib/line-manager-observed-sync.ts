@@ -10,6 +10,13 @@ const VERSION = "observed-history-v1";
 const validString = (v: unknown, max = 256): v is string => typeof v === "string" && v.length > 0 && v.length <= max && v.trim().length > 0;
 const validId = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
 
+export function parseObservedStartAt(value: string | undefined, now: number): number {
+  if (!value || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value)) throw new ObservedSyncInputError();
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString() !== value || parsed.getTime() > now) throw new ObservedSyncInputError();
+  return parsed.getTime();
+}
+
 // Worker attestation of a Manager read, not cryptographic proof from LINE.
 export function verifyObservedSignature(raw: Buffer, timestamp: string | null, signature: string | null, key: string | undefined, now = Date.now()) {
   if (!key || !/^[a-f0-9]{64}$/.test(key) || !timestamp || !/^(0|[1-9]\d{0,11})$/.test(timestamp) || !signature || !/^[a-f0-9]{64}$/.test(signature)) return false;
@@ -19,10 +26,11 @@ export function verifyObservedSignature(raw: Buffer, timestamp: string | null, s
   return timingSafeEqual(expected, Buffer.from(signature, "hex"));
 }
 
-export function parseObservedBatch(value: unknown, now = Date.now()) {
+export function parseObservedBatch(value: unknown, now = Date.now(), startAt = process.env.LINE_MANAGER_SYNC_START_AT) {
+  const cutoff = parseObservedStartAt(startAt, now);
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new ObservedSyncInputError();
   const batch = value as Record<string, unknown>;
-  if (Object.keys(batch).some((key) => !["mappingId", "managerBotId", "managerChatId", "events"].includes(key))) throw new ObservedSyncInputError();
+  if (Object.keys(batch).some((key) => !["mappingId", "managerBotId", "managerChatId", "startAt", "events"].includes(key)) || batch.startAt !== startAt || typeof batch.startAt !== "string") throw new ObservedSyncInputError();
   if (!validId(batch.mappingId) || !validString(batch.managerBotId) || !validString(batch.managerChatId) || !Array.isArray(batch.events) || batch.events.length < 1 || batch.events.length > MAX_EVENTS) throw new ObservedSyncInputError();
   const seen = new Set<string>();
   const events = batch.events.map((value) => {
@@ -32,7 +40,7 @@ export function parseObservedBatch(value: unknown, now = Date.now()) {
     if (!validString(row.messageId) || !validString(row.text, 5000) || row.chatId !== batch.managerChatId || (row.sendId != null && !validString(row.sendId))) throw new ObservedSyncInputError();
     if (typeof row.timestamp !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(row.timestamp)) throw new ObservedSyncInputError();
     const sentAt = new Date(row.timestamp);
-    if (!Number.isFinite(sentAt.getTime()) || sentAt.toISOString() !== row.timestamp || sentAt.getTime() < Date.UTC(2000, 0, 1) || sentAt.getTime() > now + 120_000 || seen.has(row.messageId)) throw new ObservedSyncInputError();
+    if (!Number.isFinite(sentAt.getTime()) || sentAt.toISOString() !== row.timestamp || sentAt.getTime() < Date.UTC(2000, 0, 1) || sentAt.getTime() > now + 120_000 || sentAt.getTime() <= cutoff || seen.has(row.messageId)) throw new ObservedSyncInputError();
     if (typeof row.verifiedAt !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(row.verifiedAt)) throw new ObservedSyncInputError();
     const verifiedAt = new Date(row.verifiedAt);
     if (!Number.isFinite(verifiedAt.getTime()) || verifiedAt.toISOString() !== row.verifiedAt || verifiedAt.getTime() < now - 120_000 || verifiedAt.getTime() > now + 120_000 || sentAt.getTime() > verifiedAt.getTime() + 120_000) throw new ObservedSyncInputError();
@@ -56,8 +64,8 @@ export async function listObservedMappings(db: Pick<PrismaClient, "lineManagerCh
   return { items, nextAfterId: rows.length > 20 ? rows[19].id : null };
 }
 
-export async function importObservedBatch(db: Pick<PrismaClient, "$transaction">, raw: unknown, now = new Date()) {
-  const batch = parseObservedBatch(raw, now.getTime());
+export async function importObservedBatch(db: Pick<PrismaClient, "$transaction">, raw: unknown, now = new Date(), startAt = process.env.LINE_MANAGER_SYNC_START_AT) {
+  const batch = parseObservedBatch(raw, now.getTime(), startAt);
   return db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(203, 5)`;
     const mapping = await tx.lineManagerChat.findUnique({ where: { id: batch.mappingId }, select: {

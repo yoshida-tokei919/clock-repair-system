@@ -11,7 +11,9 @@ import hashlib
 import hmac
 import json
 import os
+from pathlib import Path
 import re
+import tempfile
 import time
 from typing import Any, Mapping
 import urllib.error
@@ -22,9 +24,68 @@ from line_manager_sender_worker import LineoaOperationBusy, lineoa_operation
 
 MAX_MAPPINGS = 1000
 MAX_HISTORY = 100
+CHECKPOINT_VERSION = 2
 
 
 class ObservedSyncError(Exception): pass
+
+
+def checkpoint_path() -> Path:
+    root = os.environ.get("LOCALAPPDATA")
+    if not root: raise ObservedSyncError()
+    return Path(root) / "clock-repair-system" / "line-manager-observed-sync-checkpoint.json"
+
+
+def _digest(*values: str) -> str:
+    return hashlib.sha256(json.dumps(values, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def load_checkpoint(path: Path, start_at: str) -> dict[str, Any]:
+    if not path.exists():
+        return {"version": CHECKPOINT_VERSION, "startAt": start_at, "scannedAt": None, "chats": {}, "initialCoverageUnverified": True}
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeError) as error:
+        raise ObservedSyncError() from error
+    if not isinstance(state, dict) or set(state) != {"version", "startAt", "scannedAt", "chats", "initialCoverageUnverified"} or type(state["version"]) is not int or state["version"] != CHECKPOINT_VERSION or state["startAt"] != start_at or type(state["initialCoverageUnverified"]) is not bool:
+        raise ObservedSyncError()
+    try:
+        datetime.fromisoformat(state["scannedAt"].replace("Z", "+00:00"))
+    except (TypeError, ValueError, AttributeError) as error:
+        raise ObservedSyncError() from error
+    if not isinstance(state["chats"], dict) or len(state["chats"]) > MAX_MAPPINGS:
+        raise ObservedSyncError()
+    for chat, ids in state["chats"].items():
+        if not isinstance(chat, str) or re.fullmatch(r"[0-9a-f]{64}", chat) is None or not isinstance(ids, list) or len(ids) > MAX_HISTORY or len(set(ids)) != len(ids) or any(not isinstance(item, str) or re.fullmatch(r"[0-9a-f]{64}", item) is None for item in ids):
+            raise ObservedSyncError()
+    return state
+
+
+def save_checkpoint(path: Path, state: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, prefix=".observed-sync-", suffix=".tmp", delete=False) as file:
+            temp = file.name
+            json.dump(state, file, separators=(",", ":"), sort_keys=True)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp, path)
+    except OSError as error:
+        raise ObservedSyncError() from error
+    finally:
+        if temp and os.path.exists(temp): os.unlink(temp)
+
+
+def parse_start_at(value: str | None, now: datetime) -> datetime:
+    if not isinstance(value, str) or re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z", value) is None:
+        raise ObservedSyncError()
+    try:
+        cutoff = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+    except ValueError as error:
+        raise ObservedSyncError() from error
+    if cutoff > now: raise ObservedSyncError()
+    return cutoff
 
 
 def signing_key_bytes(value: str | None) -> bytes:
@@ -140,9 +201,18 @@ def signed_import(api: HttpInternalApi, key: str, body: Mapping[str, Any]) -> Ma
     return data
 
 
-def process(api: HttpInternalApi, reader: LINELibAdapter, *, apply: bool = False, verify_paging: bool = False, signing_key: str | None = None) -> dict[str, Any]:
+def process(api: HttpInternalApi, reader: LINELibAdapter, *, apply: bool = False, verify_paging: bool = False, signing_key: str | None = None, start_at: str | None = None, now: datetime | None = None, state_path: Path | None = None) -> dict[str, Any]:
     if apply and verify_paging: raise ObservedSyncError()
-    if apply: signing_key_bytes(signing_key)
+    if apply:
+        signing_key_bytes(signing_key)
+        scan_time = now or datetime.now(timezone.utc)
+        cutoff = parse_start_at(start_at, scan_time)
+        path = state_path or checkpoint_path()
+        state = load_checkpoint(path, start_at)
+        next_chats = dict(state["chats"])
+        pending: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
+        gap = False
+        unverified = False
     targets = list_mappings(api)
     bots = set(reader.bot_ids())
     if not bots: raise ObservedSyncError()
@@ -158,6 +228,21 @@ def process(api: HttpInternalApi, reader: LINELibAdapter, *, apply: bool = False
         events, earlier = parse_history(raw, chat_id, verified_at)
         has_earlier |= earlier
         scanned += 1
+        if apply:
+            chat_key = _digest(bot_id, chat_id)
+            page_ids = {_digest(message_id) for key in _page_evidence(raw, chat_id) for message_id in [key.removeprefix("message:")]}
+            prior_ids = state["chats"].get(chat_key, [])
+            if prior_ids:
+                if not page_ids.intersection(prior_ids): gap = True
+            else:
+                unverified = True
+                if len(raw["list"]) == MAX_HISTORY:
+                    timestamps = [item.get("timestamp") for item in raw["list"]]
+                    if any(type(value) is not int for value in timestamps): raise ObservedSyncError()
+                    if min(timestamps) > int(cutoff.timestamp() * 1000): gap = True
+            next_chats[chat_key] = sorted(page_ids)
+            events = [event for event in events if datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00")) > cutoff]
+            pending.append((target, events))
         candidates += len(events)
         if verify_paging:
             page_status, new_count = verify_pagination(reader, bot_id, chat_id, raw)
@@ -165,14 +250,20 @@ def process(api: HttpInternalApi, reader: LINELibAdapter, *, apply: bool = False
             if page_status == "nonprogress":
                 pagination_status = "nonprogress"
                 break
-        if apply:
+    if apply and not gap:
+        for target, events in pending:
+            bot_id, chat_id = target["managerBotId"], target["managerChatId"]
             for offset in range(0, len(events), 50):
                 batch = events[offset:offset + 50]
-                response = signed_import(api, signing_key, {"mappingId": target["id"], "managerBotId": bot_id, "managerChatId": chat_id, "events": batch})
+                response = signed_import(api, signing_key, {"mappingId": target["id"], "managerBotId": bot_id, "managerChatId": chat_id, "startAt": start_at, "events": batch})
                 imported += response["imported"]; existing += response["existing"]; deferred += response["deferred"]
-    return {"status": pagination_status if verify_paging else ("applied" if apply else "dry_run"), "scannedChatCount": scanned, "candidateCount": candidates,
+        if deferred == 0:
+            save_checkpoint(path, {"version": CHECKPOINT_VERSION, "startAt": start_at, "scannedAt": scan_time.isoformat(timespec="milliseconds").replace("+00:00", "Z"), "chats": next_chats, "initialCoverageUnverified": state["initialCoverageUnverified"] or unverified})
+    status = pagination_status if verify_paging else ("coverage_gap_possible" if gap else ("coverage_unverified" if unverified or deferred else "synced_with_overlap")) if apply else "dry_run"
+    return {"status": status, "scannedChatCount": scanned, "candidateCount": candidates,
             "imported": imported, "existing": existing, "deferred": deferred, "historyComplete": False,
-            "hasEarlierHistory": has_earlier, "mappingsIncomplete": pagination_status == "nonprogress" if verify_paging else False,
+            "startupCoverageUnverified": (state["initialCoverageUnverified"] or unverified) if apply else None,
+            "hasEarlierHistory": has_earlier, "mappingsIncomplete": (pagination_status == "nonprogress" if verify_paging else bool(apply and (gap or unverified or deferred))),
             **({"paginationNewEventCount": pagination_new} if verify_paging else {})}
 
 
@@ -191,9 +282,9 @@ def main(argv: list[str] | None = None) -> int:
         api = HttpInternalApi(LOCAL_TEST_ORIGIN if args.local else PRODUCTION_ORIGIN, token)
         with lineoa_operation(timeout_seconds=3):
             reader = LINELibAdapter.from_storage(fixed_storage_path())
-            result = process(api, reader, apply=args.apply, verify_paging=args.verify_pagination, signing_key=key)
+            result = process(api, reader, apply=args.apply, verify_paging=args.verify_pagination, signing_key=key, start_at=os.environ.get("LINE_MANAGER_SYNC_START_AT"))
         print(json.dumps(result, sort_keys=True))
-        return 0
+        return 1 if args.apply and (result["status"] != "synced_with_overlap" or result["deferred"] != 0) else 0
     except LineoaOperationBusy:
         status = "lineoa_operation_busy"
     except Exception:
