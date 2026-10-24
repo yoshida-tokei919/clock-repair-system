@@ -174,8 +174,23 @@ export async function confirmLineManagerSendOutbox(
   input: { id: number; reconciliationToken: string; actualMessageId: string; text: string; timestamp: Date; managerBotId: string; managerChatId: string; now?: Date },
 ) {
   return db.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(203, 5)`;
     const outbox = await tx.lineManagerSendOutbox.findUnique({ where: { id: input.id }, include: { inquiry: true, lineManagerChat: true, confirmedInquiryMessage: true } });
     if (!outbox) throw new LineManagerSendOutboxError("Outbox not found");
+    const confirmedOutbox = outbox;
+    // The importer takes this same lock first. A confirmed app send is canonical.
+    // Remove an exact prior observation in this transaction; conflicting evidence aborts it.
+    async function reconcileObserved() {
+      const observed = await tx.lineManagerObservedOutbound.findUnique({ where: { managerBotIdSnapshot_externalMessageId: {
+        managerBotIdSnapshot: input.managerBotId, externalMessageId: input.actualMessageId,
+      } } });
+      if (!observed) return;
+      if (observed.lineManagerChatId !== confirmedOutbox.lineManagerChatId || observed.lineUserId !== confirmedOutbox.inquiry.lineUserId ||
+        observed.managerBotIdSnapshot !== confirmedOutbox.managerBotIdSnapshot || observed.managerChatIdSnapshot !== confirmedOutbox.managerChatIdSnapshot ||
+        observed.messageType !== "TEXT" || observed.body !== input.text || observed.sentAt.getTime() !== input.timestamp.getTime() ||
+        observed.sourceKind !== "LINE_MANAGER_HISTORY") throw new LineManagerSendOutboxError("Observed LINE Manager history conflicts with confirmed send");
+      await tx.lineManagerObservedOutbound.delete({ where: { id: observed.id } });
+    }
     if (outbox.status === "CONFIRMED") {
       const message = outbox.confirmedInquiryMessage;
       if (
@@ -193,7 +208,10 @@ export async function confirmLineManagerSendOutbox(
         message.body === input.text &&
         message.sentAt?.getTime() === input.timestamp.getTime() &&
         message.status === "sent"
-      ) return outbox;
+      ) {
+        await reconcileObserved();
+        return outbox;
+      }
       throw new LineManagerSendOutboxError("Confirmed outbox conflicts with history evidence");
     }
     if (outbox.status !== "POST_UNCONFIRMED" || outbox.reconciliationToken !== input.reconciliationToken) throw new LineManagerSendOutboxError("Reconciliation claim is no longer current");
@@ -202,6 +220,7 @@ export async function confirmLineManagerSendOutbox(
     if (outbox.text !== input.text) throw new LineManagerSendOutboxError("LINE Manager history text does not match approved outbox text");
     if (input.managerBotId !== outbox.managerBotIdSnapshot || input.managerChatId !== outbox.managerChatIdSnapshot) throw new LineManagerSendOutboxError("LINE Manager history destination does not match the frozen snapshot");
     if (outbox.inquiry.lineUserId !== outbox.lineManagerChat.lineUserId || outbox.managerBotIdSnapshot !== outbox.lineManagerChat.managerBotId || outbox.managerChatIdSnapshot !== outbox.lineManagerChat.managerChatId) throw new LineManagerSendOutboxError("Verified chat mapping no longer matches this outbox destination");
+    await reconcileObserved();
     let sourceInquiryWatchId: number | null = null;
     if (outbox.sourceRepairId != null && !/^b2b-repair-comment-notice:[1-9]\d*$/.test(outbox.idempotencyKey)) {
       const sourceRepair = await tx.repair.findUnique({ where: { id: outbox.sourceRepairId }, select: { inquiryWatchPromotion: { select: { id: true, inquiryId: true, promotedRepairId: true } } } });

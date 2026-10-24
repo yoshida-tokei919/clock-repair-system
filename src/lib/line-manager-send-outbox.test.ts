@@ -166,7 +166,7 @@ test("reconciliation claims only POST_UNCONFIRMED and competing workers cannot b
 test("confirmation creates one OUTBOUND record using actual message id and is idempotent", async () => {
   const timestamp = new Date("2026-09-23T01:02:03.000Z"); let created: any; let status = "POST_UNCONFIRMED";
   const outbox = { id: 1, status, reconciliationToken: "reconcile", text: "reply", inquiryId: 10, managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat", inquiry: { lineUserId: 7 }, lineManagerChat: { lineUserId: 7, managerBotId: "bot", managerChatId: "chat" } };
-  const tx: any = { lineManagerSendOutbox: { findUnique: async () => status === "CONFIRMED" ? { ...outbox, status, confirmedManagerMessageId: "actual", confirmedInquiryMessageId: 99, confirmedInquiryMessage: created } : { ...outbox, status }, updateMany: async () => { status = "CONFIRMED"; return { count: 1 }; } }, inquiryMessage: { findUnique: async () => null, create: async (a: any) => { created = { id: 99, ...a.data }; return created; } } };
+  const tx: any = { $executeRaw: async () => 1, lineManagerObservedOutbound: { findUnique: async () => null }, lineManagerSendOutbox: { findUnique: async () => status === "CONFIRMED" ? { ...outbox, status, confirmedManagerMessageId: "actual", confirmedInquiryMessageId: 99, confirmedInquiryMessage: created } : { ...outbox, status }, updateMany: async () => { status = "CONFIRMED"; return { count: 1 }; } }, inquiryMessage: { findUnique: async () => null, create: async (a: any) => { created = { id: 99, ...a.data }; return created; } } };
   const db: any = { $transaction: async (fn: any) => fn(tx) };
   await confirmLineManagerSendOutbox(db, { id: 1, reconciliationToken: "reconcile", actualMessageId: "actual", text: "reply", timestamp, managerBotId: "bot", managerChatId: "chat" });
   assert.deepEqual(created, { id: 99, inquiryId: 10, lineUserId: 7, externalMessageId: "actual", direction: "OUTBOUND", messageType: "TEXT", body: "reply", sentAt: timestamp, status: "sent" });
@@ -176,10 +176,47 @@ test("confirmation creates one OUTBOUND record using actual message id and is id
 
 test("confirmation fails closed for text mismatch or an actual message id already used differently", async () => {
   const base: any = { id: 1, status: "POST_UNCONFIRMED", reconciliationToken: "token", text: "approved", inquiryId: 10, managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat", inquiry: { lineUserId: 7 }, lineManagerChat: { lineUserId: 7, managerBotId: "bot", managerChatId: "chat" } };
-  const tx: any = { lineManagerSendOutbox: { findUnique: async () => base }, inquiryMessage: { findUnique: async () => ({ inquiryId: 99, lineUserId: 7, direction: "OUTBOUND", messageType: "TEXT", body: "approved", sentAt: new Date(), status: "sent" }) } };
+  const tx: any = { $executeRaw: async () => 1, lineManagerObservedOutbound: { findUnique: async () => null }, lineManagerSendOutbox: { findUnique: async () => base }, inquiryMessage: { findUnique: async () => ({ inquiryId: 99, lineUserId: 7, direction: "OUTBOUND", messageType: "TEXT", body: "approved", sentAt: new Date(), status: "sent" }) } };
   const db: any = { $transaction: async (fn: any) => fn(tx) };
   await assert.rejects(confirmLineManagerSendOutbox(db, { id: 1, reconciliationToken: "token", actualMessageId: "actual", text: "different", timestamp: new Date(), managerBotId: "bot", managerChatId: "chat" }));
   await assert.rejects(confirmLineManagerSendOutbox(db, { id: 1, reconciliationToken: "token", actualMessageId: "actual", text: "approved", timestamp: new Date(), managerBotId: "bot", managerChatId: "chat" }));
+});
+
+test("confirmation replaces exact observed evidence under the shared lock", async () => {
+  const timestamp = new Date("2026-09-23T01:02:03.000Z");
+  const calls: string[] = [];
+  const outbox: any = { id: 1, lineManagerChatId: 5, status: "POST_UNCONFIRMED", reconciliationToken: "token", text: "reply", inquiryId: 10,
+    managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat", inquiry: { lineUserId: 7 }, lineManagerChat: { lineUserId: 7, managerBotId: "bot", managerChatId: "chat" } };
+  const observed = { id: 3, lineManagerChatId: 5, lineUserId: 7, managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat",
+    messageType: "TEXT", body: "reply", sentAt: timestamp, sourceKind: "LINE_MANAGER_HISTORY" };
+  const tx: any = {
+    $executeRaw: async (strings: TemplateStringsArray) => { assert.equal(strings.join(""), "SELECT pg_advisory_xact_lock(203, 5)"); calls.push("lock"); },
+    lineManagerSendOutbox: { findUnique: async () => { calls.push("outbox"); return outbox; }, updateMany: async () => { calls.push("confirm"); return { count: 1 }; } },
+    lineManagerObservedOutbound: { findUnique: async () => { calls.push("observed"); return observed; }, delete: async () => { calls.push("delete"); } },
+    inquiryMessage: { findUnique: async () => null, create: async () => { calls.push("message"); return { id: 99 }; } },
+  };
+  await confirmLineManagerSendOutbox({ $transaction: async (fn: any) => fn(tx) } as never,
+    { id: 1, reconciliationToken: "token", actualMessageId: "actual", text: "reply", timestamp, managerBotId: "bot", managerChatId: "chat" });
+  assert.deepEqual(calls.slice(0, 5), ["lock", "outbox", "observed", "delete", "message"]);
+  assert.equal(calls.at(-1), "outbox");
+  assert.equal(calls.includes("confirm"), true);
+});
+
+test("conflicting observed evidence blocks confirmation before source write", async () => {
+  const timestamp = new Date("2026-09-23T01:02:03.000Z");
+  let wrote = false;
+  const tx: any = {
+    $executeRaw: async () => 1,
+    lineManagerSendOutbox: { findUnique: async () => ({ id: 1, lineManagerChatId: 5, status: "POST_UNCONFIRMED", reconciliationToken: "token", text: "reply", inquiryId: 10,
+      managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat", inquiry: { lineUserId: 7 }, lineManagerChat: { lineUserId: 7, managerBotId: "bot", managerChatId: "chat" } }),
+      updateMany: async () => { wrote = true; return { count: 1 }; } },
+    lineManagerObservedOutbound: { findUnique: async () => ({ id: 3, lineManagerChatId: 5, lineUserId: 7, managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat",
+      messageType: "TEXT", body: "different", sentAt: timestamp, sourceKind: "LINE_MANAGER_HISTORY" }), delete: async () => { wrote = true; } },
+    inquiryMessage: { findUnique: async () => null, create: async () => { wrote = true; return { id: 99 }; } },
+  };
+  await assert.rejects(confirmLineManagerSendOutbox({ $transaction: async (fn: any) => fn(tx) } as never,
+    { id: 1, reconciliationToken: "token", actualMessageId: "actual", text: "reply", timestamp, managerBotId: "bot", managerChatId: "chat" }));
+  assert.equal(wrote, false);
 });
 
 test("source Repair must belong to the same Inquiry and is part of outbox idempotency", async () => {
@@ -210,6 +247,7 @@ test("Repair confirmation classifies with MANUAL WATCHES and preserves human MAN
     const outbox = { id: 1, status, sourceRepairId: 3, reconciliationToken: "token", text: "reply", inquiryId: 10, managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat", inquiry: { lineUserId: 7 }, lineManagerChat: { lineUserId: 7, managerBotId: "bot", managerChatId: "chat" } };
     const tx: any = {
       $executeRaw: async () => { locks++; },
+      lineManagerObservedOutbound: { findUnique: async () => null },
       repair: { findUnique: async () => ({ inquiryWatchPromotion: { id: 5, inquiryId: 10, promotedRepairId: 3 } }) },
       inquiryMessage: { findUnique: async () => null, create: async (args: any) => (createdMessage = { id: 99, ...args.data }) },
       inquiryMessageClassification: {
@@ -224,7 +262,7 @@ test("Repair confirmation classifies with MANUAL WATCHES and preserves human MAN
     const db: any = { $transaction: async (fn: any) => fn(tx) };
     const input = { id: 1, reconciliationToken: "token", actualMessageId: "actual", text: "reply", timestamp, managerBotId: "bot", managerChatId: "chat" };
     await confirmLineManagerSendOutbox(db, input);
-    assert.equal(locks, 1);
+    assert.equal(locks, 2);
     assert.equal(repairCreates, 1);
     assert.equal(classification.scope, initialSource === "MANUAL" ? "COMMON" : "WATCHES");
     assert.equal(classification.source, "MANUAL");
