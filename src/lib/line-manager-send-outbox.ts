@@ -179,7 +179,7 @@ export async function confirmLineManagerSendOutbox(
     if (!outbox) throw new LineManagerSendOutboxError("Outbox not found");
     const confirmedOutbox = outbox;
     // The importer takes this same lock first. A confirmed app send is canonical.
-    // Remove an exact prior observation in this transaction; conflicting evidence aborts it.
+    // Retain an exact prior observation as audit evidence; conflicting evidence aborts.
     async function reconcileObserved() {
       const observed = await tx.lineManagerObservedOutbound.findUnique({ where: { managerBotIdSnapshot_externalMessageId: {
         managerBotIdSnapshot: input.managerBotId, externalMessageId: input.actualMessageId,
@@ -189,7 +189,6 @@ export async function confirmLineManagerSendOutbox(
         observed.managerBotIdSnapshot !== confirmedOutbox.managerBotIdSnapshot || observed.managerChatIdSnapshot !== confirmedOutbox.managerChatIdSnapshot ||
         observed.messageType !== "TEXT" || observed.body !== input.text || observed.sentAt.getTime() !== input.timestamp.getTime() ||
         observed.sourceKind !== "LINE_MANAGER_HISTORY") throw new LineManagerSendOutboxError("Observed LINE Manager history conflicts with confirmed send");
-      await tx.lineManagerObservedOutbound.delete({ where: { id: observed.id } });
     }
     if (outbox.status === "CONFIRMED") {
       const message = outbox.confirmedInquiryMessage;

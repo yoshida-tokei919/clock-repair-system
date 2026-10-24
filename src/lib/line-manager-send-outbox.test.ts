@@ -182,7 +182,7 @@ test("confirmation fails closed for text mismatch or an actual message id alread
   await assert.rejects(confirmLineManagerSendOutbox(db, { id: 1, reconciliationToken: "token", actualMessageId: "actual", text: "approved", timestamp: new Date(), managerBotId: "bot", managerChatId: "chat" }));
 });
 
-test("confirmation replaces exact observed evidence under the shared lock", async () => {
+test("confirmation retains exact observed evidence under the shared lock", async () => {
   const timestamp = new Date("2026-09-23T01:02:03.000Z");
   const calls: string[] = [];
   const outbox: any = { id: 1, lineManagerChatId: 5, status: "POST_UNCONFIRMED", reconciliationToken: "token", text: "reply", inquiryId: 10,
@@ -192,12 +192,12 @@ test("confirmation replaces exact observed evidence under the shared lock", asyn
   const tx: any = {
     $executeRaw: async (strings: TemplateStringsArray) => { assert.equal(strings.join(""), "SELECT pg_advisory_xact_lock(203, 5)"); calls.push("lock"); },
     lineManagerSendOutbox: { findUnique: async () => { calls.push("outbox"); return outbox; }, updateMany: async () => { calls.push("confirm"); return { count: 1 }; } },
-    lineManagerObservedOutbound: { findUnique: async () => { calls.push("observed"); return observed; }, delete: async () => { calls.push("delete"); } },
+    lineManagerObservedOutbound: { findUnique: async () => { calls.push("observed"); return observed; }, delete: async () => { throw new Error("audit evidence must be retained"); } },
     inquiryMessage: { findUnique: async () => null, create: async () => { calls.push("message"); return { id: 99 }; } },
   };
   await confirmLineManagerSendOutbox({ $transaction: async (fn: any) => fn(tx) } as never,
     { id: 1, reconciliationToken: "token", actualMessageId: "actual", text: "reply", timestamp, managerBotId: "bot", managerChatId: "chat" });
-  assert.deepEqual(calls.slice(0, 5), ["lock", "outbox", "observed", "delete", "message"]);
+  assert.deepEqual(calls.slice(0, 4), ["lock", "outbox", "observed", "message"]);
   assert.equal(calls.at(-1), "outbox");
   assert.equal(calls.includes("confirm"), true);
 });

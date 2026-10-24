@@ -67,6 +67,20 @@ test("new observation writes only observed table and replay is unchanged", async
   await assert.rejects(importObservedBatch(fakeDb({ prior: { ...created, body: "different", sentAt: new Date(event.timestamp) } }).db as never, batch, now));
 });
 
+test("confirmed canonical source and retained matching observation replay as existing", async () => {
+  const first = fakeDb();
+  await importObservedBatch(first.db as never, batch, now);
+  const prior = { ...(first.writes[0] as { data: object }).data, sentAt: new Date(event.timestamp) };
+  const source = { id: 20, lineUserId: 2, direction: "OUTBOUND", messageType: "TEXT", body: event.text, sentAt: new Date(event.timestamp) };
+  const outbox = { status: "CONFIRMED", confirmedManagerMessageId: event.messageId, lineManagerChatId: 1,
+    managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat", text: event.text, sendId: "send", confirmedInquiryMessageId: 20 };
+  const replay = fakeDb({ prior, source, outboxes: [outbox] });
+  assert.deepEqual(await importObservedBatch(replay.db as never, batch, now), { imported: 0, existing: 1, deferred: 0 });
+  assert.equal(replay.writes.length, 0);
+  await assert.rejects(importObservedBatch(fakeDb({ prior: { ...prior, evidenceDigest: "wrong" }, source, outboxes: [outbox] }).db as never, batch, now));
+  await assert.rejects(importObservedBatch(fakeDb({ prior, source: { ...source, body: "wrong" }, outboxes: [outbox] }).db as never, batch, now));
+});
+
 test("conflicting source and broken mapping reject", async () => {
   await assert.rejects(importObservedBatch(fakeDb({ source: { lineUserId: 2, direction: "OUTBOUND", messageType: "TEXT", body: "wrong", sentAt: new Date(event.timestamp) } }).db as never, batch, now));
   await assert.rejects(importObservedBatch(fakeDb({ mapped: { ...mapping, evidenceManagerMessageId: "wrong" } }).db as never, batch, now));

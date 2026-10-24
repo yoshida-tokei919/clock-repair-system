@@ -67,6 +67,41 @@ def parse_history(raw: Any, chat_id: str, verified_at: str) -> tuple[list[dict[s
     return events, bool(backward)
 
 
+def _page_evidence(raw: Any, chat_id: str) -> dict[str, str]:
+    if not isinstance(raw, Mapping) or not isinstance(raw.get("list"), list) or len(raw["list"]) > MAX_HISTORY:
+        raise ObservedSyncError()
+    evidence: dict[str, str] = {}
+    for item in raw["list"]:
+        if not isinstance(item, Mapping): raise ObservedSyncError()
+        source = item.get("source")
+        if source is not None and (not isinstance(source, Mapping) or source.get("chatId") != chat_id): raise ObservedSyncError()
+        message = item.get("message")
+        message_id = message.get("id") if isinstance(message, Mapping) else None
+        if item.get("type") in ("message", "messageSent") and _valid_string(message_id):
+            if source is None: raise ObservedSyncError()
+            key = "message:" + message_id
+        else:
+            if item.get("type") in ("message", "messageSent"): raise ObservedSyncError()
+            continue
+        digest = hashlib.sha256(json.dumps(item, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
+        if key in evidence and evidence[key] != digest: raise ObservedSyncError()
+        evidence[key] = digest
+    return evidence
+
+
+def verify_pagination(reader: LINELibAdapter, bot_id: str, chat_id: str, first: Any) -> tuple[str, int]:
+    """Two pages maximum; no history data leaves this function."""
+    first_keys = _page_evidence(first, chat_id)
+    cursor = first.get("backward")
+    if cursor is None: return "pagination_unverified", 0
+    if not _valid_string(cursor): raise ObservedSyncError()
+    second = reader._client.get_chat_messages(bot_id, chat_id, limit=100, before=cursor)
+    second_keys = _page_evidence(second, chat_id)
+    if any(second_keys[key] != first_keys[key] for key in second_keys.keys() & first_keys.keys()): raise ObservedSyncError()
+    new_count = len(second_keys.keys() - first_keys.keys())
+    return ("progress" if new_count else "nonprogress"), new_count
+
+
 def list_mappings(api: HttpInternalApi) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     after = 0
@@ -105,13 +140,16 @@ def signed_import(api: HttpInternalApi, key: str, body: Mapping[str, Any]) -> Ma
     return data
 
 
-def process(api: HttpInternalApi, reader: LINELibAdapter, *, apply: bool = False, signing_key: str | None = None) -> dict[str, Any]:
+def process(api: HttpInternalApi, reader: LINELibAdapter, *, apply: bool = False, verify_paging: bool = False, signing_key: str | None = None) -> dict[str, Any]:
+    if apply and verify_paging: raise ObservedSyncError()
     if apply: signing_key_bytes(signing_key)
     targets = list_mappings(api)
     bots = set(reader.bot_ids())
     if not bots: raise ObservedSyncError()
     scanned = candidates = imported = existing = deferred = 0
     has_earlier = False
+    pagination_status = "pagination_unverified"
+    pagination_new = 0
     for target in targets:
         bot_id, chat_id = target["managerBotId"], target["managerChatId"]
         if bot_id not in bots: raise ObservedSyncError()
@@ -121,19 +159,28 @@ def process(api: HttpInternalApi, reader: LINELibAdapter, *, apply: bool = False
         has_earlier |= earlier
         scanned += 1
         candidates += len(events)
+        if verify_paging:
+            page_status, new_count = verify_pagination(reader, bot_id, chat_id, raw)
+            pagination_new += new_count
+            if page_status == "nonprogress":
+                pagination_status = "nonprogress"
+                break
         if apply:
             for offset in range(0, len(events), 50):
                 batch = events[offset:offset + 50]
                 response = signed_import(api, signing_key, {"mappingId": target["id"], "managerBotId": bot_id, "managerChatId": chat_id, "events": batch})
                 imported += response["imported"]; existing += response["existing"]; deferred += response["deferred"]
-    return {"status": "applied" if apply else "dry_run", "scannedChatCount": scanned, "candidateCount": candidates,
+    return {"status": pagination_status if verify_paging else ("applied" if apply else "dry_run"), "scannedChatCount": scanned, "candidateCount": candidates,
             "imported": imported, "existing": existing, "deferred": deferred, "historyComplete": False,
-            "hasEarlierHistory": has_earlier, "mappingsIncomplete": False}
+            "hasEarlierHistory": has_earlier, "mappingsIncomplete": pagination_status == "nonprogress" if verify_paging else False,
+            **({"paginationNewEventCount": pagination_new} if verify_paging else {})}
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only LINE Manager observed outbound sync")
-    parser.add_argument("--apply", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--apply", action="store_true")
+    mode.add_argument("--verify-pagination", action="store_true")
     parser.add_argument("--local", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -144,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
         api = HttpInternalApi(LOCAL_TEST_ORIGIN if args.local else PRODUCTION_ORIGIN, token)
         with lineoa_operation(timeout_seconds=3):
             reader = LINELibAdapter.from_storage(fixed_storage_path())
-            result = process(api, reader, apply=args.apply, signing_key=key)
+            result = process(api, reader, apply=args.apply, verify_paging=args.verify_pagination, signing_key=key)
         print(json.dumps(result, sort_keys=True))
         return 0
     except LineoaOperationBusy:

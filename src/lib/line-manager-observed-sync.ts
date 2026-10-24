@@ -79,10 +79,9 @@ export async function importObservedBatch(db: Pick<PrismaClient, "$transaction">
       if (source && (source.lineUserId !== mapping.lineUserId || source.direction !== "OUTBOUND" || source.messageType !== "TEXT" || source.body !== event.text || source.sentAt?.getTime() !== event.sentAt.getTime())) throw new ObservedSyncConflictError();
       if (outbox && (!source || source.id !== outbox.confirmedInquiryMessageId)) throw new ObservedSyncConflictError();
       const prior = await tx.lineManagerObservedOutbound.findUnique({ where: { managerBotIdSnapshot_externalMessageId: { managerBotIdSnapshot: batch.managerBotId, externalMessageId: event.messageId } } });
-      if (prior && (source || outbox)) throw new ObservedSyncConflictError();
       const digest = createHash("sha256").update(JSON.stringify([batch.managerBotId, batch.managerChatId, event.messageId, event.text, event.sentAt.toISOString(), event.sendId])).digest("hex");
       if (prior) {
-        if (prior.lineUserId !== mapping.lineUserId || prior.lineManagerChatId !== mapping.id || prior.managerChatIdSnapshot !== batch.managerChatId || prior.messageType !== "TEXT" || prior.body !== event.text || prior.sentAt.getTime() !== event.sentAt.getTime() || prior.sourceKind !== "LINE_MANAGER_HISTORY" || prior.evidenceDigest !== digest || prior.verifierVersion !== VERSION) throw new ObservedSyncConflictError();
+        if (prior.lineUserId !== mapping.lineUserId || prior.lineManagerChatId !== mapping.id || prior.managerBotIdSnapshot !== batch.managerBotId || prior.managerChatIdSnapshot !== batch.managerChatId || prior.externalMessageId !== event.messageId || prior.messageType !== "TEXT" || prior.body !== event.text || prior.sentAt.getTime() !== event.sentAt.getTime() || prior.sourceKind !== "LINE_MANAGER_HISTORY" || prior.evidenceDigest !== digest || prior.verifierVersion !== VERSION) throw new ObservedSyncConflictError();
         existing++; continue;
       }
       if (source || outbox) { existing++; continue; }

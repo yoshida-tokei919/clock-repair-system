@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent))
-from line_manager_observed_sync import ObservedSyncError, list_mappings, main, parse_history, process, signed_import, signing_key_bytes
+from line_manager_observed_sync import ObservedSyncError, list_mappings, main, parse_history, process, signed_import, signing_key_bytes, verify_pagination
 
 
 class FakeApi:
@@ -26,6 +26,64 @@ class FakeReader:
 
 
 class ObservedSyncTests(unittest.TestCase):
+    def test_pagination_progress_and_nonprogress_are_count_only(self):
+        first = {"backward": "cursor", "list": [{"type": "messageSent", "source": {"chatId": "chat"}, "message": {"id": "one"}}]}
+        class Client:
+            def __init__(self, page): self.page = page; self.calls = 0
+            def get_chat_messages(self, bot, chat, *, limit, before):
+                self.calls += 1
+                self_args = (bot, chat, limit, before)
+                assert self_args == ("bot", "chat", 100, "cursor")
+                return self.page
+        class Reader:
+            def __init__(self, page): self._client = Client(page)
+        repeat = Reader(first)
+        self.assertEqual(verify_pagination(repeat, "bot", "chat", first), ("nonprogress", 0))
+        self.assertEqual(repeat._client.calls, 1)
+        newer = Reader({"list": [{"type": "messageSent", "source": {"chatId": "chat"}, "message": {"id": "two"}}]})
+        self.assertEqual(verify_pagination(newer, "bot", "chat", first), ("progress", 1))
+        self.assertEqual(newer._client.calls, 1)
+
+    def test_pagination_conflicting_identity_fails_closed(self):
+        first = {"backward": "cursor", "list": [{"type": "messageSent", "source": {"chatId": "chat"}, "message": {"id": "one", "text": "a"}}]}
+        class Reader:
+            class Client:
+                def get_chat_messages(self, *args, **kwargs):
+                    return {"list": [{"type": "messageSent", "source": {"chatId": "chat"}, "message": {"id": "one", "text": "b"}}]}
+            _client = Client()
+        with self.assertRaises(ObservedSyncError): verify_pagination(Reader(), "bot", "chat", first)
+
+    def test_changed_read_events_do_not_count_as_pagination_progress(self):
+        first = {"backward": "cursor", "list": [
+            {"type": "chatRead", "timestamp": 1},
+            {"type": "messageSent", "source": {"chatId": "chat"}, "message": {"id": "one", "text": "same"}},
+        ]}
+        class Reader:
+            class Client:
+                def get_chat_messages(self, *args, **kwargs):
+                    return {"list": [
+                        {"type": "chatRead", "timestamp": 2},
+                        {"type": "messageSent", "source": {"chatId": "chat"}, "message": {"id": "one", "text": "same"}},
+                    ]}
+            _client = Client()
+        self.assertEqual(verify_pagination(Reader(), "bot", "chat", first), ("nonprogress", 0))
+
+    def test_diagnostic_stops_on_nonprogress_without_import(self):
+        class Reader(FakeReader):
+            def __init__(self):
+                self.calls = 0
+                self._client = self
+            def get_chat_messages(self, bot, chat, *, limit, before):
+                self.calls += 1
+                return self.messages(bot, chat)
+        reader = Reader()
+        with patch("line_manager_observed_sync.signed_import", side_effect=AssertionError("must not import")):
+            result = process(FakeApi(), reader, verify_paging=True)
+        self.assertEqual(result["status"], "nonprogress")
+        self.assertEqual(result["paginationNewEventCount"], 0)
+        self.assertFalse(result["historyComplete"])
+        self.assertEqual(reader.calls, 1)
+
     def test_short_page_with_backward_is_incomplete(self):
         result = process(FakeApi(), FakeReader())
         self.assertEqual(result["candidateCount"], 1)
