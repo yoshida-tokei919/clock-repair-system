@@ -5,6 +5,7 @@ import { assertApprovalReturnAddress } from "@/lib/return-address";
 import { reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { assertNoUnansweredAlternatives, lockEstimateOptions, UnansweredEstimateOptionsError } from "@/lib/estimate-options";
 import { findRepairIdByPublicToken } from "../_workflow";
+import { assertFreshReopenEstimate, ReopenApprovalError } from "@/lib/repair-reopen-approval";
 
 export async function POST(
   _request: Request,
@@ -41,6 +42,7 @@ export async function POST(
     if (["修理不可返却", "キャンセル返却"].includes(repair.status)) {
       throw new Error("返却処理済みの案件は承認できません。");
     }
+    await assertFreshReopenEstimate(tx, repairId, repair);
 
     if (repair.customer.type === "individual") {
       try {
@@ -72,6 +74,7 @@ export async function POST(
 
   return NextResponse.json({ success: true, repair: result });
   } catch (error) {
+    if (error instanceof ReopenApprovalError) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof UnansweredEstimateOptionsError) return NextResponse.json({ error: error.message }, { status: 409 });
     throw error;
   }

@@ -4,6 +4,7 @@ import test from "node:test";
 import { queueEstimateLineSend, resolveEstimateLineDestination, EstimateLineNotFoundError, EstimateLineUnavailableError } from "./estimate-line-send";
 import { confirmLineManagerSendOutbox, LineManagerSendOutboxError } from "./line-manager-send-outbox";
 import { businessEstimateLineKey, estimateLineKey, estimateLineKeyPrefix } from "./estimate-line-confirmation";
+import { REOPEN_EVENT_PREFIX } from "./repair-reopen-approval";
 
 const verifiedAt = new Date("2026-10-04T00:00:00Z");
 const estimateUrl = "https://example.com/customer/repairs/document-token";
@@ -11,7 +12,9 @@ const businessText = `いつもお世話になっております。\n\nお見積
 const individualText = `お見積りができましたので、下記ページよりご確認をお願いいたします。\n\n${estimateUrl}\n\nこの内容で進める場合は、画面上から承認をお願いいたします。\nご不明な点や修正のご希望がございましたら、このLINEからご連絡ください。`;
 function repair(id: number, overrides: Record<string, unknown> = {}) {
   return {
-    id, customerId: 4, status: "見積中",
+    id, customerId: 4, status: "見積中", estimateDocumentId: 11,
+    estimate: { items: [{ itemName: "新しい見積", quantity: 1, unitPrice: 0, createdAt: new Date("2026-10-04T00:30:00Z") }] },
+    estimateOptionSet: null,
     inquiryWatchPromotion: {
       id: id + 100, inquiryId: 8, promotedRepairId: id,
       inquiry: { lineUser: { linkedCustomerId: 4, lineManagerChat: { id: 6, verifiedAt } } },
@@ -49,10 +52,13 @@ function fakeDb(business = false, proxy = false) {
   let users = [{ id: 5, linkedCustomerId: proxy ? 9 : 4, lineManagerChat: { id: 6, lineUserId: 5, verifiedAt } }];
   let inquiry = { id: 8, lineUserId: 5 };
   let chat = { id: 6, lineUserId: 5, verifiedAt, managerBotId: "bot", managerChatId: "chat" };
+  const reopenEvents = new Map<number, { status: string; changedAt: Date }>();
   const tx: any = {
     customer: { findUnique: async () => ({ type: business ? "business" : "individual", lineContactCustomerId: proxy ? 9 : null }) },
     estimateDocument: { findUnique: async () => ({ customerId: 4, id: 11, repairs: rows,
-      currentPdfFile: { storageKey: "pdf-key", status: "current", estimateDocumentId: 11 } }) },
+      currentPdfFile: { storageKey: "pdf-key", status: "current", estimateDocumentId: 11,
+        hash: "hash", generatedAt: new Date("2026-10-04T01:00:00Z") } }) },
+    repairStatusLog: { findFirst: async ({ where }: any) => reopenEvents.get(where.repairId) ?? null },
     $queryRaw: async (parts: TemplateStringsArray, id?: number) => {
       const sql = parts.join("?");
       if (sql.includes('FROM "Customer"')) return [{ id: id ?? 4, type: business ? "business" : "individual", lineContactCustomerId: id === 9 ? null : proxy ? 9 : null }];
@@ -80,7 +86,11 @@ function fakeDb(business = false, proxy = false) {
     rows, get counts() { return { queued }; }, get outbox() { return outbox; },
     set users(value: typeof users) { users = value; },
     set inquiry(value: typeof inquiry) { inquiry = value; },
-    set chat(value: typeof chat) { chat = value; } };
+    set chat(value: typeof chat) { chat = value; },
+    markReopened(id: number, boundary: number) { reopenEvents.set(id, {
+      status: `${REOPEN_EVENT_PREFIX}v2:${boundary}:${boundary}:0:0:0:0:E`,
+      changedAt: new Date("2026-10-04T00:15:00Z"),
+    }); } };
 }
 
 test("business estimate queues one verified recipient without a promoted origin, including a single Repair", async () => {
@@ -95,6 +105,27 @@ test("business estimate queues one verified recipient without a promoted origin,
     assert.equal(fixture.outbox.text, businessText);
     assert.deepEqual(fixture.rows.map((row) => row.status), fixture.rows.map(() => "見積中"));
   }
+});
+
+test("reopened repair blocks historical estimate LINE queue before outbox creation", async () => {
+  const f = fakeDb();
+  f.markReopened(2, 11);
+  await assert.rejects(queueEstimateLineSend(f.db, 11, "https://example.com"), /再開後の見積/);
+  assert.equal(f.counts.queued, 0);
+});
+
+test("B2B estimate group fails closed if any member still uses its pre-reopen document", async () => {
+  const f = fakeDb(true);
+  f.markReopened(3, 11);
+  await assert.rejects(queueEstimateLineSend(f.db, 11, "https://example.com"), /再開後の見積/);
+  assert.equal(f.counts.queued, 0);
+});
+
+test("fresh zero-yen structured quote and PDF can queue after reopening", async () => {
+  const f = fakeDb();
+  f.markReopened(2, 10);
+  await queueEstimateLineSend(f.db, 11, "https://example.com");
+  assert.equal(f.counts.queued, 1);
 });
 
 test("estimate LINE queue allows the established interactive transaction budget", async () => {

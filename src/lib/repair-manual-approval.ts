@@ -4,6 +4,7 @@ import { approvalAuditStatus, APPROVAL_EVENT_PREFIX } from "@/lib/repair-approva
 import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { assertApprovalReturnAddress } from "@/lib/return-address";
 import { assertNoUnansweredAlternatives } from "@/lib/estimate-options";
+import { assertFreshReopenEstimate } from "@/lib/repair-reopen-approval";
 
 export async function recordManualApproval(
   tx: Prisma.TransactionClient,
@@ -20,6 +21,7 @@ export async function recordManualApproval(
   await assertNoUnansweredAlternatives(tx, repairId);
   if (current.status === "キャンセル") throw new Error("キャンセル済みの案件は承認できません。");
   if (["修理不可返却", "キャンセル返却"].includes(current.status)) throw new Error("返却処理済みの案件は承認できません。");
+  await assertFreshReopenEstimate(tx, repairId, current);
   if (!current.estimate?.items.some((item) => item.itemName.trim() && item.quantity > 0 && item.unitPrice >= 0)) {
     throw new Error("承認前に見積明細を保存してください。");
   }

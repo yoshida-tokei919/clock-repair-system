@@ -5,6 +5,7 @@ import { commonEstimateAmountMatches, documentTokenIncludesRepair, isIssuedOptio
 import { assertYen, sumCustomerLines } from "@/lib/pricing-tax";
 import { reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { addStatusLogIfMissing } from "../_workflow";
+import { assertFreshReopenEstimate, ReopenApprovalError } from "@/lib/repair-reopen-approval";
 
 export const runtime = "nodejs";
 
@@ -60,6 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           (tokenDocument && (document.publicToken !== token || !documentTokenIncludesRepair(tokenDocument, { id: repair.id, customerId: repair.customerId, customerType: repair.customer.type })))) {
         throw new OptionApprovalConflict("共有URLの対象案件が一致しません。");
       }
+      await assertFreshReopenEstimate(tx, repair.id, repair, { allowEmptyCommonLines: true });
       const pdf = document.currentPdfFile;
       if (!pdf || pdf.id !== body.pdfFileId || pdf.status !== "current" || pdf.estimateDocumentId !== document.id || !pdf.storageKey || !pdf.hash || !pdf.fileSize) {
         throw new OptionApprovalConflict("見積PDFが更新されました。ページを読み直してください。");
@@ -91,6 +93,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (!commonEstimateAmountMatches(commonLines, repair.estimate, document.pricingTaxMode as "INCLUSIVE" | "EXCLUSIVE")) throw new OptionApprovalConflict("共通明細の金額が一致しません。");
       const totals = selectedOptionTotal(commonLines, plan, addOns, document.pricingTaxMode as "INCLUSIVE" | "EXCLUSIVE");
       const selectedLines = [...(plan?.lines ?? []), ...addOns.flatMap(choice => choice.lines)];
+      if (commonLines.length === 0 && selectedLines.length === 0) throw new OptionApprovalConflict("見積明細がありません。見積を確認してください。");
       const existingLines = await tx.repairLineItem.findMany({ where: { repairId: repair.id }, select: { sortOrder: true } });
       const firstSortOrder = Math.max(-1, ...existingLines.map(line => line.sortOrder)) + 1;
       await tx.estimateItem.createMany({ data: selectedLines.map(line => ({
@@ -127,6 +130,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
+    if (error instanceof ReopenApprovalError) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof OptionApprovalConflict) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof Error && /選択|金額|プラン|追加作業/.test(error.message)) return NextResponse.json({ error: error.message }, { status: 409 });
     console.error("Public estimate option approval failed", error);

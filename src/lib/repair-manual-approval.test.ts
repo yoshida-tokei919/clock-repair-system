@@ -27,8 +27,9 @@ function fixture(customerType: "business" | "individual" = "business") {
       update: async ({ data }: { data: Record<string, unknown> }) => Object.assign(repair, data),
     },
     repairStatusLog: {
-      findFirst: async ({ where }: { where: { status?: string | { not: { startsWith: string } } } }) =>
+      findFirst: async ({ where }: { where: { status?: string | { not: { startsWith: string } } | { startsWith: string } } }) =>
         [...logs].reverse().find((log) => typeof where.status === "string" ? log.status === where.status
+          : where.status && "startsWith" in where.status ? log.status.startsWith(where.status.startsWith)
           : where.status ? !log.status.startsWith(where.status.not.startsWith) : true) ?? null,
       create: async ({ data }: { data: { repairId: number; status: string; changedBy?: number } }) => {
         const log = { id: logs.length + 1, repairId: data.repairId, status: data.status, changedAt: new Date(), changedBy: data.changedBy ?? null };

@@ -4,6 +4,7 @@ import { buildCustomerShareUrl } from "./customer-share-url";
 import { createApprovedLineManagerSendOutbox } from "./line-manager-send-outbox";
 import { businessEstimateLineKey, estimateLineKey, estimateLineKeyPrefix, resolveLockedBusinessEstimateDestination } from "./estimate-line-confirmation";
 import { resolveLockedLineContact } from "./line-contact";
+import { assertFreshReopenEstimate, ReopenApprovalError } from "./repair-reopen-approval";
 
 
 export class EstimateLineNotFoundError extends Error {}
@@ -91,7 +92,9 @@ export async function queueEstimateLineSend(
         id: true, customerId: true,
         currentPdfFile: { select: { storageKey: true, status: true, estimateDocumentId: true } },
         repairs: { orderBy: { id: "asc" }, select: {
-          id: true, customerId: true, status: true,
+          id: true, customerId: true, status: true, estimateDocumentId: true,
+          estimate: { select: { items: { select: { itemName: true, quantity: true, unitPrice: true, createdAt: true } } } },
+          estimateOptionSet: { select: { isActive: true, choices: { select: { lines: { select: { id: true } } } } } },
           inquiryWatchPromotion: { select: {
             id: true, inquiryId: true, promotedRepairId: true,
             inquiry: { select: { lineUser: { select: {
@@ -109,6 +112,17 @@ export async function queueEstimateLineSend(
     }
     if (!document.repairs.length || document.repairs.some((repair) => repair.customerId !== document.customerId)) {
       throw new EstimateLineUnavailableError("見積書の修理案件の顧客が一致しません。");
+    }
+    // Every member of a B2B group must have a new structured quote after its own reopen.
+    for (const repair of document.repairs) {
+      try {
+        const hasOptionLines = Boolean(repair.estimateOptionSet?.isActive &&
+          repair.estimateOptionSet.choices.some(choice => choice.lines.length > 0));
+        await assertFreshReopenEstimate(tx, repair.id, repair, { allowEmptyCommonLines: hasOptionLines });
+      } catch (error) {
+        if (error instanceof ReopenApprovalError) throw new EstimateLineUnavailableError(error.message);
+        throw error;
+      }
     }
     const business = customers[0].type === "business";
     const businessDestination = business ? await resolveLockedBusinessEstimateDestination(tx, contact!.contactCustomerId) : null;

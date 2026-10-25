@@ -37,6 +37,7 @@ import { canApplyPartsOrderStatus, getRepairStatusFromActiveOrderStatuses } from
 import { getRepairStatusForSave, getStatusDateUpdates } from "@/lib/repair-status-transition";
 import { canSelectRepairStatusStep, shouldSelectStatusStepOnDateChange } from "@/lib/repair-status-step-selection";
 import { hasUnsavedApprovalDraft } from "@/lib/repair-approval-draft";
+import { parseReopenEvent } from "@/lib/repair-reopen-approval";
 import {
     PART_INPUT_TYPES,
     type PartInputType,
@@ -564,6 +565,8 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
     useAutoRefreshOnReturn({ refreshOnFocus: false, refreshOnVisibility: false });
     const [isSaving, setIsSaving] = useState(false);
     const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+    const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+    const [reopenError, setReopenError] = useState("");
     const [returnOutcome, setReturnOutcome] = useState<"修理不可返却" | "キャンセル返却">("修理不可返却");
     const [returnCharge, setReturnCharge] = useState("0");
     const [returnShipping, setReturnShipping] = useState("0");
@@ -2076,6 +2079,21 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
         }
     };
 
+    const handleReopen = async () => {
+        if (!initialData?.id || !["修理不可返却", "キャンセル返却"].includes(persistedStatus)) return;
+        setIsSaving(true);
+        setReopenError("");
+        try {
+            const res = await fetch(`/api/repairs/${initialData.id}/reopen`, { method: "POST" });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || "再開に失敗しました。");
+            window.location.reload();
+        } catch (error) {
+            setReopenError(error instanceof Error ? error.message : "再開に失敗しました。");
+            setIsSaving(false);
+        }
+    };
+
     const handleSave = async () => {
         if (isReadOnly) return;
         if (["修理不可返却", "キャンセル返却"].includes(persistedStatus)) {
@@ -2793,6 +2811,12 @@ ${shopName}
                                 キャンセル
                             </button>
                         )}
+                        {["修理不可返却", "キャンセル返却"].includes(persistedStatus) && (
+                            <button type="button" disabled={isSaving} onClick={() => { setReopenError(""); setReopenDialogOpen(true); }}
+                                className="text-sm px-3 py-1.5 rounded-lg border-2 border-amber-500 text-amber-800 font-bold disabled:opacity-50">
+                                返却案件を再開
+                            </button>
+                        )}
                         {!initialData?.id && <span className="text-xs text-zinc-500">保存後に利用できます</span>}
                     </div>
                 </div>
@@ -2812,14 +2836,18 @@ ${shopName}
                             {(initialData?.logs || []).length === 0 ? (
                                 <div className="text-xs text-zinc-400 italic py-1">変更履歴がありません</div>
                             ) : (
-                                [...(initialData?.logs || [])].reverse().map((log: any, i: number) => (
-                                    <div key={i} className="flex items-center gap-4 text-xs">
+                                [...(initialData?.logs || [])].reverse().map((log: any, i: number) => {
+                                    const reopen = parseReopenEvent(log.status);
+                                    return <div key={i} className="flex items-center gap-4 text-xs">
                                         <span className="text-zinc-400 font-mono">
                                             {new Date(log.changedAt).toLocaleDateString('ja-JP')}
                                         </span>
-                                        <span className="text-zinc-600 font-medium">{log.status}</span>
-                                    </div>
-                                ))
+                                        <span className="text-zinc-600 font-medium">{reopen
+                                            ? <>返却案件を再開{reopen.charge !== null && `（返却料 ${reopen.charge.toLocaleString()}円、返送料 ${reopen.shipping!.toLocaleString()}円、税額 ${reopen.tax!.toLocaleString()}円、見積合計 ${reopen.total!.toLocaleString()}円）`}
+                                                {reopen.oldDocumentId && <> · <a className="text-blue-700 underline" href={`/documents/estimate/${reopen.oldDocumentId}`}>旧見積書・保存済みPDF #{reopen.oldDocumentId}</a></>}</>
+                                            : log.status}</span>
+                                    </div>;
+                                })
                             )}
                         </div>
                     )}
@@ -3920,6 +3948,13 @@ ${shopName}
                         {returnError && <p role="alert" className="text-sm text-red-600">{returnError}</p>}
                     </div>
                     <DialogFooter><Button type="button" variant="outline" onClick={() => setReturnDialogOpen(false)} disabled={isSaving}>閉じる</Button><Button type="button" onClick={handleReturn} disabled={isSaving || !returnCharge || !returnShipping || !Number.isSafeInteger(Number(returnCharge)) || !Number.isSafeInteger(Number(returnShipping)) || Number(returnCharge) < 0 || Number(returnShipping) < 0}>{isSaving ? "処理中..." : "返却処理を確定"}</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog open={reopenDialogOpen} onOpenChange={(open) => { if (!isSaving) setReopenDialogOpen(open); }}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>返却案件を再開</DialogTitle><DialogDescription>返却用の現在の下書き明細を空にして「見積中」に戻します。過去の見積書とPDF、返却履歴、受付日は保持します。以前の見積明細は自動復元されません。新しい明細の入力、見積書とPDFの発行、改めて承認が必要です。未保存の画面入力は反映されません。</DialogDescription></DialogHeader>
+                    {reopenError && <p role="alert" className="text-sm text-red-600">{reopenError}</p>}
+                    <DialogFooter><Button type="button" variant="outline" disabled={isSaving} onClick={() => setReopenDialogOpen(false)}>閉じる</Button><Button type="button" disabled={isSaving} onClick={handleReopen}>{isSaving ? "処理中..." : "再開を確定"}</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
             <Dialog open={photoSettingsOpen} onOpenChange={setPhotoSettingsOpen}>

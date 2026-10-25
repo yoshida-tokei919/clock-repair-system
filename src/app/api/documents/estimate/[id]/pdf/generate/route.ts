@@ -18,6 +18,7 @@ import { sumCustomerLines } from "@/lib/pricing-tax";
 import { issuedOptionSourceHash, optionTotals, parseOptionSet } from "@/lib/estimate-options";
 import { estimatePdfSourceFingerprint } from "@/lib/estimate-pdf-source";
 import { manualOnlyEstimateContactNote } from "@/lib/estimate-option-contact-text";
+import { assertEstimateDocumentNotArchived, HistoricalEstimateDocumentError } from "@/lib/repair-reopen-approval";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,6 +84,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       { ok: false, error: "Estimate document not found" },
       { status: 404 }
     );
+  }
+  try {
+    await assertEstimateDocumentNotArchived(prisma, estimateDocumentId);
+  } catch (error) {
+    if (error instanceof HistoricalEstimateDocumentError) return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
+    throw error;
   }
   try {
     for (const repair of estimateDocument.repairs) {
@@ -294,6 +301,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         if (repair.watch.referenceId) await tx.$queryRaw`SELECT "id" FROM "WatchReference" WHERE "id" = ${repair.watch.referenceId} FOR UPDATE`;
         if (repair.watch.caseReferenceId) await tx.$queryRaw`SELECT "id" FROM "WatchReference" WHERE "id" = ${repair.watch.caseReferenceId} FOR UPDATE`;
       }
+      await assertEstimateDocumentNotArchived(tx, estimateDocument.id);
       const current = await tx.estimateDocument.findUnique(documentQuery);
       if (estimatePdfSourceFingerprint(current) !== sourceFingerprint) throw new Error("見積内容が変更されました。再生成してください。");
       if (current?.repairs.some(repair => repair.estimateOptionSet?.isActive && repair.approvalStatus !== "pending")) throw new Error("承認済みの選択肢付き見積は再発行できません。改訂手続きが必要です。");
@@ -368,8 +376,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     return NextResponse.json(
-      { ok: false, error: error instanceof Error && error.message === "見積内容が変更されました。再生成してください。" ? error.message : "Estimate PDF generation failed" },
-      { status: error instanceof Error && error.message === "見積内容が変更されました。再生成してください。" ? 409 : 500 }
+      { ok: false, error: error instanceof HistoricalEstimateDocumentError || error instanceof Error && error.message === "見積内容が変更されました。再生成してください。" ? error.message : "Estimate PDF generation failed" },
+      { status: error instanceof HistoricalEstimateDocumentError || error instanceof Error && error.message === "見積内容が変更されました。再生成してください。" ? 409 : 500 }
     );
   }
 }
