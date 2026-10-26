@@ -33,13 +33,17 @@ export function encodeReopenEvent(event: { boundary: number; oldDocumentId: numb
 
 /** Reject regeneration of a document retained as historical by any reopened repair. */
 export async function assertEstimateDocumentNotArchived(db: PrismaClient | Prisma.TransactionClient, documentId: number) {
+  if (await isEstimateDocumentArchived(db, documentId)) {
+    throw new HistoricalEstimateDocumentError("再開前の見積書は履歴として保存されています。PDFを再生成できません。");
+  }
+}
+
+export async function isEstimateDocumentArchived(db: PrismaClient | Prisma.TransactionClient, documentId: number) {
   const events = await db.repairStatusLog.findMany({
     where: { status: { startsWith: `${REOPEN_EVENT_PREFIX}v2:`, contains: `:${documentId}:` } },
     select: { status: true },
   });
-  if (events.some(event => parseReopenEvent(event.status)?.oldDocumentId === documentId)) {
-    throw new HistoricalEstimateDocumentError("再開前の見積書は履歴として保存されています。PDFを再生成できません。");
-  }
+  return events.some(event => parseReopenEvent(event.status)?.oldDocumentId === documentId);
 }
 
 /** The event records the largest document ID visible while the repair was locked. */

@@ -4,7 +4,7 @@ import { buildCustomerShareUrl } from "./customer-share-url";
 import { createApprovedLineManagerSendOutbox } from "./line-manager-send-outbox";
 import { businessEstimateLineKey, estimateLineKey, estimateLineKeyPrefix, resolveLockedBusinessEstimateDestination } from "./estimate-line-confirmation";
 import { resolveLockedLineContact } from "./line-contact";
-import { assertFreshReopenEstimate, ReopenApprovalError } from "./repair-reopen-approval";
+import { assertFreshReopenEstimate, isEstimateDocumentArchived, ReopenApprovalError } from "./repair-reopen-approval";
 
 
 export class EstimateLineNotFoundError extends Error {}
@@ -109,6 +109,9 @@ export async function queueEstimateLineSend(
         document.repairs.length !== lockedRepairs.length ||
         document.repairs.some((repair, index) => repair.id !== lockedRepairs[index]?.id)) {
       throw new EstimateLineUnavailableError("見積書の修理案件が変更されました。");
+    }
+    if (await isEstimateDocumentArchived(tx, documentId)) {
+      throw new EstimateLineUnavailableError("再開前の見積書は履歴です。新しい見積書を発行してください。");
     }
     if (!document.repairs.length || document.repairs.some((repair) => repair.customerId !== document.customerId)) {
       throw new EstimateLineUnavailableError("見積書の修理案件の顧客が一致しません。");

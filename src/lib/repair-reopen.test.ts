@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { reopenReturnedRepair } from "./repair-reopen";
 import { assertEstimateDocumentNotArchived, assertFreshReopenEstimate, encodeReopenEvent,
@@ -7,7 +8,7 @@ import { assertEstimateDocumentNotArchived, assertFreshReopenEstimate, encodeReo
 function fixture(overrides: Record<string, unknown> = {}) {
   const calls: string[] = [];
   const repair = {
-    status: "キャンセル返却", invoiceId: null, deliveryNoteId: null, estimateDocumentId: 3,
+    status: "キャンセル返却", customerId: 4, invoiceId: null, deliveryNoteId: null, estimateDocumentId: 3,
     estimate: { id: 8, technicalFee: 0, partsTotal: 0, mechanicCost: 0, discountAmount: 0, shipping: 0,
       taxAmount: 0, totalAmount: 0, pricingTaxMode: "EXCLUSIVE",
       items: [{ itemName: "キャンセルによる返却", type: "labor", quantity: 1, unitPrice: 0, partsMasterId: null }] },
@@ -22,7 +23,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
     invoiceRepairSnapshot: { findFirst: async () => null }, orderRequest: { findFirst: async () => null },
     repairPartAllocation: { findFirst: async () => null }, lineManagerSendOutbox: { findFirst: async () => null },
     estimateOptionApproval: { findUnique: async () => null }, estimateOptionSet: { findFirst: async () => null },
-    estimateDocument: { findFirst: async () => ({ id: 3 }), findUnique: async () => ({ repairs: [{ id: 7 }] }) },
+    estimateDocument: { findFirst: async () => ({ id: 3 }), findUnique: async () => ({ customerId: 4, repairs: [{ id: 7 }] }) },
     estimateItem: { deleteMany: async () => { calls.push("estimate-items"); } },
     repairLineItem: { deleteMany: async () => { calls.push("repair-lines"); } },
     estimate: { update: async () => { calls.push("estimate"); } },
@@ -40,6 +41,30 @@ test("reopen clears only the return draft, keeps the historical document link an
   assert.deepEqual(f.calls, [`${REOPEN_EVENT_PREFIX}v2:3:3:0:0:0:0:E`, "estimate-items", "repair-lines", "estimate", "repair", "見積中"]);
   assert.deepEqual(parseReopenEvent(f.calls[0]), { boundary: 3, oldDocumentId: 3, charge: 0, shipping: 0,
     tax: 0, total: 0, taxMode: "EXCLUSIVE" });
+});
+
+test("J-004 alone reopens from five-member JE-001 without changing the other four", async () => {
+  const f = fixture();
+  const otherRepairs = [
+    { id: 2, status: "承認待ち", estimateDocumentId: 3, approvalStatus: "pending" },
+    { id: 3, status: "修理中", estimateDocumentId: 3, approvalStatus: "approved" },
+    { id: 5, status: "見積中", estimateDocumentId: 3, approvalStatus: "pending" },
+    { id: 6, status: "作業待ち", estimateDocumentId: 3, approvalStatus: "approved" },
+  ];
+  const before = structuredClone(otherRepairs);
+  f.tx.estimateDocument.findUnique = async ({ select }: any) => {
+    assert.deepEqual(select.repairs.where, { id: 38 });
+    return { customerId: 4, repairs: [{ id: 38 }] };
+  };
+  f.tx.repair.update = async ({ where, data }: any) => {
+    assert.equal(where.id, 38);
+    f.calls.push("repair");
+    Object.assign(f.repair, data);
+  };
+  await reopenReturnedRepair(f.tx, 38, 42);
+  assert.deepEqual(otherRepairs, before);
+  assert.equal(f.repair.estimateDocumentId, 3);
+  assert.equal(f.calls[0], `${REOPEN_EVENT_PREFIX}v2:3:3:0:0:0:0:E`);
 });
 
 test("nonzero return charge and shipping remain in the audit before draft deletion", async () => {
@@ -89,11 +114,22 @@ test("archived PDF guard matches exact old document ID, including B2B group hist
   await assert.doesNotReject(() => assertEstimateDocumentNotArchived(db, 12));
 });
 
+test("both public approval paths reject only an archived current document with HTTP 409", () => {
+  const regular = readFileSync("src/app/api/customer/repairs/[id]/approve/route.ts", "utf8");
+  const options = readFileSync("src/app/api/customer/repairs/[id]/estimate-options/route.ts", "utf8");
+  assert.match(regular, /repair\.estimateDocumentId && await isEstimateDocumentArchived\(tx, repair\.estimateDocumentId\)/);
+  assert.match(regular, /ReopenApprovalError\("再開前の見積書は履歴です。新しい見積書を確認してください。"\)/);
+  assert.match(regular, /error instanceof ReopenApprovalError[^\n]*status: 409/);
+  assert.match(options, /repair\.estimateDocumentId !== documentId[\s\S]*?isEstimateDocumentArchived\(tx, documentId\)/);
+  assert.match(options, /OptionApprovalConflict\("再開前の見積書は履歴です。新しい見積書を確認してください。"\)/);
+  assert.match(options, /class OptionApprovalConflict extends Error \{\s*status = 409/);
+});
+
 test("reopen rejects repeat clicks, delivered watches, money, stock, orders, outbox and drifted lines", async () => {
   const checks: [string, (f: ReturnType<typeof fixture>) => void][] = [
     ["status", f => { f.repair.status = "見積中"; }],
     ["invoice", f => { f.repair.invoiceId = 9 as never; }],
-    ["group document", f => { f.tx.estimateDocument.findUnique = async () => ({ repairs: [{ id: 7 }, { id: 8 }] }); }],
+    ["document mismatch", f => { f.tx.estimateDocument.findUnique = async () => ({ customerId: 4, repairs: [] }); }],
     ["shipment", f => { f.tx.shipmentRepair.findFirst = async () => ({ shipmentId: 1 }); }],
     ["payment", f => { f.tx.payment.findFirst = async () => ({ id: 1 }); }],
     ["invoice snapshot", f => { f.tx.invoiceRepairSnapshot.findFirst = async () => ({ id: 1 }); }],

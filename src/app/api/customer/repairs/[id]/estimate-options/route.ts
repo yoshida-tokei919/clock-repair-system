@@ -5,7 +5,7 @@ import { commonEstimateAmountMatches, documentTokenIncludesRepair, isIssuedOptio
 import { assertYen, sumCustomerLines } from "@/lib/pricing-tax";
 import { reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { addStatusLogIfMissing } from "../_workflow";
-import { assertFreshReopenEstimate, ReopenApprovalError } from "@/lib/repair-reopen-approval";
+import { assertFreshReopenEstimate, isEstimateDocumentArchived, ReopenApprovalError } from "@/lib/repair-reopen-approval";
 
 export const runtime = "nodejs";
 
@@ -60,6 +60,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           (tokenRepair && repair.publicToken !== token) ||
           (tokenDocument && (document.publicToken !== token || !documentTokenIncludesRepair(tokenDocument, { id: repair.id, customerId: repair.customerId, customerType: repair.customer.type })))) {
         throw new OptionApprovalConflict("共有URLの対象案件が一致しません。");
+      }
+      if (await isEstimateDocumentArchived(tx, documentId)) {
+        throw new OptionApprovalConflict("再開前の見積書は履歴です。新しい見積書を確認してください。");
       }
       await assertFreshReopenEstimate(tx, repair.id, repair, { allowEmptyCommonLines: true });
       const pdf = document.currentPdfFile;

@@ -58,7 +58,11 @@ function fakeDb(business = false, proxy = false) {
     estimateDocument: { findUnique: async () => ({ customerId: 4, id: 11, repairs: rows,
       currentPdfFile: { storageKey: "pdf-key", status: "current", estimateDocumentId: 11,
         hash: "hash", generatedAt: new Date("2026-10-04T01:00:00Z") } }) },
-    repairStatusLog: { findFirst: async ({ where }: any) => reopenEvents.get(where.repairId) ?? null },
+    repairStatusLog: {
+      findFirst: async ({ where }: any) => reopenEvents.get(where.repairId) ?? null,
+      findMany: async ({ where }: any) => [...reopenEvents.values()].filter(event =>
+        event.status.startsWith(where.status.startsWith) && event.status.includes(where.status.contains)),
+    },
     $queryRaw: async (parts: TemplateStringsArray, id?: number) => {
       const sql = parts.join("?");
       if (sql.includes('FROM "Customer"')) return [{ id: id ?? 4, type: business ? "business" : "individual", lineContactCustomerId: id === 9 ? null : proxy ? 9 : null }];
@@ -110,14 +114,14 @@ test("business estimate queues one verified recipient without a promoted origin,
 test("reopened repair blocks historical estimate LINE queue before outbox creation", async () => {
   const f = fakeDb();
   f.markReopened(2, 11);
-  await assert.rejects(queueEstimateLineSend(f.db, 11, "https://example.com"), /再開後の見積/);
+  await assert.rejects(queueEstimateLineSend(f.db, 11, "https://example.com"), /履歴/);
   assert.equal(f.counts.queued, 0);
 });
 
 test("B2B estimate group fails closed if any member still uses its pre-reopen document", async () => {
   const f = fakeDb(true);
   f.markReopened(3, 11);
-  await assert.rejects(queueEstimateLineSend(f.db, 11, "https://example.com"), /再開後の見積/);
+  await assert.rejects(queueEstimateLineSend(f.db, 11, "https://example.com"), /履歴/);
   assert.equal(f.counts.queued, 0);
 });
 
@@ -260,6 +264,7 @@ function confirmationFixture(idempotencyKey?: string, business = false) {
   let customerId = 4;
   let linkedCustomerId = 4;
   let inquiryId = 8;
+  let archived = false;
   const outbox = {
     id: 20, idempotencyKey: key, sourceRepairId: null, inquiryId: 8, lineManagerChatId: 6,
     text: "estimate", reconciliationToken: "token", managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat",
@@ -287,7 +292,8 @@ function confirmationFixture(idempotencyKey?: string, business = false) {
     estimateDocument: { findUnique: async () => ({ customerId }) },
     lineUser: { findMany: async () => [{ id: 5, linkedCustomerId, lineManagerChat: { id: 6, lineUserId: 5, verifiedAt } }] },
     inquiry: { findFirst: async () => ({ id: inquiryId, lineUserId: 5 }) },
-    repairStatusLog: { findFirst: async () => null, create: async () => { logs++; } },
+    repairStatusLog: { findFirst: async () => null, findMany: async () => archived
+      ? [{ status: `${REOPEN_EVENT_PREFIX}v2:11:11:0:0:0:0:E` }] : [], create: async () => { logs++; } },
     inquiryMessage: {
       findUnique: async () => null,
       create: async ({ data }: any) => (message = { id: 99, ...data }),
@@ -312,11 +318,21 @@ function confirmationFixture(idempotencyKey?: string, business = false) {
     set customerId(value: number) { customerId = value; },
     set linkedCustomerId(value: number) { linkedCustomerId = value; },
     set inquiryId(value: number) { inquiryId = value; },
+    set archived(value: boolean) { archived = value; },
     get counts() { return { updates, logs }; },
     input: { id: 20, reconciliationToken: "token", actualMessageId: "actual", text: "estimate",
       timestamp, managerBotId: "bot", managerChatId: "chat" },
   };
 }
+
+test("confirmed historical group notice cannot move a reopened repair back to approval waiting", async () => {
+  const f = confirmationFixture(undefined, true);
+  f.archived = true;
+  f.status = "POST_UNCONFIRMED";
+  await confirmLineManagerSendOutbox(f.db, f.input);
+  assert.deepEqual(f.counts, { updates: 0, logs: 0 });
+  assert.deepEqual(f.rows.map(row => row.status), ["見積中", "見積中"]);
+});
 
 test("only Manager-history confirmation moves eligible estimate Repairs once", async () => {
   const fixture = confirmationFixture();

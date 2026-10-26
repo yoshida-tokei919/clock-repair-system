@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { issueEstimateShareUrl, parseEstimateDocumentId, trustedEstimateOrigin, EstimateShareNotFoundError, EstimateShareUnavailableError } from "./estimate-share-url";
+import { REOPEN_EVENT_PREFIX } from "./repair-reopen-approval";
 
 const testOrigin = "https://example.test";
 
@@ -23,9 +24,12 @@ function fixture() {
       { status: string; storageKey: string; estimateDocumentId: number } | null,
     writes: 0, lineWrites: 0, attempts: 0, conflicts: 0,
     options: null as { timeout: number; maxWait: number } | null,
+    archived: false,
   };
   let tail = Promise.resolve();
   const tx = {
+    repairStatusLog: { findMany: async () => state.archived
+      ? [{ status: `${REOPEN_EVENT_PREFIX}v2:5:5:0:0:0:0:E` }] : [] },
     estimateDocument: { findUnique: async ({ select }: { select: { customerId?: boolean } }) =>
       state.customerId === 0 ? null : select.customerId && Object.keys(select).length === 1
         ? { customerId: state.customerId }
@@ -67,6 +71,17 @@ function fixture() {
   };
   return { state, db: db as any };
 }
+
+test("archived grouped document cannot issue another share URL, while a new document can", async () => {
+  const old = fixture();
+  old.state.archived = true;
+  await assert.rejects(issueEstimateShareUrl(old.db, 5, "https://example.test", testOrigin), /履歴/);
+  assert.equal(old.state.writes, 0);
+  const fresh = fixture();
+  fresh.state.archived = true; // The event names document 5, not this new document.
+  fresh.state.pdf!.estimateDocumentId = 6;
+  await assert.doesNotReject(() => issueEstimateShareUrl(fresh.db, 6, "https://example.test", testOrigin));
+});
 
 test("new document and linked repairs receive 24-byte base64url tokens, without LINE writes", async () => {
   const f = fixture();

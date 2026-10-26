@@ -7,7 +7,7 @@ const RETURN_NAMES = new Set(["修理不可による返却", "キャンセルに
 export async function reopenReturnedRepair(tx: Prisma.TransactionClient, repairId: number, actorId: number) {
   await tx.$queryRaw`SELECT "id" FROM "Repair" WHERE "id" = ${repairId} FOR UPDATE`;
   const repair = await tx.repair.findUnique({ where: { id: repairId }, select: {
-    status: true, invoiceId: true, deliveryNoteId: true, estimateDocumentId: true,
+    status: true, customerId: true, invoiceId: true, deliveryNoteId: true, estimateDocumentId: true,
     estimate: { select: { id: true, technicalFee: true, partsTotal: true, mechanicCost: true, discountAmount: true,
       shipping: true, taxAmount: true, totalAmount: true, pricingTaxMode: true,
       items: { orderBy: { id: "asc" }, select: { itemName: true, quantity: true, unitPrice: true, type: true, partsMasterId: true,
@@ -21,9 +21,9 @@ export async function reopenReturnedRepair(tx: Prisma.TransactionClient, repairI
   if (repair.invoiceId != null || repair.deliveryNoteId != null) throw new Error("請求書または納品書があります。発行・入金状況を照合してください。");
   if (repair.estimateDocumentId != null) {
     const oldDocument = await tx.estimateDocument.findUnique({ where: { id: repair.estimateDocumentId },
-      select: { repairs: { take: 2, select: { id: true } } } });
-    if (!oldDocument || oldDocument.repairs.length !== 1 || oldDocument.repairs[0].id !== repairId) {
-      throw new Error("旧見積書の案件対応が一意ではありません。複数案件の見積はグループ全体の改訂手続きで確認してください。");
+      select: { customerId: true, repairs: { where: { id: repairId }, select: { id: true } } } });
+    if (!oldDocument || oldDocument.customerId !== repair.customerId || oldDocument.repairs.length !== 1) {
+      throw new Error("旧見積書と案件の対応を確認できません。再開せず確認してください。");
     }
   }
   if (await tx.shipmentRepair.findFirst({ where: { repairId }, select: { shipmentId: true } })) throw new Error("発送グループの履歴があります。発送・現物の所在を確認してください。");

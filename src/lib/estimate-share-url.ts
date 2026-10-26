@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { setTimeout } from "node:timers/promises";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { buildCustomerShareUrl } from "./customer-share-url";
+import { isEstimateDocumentArchived } from "./repair-reopen-approval";
 
 export class EstimateShareNotFoundError extends Error {}
 export class EstimateShareUnavailableError extends Error {}
@@ -69,6 +70,9 @@ export async function issueEstimateShareUrl(
         document.repairs.some((repair, index) => repair.id !== lockedRepairs[index]?.id) ||
         !document.repairs.length || document.repairs.some((repair) => repair.customerId !== initial.customerId)) {
       throw new EstimateShareUnavailableError("見積書の修理案件を確認できません。");
+    }
+    if (await isEstimateDocumentArchived(tx, documentId)) {
+      throw new EstimateShareUnavailableError("再開前の見積書は履歴です。新しい見積書を発行してください。");
     }
     if (document.currentPdfFile?.status !== "current" ||
         !document.currentPdfFile.storageKey?.trim() ||

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import type { Prisma } from "@prisma/client";
 import { resolveInvoiceLineDestination } from "./invoice-delivery-routing";
 import { resolveLockedLineContact } from "./line-contact";
+import { isEstimateDocumentArchived } from "./repair-reopen-approval";
 
 const KEY_PREFIX = "estimate-document-line:";
 const WAITING_FOR_APPROVAL_STATUS = "承認待ち";
@@ -93,6 +94,7 @@ export async function transitionConfirmedEstimateRepairs(
   const lockedRepairs = await tx.$queryRaw<{ id: number }[]>`
     SELECT "id" FROM "Repair" WHERE "estimateDocumentId" = ${documentId} ORDER BY "id" FOR UPDATE
   `;
+  if (await isEstimateDocumentArchived(tx, documentId)) return 0;
   const repairs = await tx.repair.findMany({
     where: { estimateDocumentId: documentId }, orderBy: { id: "asc" },
     select: {

@@ -5,7 +5,7 @@ import { assertApprovalReturnAddress } from "@/lib/return-address";
 import { reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { assertNoUnansweredAlternatives, lockEstimateOptions, UnansweredEstimateOptionsError } from "@/lib/estimate-options";
 import { findRepairIdByPublicToken } from "../_workflow";
-import { assertFreshReopenEstimate, ReopenApprovalError } from "@/lib/repair-reopen-approval";
+import { assertFreshReopenEstimate, isEstimateDocumentArchived, ReopenApprovalError } from "@/lib/repair-reopen-approval";
 
 export async function POST(
   _request: Request,
@@ -34,6 +34,9 @@ export async function POST(
 
     if (!repair) {
       throw new Error("修理案件が見つかりません。");
+    }
+    if (repair.estimateDocumentId && await isEstimateDocumentArchived(tx, repair.estimateDocumentId)) {
+      throw new ReopenApprovalError("再開前の見積書は履歴です。新しい見積書を確認してください。");
     }
 
     if (repair.status === "キャンセル") {
