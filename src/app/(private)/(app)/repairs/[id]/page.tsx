@@ -111,53 +111,54 @@ export default async function RepairDetailPage({ params, searchParams }: { param
 
     if (!repair) return notFound();
 
-    const prepayments = await prisma.payment.findMany({
-        where: { repairId: repair.id, kind: "REPAIR_PREPAYMENT" },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        select: {
-            id: true, amount: true, purpose: true, status: true,
-            provider: true, method: true, createdAt: true, paidAt: true,
-            refunds: { select: { id: true, amount: true, status: true, reason: true } },
-            allocations: { select: { allocatedAmount: true, releases: { select: { amount: true } } } },
-        },
-    });
-
-    const activeTagAssignment = await prisma.physicalTagAssignment.findFirst({
-        where: { repairId: repair.id, releasedAt: null },
-        select: {
-            physicalTag: { select: { id: true, shortCode: true, qrToken: true, nfcUid: true } },
-        },
-    });
-
-    const activeLocationAssignment = await prisma.storageLocationAssignment.findFirst({
-        where: { repairId: repair.id, releasedAt: null },
-        select: {
-            storageLocationId: true,
-            assignedAt: true,
-            storageLocation: {
-                select: { name: true, shortCode: true, locationType: true },
+    const [prepayments, activeTagAssignment, activeLocationAssignment, locationNodes, publicCase] = await Promise.all([
+        prisma.payment.findMany({
+            where: { repairId: repair.id, kind: "REPAIR_PREPAYMENT" },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: {
+                id: true, amount: true, purpose: true, status: true,
+                provider: true, method: true, createdAt: true, paidAt: true,
+                refunds: { select: { id: true, amount: true, status: true, reason: true } },
+                allocations: { select: { allocatedAmount: true, releases: { select: { amount: true } } } },
             },
-        },
-    });
-    const locationNodes = await prisma.storageLocation.findMany({
-        select: { id: true, name: true, locationType: true, parentId: true, isActive: true },
-    });
+        }),
+
+        prisma.physicalTagAssignment.findFirst({
+            where: { repairId: repair.id, releasedAt: null },
+            select: {
+                physicalTag: { select: { id: true, shortCode: true, qrToken: true, nfcUid: true } },
+            },
+        }),
+
+        prisma.storageLocationAssignment.findFirst({
+            where: { repairId: repair.id, releasedAt: null },
+            select: {
+                storageLocationId: true,
+                assignedAt: true,
+                storageLocation: {
+                    select: { name: true, shortCode: true, locationType: true },
+                },
+            },
+        }),
+        prisma.storageLocation.findMany({
+            select: { id: true, name: true, locationType: true, parentId: true, isActive: true },
+        }),
+        prisma.publicCase.findUnique({
+            where: {
+                sourceType_sourceRepairId: {
+                    sourceType: "WEB_APP",
+                    sourceRepairId: String(repair.id),
+                },
+            },
+            select: { id: true },
+        }),
+    ]);
     const zoneRecommendation = recommendZoneForRepair(repair);
     const zoneComparison = compareStorageZone(
         zoneRecommendation,
         activeLocationAssignment?.storageLocationId ?? null,
         new Map(locationNodes.map(location => [location.id, location])),
     );
-
-    const publicCase = await prisma.publicCase.findUnique({
-        where: {
-            sourceType_sourceRepairId: {
-                sourceType: "WEB_APP",
-                sourceRepairId: String(repair.id),
-            },
-        },
-        select: { id: true },
-    });
 
     // RepairEntryForm のステータスバーは日本語ステータス名をキーにして日付を読む。
     const statusLog: Record<string, string> = {};
