@@ -78,7 +78,7 @@ import {
     getRefsByModel, upsertRef, getRepairWorkCategories, getRepairWorkActions, getInternalPartNameMasters,
     getExternalRepairPricingRules
 } from "@/actions/master-actions";
-import { getCustomers } from "@/actions/customer-actions";
+import { searchRepairCustomers } from "@/actions/customer-actions";
 import { calculateTaxableAmounts, laborCustomerUnitPrice, partCustomerUnitPrice, type PricingTaxMode } from "@/lib/pricing-tax";
 
 // --- COMPONENTS ---
@@ -1293,11 +1293,50 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
     const [calOpts, setCalOpts] = useState<any[]>([]);
     const [masterCalOpts, setMasterCalOpts] = useState<any[]>([]);
     const [customerOpts, setCustomerOpts] = useState<any[]>([]);
+    const customerSearchRequest = useRef(0);
+    const customerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => () => {
+        customerSearchRequest.current += 1;
+        if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current);
+    }, []);
+
+    const searchCustomers = useCallback((query: string) => {
+        const request = ++customerSearchRequest.current;
+        if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current);
+        setCustomerOpts([]);
+        if (!customerTypeSelection) return;
+
+        const type = customerTypeSelection;
+        customerSearchTimer.current = setTimeout(async () => {
+            try {
+                const customers = await searchRepairCustomers(type, query);
+                if (request !== customerSearchRequest.current) return;
+                setCustomerOpts(customers.map(c => ({
+                    id: c.id,
+                    label: c.name,
+                    value: c.name,
+                    sub: c.phone || "No phone",
+                    searchText: `${c.phone || ""} ${c.prefix || ""}`,
+                    type: c.type,
+                    prefix: c.prefix,
+                    phone: c.phone,
+                    lineId: c.lineId,
+                    address: c.address,
+                    pricingTaxMode: c.pricingTaxMode,
+                })));
+            } catch {
+                if (request === customerSearchRequest.current) setCustomerOpts([]);
+            }
+        }, 300);
+    }, [customerTypeSelection]);
     const [workOpts, setWorkOpts] = useState<any[]>([]);
     const [rawPricingRuleCandidates, setRawPricingRuleCandidates] = useState<any[]>([]);
 
     const handleCustomerTypeSelect = useCallback((nextType: Exclude<CustomerTypeSelection, null>) => {
         if (customerTypeSelection !== nextType) {
+            customerSearchRequest.current += 1;
+            if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current);
             setCustomerId(null);
             setPricingTaxMode("EXCLUSIVE");
             setCustomerName("");
@@ -2963,31 +3002,15 @@ ${shopName}
                                                 setCustomerId(null);
                                                 setPricingTaxMode("EXCLUSIVE");
                                             }}
-                                            onSearchChange={async (s) => {
-                                                if (!customerTypeSelection) {
-                                                    setCustomerOpts([]);
-                                                    return;
-                                                }
-                                                const res = await getCustomers(s);
-                                                setCustomerOpts(res.filter((c) => normalizeCustomerTypeSelection(c.type) === customerTypeSelection).map(c => ({
-                                                    id: c.id,
-                                                    label: c.name,
-                                                    value: c.name,
-                                                    sub: c.phone || "No phone",
-                                                    type: c.type,
-                                                    prefix: c.prefix,
-                                                    phone: c.phone,
-                                                    lineId: c.lineId,
-                                                    address: c.address,
-                                                     pricingTaxMode: c.pricingTaxMode,
-                                                })));
-                                            }}
+                                            onSearchChange={searchCustomers}
                                             onSelectOption={(option) => {
                                                 const optionCustomerType = normalizeCustomerTypeSelection(option.type);
                                                 if (!customerTypeSelection || optionCustomerType !== customerTypeSelection) {
                                                     alert("選択中の顧客種別と一致する顧客候補を選択してください。");
                                                     return;
                                                 }
+                                                customerSearchRequest.current += 1;
+                                                if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current);
                                                 setCustomerId(option.id ?? null);
                                                  setPricingTaxMode(initialData?.estimate
                                                      ? (initialData.estimate.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE")

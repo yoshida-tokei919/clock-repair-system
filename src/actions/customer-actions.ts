@@ -173,6 +173,42 @@ export async function getCustomers(query?: string) {
     });
 }
 
+/** Repair entry autocomplete only. Keep the general customer listing unchanged. */
+export async function searchRepairCustomers(type: "business" | "individual", query: string) {
+    if (type !== "business" && type !== "individual") {
+        throw new Error("顧客種別を選択してください。");
+    }
+
+    const search = query.trim();
+    return prisma.customer.findMany({
+        where: {
+            type: {
+                in: type === "business" ? ["business", "b2b"] : ["individual", "b2c"],
+                mode: "insensitive",
+            },
+            ...(search ? {
+                OR: [
+                    { name: { contains: search, mode: "insensitive" as const } },
+                    { phone: { contains: search, mode: "insensitive" as const } },
+                    { prefix: { contains: search, mode: "insensitive" as const } },
+                ],
+            } : {}),
+        },
+        select: {
+            id: true,
+            name: true,
+            type: true,
+            phone: true,
+            prefix: true,
+            lineId: true,
+            address: true,
+            pricingTaxMode: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+    });
+}
+
 export async function getCustomerById(id: number) {
     return await prisma.customer.findUnique({
         where: { id },
