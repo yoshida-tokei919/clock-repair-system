@@ -2934,7 +2934,7 @@ ${shopName}
 
                 {/* メインタブ */}
                 {activeTab === 'main' && (
-                <div className="grid gap-3 p-3 xl:grid-cols-[minmax(360px,0.85fr)_minmax(640px,1.4fr)]">
+                <div className="grid gap-3 p-3 xl:grid-cols-2">
 
                     {/* 左カラム：案件確認情報 */}
                     <div className="space-y-3">
