@@ -236,10 +236,10 @@ def process(api: HttpInternalApi, reader: LINELibAdapter, *, apply: bool = False
                 if not page_ids.intersection(prior_ids): gap = True
             else:
                 unverified = True
-                if len(raw["list"]) == MAX_HISTORY:
+                if earlier or len(raw["list"]) == MAX_HISTORY:
                     timestamps = [item.get("timestamp") for item in raw["list"]]
                     if any(type(value) is not int for value in timestamps): raise ObservedSyncError()
-                    if min(timestamps) > int(cutoff.timestamp() * 1000): gap = True
+                    if not timestamps or min(timestamps) > int(cutoff.timestamp() * 1000): gap = True
             next_chats[chat_key] = sorted(page_ids)
             events = [event for event in events if datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00")) > cutoff]
             pending.append((target, events))

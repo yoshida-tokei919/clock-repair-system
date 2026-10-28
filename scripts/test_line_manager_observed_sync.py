@@ -23,7 +23,7 @@ class FakeApi:
 class FakeReader:
     def bot_ids(self): return ("bot",)
     def messages(self, bot, chat):
-        return {"backward": "older", "list": [{"type": "chatRead"}, {"type": "messageSent", "source": {"chatId": "chat"},
+        return {"backward": "older", "list": [{"type": "chatRead", "timestamp": 1699999999000}, {"type": "messageSent", "source": {"chatId": "chat"},
             "timestamp": 1700000000000, "message": {"type": "text", "id": "msg", "text": "hello"}}]}
 
 
@@ -113,6 +113,46 @@ class ObservedSyncTests(unittest.TestCase):
             result = process(FakeApi(), FullReader(), apply=True, signing_key="ab" * 32,
                 start_at="2023-11-14T22:13:19.999Z", now=datetime(2026, 10, 24, tzinfo=timezone.utc), state_path=self.state_path)
         self.assertEqual(result["status"], "coverage_gap_possible")
+        self.assertFalse(self.state_path.exists())
+
+    def test_short_backward_first_page_after_cutoff_blocks_import_and_checkpoint(self):
+        class Reader(FakeReader):
+            def messages(self, bot, chat):
+                return {"backward": "older", "list": [{"type": "messageSent", "source": {"chatId": chat},
+                    "timestamp": 1700000000000, "message": {"type": "text", "id": "new", "text": "hello"}}]}
+        with patch("line_manager_observed_sync.signed_import", side_effect=AssertionError("must not import")), \
+             patch("line_manager_observed_sync.save_checkpoint", side_effect=AssertionError("must not checkpoint")):
+            result = process(FakeApi(), Reader(), apply=True, signing_key="ab" * 32,
+                start_at="2023-11-14T22:13:19.999Z", now=datetime(2026, 10, 24, tzinfo=timezone.utc), state_path=self.state_path)
+        self.assertEqual(result["status"], "coverage_gap_possible")
+        self.assertEqual(result["imported"], 0)
+        self.assertFalse(self.state_path.exists())
+
+    def test_short_backward_first_page_spanning_cutoff_is_unverified(self):
+        with patch("line_manager_observed_sync.signed_import", return_value={"imported": 1, "existing": 0, "deferred": 0}) as importer:
+            result = process(FakeApi(), FakeReader(), apply=True, signing_key="ab" * 32,
+                start_at="2023-11-14T22:13:19.999Z", now=datetime(2026, 10, 24, tzinfo=timezone.utc), state_path=self.state_path)
+        self.assertEqual(result["status"], "coverage_unverified")
+        importer.assert_called_once()
+        self.assertTrue(self.state_path.exists())
+
+    def test_empty_backward_first_page_blocks_import_and_checkpoint(self):
+        class Reader(FakeReader):
+            def messages(self, bot, chat): return {"backward": "older", "list": []}
+        with patch("line_manager_observed_sync.signed_import", side_effect=AssertionError("must not import")), \
+             patch("line_manager_observed_sync.save_checkpoint", side_effect=AssertionError("must not checkpoint")):
+            result = process(FakeApi(), Reader(), apply=True, signing_key="ab" * 32,
+                start_at="2023-11-14T22:13:19.999Z", now=datetime(2026, 10, 24, tzinfo=timezone.utc), state_path=self.state_path)
+        self.assertEqual(result["status"], "coverage_gap_possible")
+        self.assertFalse(self.state_path.exists())
+
+    def test_short_backward_first_page_validates_assessed_timestamps(self):
+        class Reader(FakeReader):
+            def messages(self, bot, chat): return {"backward": "older", "list": [{"type": "chatRead"}]}
+        with patch("line_manager_observed_sync.signed_import", side_effect=AssertionError("must not import")):
+            with self.assertRaises(ObservedSyncError):
+                process(FakeApi(), Reader(), apply=True, signing_key="ab" * 32,
+                    start_at="2023-11-14T22:13:19.999Z", now=datetime(2026, 10, 24, tzinfo=timezone.utc), state_path=self.state_path)
         self.assertFalse(self.state_path.exists())
 
     def test_main_apply_nonconfident_and_deferred_exit_nonzero_with_counts(self):
