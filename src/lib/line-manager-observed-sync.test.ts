@@ -51,10 +51,24 @@ test("start cutoff rejects missing, invalid, future, and boundary events before 
   assert.equal(writes.length, 0);
 });
 
-test("mapping list validates immutable inbound evidence and linked customer", async () => {
+test("mapping list validates immutable inbound evidence for linked customers", async () => {
   const db = { lineManagerChat: { findMany: async () => [mapping] } };
   assert.equal((await listObservedMappings(db as never, 0)).items.length, 1);
-  await assert.rejects(listObservedMappings({ lineManagerChat: { findMany: async () => [{ ...mapping, lineUser: { linkedCustomerId: null } }] } } as never, 0));
+  await assert.rejects(listObservedMappings({ lineManagerChat: { findMany: async () => [{ ...mapping, evidenceMessage: { ...mapping.evidenceMessage, externalMessageId: "conflict" } }] } } as never, 0));
+});
+
+test("mapping list filters unlinked customers before pagination", async () => {
+  const rows = [{ ...mapping, id: 1, lineUser: { linkedCustomerId: null } }, ...Array.from({ length: 21 }, (_, index) => ({ ...mapping, id: index + 2 }))];
+  const db = { lineManagerChat: { findMany: async (args: { where: { id: { gt: number }; lineUser: { linkedCustomerId: { not: null } } }; take: number }) => {
+    assert.deepEqual(args.where.lineUser, { linkedCustomerId: { not: null } });
+    return rows.filter((row) => row.id > args.where.id.gt && row.lineUser.linkedCustomerId !== null).slice(0, args.take);
+  } } };
+  const first = await listObservedMappings(db as never, 0);
+  assert.deepEqual(first.items.map((item) => item.id), Array.from({ length: 20 }, (_, index) => index + 2));
+  assert.equal(first.nextAfterId, 21);
+  const second = await listObservedMappings(db as never, first.nextAfterId!);
+  assert.deepEqual(second.items.map((item) => item.id), [22]);
+  assert.equal(second.nextAfterId, null);
 });
 
 function fakeDb(options: { unresolved?: boolean; prior?: object; source?: object; outboxes?: object[]; mapped?: object } = {}) {

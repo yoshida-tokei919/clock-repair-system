@@ -52,7 +52,7 @@ export function parseObservedBatch(value: unknown, now = Date.now(), startAt = p
 
 export async function listObservedMappings(db: Pick<PrismaClient, "lineManagerChat">, afterId: number) {
   if (!Number.isSafeInteger(afterId) || afterId < 0) throw new ObservedSyncInputError();
-  const rows = await db.lineManagerChat.findMany({ where: { id: { gt: afterId } }, orderBy: { id: "asc" }, take: 21, select: {
+  const rows = await db.lineManagerChat.findMany({ where: { id: { gt: afterId }, lineUser: { linkedCustomerId: { not: null } } }, orderBy: { id: "asc" }, take: 21, select: {
     id: true, lineUserId: true, managerBotId: true, managerChatId: true, evidenceInquiryMessageId: true, evidenceManagerMessageId: true,
     lineUser: { select: { linkedCustomerId: true } },
     evidenceMessage: { select: { id: true, direction: true, lineUserId: true, externalMessageId: true, inquiry: { select: { lineUserId: true } } } },
