@@ -152,7 +152,7 @@ export function WorkTimerProvider({ children, adminEmail }: { children: ReactNod
   }, []);
   useEffect(() => { if (hydrated) void refreshTotals(cards); }, [cards, hydrated, refreshTotals]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (refreshTotalsAfterActive = true) => {
     if (busyRef.current || refreshingRef.current) return;
     refreshingRef.current = true;
     setLoading(true);
@@ -162,7 +162,7 @@ export function WorkTimerProvider({ children, adminEmail }: { children: ReactNod
       const body = await request("/api/work-time-sessions/active");
       setActive(activeSession(body.session));
       setReady(true);
-      if (hydratedRef.current) await refreshTotals(cardsRef.current);
+      if (refreshTotalsAfterActive && hydratedRef.current) await refreshTotals(cardsRef.current);
     } catch (cause) {
       setReady(false);
       setError(cause instanceof Error ? cause.message : "タイマーを取得できませんでした。");
@@ -172,7 +172,7 @@ export function WorkTimerProvider({ children, adminEmail }: { children: ReactNod
     }
   }, [refreshTotals]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void refresh(false); }, [refresh]);
   useEffect(() => {
     const onFocus = () => { void refresh(); };
     window.addEventListener("focus", onFocus);
@@ -201,8 +201,11 @@ export function WorkTimerProvider({ children, adminEmail }: { children: ReactNod
       const session = activeSession(body.session);
       if (!session) throw new Error("タイマーの応答形式が不正です。");
       setActive(session);
-      addCard({ ...input, label: session.workLabelSnapshot ?? undefined });
-      void refreshTotals(cards);
+      const currentCards = cardsRef.current;
+      const cardInput = { ...input, label: session.workLabelSnapshot ?? undefined };
+      const cardCannotBeAdded = currentCards.length >= 30 && !currentCards.some(card => card.key === cardKey(cardInput));
+      addCard(cardInput);
+      if (cardCannotBeAdded) void refreshTotals(currentCards);
     } catch (cause) {
       setReady(false);
       setError(cause instanceof Error ? cause.message : "タイマーを開始できませんでした。");
@@ -214,7 +217,7 @@ export function WorkTimerProvider({ children, adminEmail }: { children: ReactNod
       busyRef.current = false;
       setBusy(false);
     }
-  }, [loading, ready, addCard, cards, refreshTotals, active]);
+  }, [loading, ready, addCard, refreshTotals, active]);
 
   const stop = useCallback(async () => {
     if (busyRef.current || loading || !ready) return;
@@ -226,7 +229,7 @@ export function WorkTimerProvider({ children, adminEmail }: { children: ReactNod
       if (typeof body.stopped !== "boolean" || (body.stopped && (!body.session || typeof body.session !== "object")) ||
           (!body.stopped && body.session !== null)) throw new Error("タイマーの応答形式が不正です。");
       setActive(null);
-      void refreshTotals(cards);
+      void refreshTotals(cardsRef.current);
     } catch (cause) {
       setReady(false);
       setError(cause instanceof Error ? cause.message : "タイマーを停止できませんでした。");
@@ -234,7 +237,7 @@ export function WorkTimerProvider({ children, adminEmail }: { children: ReactNod
       busyRef.current = false;
       setBusy(false);
     }
-  }, [loading, ready, cards, refreshTotals, active]);
+  }, [loading, ready, refreshTotals, active]);
 
   const elapsedSeconds = active && now !== null
     ? Math.max(0, Math.floor((now - Date.parse(active.startedAt)) / 1000)) : null;
