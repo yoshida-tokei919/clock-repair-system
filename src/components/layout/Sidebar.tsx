@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import AdminAccountControls from './AdminAccountControls'
+import { CustomerCommentNotifications } from './CustomerCommentNotifications'
 
 const NAV_ITEMS = [
   { href: '/admin', label: 'ダッシュボード', icon: '🏠' },
@@ -42,6 +43,7 @@ export default function Sidebar({ adminEmail }: { adminEmail: string }) {
           </Link>
         ))}
       </nav>
+      <CustomerCommentNotifications />
       <AdminAccountControls email={adminEmail} />
     </header>
   )

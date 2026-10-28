@@ -164,6 +164,7 @@ enum SlackNotificationTarget {
 
 enum SlackNotificationKind {
   NEW_INQUIRY
+  CUSTOMER_COMMENT
   IMAGE_ADDED
   INQUIRY_UPDATED
   NEEDS_REVIEW

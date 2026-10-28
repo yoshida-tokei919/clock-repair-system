@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { saveCustomerCommentWithNotification } from "@/lib/customer-comment-notification";
 import { findRepairIdByPublicToken } from "../_workflow";
 
 export async function POST(
@@ -20,13 +21,7 @@ export async function POST(
     return NextResponse.json({ error: "修理案件が見つかりません。" }, { status: 404 });
   }
 
-  const [message] = await prisma.$queryRaw<
-    { id: number; body: string; createdAt: Date }[]
-  >`
-    INSERT INTO "RepairCustomerMessage" ("repairId", "body", "senderType")
-    VALUES (${repairId}, ${messageBody}, 'partner')
-    RETURNING "id", "body", "createdAt"
-  `;
+  const message = await saveCustomerCommentWithNotification(prisma, repairId, messageBody, request.url);
 
   return NextResponse.json({ success: true, message });
 }
