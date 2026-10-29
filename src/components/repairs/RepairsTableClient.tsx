@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Repair, Customer, Brand, Model, Watch } from "@prisma/client";
@@ -40,7 +40,64 @@ interface RepairsTableClientProps {
     repairs: RepairWithRelations[];
 }
 
+const photoProxyPattern = /^\/api\/repair-photos\/([1-9]\d*)$/;
+
+function RepairThumbnail({ photo, signedUrl, batchReady }: { photo: string | null; signedUrl?: string; batchReady: boolean }) {
+    const [failedSignedUrl, setFailedSignedUrl] = useState<string | null>(null);
+    if (!photo) return <div className="h-14 w-14 rounded border bg-slate-100" aria-label="写真なし" />;
+
+    const isProxy = photoProxyPattern.test(photo);
+    if (isProxy && !batchReady) return <div className="h-14 w-14 rounded border bg-slate-100" aria-label="写真を読み込み中" />;
+
+    const useSignedUrl = isProxy && signedUrl && signedUrl !== failedSignedUrl;
+    return <img
+        src={useSignedUrl ? signedUrl : photo}
+        alt="修理写真"
+        loading="lazy"
+        decoding="async"
+        className="h-14 w-14 rounded border object-cover"
+        onError={useSignedUrl ? () => setFailedSignedUrl(signedUrl) : undefined}
+    />;
+}
+
 export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
+    const [photoBatch, setPhotoBatch] = useState<{ repairs: RepairWithRelations[]; urls: Record<string, string> } | null>(null);
+    const photoIds = useMemo(() => [...new Set(repairs.flatMap((repair) => {
+        const match = repair.photo?.match(photoProxyPattern);
+        const id = match ? Number(match[1]) : NaN;
+        return Number.isSafeInteger(id) ? [id] : [];
+    }))], [repairs]);
+
+    useEffect(() => {
+        if (photoIds.length === 0) return;
+        const controller = new AbortController();
+        let active = true;
+        void (async () => {
+            try {
+                const response = await fetch("/api/repair-photos/signed-urls", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ids: photoIds }),
+                    cache: "no-store",
+                    signal: controller.signal,
+                });
+                if (!response.ok) throw new Error("Photo URL batch failed");
+                const result: unknown = await response.json();
+                if (!result || typeof result !== "object" || !("urls" in result) ||
+                    !result.urls || typeof result.urls !== "object" || Array.isArray(result.urls)) {
+                    throw new Error("Invalid photo URL batch");
+                }
+                const urls = result.urls as Record<string, unknown>;
+                const validUrls = Object.fromEntries(photoIds.flatMap((id) =>
+                    typeof urls[id] === "string" ? [[id, urls[id]]] : []));
+                if (active) setPhotoBatch({ repairs, urls: validUrls });
+            } catch {
+                if (active) setPhotoBatch({ repairs, urls: {} });
+            }
+        })();
+        return () => { active = false; controller.abort(); };
+    }, [repairs, photoIds]);
+
     const [invoicePreview, setInvoicePreview] = useState<Awaited<ReturnType<typeof previewBulkInvoiceAllocations>> | null>(null);
     const [requestedAllocations, setRequestedAllocations] = useState<Record<number, Record<number, number>>>({});
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -316,11 +373,11 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                         />
                                     </td>
                                     <td className="px-2 py-3">
-                                        {repair.photo ? (
-                                            <img src={repair.photo} alt="修理写真" loading="lazy" decoding="async" className="h-14 w-14 rounded border object-cover" />
-                                        ) : (
-                                            <div className="h-14 w-14 rounded border bg-slate-100" aria-label="写真なし" />
-                                        )}
+                                        <RepairThumbnail
+                                            photo={repair.photo}
+                                            signedUrl={photoBatch?.repairs === repairs ? photoBatch.urls[repair.photo?.match(photoProxyPattern)?.[1] ?? ""] : undefined}
+                                            batchReady={photoBatch?.repairs === repairs}
+                                        />
                                     </td>
                                     <td className="px-4 py-3 font-mono font-bold text-slate-700">
                                         <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
