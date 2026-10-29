@@ -538,9 +538,18 @@ const AdvancedCombobox: React.FC<{
 interface Props {
     initialData?: any;
     mode?: 'create' | 'edit' | 'view';
-    initialTab?: 'main' | 'line';
+    initialTab?: 'main' | 'work' | 'photo' | 'document' | 'line';
     initialConversation?: 'line' | 'comments';
     focusMessageId?: number;
+    detailPanels?: {
+        work: React.ReactNode;
+        prepayments: React.ReactNode;
+        estimateOptions: React.ReactNode;
+        tagSummary: string;
+        storageSummary: string;
+        storageAlert?: string;
+        attentionLabels?: string[];
+    };
 }
 
 function getServerStateSyncKey(initialData: any): string {
@@ -560,7 +569,7 @@ function getServerStateSyncKey(initialData: any): string {
     });
 }
 
-export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'main', initialConversation = 'line', focusMessageId }: Props) {
+export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'main', initialConversation = 'line', focusMessageId, detailPanels }: Props) {
     const router = useRouter();
     useAutoRefreshOnReturn({ refreshOnFocus: false, refreshOnVisibility: false });
     const [isSaving, setIsSaving] = useState(false);
@@ -1455,7 +1464,12 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
     const [editingDateFor, setEditingDateFor] = useState<string | null>(null);
 
     // --- 8. TABS ---
-    const [activeTab, setActiveTab] = useState<'main' | 'photo' | 'document' | 'line'>(initialTab);
+    const [activeTab, setActiveTab] = useState<'main' | 'work' | 'photo' | 'document' | 'line'>(initialTab);
+    // Open infrequently used panels only when needed, then keep them mounted to retain drafts.
+    const [visitedDetailTabs, setVisitedDetailTabs] = useState<ReadonlySet<'work' | 'document'>>(
+        () => new Set(initialTab === 'work' || initialTab === 'document' ? [initialTab] : [])
+    );
+    const [estimateOptionsVisited, setEstimateOptionsVisited] = useState(false);
     const [conversation, setConversation] = useState<'line' | 'comments'>(initialConversation);
     const isBusinessRepair = initialData?.customer?.type === 'business';
     const selectConversation = (next: 'line' | 'comments') => {
@@ -2899,21 +2913,38 @@ ${shopName}
                 </div>
             )}
             {/* --- TAB NAV --- */}
-            <div className="bg-white border-b border-zinc-200 flex shrink-0">
+            {detailPanels && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b bg-white px-4 py-2 text-xs text-zinc-700" aria-label="案件の管理状況">
+                    <span className="font-semibold">{customerName || "顧客未登録"} / {[brand, model].filter(Boolean).join(" ") || "時計未登録"}</span>
+                    <span>タグ：{detailPanels.tagSummary}</span>
+                    <span>保管：{detailPanels.storageSummary}</span>
+                    {detailPanels.storageAlert && <span className="font-semibold text-amber-800">{detailPanels.storageAlert}</span>}
+                    {detailPanels.attentionLabels?.map(label => <span key={label} className="font-semibold text-amber-800">{label}</span>)}
+                </div>
+            )}
+            <div className="bg-white border-b border-zinc-200 flex shrink-0 flex-wrap" role="tablist" aria-label="案件詳細">
                 {([
                     { id: 'main',     label: 'メイン' },
+                    ...(detailPanels ? [{ id: 'work' as const, label: '作業管理' }] : []),
                     { id: 'photo',    label: '写真' },
-                    { id: 'document', label: '書類' },
+                    { id: 'document', label: detailPanels ? '書類・精算' : '書類' },
                     ...(initialData?.id ? [{ id: 'line', label: 'LINE' } as const] : []),
                 ] as const).map(tab => (
                     <button
                         key={tab.id}
                         type="button"
+                        role="tab"
+                        aria-selected={activeTab === tab.id}
                         onClick={() => {
                             setActiveTab(tab.id);
+                            if (tab.id === 'work' || tab.id === 'document') {
+                                setVisitedDetailTabs(current => current.has(tab.id) ? current : new Set([...current, tab.id]));
+                            }
                             const url = new URL(window.location.href);
                             if (tab.id === 'line') url.searchParams.set('tab', 'line');
-                            else { url.searchParams.delete('tab'); url.searchParams.delete('conversation'); url.searchParams.delete('messageId'); }
+                            else if (detailPanels && tab.id !== 'main') url.searchParams.set('tab', tab.id);
+                            else url.searchParams.delete('tab');
+                            if (tab.id !== 'line') { url.searchParams.delete('conversation'); url.searchParams.delete('messageId'); }
                             window.history.replaceState(null, '', url);
                         }}
                         className={cn(
@@ -2930,6 +2961,29 @@ ${shopName}
 
             {/* --- MAIN CONTENT --- */}
             <div className="flex-1 overflow-y-auto">
+                {detailPanels && (
+                    <>
+                        {/* Keep independently editable management panels mounted while switching tabs. */}
+                        <div className={activeTab === 'main' ? 'px-3 pt-3' : 'hidden'}>
+                            <details className="rounded-md border border-zinc-200 bg-white" onToggle={event => { if (event.currentTarget.open) setEstimateOptionsVisited(true); }}>
+                                <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-zinc-700">
+                                    見積の選択肢（複数案）を表示
+                                </summary>
+                                {estimateOptionsVisited && <div className="border-t border-zinc-200 py-2">{detailPanels.estimateOptions}</div>}
+                            </details>
+                        </div>
+                        {visitedDetailTabs.has('work') && (
+                            <div className={activeTab === 'work' ? 'pb-4' : 'hidden'} role="tabpanel" aria-label="作業管理">
+                                {detailPanels.work}
+                            </div>
+                        )}
+                        {visitedDetailTabs.has('document') && (
+                            <div className={activeTab === 'document' ? '' : 'hidden'}>
+                                {detailPanels.prepayments}
+                            </div>
+                        )}
+                    </>
+                )}
                 <fieldset disabled={isReadOnly} className="contents">
 
                 {/* メインタブ */}

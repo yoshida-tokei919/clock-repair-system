@@ -231,7 +231,23 @@ export default async function RepairDetailPage({ params, searchParams }: { param
 
     return (
         <div className="bg-zinc-100 min-h-screen">
-            <RepairSchedulePanel
+            <RepairEntryForm
+                mode="view"
+                initialData={initialData}
+                initialTab={query.tab === "work" || query.tab === "photo" || query.tab === "document" || query.tab === "line" ? query.tab : "main"}
+                initialConversation={query.conversation === "comments" ? "comments" : "line"}
+                focusMessageId={/^\d+$/.test(query.messageId ?? "") ? Number(query.messageId) : undefined}
+                detailPanels={{
+                    tagSummary: activeTagAssignment?.physicalTag.shortCode ?? "未登録",
+                    storageSummary: activeLocationAssignment?.storageLocation.name ?? "未登録",
+                    storageAlert: zoneComparison.comparison === "MISMATCH" ? STORAGE_COMPARISON_LABELS[zoneComparison.comparison] : undefined,
+                    attentionLabels: [
+                        ...(repair.planningState?.blocked ? [repair.planningState.blockReason === "WAITING_PARTS" ? "部品待ち" : "作業中断中"] : []),
+                        ...(prepayments.some(payment => payment.status === "PENDING") ? ["前受金未入金"] : []),
+                    ],
+                    work: (
+                        <>
+                            <RepairSchedulePanel
                 repairId={repair.id}
                 scheduledDate={repair.scheduledDate?.toISOString() ?? null}
                 estimatedWorkMinutes={repair.estimatedWorkMinutes}
@@ -241,7 +257,6 @@ export default async function RepairDetailPage({ params, searchParams }: { param
                 priorityScore={repair.priorityScore}
             />
             <RepairPlanningPanel repairId={repair.id} />
-            <RepairPrepaymentPanel repairId={repair.id} isBusiness={repair.customer.type === "business"} payments={prepayments} />
             <PhysicalTagPanel
                 repairId={repair.id}
                 inquiryNumber={repair.inquiryNumber}
@@ -289,8 +304,12 @@ export default async function RepairDetailPage({ params, searchParams }: { param
                 itemNameSnapshot: item.itemNameSnapshot,
                 estimateDisplayNameSnapshot: item.estimateDisplayNameSnapshot,
             }))} />
-            <EstimateOptionsPanel repairId={repair.id} />
-            <RepairEntryForm mode="view" initialData={initialData} initialTab={query.tab === "line" ? "line" : "main"} initialConversation={query.conversation === "comments" ? "comments" : "line"} focusMessageId={/^\d+$/.test(query.messageId ?? "") ? Number(query.messageId) : undefined} />
+                        </>
+                    ),
+                    prepayments: <RepairPrepaymentPanel repairId={repair.id} isBusiness={repair.customer.type === "business"} payments={prepayments} />,
+                    estimateOptions: <EstimateOptionsPanel repairId={repair.id} />,
+                }}
+            />
         </div>
     );
 }
