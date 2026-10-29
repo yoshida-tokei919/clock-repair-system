@@ -317,7 +317,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                                     </td>
                                     <td className="px-2 py-3">
                                         {repair.photo ? (
-                                            <img src={repair.photo} alt="修理写真" className="h-14 w-14 rounded border object-cover" />
+                                            <img src={repair.photo} alt="修理写真" loading="lazy" decoding="async" className="h-14 w-14 rounded border object-cover" />
                                         ) : (
                                             <div className="h-14 w-14 rounded border bg-slate-100" aria-label="写真なし" />
                                         )}
