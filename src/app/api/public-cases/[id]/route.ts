@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { copyRepairPhotoObjectToPublicCase, deleteRepairPhotoObject, isR2PublicCasePhotoKey, isR2RepairPhotoKey } from "@/lib/r2-repair-photos";
+import { partItemInputs } from "@/lib/public-case-part-items";
 
 type ImagePhoto = {
   id: number;
@@ -106,6 +107,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (editedWorkItems === null) {
       return NextResponse.json({ error: "Invalid work items." }, { status: 400 });
     }
+    const editedPartItems = body.partItems === undefined ? undefined : partItemInputs(body.partItems);
+    if (editedPartItems === null) {
+      return NextResponse.json({ error: "Invalid part items." }, { status: 400 });
+    }
 
     const repairPhotos: ImagePhoto[] = selectedPhotoIds.length
       ? await prisma.repairPhoto.findMany({
@@ -202,6 +207,49 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         });
       }
 
+      if (editedPartItems !== undefined) {
+        const existingPartItems = await tx.publicCasePartItem.findMany({
+          where: { publicCaseId },
+          select: { id: true, displayName: true, sourceText: true, sortOrder: true },
+        });
+        const existingPartItemIds = new Set(existingPartItems.map((item) => item.id));
+        if (editedPartItems.some((item) => item.id !== undefined && !existingPartItemIds.has(item.id))) {
+          throw new Error("Invalid part item ID for this PublicCase.");
+        }
+        const retainedPartItemIds = editedPartItems.flatMap((item) => item.id === undefined ? [] : [item.id]);
+        await tx.publicCasePartItem.deleteMany({
+          where: { publicCaseId, ...(retainedPartItemIds.length ? { id: { notIn: retainedPartItemIds } } : {}) },
+        });
+        for (const item of editedPartItems) {
+          if (item.id === undefined) continue;
+          const existing = existingPartItems.find((part) => part.id === item.id)!;
+          if (item.displayName !== (existing.displayName?.trim() || existing.sourceText)) {
+            await tx.publicCasePartItem.update({
+              where: { id: item.id, publicCaseId },
+              data: { displayName: item.displayName },
+            });
+          }
+        }
+        const nextPartSortOrder = Math.max(-1, ...existingPartItems.map((item) => item.sortOrder)) + 1;
+        const newPartItems = editedPartItems.filter((item) => item.id === undefined);
+        if (newPartItems.length) {
+          await tx.publicCasePartItem.createMany({
+            data: newPartItems.map((item, index) => ({
+              publicCaseId,
+              sourceArea: "manual",
+              sourceText: item.displayName,
+              normalizedSourceText: item.displayName,
+              displayName: item.displayName,
+              price: null,
+              showPriceB2b: false,
+              showPriceB2c: false,
+              reviewStatus: action === "publish" || isPublished ? "APPROVED" : "DRAFT",
+              sortOrder: nextPartSortOrder + index,
+            })),
+          });
+        }
+      }
+
       const oldImages = await tx.publicCaseImage.findMany({ where: { publicCaseId }, select: { id: true, storagePath: true, url: true, isPrimary: true, sortOrder: true } });
       const deletedImages = oldImages.filter((image) => !retainedImageIds.includes(image.id));
       replacedPublicObjectKeys = deletedImages.flatMap((image) => isR2PublicCasePhotoKey(image.storagePath) ? [image.storagePath] : []);
@@ -266,6 +314,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof Error && error.message === "Invalid part item ID for this PublicCase.") {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error("Update PublicCase error:", error);
     return NextResponse.json({ error: "PublicCaseを更新できませんでした。" }, { status: 500 });
   }

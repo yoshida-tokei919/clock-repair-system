@@ -12,6 +12,7 @@ import { toast } from "@/components/ui/use-toast";
 type Photo = { id: number; storageKey: string; fileName?: string | null; publicCaseVisible: boolean };
 type CaseImage = { id: number; storagePath?: string | null; url?: string | null; isPrimary: boolean };
 type EditableWorkItem = { id?: number; displayName: string };
+type EditablePartItem = { id?: number; displayName: string };
 type PublicCaseEditorData = {
   id: number;
   repair: { id: number; inquiryNumber?: string | null; photoPostingOptOut: boolean; photos: Photo[] };
@@ -81,6 +82,9 @@ export function PublicCaseEditor({ data }: { data: PublicCaseEditorData }) {
       displayName: item.b2cDisplayName?.trim() || item.b2bDisplayName?.trim() || item.normalizedWorkName?.trim() || item.sourceText,
     })),
   );
+  const [editablePartItems, setEditablePartItems] = useState<EditablePartItem[]>(() =>
+    data.partItems.map((item) => ({ id: item.id, displayName: item.displayName?.trim() || item.sourceText })),
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   const isPublished = data.reviewStatus === "APPROVED" && data.b2cPublishStatus === "PUBLISHED";
@@ -112,6 +116,7 @@ export function PublicCaseEditor({ data }: { data: PublicCaseEditorData }) {
           snapshotImageIds,
           primaryImageId,
           workItems: editableWorkItems,
+          partItems: editablePartItems,
         }),
       });
       const result = await response.json().catch(() => ({}));
@@ -188,7 +193,24 @@ export function PublicCaseEditor({ data }: { data: PublicCaseEditorData }) {
 
       <section className="rounded-lg border bg-white p-5">
         <h2 className="mb-3 text-base font-bold">交換部品</h2>
-        {data.partItems.length ? <ul className="space-y-2 text-sm">{data.partItems.map((item) => <li key={item.id}>{display(item.displayName) !== "—" ? display(item.displayName) : item.sourceText}</li>)}</ul> : <p className="text-sm text-zinc-500">交換部品はありません。</p>}
+        <p className="mb-3 text-sm text-zinc-500">公開用snapshotの部品名を編集します。部品名はB2B表示とも共通です。</p>
+        <div className="space-y-2">
+          {editablePartItems.map((item, index) => (
+            <div key={item.id ?? `new-${index}`} className="flex gap-2">
+              <Input
+                value={item.displayName}
+                onChange={(event) => setEditablePartItems((items) => items.map((current, currentIndex) => currentIndex === index ? { ...current, displayName: event.target.value } : current))}
+                aria-label="交換部品名"
+              />
+              <Button type="button" size="icon" variant="outline" onClick={() => setEditablePartItems((items) => items.filter((_, currentIndex) => currentIndex !== index))} aria-label="交換部品を削除">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+        <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setEditablePartItems((items) => [...items, { displayName: "" }])}>
+          <Plus className="mr-1 h-4 w-4" />交換部品を追加
+        </Button>
       </section>
 
       <section className="rounded-lg border bg-white p-5">
