@@ -48,18 +48,30 @@ export default async function GalleryPage({
     brandOptions.find((option) => option.value === brand)?.label || brand;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 md:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
       <JsonLd data={breadcrumbJsonLd("/cases/gallery")} />
-      <div className="mb-10 text-center">
-        <p className="mb-3 text-sm font-semibold tracking-[0.18em] text-blue-900">
-          REPAIR CASES
-        </p>
-        <h1 className="mb-4 text-3xl font-bold tracking-tight text-neutral-900 md:text-4xl">
-          修理事例ギャラリー
-        </h1>
-        <p className="leading-relaxed text-neutral-500">
-          ブランドや修理内容から、実際の修理事例をご覧いただけます。
-        </p>
+      <nav aria-label="パンくずリスト" className="mb-5 text-sm text-slate-600">
+        <ol className="flex items-center gap-2">
+          <li><Link href="/" className="hover:text-blue-900 hover:underline focus-visible:underline">ホーム</Link></li>
+          <li aria-hidden="true">/</li>
+          <li aria-current="page" className="text-slate-900">修理事例ギャラリー</li>
+        </ol>
+      </nav>
+      <div className="relative mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm md:px-10 md:py-10">
+        <div className="pointer-events-none absolute inset-0 bg-[url('/img/dial-hands.jpg')] bg-cover bg-center opacity-[0.08]" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white via-white/95 to-white/75" aria-hidden="true" />
+        <div className="relative">
+          <p className="mb-2 text-xs font-semibold tracking-[0.2em] text-blue-900">
+            REPAIR CASES
+          </p>
+          <h1 className="mb-3 text-2xl font-bold tracking-tight text-blue-950 md:text-4xl">
+            修理事例ギャラリー
+          </h1>
+          <div className="mx-auto mb-4 h-0.5 w-12 bg-[#b59410]" aria-hidden="true" />
+          <p className="text-sm leading-relaxed text-slate-600">
+            ブランドや修理内容から、実際の修理事例をご覧いただけます。
+          </p>
+        </div>
       </div>
 
       <form
