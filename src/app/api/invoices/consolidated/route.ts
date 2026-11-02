@@ -18,7 +18,8 @@ export async function GET() {
           company: { select: { name: true, billingCustomerId: true } } } } } } },
     orderBy: { issuedDate: "desc" }, take: 300 }),
     prisma.consolidatedInvoice.findMany({ orderBy: { createdAt: "desc" }, take: 100,
-      include: { sources: { include: { deliveryNotes: true }, orderBy: { id: "asc" } } } }),
+      include: { publication: { select: { status: true, publicToken: true } },
+        sources: { include: { deliveryNotes: true }, orderBy: { id: "asc" } } } }),
   ]);
   const eligible = invoices.filter(invoice => invoice.customer.b2bCompanyMembership?.company.billingCustomerId != null)
     .map(invoice => ({ id: invoice.id, invoiceNumber: invoice.invoiceNumber,

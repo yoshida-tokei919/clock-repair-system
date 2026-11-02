@@ -1990,8 +1990,26 @@ model ConsolidatedInvoice {
 
   billingCustomer Customer @relation("ConsolidatedBillingDestination", fields: [billingCustomerId], references: [id], onDelete: Restrict)
   sources ConsolidatedInvoiceSource[]
+  publication ConsolidatedInvoicePublication?
 
   @@index([companyId, createdAt])
+}
+
+// Mutable delivery state is separate from the immutable Task207C audit rows.
+model ConsolidatedInvoicePublication {
+  id Int @id @default(autoincrement())
+  consolidatedInvoiceId Int @unique
+  consolidatedInvoice ConsolidatedInvoice @relation(fields: [consolidatedInvoiceId], references: [id], onDelete: Restrict)
+  status String @default("draft") // draft, current
+  version Int @default(1)
+  publicToken String @unique
+  storageKey String?
+  fileName String
+  contentType String @default("application/pdf")
+  fileSize Int?
+  hash String?
+  createdAt DateTime @default(now())
+  publishedAt DateTime?
 }
 
 model ConsolidatedInvoiceSource {

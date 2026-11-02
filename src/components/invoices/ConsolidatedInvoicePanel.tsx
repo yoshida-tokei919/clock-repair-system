@@ -6,6 +6,7 @@ import Link from "next/link";
 type Candidate = { id: number; invoiceNumber: string; grossTotalAmount: number; sourceCustomerName: string;
   companyId: number; companyName: string; billingCustomerId: number };
 type Bundle = { id: number; createdAt: string; companyName: string; billingName: string;
+  publication: { status: string; publicToken: string } | null;
   billingCompanyName: string | null; billingZipCode: string | null; billingPrefecture: string | null;
   billingCity: string | null; billingStreet: string | null; billingBuilding: string | null;
   billingAddress: string | null; grossTotalAmount: number;
@@ -22,6 +23,7 @@ export function ConsolidatedInvoicePanel() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [generatingId, setGeneratingId] = useState<number | null>(null);
   const load = useCallback(async () => {
     const response = await fetch("/api/invoices/consolidated");
     if (!response.ok) throw new Error("集約請求の取得に失敗しました。");
@@ -46,6 +48,17 @@ export function ConsolidatedInvoicePanel() {
       setSelected([]); setExpanded(result.id); await load();
     } catch (error) { setError(error instanceof Error ? error.message : "集約請求を作成できませんでした。"); }
     finally { setSaving(false); }
+  }
+
+  async function generatePdf(id: number) {
+    setGeneratingId(id); setError("");
+    try {
+      const response = await fetch(`/api/invoices/consolidated/${id}/pdf/generate`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "PDFを生成できませんでした。");
+      await load();
+    } catch (error) { setError(error instanceof Error ? error.message : "PDFを生成できませんでした。"); }
+    finally { setGeneratingId(null); }
   }
 
   return <section className="mt-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
@@ -82,6 +95,15 @@ export function ConsolidatedInvoicePanel() {
         <strong>¥{bundle.grossTotalAmount.toLocaleString()}</strong>
       </button>
       {expanded === bundle.id && <div className="mt-3 border-t pt-3 space-y-3">
+        <div className="flex flex-wrap gap-3 items-center">
+          {bundle.publication?.status === "current" ? <>
+            <a className="text-blue-700 underline" href={`/api/invoices/consolidated/${bundle.id}/pdf`} target="_blank" rel="noopener noreferrer">PDFを開く・保存</a>
+            <a className="text-blue-700 underline" href={`/customer/consolidated-invoices/${bundle.publication.publicToken}`} target="_blank" rel="noopener noreferrer">顧客共有ページを開く</a>
+          </> : <button className="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-40" disabled={generatingId !== null || bundle.publication !== null} onClick={() => generatePdf(bundle.id)}>
+            {generatingId === bundle.id ? "PDF生成中..." : "PDF生成"}
+          </button>}
+        </div>
+        <p className="text-xs text-amber-800">顧客共有ページは管理者の確認用です。元請求書の入金確認・LINE送付の統合が完了するまで、顧客へURLを送らないでください。</p>
         <p>請求先（作成時）: {bundle.billingCompanyName || bundle.billingName} {bundle.billingName}<br />
           〒{bundle.billingZipCode || "—"} {bundle.billingAddress || [bundle.billingPrefecture, bundle.billingCity, bundle.billingStreet, bundle.billingBuilding].filter(Boolean).join("")}</p>
         {bundle.sources.map(source => <div key={source.id} className="bg-gray-50 rounded p-2">
@@ -92,7 +114,7 @@ export function ConsolidatedInvoicePanel() {
             {note.subtotalAmount !== null ? ` / 税抜小計 ¥${note.subtotalAmount.toLocaleString()}` : " / 金額未確定"}
           </p>)}
         </div>)}
-        <p className="text-xs text-gray-500">納品書行に税込金額・税額は配賦していません。PDF発行・送付・入金処理は未対応です。</p>
+        <p className="text-xs text-gray-500">納品書行に税込金額・税額は配賦していません。集約請求のLINE送付・入金処理は未対応です。</p>
       </div>}
     </div>)}
   </section>;
