@@ -164,8 +164,7 @@ export default async function CustomerInvoicePage({
       <div className="mx-auto max-w-3xl space-y-4">
         <header className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
           <p className="text-xs font-bold text-blue-600">ヨシダ時計修理工房</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">請求書のご確認</h1>
-          <p className="mt-2 text-sm text-slate-600">請求書の内容をご確認ください。</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">請求書のご案内</h1>
         </header>
         {(invoice.status === "void" || invoice.status === "canceled") && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">この請求書は取消済みです。お支払いは不要です。</div>}
 
@@ -187,10 +186,6 @@ export default async function CustomerInvoicePage({
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                 <dt className="text-xs font-bold text-blue-700">請求総額（税込）</dt>
                 <dd className="mt-1 text-2xl font-bold tabular-nums text-blue-900">{formatCurrency(invoice.grossTotalAmount)}</dd>
-              </div>
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <dt className="text-xs font-bold text-blue-700">支払期限</dt>
-                <dd className="mt-1 text-xl font-bold text-blue-900">{formatDate(invoice.paymentDueDate)}</dd>
               </div>
             </> : null}
             <div className="rounded-lg bg-slate-50 p-3">
@@ -218,10 +213,10 @@ export default async function CustomerInvoicePage({
               <dt className="text-xs font-bold text-slate-500">発行日</dt>
               <dd className="mt-1 font-semibold">{formatDate(invoice.issuedDate)}</dd>
             </div>
-            {invoice.customer.type === "individual" && <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
+            <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
               <dt className="text-xs font-bold text-slate-500">支払期限</dt>
               <dd className="mt-1 font-semibold">{formatDate(invoice.paymentDueDate)}</dd>
-            </div>}
+            </div>
             {invoice.customer.type === "individual" && <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
               <dt className="text-xs font-bold text-slate-500">請求総額（税込）</dt>
               <dd className="mt-1 font-semibold">{formatCurrency(invoice.grossTotalAmount)}</dd>
@@ -260,7 +255,7 @@ export default async function CustomerInvoicePage({
               </div>
               <div>
                 <dt className="text-xs font-bold text-slate-500">口座名義</dt>
-                <dd className="mt-1 flex flex-wrap items-center gap-2 font-semibold">ヨシダ シュウヘイ <InvoiceBankCopyButton value="ヨシダ シュウヘイ" label="口座名義" /></dd>
+                <dd className="mt-1 font-semibold">ヨシダ シュウヘイ</dd>
               </div>
             </dl>
             <p className="mt-3 text-sm text-slate-600">振込手数料はお客様のご負担となります。</p>
