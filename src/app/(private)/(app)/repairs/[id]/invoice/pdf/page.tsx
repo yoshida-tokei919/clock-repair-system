@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import React, { useEffect, useState } from 'react';
+import '@/components/pdf/registerInvoiceBrowserFont';
 import { InvoiceDocument } from '@/components/pdf/InvoiceDocument'; // Import Invoice Document
 import { usePDF } from '@react-pdf/renderer';
 

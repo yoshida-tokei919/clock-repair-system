@@ -1,5 +1,6 @@
 "use client";
 
+import "@/components/pdf/registerInvoiceBrowserFont";
 import { InvoiceDocument, InvoiceDocumentProps } from "@/components/pdf/InvoiceDocument";
 import { usePDF } from "@react-pdf/renderer";
 import { useEffect, useState } from "react";

@@ -1,9 +1,7 @@
 import React from 'react';
 import { formatWatchInformation } from '@/lib/timepiece-type';
 import type { TimepieceType } from '@prisma/client';
-import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
-
-Font.register({ family: 'Noto Sans JP', src: '/fonts/NotoSansJP-Regular.otf' });
+import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
   page: { padding: 30, fontFamily: 'Noto Sans JP', fontSize: 10, color: '#333' },
@@ -40,7 +38,7 @@ export interface InvoiceDocumentProps {
 }
 
 export function InvoiceDocument({ data }: InvoiceDocumentProps) {
-  const isB2C = data.customer.type === 'individual' && data.pricingTaxMode !== 'INCLUSIVE';
+  const isB2C = data.customer.type === 'individual';
   const inclusive = !isB2C && data.pricingTaxMode === 'INCLUSIVE';
   const subTotal = data.subtotalAmount ?? data.items.reduce((sum, item) => sum + item.amount, 0);
   const tax = data.taxAmount ?? Math.floor(subTotal * data.taxRate);

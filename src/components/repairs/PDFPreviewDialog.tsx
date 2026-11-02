@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PDFViewer, PDFDownloadLink } from "@react-pdf/renderer";
 import { EstimateDocument } from "@/components/pdf/EstimateDocument";
 import { DeliveryDocument } from "@/components/pdf/DeliveryDocument";
+import "@/components/pdf/registerInvoiceBrowserFont";
 import { InvoiceDocument } from "@/components/pdf/InvoiceDocument";
 import { WarrantyDocument } from "@/components/pdf/WarrantyDocument";
 import { Loader2, Printer, Download } from "lucide-react";

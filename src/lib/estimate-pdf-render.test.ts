@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-// The invoice document registers the same browser-only font family at import time.
-// Estimate generation must still use its server-side font file.
+// Importing another PDF document must not disturb the estimate server font.
 import "@/components/pdf/InvoiceDocument";
 import { renderEstimatePdfBuffer } from "./estimate-pdf-render";
 
-test("renders an estimate PDF after another document registers a browser font", async () => {
+test("renders an estimate PDF after importing another document", async () => {
   const pdf = await renderEstimatePdfBuffer({
     estimateNumber: "CE-001",
     date: "2026/10/04",
