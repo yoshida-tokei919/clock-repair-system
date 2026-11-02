@@ -1,9 +1,8 @@
 import { hasConsistentInvoiceSnapshots, invoicePdfRepairAmount } from "@/lib/invoice-repair-snapshots";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import path from "path";
-
-import { InvoiceDocument, type InvoiceDocumentProps } from "@/components/pdf/InvoiceDocument";
+import type { InvoiceDocumentProps } from "@/components/pdf/InvoiceDocument";
+import { renderInvoicePdfBuffer } from "@/lib/invoice-pdf-render";
 import { requireAdminApi } from "@/lib/admin-api-auth";
 import { authOptions } from "@/lib/auth";
 import {
@@ -22,32 +21,6 @@ export const dynamic = "force-dynamic";
 
 function getInvoicePdfFileName(invoiceNumber: string) {
   return `invoice_${invoiceNumber.replace(/[^\w.-]+/g, "_")}.pdf`;
-}
-
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  return Buffer.concat(chunks);
-}
-
-async function renderInvoicePdfBuffer(data: InvoiceDocumentProps["data"]) {
-  const nodeRequire = eval("require") as NodeRequire;
-  const ReactRuntime = nodeRequire("react");
-  const renderer = nodeRequire("@react-pdf/renderer");
-  const { Font, renderToStream } = renderer;
-
-  Font.register({
-    family: "Noto Sans JP",
-    src: path.join(process.cwd(), "public", "fonts", "NotoSansJP-Regular.otf"),
-  });
-
-  const documentElement = ReactRuntime.createElement(InvoiceDocument, { data });
-  const stream = (await renderToStream(documentElement)) as NodeJS.ReadableStream;
-  return streamToBuffer(stream);
 }
 
 function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof findInvoiceForPdf>>>, requestedDate?: Date) {

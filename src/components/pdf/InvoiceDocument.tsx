@@ -1,10 +1,11 @@
 import React from 'react';
 import { formatWatchInformation } from '@/lib/timepiece-type';
 import type { TimepieceType } from '@prisma/client';
-import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
+import * as browserRenderer from '@react-pdf/renderer';
 
-const styles = StyleSheet.create({
-  page: { padding: 30, fontFamily: 'Noto Sans JP', fontSize: 10, color: '#333' },
+function invoiceStyles(StyleSheet: typeof browserRenderer.StyleSheet, fontFamily: string) {
+  return StyleSheet.create({
+  page: { padding: 30, fontFamily, fontSize: 10, color: '#333' },
   header: { marginBottom: 20, borderBottomWidth: 1, borderColor: '#333', paddingBottom: 5, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   title: { fontSize: 18, fontWeight: 'bold' }, date: { fontSize: 10 },
   infoArea: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
@@ -24,7 +25,8 @@ const styles = StyleSheet.create({
   summaryLabel: { width: '40%', textAlign: 'right', marginRight: 10, fontSize: 9 },
   summaryValue: { width: '30%', textAlign: 'right', fontSize: 10 },
   grandTotal: { borderTopWidth: 2, borderColor: '#333', paddingTop: 4, fontWeight: 'bold' },
-});
+  });
+}
 
 export interface InvoiceDocumentProps {
   data: {
@@ -38,6 +40,16 @@ export interface InvoiceDocumentProps {
 }
 
 export function InvoiceDocument({ data }: InvoiceDocumentProps) {
+  return createInvoiceDocumentElement(browserRenderer, data, 'Noto Sans JP');
+}
+
+export function createInvoiceDocumentElement(
+  renderer: typeof browserRenderer,
+  data: InvoiceDocumentProps['data'],
+  fontFamily: string,
+) {
+  const { Document, Page, Text, View, StyleSheet } = renderer;
+  const styles = invoiceStyles(StyleSheet, fontFamily);
   const isB2C = data.customer.type === 'individual';
   const inclusive = !isB2C && data.pricingTaxMode === 'INCLUSIVE';
   const subTotal = data.subtotalAmount ?? data.items.reduce((sum, item) => sum + item.amount, 0);

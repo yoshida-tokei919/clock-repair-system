@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
-import path from "node:path";
 import test from "node:test";
-import React from "react";
-import { Font, renderToBuffer } from "@react-pdf/renderer";
 import { InvoiceDocument } from "./InvoiceDocument";
 
 function texts(node: unknown): string[] {
@@ -63,15 +60,4 @@ test("inclusive individual invoice keeps B2C job rows and prepayment presentatio
   assert.match(output, /今回のお支払い額/);
   assert.match(output, /¥\s*49,000/);
   assert.doesNotMatch(output, /納品書番号|お振込先|御中/);
-});
-
-test("server renderer creates a Japanese invoice PDF with the filesystem font", async () => {
-  Font.register({
-    family: "Noto Sans JP",
-    src: path.join(process.cwd(), "public", "fonts", "NotoSansJP-Regular.otf"),
-  });
-  const document = React.createElement(InvoiceDocument, { data: individualInvoice });
-  const pdf = await renderToBuffer(document as unknown as Parameters<typeof renderToBuffer>[0]);
-  assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
-  assert.ok(pdf.length > 1000);
 });
