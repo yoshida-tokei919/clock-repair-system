@@ -2,6 +2,7 @@ import { hasConsistentInvoiceSnapshots } from "@/lib/invoice-repair-snapshots";
 import { notFound } from "next/navigation";
 
 import { InvoiceCheckoutButton } from "@/components/customer/InvoiceCheckoutButton";
+import { InvoiceBankCopyButton } from "@/components/customer/InvoiceBankCopyButton";
 import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 import { prisma } from "@/lib/prisma";
 
@@ -154,6 +155,8 @@ export default async function CustomerInvoicePage({
     && invoice.status === "issued"
     && paymentSummary.outstandingBalance > 0
     && paymentSummary.invoiceRefundPendingAmount === 0;
+  const showBankTransfer = invoice.status === "issued"
+    && (invoice.customer.type === "individual" ? !isPaid : paymentSummary.outstandingBalance > 0);
   const checkoutState = (await searchParams)?.checkout;
 
   return (
@@ -180,6 +183,16 @@ export default async function CustomerInvoicePage({
         <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="text-base font-bold text-slate-900">概要</h2>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            {invoice.customer.type === "business" ? <>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <dt className="text-xs font-bold text-blue-700">請求総額（税込）</dt>
+                <dd className="mt-1 text-2xl font-bold tabular-nums text-blue-900">{formatCurrency(invoice.grossTotalAmount)}</dd>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <dt className="text-xs font-bold text-blue-700">支払期限</dt>
+                <dd className="mt-1 text-xl font-bold text-blue-900">{formatDate(invoice.paymentDueDate)}</dd>
+              </div>
+            </> : null}
             <div className="rounded-lg bg-slate-50 p-3">
               <dt className="text-xs font-bold text-slate-500">請求書番号</dt>
               <dd className="mt-1 font-semibold">{invoice.invoiceNumber}</dd>
@@ -205,14 +218,18 @@ export default async function CustomerInvoicePage({
               <dt className="text-xs font-bold text-slate-500">発行日</dt>
               <dd className="mt-1 font-semibold">{formatDate(invoice.issuedDate)}</dd>
             </div>
-            <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
+            {invoice.customer.type === "individual" && <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
               <dt className="text-xs font-bold text-slate-500">支払期限</dt>
               <dd className="mt-1 font-semibold">{formatDate(invoice.paymentDueDate)}</dd>
-            </div>
-            <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
+            </div>}
+            {invoice.customer.type === "individual" && <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
               <dt className="text-xs font-bold text-slate-500">請求総額（税込）</dt>
               <dd className="mt-1 font-semibold">{formatCurrency(invoice.grossTotalAmount)}</dd>
-            </div>
+            </div>}
+            {invoice.customer.type === "business" && showBankTransfer && <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
+              <dt className="text-xs font-bold text-slate-500">お支払い方法</dt>
+              <dd className="mt-1 font-semibold">銀行振込</dd>
+            </div>}
             {invoice.shippingFeeAmount > 0 && <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2"><dt className="text-xs font-bold text-slate-500">送料（税込・請求総額に含む）</dt><dd className="mt-1 font-semibold">{formatCurrency(invoice.shippingFeeAmount)}</dd></div>}
             {invoice.customer.type === "individual" ? <>
               <div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-bold text-slate-500">前受金充当額</dt><dd className="mt-1 font-semibold">{formatCurrency(prepaymentApplied)}</dd></div>
@@ -225,7 +242,7 @@ export default async function CustomerInvoicePage({
           </dl>
         </section>
 
-        {invoice.customer.type === "individual" && invoice.status === "issued" && !isPaid ? (
+        {showBankTransfer ? (
           <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
             <h2 className="text-base font-bold text-slate-900">銀行振込のご案内</h2>
             <dl className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3 text-sm">
@@ -239,11 +256,11 @@ export default async function CustomerInvoicePage({
               </div>
               <div>
                 <dt className="text-xs font-bold text-slate-500">口座番号</dt>
-                <dd className="mt-1 font-semibold">普通 3602468</dd>
+                <dd className="mt-1 flex flex-wrap items-center gap-2 font-semibold">普通 3602468 <InvoiceBankCopyButton value="3602468" label="口座番号" /></dd>
               </div>
               <div>
                 <dt className="text-xs font-bold text-slate-500">口座名義</dt>
-                <dd className="mt-1 font-semibold">ヨシダ シュウヘイ</dd>
+                <dd className="mt-1 flex flex-wrap items-center gap-2 font-semibold">ヨシダ シュウヘイ <InvoiceBankCopyButton value="ヨシダ シュウヘイ" label="口座名義" /></dd>
               </div>
             </dl>
             <p className="mt-3 text-sm text-slate-600">振込手数料はお客様のご負担となります。</p>
