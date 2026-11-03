@@ -117,7 +117,8 @@ async function withNoUnresolvedPost<T>(db: LineManagerSendOutboxDb, action: (tx:
 export async function safeClaimLineManagerSendOutbox(db: LineManagerSendOutboxDb, input: { id: number; now?: Date; leaseMs?: number }) {
   const now = nowOr(input.now); const token = randomUUID(); const expires = new Date(now.getTime() + (input.leaseMs ?? CLAIM_LEASE_MS));
   return withNoUnresolvedPost(db, async (tx) => {
-    const candidate = await tx.lineManagerSendOutbox.findUnique({ where: { id: input.id }, select: { idempotencyKey: true, inquiryId: true, lineManagerChatId: true, sourceRepairId: true } });
+    const candidate = await tx.lineManagerSendOutbox.findUnique({ where: { id: input.id }, select: { idempotencyKey: true, inquiryId: true, lineManagerChatId: true, sourceRepairId: true,
+      text: true, managerBotIdSnapshot: true, managerChatIdSnapshot: true } });
     if (candidate) {
       try {
         await assertLineContactOutboxCurrent(tx, candidate);
@@ -148,7 +149,8 @@ export async function markLineManagerPreSendFailed(db: LineManagerSendOutboxDb, 
 /** Mandatory durable fence: a sender may POST only after this returns true. */
 export async function fenceLineManagerPostAttempt(db: LineManagerSendOutboxDb, input: { id: number; claimToken: string; now?: Date }) {
   const result = await withNoUnresolvedPost(db, async (tx) => {
-    const candidate = await tx.lineManagerSendOutbox.findUnique({ where: { id: input.id }, select: { idempotencyKey: true, inquiryId: true, lineManagerChatId: true, sourceRepairId: true } });
+    const candidate = await tx.lineManagerSendOutbox.findUnique({ where: { id: input.id }, select: { idempotencyKey: true, inquiryId: true, lineManagerChatId: true, sourceRepairId: true,
+      text: true, managerBotIdSnapshot: true, managerChatIdSnapshot: true } });
     if (candidate) await assertLineContactOutboxCurrent(tx, candidate);
     return tx.lineManagerSendOutbox.updateMany({ where: { id: input.id, status: "CLAIMED", claimToken: input.claimToken, sendAttemptCount: { lte: MAX_SEND_ATTEMPTS } }, data: { status: "POST_UNCONFIRMED", postAttemptedAt: nowOr(input.now), claimToken: null, claimLeaseExpiresAt: null, lastError: null } });
   });

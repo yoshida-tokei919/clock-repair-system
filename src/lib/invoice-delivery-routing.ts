@@ -14,6 +14,16 @@ export async function hasUnresolvedInvoiceLineOutbox(tx: Prisma.TransactionClien
   return rows.length > 1 || (rows.length === 1 && !["CONFIRMED", "CANCELLED"].includes(rows[0].status));
 }
 
+export async function hasUnresolvedConsolidatedInvoiceLineOutbox(tx: Prisma.TransactionClient, invoiceId: number) {
+  const sources = await tx.consolidatedInvoiceSource.findMany({ where: { invoiceId }, select: { consolidatedInvoiceId: true } });
+  if (sources.length > 1) return true;
+  if (!sources.length) return false;
+  const rows = await tx.$queryRaw<{ status: string }[]>`
+    SELECT "status" FROM "LineManagerSendOutbox"
+    WHERE "idempotencyKey" = ${`b2b-consolidated-invoice-line:${sources[0].consolidatedInvoiceId}`} FOR UPDATE`;
+  return rows.length > 1 || (rows.length === 1 && !["CONFIRMED", "CANCELLED"].includes(rows[0].status));
+}
+
 export class InvoiceDeliveryUnavailableError extends Error {
   constructor(message: string, readonly status = 409, readonly postal = false) { super(message); }
 }
@@ -54,9 +64,11 @@ export function buildInvoiceLineMessage(label: string, sharedUrl: string) {
 export async function getInvoiceDeliveryState(db: PrismaClient, invoiceId: number) {
   const invoice = await db.invoice.findUnique({ where: { id: invoiceId }, select: {
     customerId: true, billingCustomerId: true, status: true, customer: { select: { type: true } },
-    billingCustomer: { select: { type: true } }, sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true,
+    billingCustomer: { select: { type: true } }, consolidatedSource: { select: { id: true } },
+    sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true,
   } });
   if (!invoice || invoice.customer.type !== "business" || !["issued", "paid"].includes(invoice.status)) return null;
+  if (invoice.consolidatedSource) return null;
   if (invoice.billingCustomerId != null && invoice.billingCustomerId !== invoice.customerId && invoice.billingCustomer?.type !== "business") return null;
   const outbox = await db.lineManagerSendOutbox.findUnique({ where: { idempotencyKey: invoiceDeliveryKey(invoiceId) }, select: { status: true } });
   if (outbox) return { method: "LINE" as const, status: outbox.status };
@@ -85,10 +97,14 @@ export async function queueInvoiceLineDelivery(
     const invoice = await tx.invoice.findUnique({ where: { id: invoiceId }, select: {
       id: true, customerId: true, billingCustomerId: true, status: true, billingMonth: true, publicToken: true, sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true,
       customer: { select: { type: true } }, billingCustomer: { select: { type: true } },
+      consolidatedSource: { select: { id: true } },
       currentPdfFile: { select: { status: true, storageKey: true } },
     } });
     if (!invoice || invoice.customer.type !== "business" || !["issued", "paid"].includes(invoice.status)) {
       throw new InvoiceDeliveryUnavailableError("法人の発行済み請求書のみ送信待ちにできます。");
+    }
+    if (invoice.consolidatedSource) {
+      throw new InvoiceDeliveryUnavailableError("集約済みの元請求書は個別にLINE送信待ちにできません。");
     }
     if (invoice.billingCustomerId != null && invoice.billingCustomerId !== invoice.customerId && invoice.billingCustomer?.type !== "business") {
       throw new InvoiceDeliveryUnavailableError("請求先の法人顧客を確認できません。");

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { hasUnresolvedInvoiceLineOutbox } from "./invoice-delivery-routing";
+import { hasUnresolvedConsolidatedInvoiceLineOutbox, hasUnresolvedInvoiceLineOutbox } from "./invoice-delivery-routing";
 
 type PdfPublication = {
   invoiceId: number;
@@ -28,6 +28,7 @@ export async function publishInvoicePdf(
       }
       if (lockedInvoice.lineSendStartedAt) throw new Error("Invoice has an unresolved LINE send");
       if (await hasUnresolvedInvoiceLineOutbox(tx, invoiceId)) throw new Error("Invoice has an unresolved LINE outbox");
+      if (await hasUnresolvedConsolidatedInvoiceLineOutbox(tx, invoiceId)) throw new Error("Source invoice has an unresolved consolidated LINE outbox");
       if (expectedIssuedDate && lockedInvoice.issuedDate.getTime() !== expectedIssuedDate.getTime()) throw new Error("Invoice issue date changed during PDF generation");
 
       await tx.$executeRaw`

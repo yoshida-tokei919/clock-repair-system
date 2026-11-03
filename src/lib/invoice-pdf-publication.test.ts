@@ -5,7 +5,7 @@ import { publishInvoicePdf } from "./invoice-pdf-publication";
 const input = { invoiceId: 1, pdfFileId: 7, storageKey: "invoices/1/7.pdf", hash: "expected-hash", fileSize: 123 };
 
 function fixture(options: { publicationError?: "committed" | "rolled-back"; status?: string; lineSendStartedAt?: Date | null;
-  outboxStatus?: string; readError?: boolean; inconsistent?: boolean } = {}) {
+  outboxStatus?: string; consolidatedStatus?: string; readError?: boolean; inconsistent?: boolean } = {}) {
   const invoice = { status: options.status ?? "issued", lineSendStartedAt: options.lineSendStartedAt ?? null,
     currentPdfFileId: 3 as number | null, issuedDate: new Date("2026-10-14T15:00:00Z") };
   const file = { invoiceId: 1, status: "draft", storageKey: "", hash: null as string | null,
@@ -19,14 +19,18 @@ function fixture(options: { publicationError?: "committed" | "rolled-back"; stat
       publicationCalls++;
       const publishing = publicationCalls === 1;
       const tx = {
-        $queryRaw: async (strings: TemplateStringsArray) => {
+        $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
           const sql = strings.join("?");
           if (!publishing && options.readError) throw new Error("read unavailable");
-          if (sql.includes('FROM "LineManagerSendOutbox"')) return options.outboxStatus ? [{ status: options.outboxStatus }] : [];
+          if (sql.includes('FROM "LineManagerSendOutbox"')) {
+            const status = String(values[0]).startsWith("b2b-consolidated-") ? options.consolidatedStatus : options.outboxStatus;
+            return status ? [{ status }] : [];
+          }
           if (sql.includes('"currentPdfFileId" FROM "Invoice"')) return [invoice];
           if (sql.includes('FROM "InvoicePdfFile"')) return [file];
           return [invoice];
         },
+        consolidatedInvoiceSource: { findMany: async () => options.consolidatedStatus ? [{ consolidatedInvoiceId: 9 }] : [] },
         $executeRaw: async (strings: TemplateStringsArray, ...values: any[]) => {
           const sql = strings.join("?");
           if (sql.includes("'superseded'")) previous.status = "superseded";
@@ -81,6 +85,16 @@ test("lost commit acknowledgment with matching published read-back returns succe
   assert.deepEqual(state.deleted, []);
   assert.equal(state.voidUpdates(), 0);
   assert.equal(state.transactions(), 2);
+});
+
+test("unresolved consolidated outbox blocks source republish and issue-date change", async () => {
+  for (const status of ["APPROVED", "CLAIMED", "POST_UNCONFIRMED", "UNKNOWN"]) {
+    const state = fixture({ consolidatedStatus: status });
+    const issuedDate = new Date(state.invoice.issuedDate);
+    assert.equal(await state.run({ expectedIssuedDate: issuedDate, requestedIssuedDate: new Date("2026-11-03") }), "failed");
+    assert.equal(state.invoice.currentPdfFileId, 3);
+    assert.equal(state.invoice.issuedDate.getTime(), issuedDate.getTime());
+  }
 });
 
 test("proved rollback voids only the draft and removes its upload", async () => {

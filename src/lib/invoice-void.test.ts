@@ -4,7 +4,7 @@ import { voidInvoice } from "./invoice-void";
 import { releaseAllocation } from "./allocation-release";
 
 function fixture(rows: any[], lineSendStartedAt: Date | null = null, lineSendRetryKey: string | null = null,
-  outboxStatus: string | null = null) {
+  outboxStatus: string | null = null, consolidatedStatus: string | null = null) {
   const releases: any[] = [];
   const queries: { sql: string; values: unknown[] }[] = [];
   let status = "issued";
@@ -12,7 +12,10 @@ function fixture(rows: any[], lineSendStartedAt: Date | null = null, lineSendRet
     $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = strings.join("?");
       queries.push({ sql, values });
-      if (sql.includes('FROM "LineManagerSendOutbox"')) return outboxStatus ? [{ status: outboxStatus }] : [];
+      if (sql.includes('FROM "LineManagerSendOutbox"')) {
+        const status = String(values[0]).startsWith("b2b-consolidated-") ? consolidatedStatus : outboxStatus;
+        return status ? [{ status }] : [];
+      }
       return [{ id: 1, lineSendStartedAt, lineSendRetryKey }];
     },
     invoice: { findUnique: async () => ({ status, paymentAllocations: rows }),
@@ -24,6 +27,7 @@ function fixture(rows: any[], lineSendStartedAt: Date | null = null, lineSendRet
     paymentAllocationRelease: { create: async ({ data }: any) => { releases.push(data);
       rows.find(r => r.id === data.allocationId).releases.push({ amount: data.amount }); return data; } },
     repair: { updateMany: async () => ({ count: 1 }) },
+    consolidatedInvoiceSource: { findMany: async () => consolidatedStatus ? [{ consolidatedInvoiceId: 9 }] : [] },
   };
   return { db: { $transaction: async (fn: any) => fn(tx) } as any, tx, releases, queries, getStatus: () => status };
 }
@@ -41,6 +45,19 @@ test("prepayment-only invoice void releases credit without deleting allocation",
   assert.equal(state.getStatus(), "void");
   assert.equal(state.releases[0].allocationId, 1);
   assert.equal(original.releases[0].amount, 5000);
+});
+
+test("unresolved consolidated outbox blocks source void under Invoice lock", async () => {
+  for (const status of ["APPROVED", "CLAIMED", "POST_UNCONFIRMED", "UNKNOWN"]) {
+    const state = fixture([], null, null, null, status);
+    await assert.rejects(voidInvoice(state.db, 1, 9), /Consolidated LINE delivery is unresolved/);
+    assert.equal(state.getStatus(), "issued");
+    const queries = state.queries;
+    assert.ok(queries[0].sql.includes('FROM "Invoice"'));
+    assert.deepEqual(queries.find(query => query.values[0] === "b2b-consolidated-invoice-line:9")?.values,
+      ["b2b-consolidated-invoice-line:9"]);
+    assert.equal(queries.some(query => query.sql.includes('FROM "Payment"')), false);
+  }
 });
 
 test("unresolved LINE reservation blocks void before payment locks and allocation releases", async () => {

@@ -144,6 +144,27 @@ test("unresolved POST_UNCONFIRMED blocks direct claim and fence before mutation"
   assert.equal(updates, 0);
 });
 
+test("stale consolidated intent is quarantined at claim and cannot cross the post fence", async () => {
+  const candidate = { idempotencyKey: "b2b-consolidated-invoice-line:9", inquiryId: 7,
+    lineManagerChatId: 6, sourceRepairId: null, text: "frozen", managerBotIdSnapshot: "bot", managerChatIdSnapshot: "chat" };
+  const writes: any[] = [];
+  const tx: any = {
+    $executeRaw: async () => 1,
+    consolidatedInvoice: { findUnique: async () => null },
+    lineManagerSendOutbox: {
+      findFirst: async () => null,
+      findUnique: async () => candidate,
+      updateMany: async (query: any) => { writes.push(query); return { count: 1 }; },
+    },
+  };
+  const db: any = { $transaction: async (fn: any) => fn(tx) };
+  assert.equal(await safeClaimLineManagerSendOutbox(db, { id: 1 }), null);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].data.status, "PRE_SEND_FAILED");
+  await assert.rejects(fenceLineManagerPostAttempt(db, { id: 1, claimToken: "token" }));
+  assert.equal(writes.length, 1);
+});
+
 test("retry backoff is durable and send attempts stop at five", () => {
   const now = new Date("2026-09-23T00:10:00Z");
   const clauses = lineManagerSendCandidateWhere(now).OR as any[];
