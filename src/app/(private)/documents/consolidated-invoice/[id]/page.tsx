@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { formatIssuedDate, parseIssuedDate } from "@/lib/document-issued-date";
 import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 import { consolidatedDeliveryKey, consolidatedPaymentPurpose } from "@/lib/consolidated-invoice-operations";
-import { consolidatedDeliveryNoteRows, hasConsolidatedSourceSnapshotIntegrity, isConsolidatedDeliveryNotePdf, isCurrentConsolidatedPdf, validConsolidatedShareToken } from "@/lib/consolidated-invoice-publication";
+import { consolidatedDeliveryNoteRows, hasConsolidatedSourceSnapshotIntegrity, isConsolidatedNetDeliveryNotePdf, isCurrentConsolidatedPdf, validConsolidatedShareToken } from "@/lib/consolidated-invoice-publication";
 import { IssuedDateEditor } from "@/components/documents/IssuedDateEditor";
 import { ConsolidatedInvoiceActions } from "@/components/invoices/ConsolidatedInvoiceActions";
 import { invoiceDeliveryKey } from "@/lib/invoice-delivery-routing";
@@ -18,7 +18,7 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
   const id = Number(raw);
   if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(id)) return notFound();
   const bundle = await prisma.consolidatedInvoice.findUnique({ where: { id }, include: {
-    publication: true, pdfHistory: { orderBy: { version: "desc" } }, issueState: true, sources: { orderBy: { invoiceId: "asc" }, include: { deliveryNotes: true,
+    publication: true, pdfHistory: { orderBy: { version: "desc" } }, issueState: true, sources: { orderBy: { id: "asc" }, include: { deliveryNotes: { orderBy: { id: "asc" } },
       invoice: { select: { id: true, invoiceNumber: true, customerId: true, issuedDate: true, totalAmount: true, taxAmount: true,
         shippingFeeAmount: true, grossTotalAmount: true, paymentDueDate: true, status: true, sentAt: true, lineSendRetryKey: true,
         lineSendStartedAt: true, pdfFiles: { select: { sentAt: true } },
@@ -83,12 +83,12 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
       </header>
       <section className="rounded-lg bg-white p-5 shadow-sm text-sm">
         <h2 className="font-bold">納品書別のご請求</h2>
-        {rows ? <div className="mt-3 overflow-x-auto"><table className="w-full text-left"><thead><tr className="border-b"><th className="py-2">納品書番号</th><th>納品日</th><th>内容</th><th className="text-right">金額（税込）</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.slipNumber}-${index}`} className="border-b"><td className="py-2">{row.slipNumber}</td><td>{row.date}</td><td>修理 {row.repairCount}点</td><td className="text-right">{yen(row.amount)}</td></tr>)}</tbody></table></div>
+        {rows ? <div className="mt-3 overflow-x-auto"><table className="w-full text-left"><thead><tr className="border-b"><th className="py-2">納品書番号</th><th>納品日</th><th>内容</th><th className="text-right">金額</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.slipNumber}-${index}`} className="border-b"><td className="py-2">{row.slipNumber}</td><td>{row.date}</td><td>{row.repairCount}点</td><td className="text-right">{yen(row.amount)}</td></tr>)}</tbody></table></div>
           : <p role="alert" className="mt-3 text-red-800">納品書の確定額を確認できません。</p>}
         <details className="mt-4 text-xs text-slate-500"><summary>内部照合用の元請求書</summary>{bundle.sources.map(source => <p key={source.id}><Link className="text-blue-700 underline" href={`/documents/invoice/${source.invoiceId}`}>{source.invoiceNumber}</Link>　{yen(source.grossTotalAmount)}</p>)}</details>
         <p className="mt-3 text-xs text-slate-500">集約請求の取消だけでは、元請求書の入金・発行は取り消されません。</p>
       </section>
-      {pdfReady && rows && !isConsolidatedDeliveryNotePdf(id, bundle.publication!.fileName) && <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm"><p className="font-bold">新形式PDFプレビュー（管理者専用・未公開）</p><p>保存済みPDFとは別の表示です。共有ページのPDFは保存済みのままです。</p><a className="text-blue-700 underline" href={`/api/invoices/consolidated/${id}/pdf/preview`} target="_blank" rel="noopener noreferrer">新形式PDFを開く</a></div>}
+      {pdfReady && rows && !isConsolidatedNetDeliveryNotePdf(id, bundle.publication!.fileName) && <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm"><p className="font-bold">新形式PDFプレビュー（管理者専用・未公開）</p><p>保存済みPDFとは別の表示です。共有ページのPDFは保存済みのままです。</p><a className="text-blue-700 underline" href={`/api/invoices/consolidated/${id}/pdf/preview`} target="_blank" rel="noopener noreferrer">新形式PDFを開く</a></div>}
       {pdfReady ? <iframe src={`/api/invoices/consolidated/${id}/pdf`} className="h-[75vh] w-full border-0 bg-white" title="保存済み集約請求書PDF" />
         : <div className="rounded border border-amber-200 bg-amber-50 p-5 text-sm">保存済みPDFがありません。元請求書と入金・送信状態を確認してPDFを生成してください。</div>}
     </div>

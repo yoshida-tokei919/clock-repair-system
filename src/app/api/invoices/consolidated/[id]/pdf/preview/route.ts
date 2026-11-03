@@ -13,7 +13,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const id = Number(raw);
   if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(id)) return new Response("Not found", { status: 404 });
   const bundle = await prisma.consolidatedInvoice.findUnique({ where: { id }, include: {
-    publication: true, issueState: true, sources: { orderBy: { id: "asc" }, include: { deliveryNotes: true, invoice: { select: {
+    publication: true, issueState: true, sources: { orderBy: { id: "asc" }, include: { deliveryNotes: { orderBy: { id: "asc" } }, invoice: { select: {
       id: true, invoiceNumber: true, customerId: true, issuedDate: true, totalAmount: true,
       taxAmount: true, shippingFeeAmount: true, grossTotalAmount: true, paymentDueDate: true,
     } } } },

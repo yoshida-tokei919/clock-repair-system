@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { ConsolidatedBundle } from "./consolidated-invoice-publication";
-import { assertConsolidatedSourceUnpaid, buildConsolidatedPdfData, consolidatedDeliveryNotePdfFileName, consolidatedDeliveryNoteRows, hasConsolidatedSourceSnapshotIntegrity, isConsolidatedDeliveryNotePdf, isCurrentConsolidatedPdf, newConsolidatedShareToken, validConsolidatedShareToken } from "./consolidated-invoice-publication";
+import { assertConsolidatedSourceUnpaid, buildConsolidatedPdfData, consolidatedDeliveryNotePdfFileName, consolidatedDeliveryNoteRows, hasConsolidatedSourceSnapshotIntegrity, isConsolidatedDeliveryNotePdf, isConsolidatedNetDeliveryNotePdf, isCurrentConsolidatedPdf, newConsolidatedShareToken, validConsolidatedShareToken } from "./consolidated-invoice-publication";
 import { consolidatedInvoiceDocumentData, renderConsolidatedInvoicePdf } from "./consolidated-invoice-pdf";
+import { InvoiceDocument } from "@/components/pdf/InvoiceDocument";
+
+function documentText(node: unknown): string {
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) return node.map(documentText).join(" ");
+  if (node && typeof node === "object" && "props" in node) return documentText((node as { props: { children?: unknown } }).props.children);
+  return "";
+}
 
 const due = new Date("2026-12-31T00:00:00Z");
 const fixture = {
@@ -47,7 +56,9 @@ test("consolidated PDF totals use immutable source snapshots", () => {
   assert.equal(data.gross, 82428);
   assert.equal(data.subtotal, 73700);
   assert.equal(data.tax, 7370);
-  assert.deepEqual(data.rows.map(row => [row.slipNumber, row.repairCount, row.amount]), [["KD-001", 6, 79329], ["SD-001", 4, 3099]]);
+  assert.deepEqual(data.rows.map(row => [row.slipNumber, row.repairCount, row.amount, row.taxAmount, row.grossAmount]),
+    [["KD-001", 6, 72179, 7150, 79329], ["SD-001", 4, 2879, 220, 3099]]);
+  assert.equal(data.rows.reduce((sum, row) => sum + row.amount, 0), data.gross - data.tax);
   assert.equal(data.dueDate, "2026-12-31");
   assert.throws(() => buildConsolidatedPdfData({ ...fixture, grossTotalAmount: 82427 }, [due, due]));
   assert.throws(() => buildConsolidatedPdfData({ ...fixture, sources: [{ ...fixture.sources[0], taxAmount: 0 }, fixture.sources[1]] }, [due, due]));
@@ -76,12 +87,28 @@ test("public PDF access requires a fully published pointer", () => {
   assert.equal(isCurrentConsolidatedPdf(null), false);
 });
 
-test("only the delivery-note PDF filename enables the matching public breakdown", () => {
-  assert.equal(consolidatedDeliveryNotePdfFileName(1), "consolidated_invoice_1_delivery_notes.pdf");
+test("net PDF filenames distinguish new public breakdowns from saved legacy PDFs", () => {
+  assert.equal(consolidatedDeliveryNotePdfFileName(1), "consolidated_invoice_1_net_delivery_notes.pdf");
+  assert.equal(isConsolidatedNetDeliveryNotePdf(1, "consolidated_invoice_1_net_delivery_notes.pdf"), true);
+  assert.equal(isConsolidatedNetDeliveryNotePdf(1, "consolidated_invoice_1_v2_net_delivery_notes.pdf"), true);
+  assert.equal(isConsolidatedNetDeliveryNotePdf(1, "consolidated_invoice_1_delivery_notes.pdf"), false);
   assert.equal(isConsolidatedDeliveryNotePdf(1, "consolidated_invoice_1_delivery_notes.pdf"), true);
   assert.equal(isConsolidatedDeliveryNotePdf(1, "consolidated_invoice_1_v2_delivery_notes.pdf"), true);
   assert.equal(isConsolidatedDeliveryNotePdf(1, "consolidated_invoice_1.pdf"), false);
   assert.equal(isConsolidatedDeliveryNotePdf(1, "consolidated_invoice_2_delivery_notes.pdf"), false);
+  const publicPage = readFileSync("src/app/(private)/customer/consolidated-invoices/[token]/page.tsx", "utf8");
+  assert.match(publicPage, /const newFormat = isConsolidatedNetDeliveryNotePdf\(bundle\.id, publication\.fileName\)/);
+  assert.match(publicPage, /if \(newFormat\) \{/);
+  const reissue = readFileSync("src/app/api/invoices/consolidated/[id]/pdf/reissue/route.ts", "utf8");
+  assert.match(reissue, /const fileName = `consolidated_invoice_\$\{id\}_v\$\{version\}_net_delivery_notes\.pdf`/);
+  assert.match(reissue, /storageKey: previous\.storageKey!, fileName: previous\.fileName/);
+});
+
+test("admin PDF preview uses the same source and delivery note ordering as publication", () => {
+  const preview = readFileSync("src/app/api/invoices/consolidated/[id]/pdf/preview/route.ts", "utf8");
+  assert.match(preview, /sources: \{ orderBy: \{ id: "asc" \}, include: \{ deliveryNotes: \{ orderBy: \{ id: "asc" \} \}/);
+  assert.match(preview, /buildConsolidatedPdfData\(bundle, bundle\.sources\.map\(source => source\.invoice\.paymentDueDate\)\)/);
+  assert.match(preview, /renderConsolidatedInvoicePdf\(data\)/);
 });
 
 test("paid, partial, pending and cross-customer source payments block full-gross publication", () => {
@@ -113,8 +140,16 @@ test("one consolidated invoice renders as a PDF", async () => {
   assert.equal(document.shippingFeeAmount, 0);
   assert.equal(document.dueDate, "2026/12/31");
   assert.match(document.bankInfo!, /3602468/);
-  assert.equal(document.taxSummaryLabel, "内消費税（確定額）");
-  assert.equal(document.grossTotalAmount, document.items.reduce((sum, row) => sum + row.amount, 0));
+  assert.equal(document.pricingTaxMode, "EXCLUSIVE");
+  assert.equal(document.taxSummaryLabel, undefined);
+  assert.deepEqual(document.items.map(item => [item.description, item.amount]), [["6点", 72179], ["4点", 2879]]);
+  assert.equal(document.subtotalAmount, document.items.reduce((sum, row) => sum + row.amount, 0));
+  assert.equal(document.grossTotalAmount, document.subtotalAmount! + document.taxAmount!);
+  const renderedText = documentText(InvoiceDocument({ data: document }));
+  assert.match(renderedText, /小計/);
+  assert.match(renderedText, /消費税 \(10%\)/);
+  assert.match(renderedText, /合計請求額/);
+  assert.doesNotMatch(renderedText, /金額（税込）|内消費税|修理 6点/);
   assert.equal(JSON.stringify(document).includes("KI-001"), false);
   assert.equal(JSON.stringify(document).includes("架空A店"), false);
   assert.equal(JSON.stringify(document).includes("請求先支店"), false);
@@ -135,13 +170,19 @@ test("split-note rounding allocates the exact sourced gross and rejects incomple
     ] }, fixture.sources[1],
   ] } as ConsolidatedBundle;
   const rows = consolidatedDeliveryNoteRows(split);
-  assert.deepEqual(rows.map(row => row.amount), [1, 79328, 3099]);
+  assert.deepEqual(rows.map(row => [row.amount, row.taxAmount, row.grossAmount]), [[1, 0, 1], [72178, 7150, 79328], [2879, 220, 3099]]);
   const round = consolidatedDeliveryNoteRows({ grossTotalAmount: 3109, sources: [
     { totalAmount: 3, taxAmount: 6, shippingFeeAmount: 1, grossTotalAmount: 10,
       deliveryNotes: [1, 2, 3].map(index => ({ slipNumber: `R-${index}`, issuedDate: due, repairCount: 1, subtotalAmount: 1 })) },
     fixture.sources[1],
   ] });
-  assert.deepEqual(round.map(row => row.amount), [3, 3, 4, 3099]);
+  assert.deepEqual(round.map(row => [row.amount, row.taxAmount, row.grossAmount]), [[1, 2, 3], [1, 2, 3], [2, 2, 4], [2879, 220, 3099]]);
+  const zeroNet = consolidatedDeliveryNoteRows({ grossTotalAmount: 3102, sources: [
+    { totalAmount: 0, taxAmount: 2, shippingFeeAmount: 1, grossTotalAmount: 3,
+      deliveryNotes: [1, 2].map(index => ({ slipNumber: `Z-${index}`, issuedDate: due, repairCount: 1, subtotalAmount: 0 })) },
+    fixture.sources[1],
+  ] });
+  assert.deepEqual(zeroNet.slice(0, 2).map(row => [row.amount, row.taxAmount, row.grossAmount]), [[0, 1, 1], [1, 1, 2]]);
   for (const invalid of [
     { slipNumber: null }, { issuedDate: null }, { repairCount: 0 }, { subtotalAmount: null }, { subtotalAmount: 71499 },
   ]) {
@@ -149,4 +190,10 @@ test("split-note rounding allocates the exact sourced gross and rejects incomple
       { ...fixture.sources[0], deliveryNotes: [{ ...fixture.sources[0].deliveryNotes[0], ...invalid }] }, fixture.sources[1],
     ] }));
   }
+  for (const invalid of [
+    { taxAmount: -1 }, { shippingFeeAmount: -1 }, { totalAmount: Number.MAX_SAFE_INTEGER + 1 },
+    { grossTotalAmount: fixture.sources[0].grossTotalAmount - 1 },
+  ]) assert.throws(() => consolidatedDeliveryNoteRows({ ...fixture, sources: [
+    { ...fixture.sources[0], ...invalid }, fixture.sources[1],
+  ] }));
 });

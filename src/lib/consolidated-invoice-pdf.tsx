@@ -12,14 +12,13 @@ export function consolidatedInvoiceDocumentData(data: ConsolidatedPdfData): Invo
     date: displayIssuedDate(bundle.issueState!.issuedDate),
     dueDate: data.dueDate?.replaceAll("-", "/") ?? "未確定",
     customer: { name: recipient, type: "business" },
-    items: data.rows.map(row => ({ slipNumber: row.slipNumber, date: row.date.replaceAll("-", "/"), description: `修理 ${row.repairCount}点`, amount: row.amount })),
+    items: data.rows.map(row => ({ slipNumber: row.slipNumber, date: row.date.replaceAll("-", "/"), description: `${row.repairCount}点`, amount: row.amount })),
     taxRate: 0.1,
-    pricingTaxMode: "INCLUSIVE",
+    pricingTaxMode: "EXCLUSIVE",
     subtotalAmount: data.gross - data.tax,
     taxAmount: data.tax,
     shippingFeeAmount: 0,
     grossTotalAmount: data.gross,
-    taxSummaryLabel: "内消費税（確定額）",
     bankInfo: "三井住友銀行　店番411\n普通 3602468\nヨシダ シュウヘイ",
   };
 }

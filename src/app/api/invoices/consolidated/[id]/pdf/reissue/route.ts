@@ -86,7 +86,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const storageKey = `consolidated-invoices/${id}/${previous.id}-${randomUUID()}.pdf`;
   const version = previous.version + 1;
   const hash = createHash("sha256").update(buffer).digest("hex");
-  const fileName = `consolidated_invoice_${id}_v${version}_delivery_notes.pdf`;
+  const fileName = `consolidated_invoice_${id}_v${version}_net_delivery_notes.pdf`;
   try { await uploadConsolidatedPdf(storageKey, buffer); }
   catch (error) {
     console.error("Consolidated reissue upload failed", { id, storageKey, error });

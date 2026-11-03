@@ -5,14 +5,18 @@ import { formatIssuedDate } from "./document-issued-date";
 
 export const consolidatedBundleInclude = {
   issueState: true,
-  sources: { include: { deliveryNotes: true }, orderBy: { id: "asc" } },
+  sources: { include: { deliveryNotes: { orderBy: { id: "asc" } } }, orderBy: { id: "asc" } },
 } satisfies Prisma.ConsolidatedInvoiceInclude;
 
 export type ConsolidatedBundle = Prisma.ConsolidatedInvoiceGetPayload<{ include: typeof consolidatedBundleInclude }>;
 
-export const consolidatedDeliveryNotePdfFileName = (id: number) => `consolidated_invoice_${id}_delivery_notes.pdf`;
-export const isConsolidatedDeliveryNotePdf = (id: number, fileName: string) =>
+export const consolidatedDeliveryNotePdfFileName = (id: number) => `consolidated_invoice_${id}_net_delivery_notes.pdf`;
+export const isConsolidatedNetDeliveryNotePdf = (id: number, fileName: string) =>
   fileName === consolidatedDeliveryNotePdfFileName(id) ||
+  new RegExp(`^consolidated_invoice_${id}_v(?:[2-9]|[1-9]\\d+)_net_delivery_notes\\.pdf$`).test(fileName);
+export const isConsolidatedDeliveryNotePdf = (id: number, fileName: string) =>
+  isConsolidatedNetDeliveryNotePdf(id, fileName) ||
+  fileName === `consolidated_invoice_${id}_delivery_notes.pdf` ||
   new RegExp(`^consolidated_invoice_${id}_v(?:[2-9]|[1-9]\\d+)_delivery_notes\\.pdf$`).test(fileName);
 
 type NoteSource = { totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
@@ -20,7 +24,7 @@ type NoteSource = { totalAmount: number; taxAmount: number; shippingFeeAmount: n
 
 export function consolidatedDeliveryNoteRows(bundle: { grossTotalAmount: number; sources: readonly NoteSource[] }) {
   if (bundle.sources.length < 2) throw new Error("Incomplete consolidated invoice");
-  const rows: { slipNumber: string; date: string; repairCount: number; amount: number }[] = [];
+  const rows: { slipNumber: string; date: string; repairCount: number; amount: number; taxAmount: number; grossAmount: number }[] = [];
   for (const source of bundle.sources) {
     const { totalAmount: net, taxAmount: tax, shippingFeeAmount: shipping, grossTotalAmount: gross } = source;
     if (![net, tax, shipping, gross].every(value => Number.isSafeInteger(value) && value >= 0) || gross !== net + tax + shipping ||
@@ -30,21 +34,27 @@ export function consolidatedDeliveryNoteRows(bundle: { grossTotalAmount: number;
       !Number.isSafeInteger(note.repairCount) || note.repairCount <= 0 ||
       !Number.isSafeInteger(note.subtotalAmount) || (note.subtotalAmount ?? -1) < 0) ||
       notes.reduce((sum, note) => sum + note.subtotalAmount!, 0) !== net) throw new Error("Incomplete delivery note snapshot");
-    // Cumulative allocation gives deterministic rounding and assigns every sourced yen.
-    let cumulativeNet = 0, allocated = 0;
+    // Allocate the frozen shipping and tax independently; cumulative division assigns every yen.
+    let cumulativeNet = 0, allocatedShipping = 0, allocatedTax = 0;
     for (const [index, note] of notes.entries()) {
       cumulativeNet += note.subtotalAmount!;
-      const cumulativeGross = net === 0
-        ? Number(BigInt(gross) * BigInt(index + 1) / BigInt(notes.length))
-        : Number(BigInt(gross) * BigInt(cumulativeNet) / BigInt(net));
-      const amount = cumulativeGross - allocated;
-      if (!Number.isSafeInteger(amount) || amount < 0) throw new Error("Invalid delivery note allocation");
-      allocated = cumulativeGross;
-      rows.push({ slipNumber: note.slipNumber!.trim(), date: formatIssuedDate(note.issuedDate!), repairCount: note.repairCount, amount });
+      const allocatedPortion = (value: number) => net === 0
+        ? Number(BigInt(value) * BigInt(index + 1) / BigInt(notes.length))
+        : Number(BigInt(value) * BigInt(cumulativeNet) / BigInt(net));
+      const nextShipping = allocatedPortion(shipping);
+      const nextTax = allocatedPortion(tax);
+      const amount = note.subtotalAmount! + nextShipping - allocatedShipping;
+      const taxAmount = nextTax - allocatedTax;
+      const grossAmount = amount + taxAmount;
+      if (![amount, taxAmount, grossAmount].every(value => Number.isSafeInteger(value) && value >= 0)) throw new Error("Invalid delivery note allocation");
+      allocatedShipping = nextShipping;
+      allocatedTax = nextTax;
+      rows.push({ slipNumber: note.slipNumber!.trim(), date: formatIssuedDate(note.issuedDate!), repairCount: note.repairCount, amount, taxAmount, grossAmount });
     }
-    if (allocated !== gross) throw new Error("Delivery note total mismatch");
+    if (allocatedShipping !== shipping || allocatedTax !== tax ||
+        rows.slice(-notes.length).reduce((sum, row) => sum + row.grossAmount, 0) !== gross) throw new Error("Delivery note total mismatch");
   }
-  if (rows.reduce((sum, row) => sum + row.amount, 0) !== bundle.grossTotalAmount) throw new Error("Consolidated total mismatch");
+  if (rows.reduce((sum, row) => sum + row.grossAmount, 0) !== bundle.grossTotalAmount) throw new Error("Consolidated total mismatch");
   return rows;
 }
 

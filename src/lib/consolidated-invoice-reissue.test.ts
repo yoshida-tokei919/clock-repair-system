@@ -19,7 +19,7 @@ test("reissue changes the rendered date while preserving sourced delivery amount
   const data = buildConsolidatedPdfData(revised, [null, null]);
   assert.equal(bundle.issueState!.issuedDate.getTime(), oldDate.getTime());
   assert.equal(data.bundle.issueState!.issuedDate.getTime(), newDate.getTime());
-  assert.deepEqual(data.rows.map(row => [row.slipNumber, row.amount]), [["KD-001", 79329], ["SD-001", 3099]]);
+  assert.deepEqual(data.rows.map(row => [row.slipNumber, row.amount]), [["KD-001", 72179], ["SD-001", 2879]]);
   assert.equal(data.gross, 82428);
   assert.equal(isConsolidatedDeliveryNotePdf(1, "consolidated_invoice_1_v2_delivery_notes.pdf"), true);
   assert.equal(isConsolidatedDeliveryNotePdf(1, "consolidated_invoice_1_v10_delivery_notes.pdf"), true);
@@ -48,5 +48,5 @@ test("schema unique name matches migration and admin preview is legacy-only", ()
   const schema = readFileSync(join(process.cwd(), "prisma/schema.prisma"), "utf8");
   const page = readFileSync(join(process.cwd(), "src/app/(private)/documents/consolidated-invoice/[id]/page.tsx"), "utf8");
   assert.match(schema, /@@unique\(\[consolidatedInvoiceId, version\], map: "ConsolidatedInvoicePdfHistory_bundle_version_key"\)/);
-  assert.match(page, /pdfReady && rows && !isConsolidatedDeliveryNotePdf\(id, bundle\.publication!\.fileName\)/);
+  assert.match(page, /pdfReady && rows && !isConsolidatedNetDeliveryNotePdf\(id, bundle\.publication!\.fileName\)/);
 });
