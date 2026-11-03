@@ -1991,8 +1991,16 @@ model ConsolidatedInvoice {
   billingCustomer Customer @relation("ConsolidatedBillingDestination", fields: [billingCustomerId], references: [id], onDelete: Restrict)
   sources ConsolidatedInvoiceSource[]
   publication ConsolidatedInvoicePublication?
+  issueState ConsolidatedInvoiceIssueState?
 
   @@index([companyId, createdAt])
+}
+
+// Mutable issue date; the consolidated invoice and source snapshots remain immutable audit rows.
+model ConsolidatedInvoiceIssueState {
+  consolidatedInvoiceId Int @id
+  consolidatedInvoice ConsolidatedInvoice @relation(fields: [consolidatedInvoiceId], references: [id], onDelete: Restrict)
+  issuedDate DateTime
 }
 
 // Mutable delivery state is separate from the immutable Task207C audit rows.

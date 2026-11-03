@@ -7,11 +7,19 @@ import { assertConsolidatedSourceUnpaid, buildConsolidatedPdfData, consolidatedB
 import { renderConsolidatedInvoicePdf } from "@/lib/consolidated-invoice-pdf";
 import { calculateInvoicePdfHash } from "@/lib/invoice-pdf-storage";
 import { deleteConsolidatedPdf, uploadConsolidatedPdf } from "@/lib/r2-consolidated-invoice-pdf";
+import { consolidatedDeliveryKey, lockAndCheckConsolidatedSources } from "@/lib/consolidated-invoice-operations";
+import { invoiceDeliveryKey } from "@/lib/invoice-delivery-routing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function checkSources(tx: Prisma.TransactionClient, bundle: ConsolidatedBundle) {
+    const checked = await lockAndCheckConsolidatedSources(tx, bundle.id);
+    if (await tx.lineManagerSendOutbox.findUnique({ where: { idempotencyKey: consolidatedDeliveryKey(bundle.id) }, select: { id: true } })) throw new Error("Consolidated LINE outbox exists");
+    for (const invoice of checked.invoices) {
+      if (invoice.sentAt || invoice.lineSendRetryKey || invoice.lineSendStartedAt || invoice.pdfFiles.some(file => file.sentAt) ||
+        await tx.lineManagerSendOutbox.findUnique({ where: { idempotencyKey: invoiceDeliveryKey(invoice.id) }, select: { id: true } })) throw new Error("Individual delivery exists");
+    }
     const ids = bundle.sources.map(source => source.invoiceId).sort((a, b) => a - b);
     for (const sourceId of ids) await tx.$queryRaw`SELECT "id" FROM "Invoice" WHERE "id" = ${sourceId} FOR UPDATE`;
     const invoices = await tx.invoice.findMany({ where: { id: { in: ids } }, select: {
@@ -25,9 +33,10 @@ async function checkSources(tx: Prisma.TransactionClient, bundle: ConsolidatedBu
     return bundle.sources.map(source => byId.get(source.invoiceId)!.paymentDueDate);
 }
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const unauthorized = await requireAdminApi();
   if (unauthorized) return unauthorized;
+  if ((await request.text()).trim()) return NextResponse.json({ error: "PDF生成後の発行日変更・再発行は現在利用できません。" }, { status: 409 });
   const id = Number((await params).id);
   if (!Number.isSafeInteger(id) || id <= 0) return NextResponse.json({ error: "Invalid bundle id" }, { status: 400 });
   const existing = await prisma.consolidatedInvoicePublication.findUnique({ where: { consolidatedInvoiceId: id } });
@@ -36,6 +45,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const bundle = await prisma.consolidatedInvoice.findUnique({ where: { id }, include: consolidatedBundleInclude });
   if (!bundle) return NextResponse.json({ error: "集約請求が見つかりません。" }, { status: 404 });
+  if (!bundle.issueState) return NextResponse.json({ error: "発行日を確認できません。" }, { status: 409 });
   let dueDates: (Date | null)[];
   try { dueDates = await prisma.$transaction(tx => checkSources(tx, bundle)); }
   catch { return NextResponse.json({ error: "元請求書に入金・処理中決済があるか、状態が変更されました。" }, { status: 409 }); }
@@ -53,6 +63,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   try {
     publication = await prisma.$transaction(async tx => {
       const latestDueDates = await checkSources(tx, bundle);
+      const locked = await tx.$queryRaw<{ id: number }[]>`SELECT "id" FROM "ConsolidatedInvoice" WHERE "id" = ${id} FOR UPDATE`;
+      if (locked.length !== 1) throw new Error("Bundle changed");
+      const stateRows = await tx.$queryRaw<{ issuedDate: Date }[]>`SELECT "issuedDate" FROM "ConsolidatedInvoiceIssueState" WHERE "consolidatedInvoiceId" = ${id} FOR UPDATE`;
+      if (stateRows.length !== 1 || stateRows[0].issuedDate.getTime() !== bundle.issueState!.issuedDate.getTime()) throw new Error("Issue date changed");
       if (latestDueDates.some((date, index) => date?.getTime() !== dueDates[index]?.getTime())) {
         throw new Error("Source due date changed");
       }

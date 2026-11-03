@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { resolveEffectiveBillingCustomer } from "./b2b-company";
 import { hasConsistentInvoiceSnapshots } from "./invoice-repair-snapshots";
+import { resolveIssuedDate } from "./document-issued-date";
 
 export class ConsolidatedInvoiceError extends Error {}
 
@@ -65,8 +66,9 @@ export function assertConsolidationSelection(
 
 export async function createConsolidatedInvoice(
   db: PrismaClient,
-  input: { invoiceIds: number[]; companyId: number; billingCustomerId: number },
+  input: { invoiceIds: number[]; companyId: number; billingCustomerId: number; issuedDate?: string },
 ) {
+  const issuedDate = resolveIssuedDate(input.issuedDate);
   const ids = input.invoiceIds;
   if (!Array.isArray(ids) || ids.length < 2 || ids.length > 100 || new Set(ids).size !== ids.length
     || ids.some(id => !Number.isSafeInteger(id) || id <= 0)
@@ -107,6 +109,7 @@ export async function createConsolidatedInvoice(
       billingStreet: recipient.street, billingBuilding: recipient.building,
       billingAddress: recipient.address, billingPhone: recipient.phone, billingEmail: recipient.email,
       grossTotalAmount,
+      issueState: { create: { issuedDate } },
       sources: { create: ordered.map(invoice => ({ invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber, sourceCustomerId: invoice.customerId,
         sourceCustomerName: invoice.customer.name, sourceCompanyName: invoice.customer.companyName,
@@ -114,6 +117,6 @@ export async function createConsolidatedInvoice(
         deliveryNotes: { create: deliveryNoteBreakdown(invoice.repairSnapshots,
           hasConsistentInvoiceSnapshots(invoice)) },
       })) },
-    }, include: { sources: { include: { deliveryNotes: true } } } });
+    }, include: { issueState: true, sources: { include: { deliveryNotes: true } } } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

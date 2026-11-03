@@ -22,7 +22,7 @@ export async function GET() {
           company: { select: { name: true, billingCustomerId: true } } } } } } },
     orderBy: { issuedDate: "desc" }, take: 300 }),
     prisma.consolidatedInvoice.findMany({ orderBy: { createdAt: "desc" }, take: 100,
-      include: { publication: { select: { status: true, publicToken: true, storageKey: true, hash: true, fileSize: true, publishedAt: true } },
+      include: { issueState: { select: { issuedDate: true } }, publication: { select: { status: true, publicToken: true, storageKey: true, hash: true, fileSize: true, publishedAt: true } },
         sources: { include: { deliveryNotes: true, invoice: { select: { id: true, invoiceNumber: true, customerId: true,
           issuedDate: true, totalAmount: true, taxAmount: true, shippingFeeAmount: true,
           sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true, pdfFiles: { select: { sentAt: true } },
@@ -50,7 +50,7 @@ export async function GET() {
   const deliveryByKey = new Map(deliveryRows.map(row => [row.idempotencyKey, row.status]));
   const prepaymentInvoiceIds = new Set(prepayments.map(row => row.repair?.invoiceId));
   const result = await Promise.all(bundles.map(async bundle => {
-    let sourceSafe = bundle.sources.length >= 2;
+    let sourceSafe = bundle.sources.length >= 2 && !!bundle.issueState;
     let legacyDeliverySafe = true;
     let unpaidSafe = true;
     const sources = bundle.sources.map(({ invoice, ...source }) => {
@@ -76,7 +76,7 @@ export async function GET() {
     const operationalSafe = sourceSafe && legacyDeliverySafe;
     const newDeliverySafe = operationalSafe && unpaidSafe && paymentStatus === "UNPAID";
     const destination = outboxStatus || !pdfReady || !newDeliverySafe ? null : await resolveInvoiceLineDestination(prisma, bundle.billingCustomerId);
-    return { ...bundle, sources, paidAmount, outstandingBalance,
+    return { ...bundle, issuedDate: bundle.issueState?.issuedDate ?? null, sources, paidAmount, outstandingBalance,
       paymentStatus,
       deliveryMethod: outboxStatus ? "LINE" : !operationalSafe ? "BLOCKED" : !newDeliverySafe ? "NONE" : destination ? "LINE" : "POSTAL",
       deliveryStatus: outboxStatus ?? (!operationalSafe ? "BLOCKED" : !newDeliverySafe ? "NO_NEW_DELIVERY" : destination ? "READY" : "PRINT_PENDING"), pdfReady,
@@ -93,17 +93,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "入力が不正です。" }, { status: 400 });
   }
   if (!body || typeof body !== "object") return NextResponse.json({ error: "入力が不正です。" }, { status: 400 });
-  const input = body as { invoiceIds?: unknown; companyId?: unknown; billingCustomerId?: unknown };
+  const input = body as { invoiceIds?: unknown; companyId?: unknown; billingCustomerId?: unknown; issuedDate?: unknown };
   if (!Array.isArray(input.invoiceIds) || typeof input.companyId !== "number" || typeof input.billingCustomerId !== "number") {
     return NextResponse.json({ error: "会社・請求先と請求書を選択してください。" }, { status: 400 });
   }
+  if (input.issuedDate !== undefined && typeof input.issuedDate !== "string") return NextResponse.json({ error: "発行日はYYYY-MM-DD形式で指定してください。" }, { status: 400 });
   try {
     const bundle = await createConsolidatedInvoice(prisma, {
       invoiceIds: input.invoiceIds, companyId: input.companyId, billingCustomerId: input.billingCustomerId,
+      issuedDate: input.issuedDate as string | undefined,
     });
     return NextResponse.json(bundle, { status: 201 });
   } catch (error) {
     if (error instanceof ConsolidatedInvoiceError) return NextResponse.json({ error: error.message }, { status: 409 });
+    if (error instanceof Error && error.message.includes("発行日")) return NextResponse.json({ error: error.message }, { status: 400 });
     // Unique-source and serializable conflicts both require a refreshed selection.
     console.error("Consolidated invoice creation failed", error);
     return NextResponse.json({ error: "請求書の状態が変更されました。再読み込みしてください。" }, { status: 409 });

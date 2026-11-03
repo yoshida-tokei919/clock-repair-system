@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { IssuedDateDialog } from "@/components/documents/IssuedDateDialog";
 
 type Candidate = { id: number; invoiceNumber: string; grossTotalAmount: number; sourceCustomerName: string;
   companyId: number; companyName: string; billingCustomerId: number };
-type Bundle = { id: number; createdAt: string; companyName: string; billingName: string;
+type Bundle = { id: number; issuedDate: string | null; companyName: string; billingName: string;
   publication: { status: string; publicToken: string } | null; pdfReady: boolean;
   paidAmount: number; outstandingBalance: number; paymentStatus: string;
   deliveryMethod: string; deliveryStatus: string; operationalSafe: boolean; canConfirmPayment: boolean;
@@ -25,6 +26,7 @@ export function ConsolidatedInvoicePanel() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [generatingId, setGeneratingId] = useState<number | null>(null);
   const [actionId, setActionId] = useState<number | null>(null);
   const load = useCallback(async () => {
@@ -39,16 +41,16 @@ export function ConsolidatedInvoicePanel() {
   const chosen = candidates.filter(row => selected.includes(row.id));
   const billingCustomerId = candidates[0]?.billingCustomerId;
 
-  async function create() {
+  async function create(issuedDate?: string) {
     if (!companyId || !billingCustomerId || selected.length < 2) return;
     setSaving(true); setError("");
     try {
       const response = await fetch("/api/invoices/consolidated", { method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId, billingCustomerId, invoiceIds: selected }) });
+        body: JSON.stringify({ companyId, billingCustomerId, invoiceIds: selected, issuedDate }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "集約請求を作成できませんでした。");
-      setSelected([]); setExpanded(result.id); await load();
+      setSelected([]); setIssueDialogOpen(false); setExpanded(result.id); await load();
     } catch (error) { setError(error instanceof Error ? error.message : "集約請求を作成できませんでした。"); }
     finally { setSaving(false); }
   }
@@ -108,7 +110,7 @@ export function ConsolidatedInvoicePanel() {
       </label>)}
       <div className="flex items-center justify-between pt-2">
         <span>選択合計（税込） ¥{chosen.reduce((sum, row) => sum + row.grossTotalAmount, 0).toLocaleString()}</span>
-        <button className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-40" disabled={saving || selected.length < 2} onClick={create}>
+        <button className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-40" disabled={saving || selected.length < 2} onClick={() => setIssueDialogOpen(true)}>
           {saving ? "作成中..." : "集約請求を作成"}
         </button>
       </div>
@@ -117,11 +119,16 @@ export function ConsolidatedInvoicePanel() {
     <h3 className="font-semibold mt-7 mb-2">作成済み集約請求</h3>
     {bundles.length === 0 && <p className="text-sm text-gray-500">まだありません。</p>}
     {bundles.map(bundle => <div key={bundle.id} className="border rounded mb-2 p-3 text-sm">
-      <button className="w-full text-left flex justify-between" onClick={() => setExpanded(expanded === bundle.id ? null : bundle.id)}>
-        <span>#{bundle.id} {bundle.companyName} / {new Date(bundle.createdAt).toLocaleDateString("ja-JP")}</span>
+      <Link className="flex justify-between rounded hover:text-blue-700" href={`/documents/consolidated-invoice/${bundle.id}`}>
+        <span>集約 #{bundle.id} / {bundle.billingCompanyName || bundle.billingName} / 発行 {bundle.issuedDate ? new Date(bundle.issuedDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "未確認"}</span>
         <strong>¥{bundle.grossTotalAmount.toLocaleString()}</strong>
-      </button>
+      </Link>
+      <div className="mt-1 flex justify-between items-center">
+        <span className={`rounded-full px-2 py-0.5 text-xs ${bundle.paymentStatus === "PAID" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{bundle.paymentStatus === "PAID" ? "入金済み" : bundle.paymentStatus === "PARTIAL" ? "一部入金" : "未入金"}</span>
+        <button className="text-blue-700 underline" onClick={() => setExpanded(expanded === bundle.id ? null : bundle.id)}>{expanded === bundle.id ? "閉じる" : "一覧で詳細を表示"}</button>
+      </div>
       {expanded === bundle.id && <div className="mt-3 border-t pt-3 space-y-3">
+        <Link className="text-blue-700 underline" href={`/documents/consolidated-invoice/${bundle.id}`}>集約請求書の詳細を開く</Link>
         <div className="flex flex-wrap gap-3 items-center">
           {bundle.pdfReady ? <>
             <a className="text-blue-700 underline" href={`/api/invoices/consolidated/${bundle.id}/pdf`} target="_blank" rel="noopener noreferrer">PDFを開く・保存</a>
@@ -150,5 +157,7 @@ export function ConsolidatedInvoicePanel() {
         <p className="text-xs text-gray-500">納品書行に税込金額・税額は配賦していません。LINEのAPPROVEDは送信待ちであり、送信済みではありません。</p>
       </div>}
     </div>)}
-  </section>;
+      <IssuedDateDialog open={issueDialogOpen} title="集約請求書の発行を確認" busy={saving}
+        onClose={() => setIssueDialogOpen(false)} onConfirm={date => void create(date)} />
+    </section>;
 }

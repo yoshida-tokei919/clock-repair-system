@@ -13,6 +13,12 @@ export class ConsolidatedOperationError extends Error {
 export const consolidatedDeliveryKey = (id: number) => `b2b-consolidated-invoice-line:${id}`;
 export const consolidatedPaymentPurpose = (id: number) => `consolidated-invoice:${id}`;
 
+export async function hasIndividualInvoiceOutbox(tx: Prisma.TransactionClient, invoiceId: number) {
+  return !!await tx.lineManagerSendOutbox.findUnique({
+    where: { idempotencyKey: invoiceDeliveryKey(invoiceId) }, select: { id: true },
+  });
+}
+
 export function consolidatedPaymentTotals(sources: readonly { paidAmount: number; outstandingBalance: number }[]) {
   const paidAmount = sources.reduce((sum, row) => sum + row.paidAmount, 0);
   const outstandingBalance = sources.reduce((sum, row) => sum + row.outstandingBalance, 0);

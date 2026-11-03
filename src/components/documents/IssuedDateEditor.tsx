@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { IssuedDateDialog } from "./IssuedDateDialog";
 
-type DocumentType = "estimate" | "delivery" | "invoice" | "warranty";
+type DocumentType = "estimate" | "delivery" | "invoice" | "warranty" | "consolidated-invoice";
 
 export function IssuedDateEditor({ type, id, issuedDate, hasPdf = false, onSaved }: {
   type: DocumentType; id: number; issuedDate: string; hasPdf?: boolean; onSaved?: () => void;
@@ -18,7 +18,8 @@ export function IssuedDateEditor({ type, id, issuedDate, hasPdf = false, onSaved
     setBusy(true); setError(null);
     try {
       const pdfUrl = type === "estimate" ? `/api/documents/estimate/${id}/pdf/generate` : `/api/invoices/${id}/pdf/generate`;
-      const response = await fetch(hasPdf ? pdfUrl : `/api/documents/issued-date/${type}/${id}`, {
+      const editUrl = type === "consolidated-invoice" ? `/api/invoices/consolidated/${id}/issued-date` : `/api/documents/issued-date/${type}/${id}`;
+      const response = await fetch(hasPdf ? pdfUrl : editUrl, {
         method: hasPdf ? "POST" : "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ issuedDate: date }),
       });

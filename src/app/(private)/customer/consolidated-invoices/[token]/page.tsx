@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { isCurrentConsolidatedPdf, validConsolidatedShareToken } from "@/lib/consolidated-invoice-publication";
 import { calculateInvoicePdfHash } from "@/lib/invoice-pdf-storage";
 import { downloadConsolidatedPdf } from "@/lib/r2-consolidated-invoice-pdf";
+import { formatIssuedDate } from "@/lib/document-issued-date";
 
 export const dynamic = "force-dynamic";
 
@@ -10,13 +11,14 @@ export default async function ConsolidatedCustomerPage({ params }: { params: Pro
   const token = (await params).token;
   if (!validConsolidatedShareToken(token)) return notFound();
   const publication = await prisma.consolidatedInvoicePublication.findUnique({ where: { publicToken: token },
-    include: { consolidatedInvoice: { include: { sources: { include: { deliveryNotes: true }, orderBy: { id: "asc" } } } } } });
+    include: { consolidatedInvoice: { include: { issueState: true, sources: { include: { deliveryNotes: true }, orderBy: { id: "asc" } } } } } });
   if (!isCurrentConsolidatedPdf(publication)) return notFound();
   try {
     const stored = await downloadConsolidatedPdf(publication.storageKey);
     if (stored.length !== publication.fileSize || calculateInvoicePdfHash(stored) !== publication.hash) return notFound();
   } catch { return notFound(); }
   const bundle = publication.consolidatedInvoice;
+  if (!bundle.issueState) return notFound();
   if (bundle.sources.length < 2 || bundle.sources.reduce((sum, source) => sum + source.grossTotalAmount, 0) !== bundle.grossTotalAmount) return notFound();
   const pdfHref = `/customer/consolidated-invoices/${token}/invoice.pdf`;
   const yen = (amount: number) => `¥${amount.toLocaleString("ja-JP")}`;
@@ -30,6 +32,7 @@ export default async function ConsolidatedCustomerPage({ params }: { params: Pro
         <h2 className="font-bold">ご請求内容</h2>
         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
           <div><dt className="text-slate-500">集約請求</dt><dd className="font-semibold">#{bundle.id}</dd></div>
+          <div><dt className="text-slate-500">発行日</dt><dd className="font-semibold">{formatIssuedDate(bundle.issueState.issuedDate)}</dd></div>
           <div><dt className="text-slate-500">請求先（作成時）</dt><dd className="font-semibold">{bundle.billingCompanyName || bundle.billingName}</dd></div>
           <div className="sm:col-span-2"><dt className="text-slate-500">請求総額（税込）</dt><dd className="text-2xl font-bold text-blue-800">{yen(bundle.grossTotalAmount)}</dd></div>
         </dl>

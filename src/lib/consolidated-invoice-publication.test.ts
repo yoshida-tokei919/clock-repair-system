@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ConsolidatedBundle } from "./consolidated-invoice-publication";
-import { assertConsolidatedSourceUnpaid, buildConsolidatedPdfData, isCurrentConsolidatedPdf, newConsolidatedShareToken, validConsolidatedShareToken } from "./consolidated-invoice-publication";
+import { assertConsolidatedSourceUnpaid, buildConsolidatedPdfData, hasConsolidatedSourceSnapshotIntegrity, isCurrentConsolidatedPdf, newConsolidatedShareToken, validConsolidatedShareToken } from "./consolidated-invoice-publication";
 import { renderConsolidatedInvoicePdf } from "./consolidated-invoice-pdf";
 
 const due = new Date("2026-12-31T00:00:00Z");
 const fixture = {
-  id: 1, createdAt: new Date("2026-11-03T00:00:00Z"), companyName: "架空グループ", billingName: "架空取引先",
+  id: 1, createdAt: new Date("2026-11-03T00:00:00Z"), issueState: { issuedDate: new Date("2026-11-04T15:00:00Z") }, companyName: "架空グループ", billingName: "架空取引先",
   billingCompanyName: null, billingZipCode: null, billingAddress: null, billingPrefecture: null,
   billingCity: null, billingStreet: null, billingBuilding: null,
   grossTotalAmount: 82428,
@@ -19,8 +19,30 @@ const fixture = {
   ],
 } as unknown as ConsolidatedBundle;
 
+test("admin actions require frozen source integrity but ordinary payment status is separate", () => {
+  const sources = fixture.sources.map((source, index) => ({ ...source,
+    sourceCustomerId: index + 20, issuedDate: due,
+    invoice: { id: source.invoiceId, invoiceNumber: source.invoiceNumber, customerId: index + 20,
+      issuedDate: due, totalAmount: source.totalAmount, taxAmount: source.taxAmount,
+      shippingFeeAmount: source.shippingFeeAmount, grossTotalAmount: source.grossTotalAmount, status: "paid" },
+  }));
+  const bundle = { grossTotalAmount: fixture.grossTotalAmount, sources };
+  assert.equal(hasConsolidatedSourceSnapshotIntegrity(bundle), true);
+  assert.equal(hasConsolidatedSourceSnapshotIntegrity({ ...bundle, grossTotalAmount: bundle.grossTotalAmount - 1 }), false);
+  for (const changed of [
+    { invoiceNumber: "other" }, { customerId: 999 }, { issuedDate: new Date(0) },
+    { totalAmount: 0 }, { taxAmount: 0 }, { shippingFeeAmount: 1 }, { grossTotalAmount: 1 },
+  ]) {
+    assert.equal(hasConsolidatedSourceSnapshotIntegrity({ ...bundle, sources: [
+      { ...sources[0], invoice: { ...sources[0].invoice, ...changed } }, sources[1],
+    ] }), false);
+  }
+});
+
 test("consolidated PDF totals use immutable source snapshots", () => {
   const data = buildConsolidatedPdfData(fixture, [due, due]);
+  assert.equal(data.bundle.issueState?.issuedDate.toISOString(), "2026-11-04T15:00:00.000Z");
+  assert.throws(() => buildConsolidatedPdfData({ ...fixture, issueState: null }, [due, due]));
   assert.equal(data.gross, 82428);
   assert.equal(data.subtotal, 74934);
   assert.equal(data.tax, 7494);

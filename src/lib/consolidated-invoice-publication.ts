@@ -3,13 +3,34 @@ import type { Prisma } from "@prisma/client";
 import { calculateInvoicePaymentSummary } from "./invoice-payment";
 
 export const consolidatedBundleInclude = {
+  issueState: true,
   sources: { include: { deliveryNotes: true }, orderBy: { id: "asc" } },
 } satisfies Prisma.ConsolidatedInvoiceInclude;
 
 export type ConsolidatedBundle = Prisma.ConsolidatedInvoiceGetPayload<{ include: typeof consolidatedBundleInclude }>;
 
+type SnapshotSource = {
+  invoiceId: number; invoiceNumber: string; sourceCustomerId: number; issuedDate: Date;
+  totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
+  invoice: { id: number; invoiceNumber: string; customerId: number; issuedDate: Date;
+    totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number };
+};
+
+export function hasConsolidatedSourceSnapshotIntegrity(bundle: { grossTotalAmount: number; sources: SnapshotSource[] }) {
+  return bundle.sources.length >= 2 &&
+    bundle.sources.reduce((sum, source) => sum + source.grossTotalAmount, 0) === bundle.grossTotalAmount &&
+    bundle.sources.every(source => source.invoice.id === source.invoiceId &&
+      source.invoice.invoiceNumber === source.invoiceNumber &&
+      source.invoice.customerId === source.sourceCustomerId &&
+      source.invoice.issuedDate.getTime() === source.issuedDate.getTime() &&
+      source.invoice.totalAmount === source.totalAmount && source.invoice.taxAmount === source.taxAmount &&
+      source.invoice.shippingFeeAmount === source.shippingFeeAmount &&
+      source.invoice.grossTotalAmount === source.grossTotalAmount &&
+      source.grossTotalAmount > 0 && source.grossTotalAmount === source.totalAmount + source.taxAmount + source.shippingFeeAmount);
+}
+
 export function buildConsolidatedPdfData(bundle: ConsolidatedBundle, dueDates: (Date | null)[]) {
-  if (bundle.sources.length < 2 || dueDates.length !== bundle.sources.length) throw new Error("Incomplete consolidated invoice");
+  if (!bundle.issueState || bundle.sources.length < 2 || dueDates.length !== bundle.sources.length) throw new Error("Incomplete consolidated invoice");
   let subtotal = 0, tax = 0, shipping = 0, gross = 0;
   for (const source of bundle.sources) {
     if (source.totalAmount < 0 || source.taxAmount < 0 || source.shippingFeeAmount < 0 ||

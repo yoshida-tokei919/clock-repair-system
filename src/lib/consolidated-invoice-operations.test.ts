@@ -2,9 +2,25 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { PrismaClient } from "@prisma/client";
+import { invoiceDeliveryKey } from "./invoice-delivery-routing";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { confirmConsolidatedBankReceipt, consolidatedDeliveryKey, consolidatedPaymentPurpose, consolidatedPaymentTotals,
-  queueConsolidatedInvoiceLine } from "./consolidated-invoice-operations";
+  hasIndividualInvoiceOutbox, queueConsolidatedInvoiceLine } from "./consolidated-invoice-operations";
+
+test("individual invoice outbox blocks date changes in every state", async () => {
+  const keys: string[] = [];
+  let row: { id: number; status: string } | null = { id: 1, status: "CANCELLED" };
+  const tx = { lineManagerSendOutbox: { findUnique: async ({ where }: { where: { idempotencyKey: string } }) => {
+    keys.push(where.idempotencyKey);
+    return row;
+  } } } as unknown as Prisma.TransactionClient;
+  assert.equal(await hasIndividualInvoiceOutbox(tx, 42), true);
+  row = { id: 1, status: "CONFIRMED" };
+  assert.equal(await hasIndividualInvoiceOutbox(tx, 42), true);
+  row = null;
+  assert.equal(await hasIndividualInvoiceOutbox(tx, 42), false);
+  assert.deepEqual(keys, Array(3).fill(invoiceDeliveryKey(42)));
+});
 
 const token = "a".repeat(43);
 const issuedDate = new Date("2026-11-01T00:00:00Z");

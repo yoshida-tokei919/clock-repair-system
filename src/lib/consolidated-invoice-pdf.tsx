@@ -24,7 +24,7 @@ export async function renderConsolidatedInvoicePdf(data: ConsolidatedPdfData): P
   const address = bundle.billingAddress || [bundle.billingPrefecture, bundle.billingCity, bundle.billingStreet, bundle.billingBuilding].filter(Boolean).join("");
   const pdf = <Document><Page size="A4" style={styles.page}>
     <Text style={styles.heading}>請求書（集約）</Text>
-    <Text style={styles.meta}>集約請求 #{bundle.id}　発行日: {date(bundle.createdAt)}</Text>
+    <Text style={styles.meta}>集約請求 #{bundle.id}　発行日: {date(bundle.issueState!.issuedDate)}</Text>
     <Text style={styles.meta}>取引先グループ: {bundle.companyName}</Text>
     <Text style={styles.recipient}>{bundle.billingCompanyName || bundle.billingName} 御中</Text>
     {!!bundle.billingZipCode && <Text style={styles.meta}>〒{bundle.billingZipCode}</Text>}
