@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { calculateInvoicePaymentSummary } from "./invoice-payment";
+import { formatIssuedDate } from "./document-issued-date";
 
 export const consolidatedBundleInclude = {
   issueState: true,
@@ -8,6 +9,43 @@ export const consolidatedBundleInclude = {
 } satisfies Prisma.ConsolidatedInvoiceInclude;
 
 export type ConsolidatedBundle = Prisma.ConsolidatedInvoiceGetPayload<{ include: typeof consolidatedBundleInclude }>;
+
+export const consolidatedDeliveryNotePdfFileName = (id: number) => `consolidated_invoice_${id}_delivery_notes.pdf`;
+export const isConsolidatedDeliveryNotePdf = (id: number, fileName: string) =>
+  fileName === consolidatedDeliveryNotePdfFileName(id);
+
+type NoteSource = { totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
+  deliveryNotes: { slipNumber: string | null; issuedDate: Date | null; repairCount: number; subtotalAmount: number | null }[] };
+
+export function consolidatedDeliveryNoteRows(bundle: { grossTotalAmount: number; sources: readonly NoteSource[] }) {
+  if (bundle.sources.length < 2) throw new Error("Incomplete consolidated invoice");
+  const rows: { slipNumber: string; date: string; repairCount: number; amount: number }[] = [];
+  for (const source of bundle.sources) {
+    const { totalAmount: net, taxAmount: tax, shippingFeeAmount: shipping, grossTotalAmount: gross } = source;
+    if (![net, tax, shipping, gross].every(value => Number.isSafeInteger(value) && value >= 0) || gross !== net + tax + shipping ||
+        source.deliveryNotes.length === 0) throw new Error("Invalid source invoice snapshot");
+    const notes = source.deliveryNotes;
+    if (notes.some(note => !note.slipNumber?.trim() || !note.issuedDate || !Number.isFinite(note.issuedDate.getTime()) ||
+      !Number.isSafeInteger(note.repairCount) || note.repairCount <= 0 ||
+      !Number.isSafeInteger(note.subtotalAmount) || (note.subtotalAmount ?? -1) < 0) ||
+      notes.reduce((sum, note) => sum + note.subtotalAmount!, 0) !== net) throw new Error("Incomplete delivery note snapshot");
+    // Cumulative allocation gives deterministic rounding and assigns every sourced yen.
+    let cumulativeNet = 0, allocated = 0;
+    for (const [index, note] of notes.entries()) {
+      cumulativeNet += note.subtotalAmount!;
+      const cumulativeGross = net === 0
+        ? Number(BigInt(gross) * BigInt(index + 1) / BigInt(notes.length))
+        : Number(BigInt(gross) * BigInt(cumulativeNet) / BigInt(net));
+      const amount = cumulativeGross - allocated;
+      if (!Number.isSafeInteger(amount) || amount < 0) throw new Error("Invalid delivery note allocation");
+      allocated = cumulativeGross;
+      rows.push({ slipNumber: note.slipNumber!.trim(), date: formatIssuedDate(note.issuedDate!), repairCount: note.repairCount, amount });
+    }
+    if (allocated !== gross) throw new Error("Delivery note total mismatch");
+  }
+  if (rows.reduce((sum, row) => sum + row.amount, 0) !== bundle.grossTotalAmount) throw new Error("Consolidated total mismatch");
+  return rows;
+}
 
 type SnapshotSource = {
   invoiceId: number; invoiceNumber: string; sourceCustomerId: number; issuedDate: Date;
@@ -45,7 +83,8 @@ export function buildConsolidatedPdfData(bundle: ConsolidatedBundle, dueDates: (
   if (!Number.isSafeInteger(gross) || gross !== bundle.grossTotalAmount) throw new Error("Consolidated total mismatch");
   const dateValues = dueDates.map(date => date?.toISOString().slice(0, 10) ?? null);
   const dueDate = dateValues[0] && dateValues.every(date => date === dateValues[0]) ? dateValues[0] : null;
-  return { bundle, subtotal, tax, shipping, gross, dueDate };
+  const rows = consolidatedDeliveryNoteRows(bundle);
+  return { bundle, subtotal, tax, shipping, gross, dueDate, rows };
 }
 
 export type ConsolidatedPdfData = ReturnType<typeof buildConsolidatedPdfData>;

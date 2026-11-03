@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { isCurrentConsolidatedPdf, validConsolidatedShareToken } from "@/lib/consolidated-invoice-publication";
+import { consolidatedDeliveryNoteRows, isConsolidatedDeliveryNotePdf, isCurrentConsolidatedPdf, validConsolidatedShareToken } from "@/lib/consolidated-invoice-publication";
 import { calculateInvoicePdfHash } from "@/lib/invoice-pdf-storage";
 import { downloadConsolidatedPdf } from "@/lib/r2-consolidated-invoice-pdf";
 import { formatIssuedDate } from "@/lib/document-issued-date";
@@ -19,7 +19,11 @@ export default async function ConsolidatedCustomerPage({ params }: { params: Pro
   } catch { return notFound(); }
   const bundle = publication.consolidatedInvoice;
   if (!bundle.issueState) return notFound();
-  if (bundle.sources.length < 2 || bundle.sources.reduce((sum, source) => sum + source.grossTotalAmount, 0) !== bundle.grossTotalAmount) return notFound();
+  const newFormat = isConsolidatedDeliveryNotePdf(bundle.id, publication.fileName);
+  let rows: ReturnType<typeof consolidatedDeliveryNoteRows> | null = null;
+  if (newFormat) {
+    try { rows = consolidatedDeliveryNoteRows(bundle); } catch { return notFound(); }
+  }
   const pdfHref = `/customer/consolidated-invoices/${token}/invoice.pdf`;
   const yen = (amount: number) => `¥${amount.toLocaleString("ja-JP")}`;
   return <main className="min-h-screen bg-slate-100 px-3 py-6 text-slate-900 sm:py-10">
@@ -33,17 +37,14 @@ export default async function ConsolidatedCustomerPage({ params }: { params: Pro
         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
           <div><dt className="text-slate-500">集約請求</dt><dd className="font-semibold">#{bundle.id}</dd></div>
           <div><dt className="text-slate-500">発行日</dt><dd className="font-semibold">{formatIssuedDate(bundle.issueState.issuedDate)}</dd></div>
-          <div><dt className="text-slate-500">請求先（作成時）</dt><dd className="font-semibold">{bundle.billingCompanyName || bundle.billingName}</dd></div>
+          <div><dt className="text-slate-500">請求先（作成時）</dt><dd className="font-semibold">{bundle.companyName}</dd></div>
           <div className="sm:col-span-2"><dt className="text-slate-500">請求総額（税込）</dt><dd className="text-2xl font-bold text-blue-800">{yen(bundle.grossTotalAmount)}</dd></div>
         </dl>
       </section>
-      <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
-        <h2 className="font-bold">店舗別の元請求書</h2>
-        <ul className="mt-3 space-y-2">{bundle.sources.map(source => <li key={source.id} className="rounded-lg bg-slate-50 p-3 text-sm">
-          <div className="flex flex-wrap justify-between gap-2"><span>{source.sourceCompanyName || source.sourceCustomerName} / {source.invoiceNumber}</span><strong>税込 {yen(source.grossTotalAmount)}</strong></div>
-          {source.deliveryNotes.length > 0 && <p className="mt-1 text-xs text-slate-600">納品書: {source.deliveryNotes.map(note => note.slipNumber || (note.deliveryNoteId ? `#${note.deliveryNoteId}` : "未紐付け")).join("、")}</p>}
-        </li>)}</ul>
-      </section>
+      {rows ? <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
+        <h2 className="font-bold">納品書別のご請求</h2>
+        <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="py-2">納品書番号</th><th>納品日</th><th>内容</th><th className="text-right">金額（税込）</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.slipNumber}-${index}`} className="border-b"><td className="py-2">{row.slipNumber}</td><td>{row.date}</td><td>修理 {row.repairCount}点</td><td className="text-right">{yen(row.amount)}</td></tr>)}</tbody></table></div>
+      </section> : <section className="rounded-xl border border-blue-100 bg-white p-5 text-sm shadow-sm">ご請求内容は保存済みPDFをご確認ください。</section>}
       <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
         <h2 className="font-bold">請求書PDF</h2>
         <p className="mt-2 text-sm text-slate-600">保存済みの集約請求書をご確認ください。</p>

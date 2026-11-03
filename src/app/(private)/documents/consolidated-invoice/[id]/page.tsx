@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { formatIssuedDate } from "@/lib/document-issued-date";
 import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 import { consolidatedDeliveryKey } from "@/lib/consolidated-invoice-operations";
-import { hasConsolidatedSourceSnapshotIntegrity, isCurrentConsolidatedPdf, validConsolidatedShareToken } from "@/lib/consolidated-invoice-publication";
+import { consolidatedDeliveryNoteRows, hasConsolidatedSourceSnapshotIntegrity, isCurrentConsolidatedPdf, validConsolidatedShareToken } from "@/lib/consolidated-invoice-publication";
 import { IssuedDateEditor } from "@/components/documents/IssuedDateEditor";
 import { ConsolidatedInvoiceActions } from "@/components/invoices/ConsolidatedInvoiceActions";
 import { invoiceDeliveryKey } from "@/lib/invoice-delivery-routing";
@@ -43,7 +43,9 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
   const individuallyDelivered = individualOutboxCount > 0 || bundle.sources.some(source => source.invoice.sentAt || source.invoice.lineSendRetryKey || source.invoice.lineSendStartedAt || source.invoice.pdfFiles.some(file => file.sentAt));
   const snapshotSafe = !!bundle.issueState && hasConsolidatedSourceSnapshotIntegrity(bundle);
   const unpaidSafe = outstanding === bundle.grossTotalAmount && paidAmount === 0 && prepaymentCount === 0 && bundle.sources.every(source => source.invoice.status === "issued" && source.invoice.paymentAllocations.length === 0);
-  const canGenerate = snapshotSafe && !bundle.publication && !outbox && !individuallyDelivered && unpaidSafe;
+  let rows: ReturnType<typeof consolidatedDeliveryNoteRows> | null = null;
+  try { rows = consolidatedDeliveryNoteRows(bundle); } catch { /* Incomplete snapshots cannot produce delivery note rows. */ }
+  const canGenerate = snapshotSafe && !!rows && !bundle.publication && !outbox && !individuallyDelivered && unpaidSafe;
   const canConfirmPayment = snapshotSafe && !individuallyDelivered && unpaidSafe;
   const canQueue = snapshotSafe && pdfReady && !!destination && !outbox && !individuallyDelivered && unpaidSafe;
   const delivery = outbox?.status === "CONFIRMED" ? "LINE送信確認済み" : outbox?.status === "APPROVED" ? "LINE送信待ち（未送信）"
@@ -56,7 +58,7 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
         {!bundle.issueState ? <p role="alert" className="mt-2 text-sm text-red-800">発行日を確認できません。操作を停止しています。</p>
           : bundle.publication ? <p className="mt-2 text-sm">発行日: {formatIssuedDate(bundle.issueState.issuedDate)} <span className="text-slate-500">（PDF発行後は変更できません。{outbox ? "LINE送信履歴があります。" : "再発行は未対応です。"}）</span></p>
           : <IssuedDateEditor type="consolidated-invoice" id={id} issuedDate={formatIssuedDate(bundle.issueState.issuedDate)} />}
-        <p className="mt-2 text-sm">請求先: {bundle.billingCompanyName || bundle.billingName} / {bundle.billingName}</p>
+        <p className="mt-2 text-sm">請求先: {bundle.companyName}</p>
         <p className="text-sm">支払期限: {dueDate ?? "未確定（元請求書の期限が一致しません）"}</p>
         <p className="text-sm">請求額: {yen(bundle.grossTotalAmount)}　入金済: {yen(paidAmount)}　未収: {yen(outstanding)} <strong>{paymentStatus}</strong></p>
         <p className="text-sm">案内: {delivery}</p>
@@ -65,13 +67,13 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
         <div className="mt-4"><ConsolidatedInvoiceActions id={id} pdfReady={pdfReady} canGenerate={canGenerate} canQueue={canQueue} canConfirmPayment={canConfirmPayment} shareToken={pdfReady ? bundle.publication!.publicToken : null} /></div>
       </header>
       <section className="rounded-lg bg-white p-5 shadow-sm text-sm">
-        <h2 className="font-bold">元請求書・納品書</h2>
-        {bundle.sources.map(source => <div key={source.id} className="mt-3 rounded border p-3">
-          <Link className="text-blue-700 underline" href={`/documents/invoice/${source.invoiceId}`}>{source.invoiceNumber}</Link>　{source.sourceCompanyName || source.sourceCustomerName}　{yen(source.grossTotalAmount)}
-          {source.deliveryNotes.map(note => <p key={note.id} className="ml-4 text-slate-600">納品書 {note.slipNumber || (note.deliveryNoteId ? `#${note.deliveryNoteId}` : "未紐付け")} / 修理 {note.repairCount}件{note.subtotalAmount !== null ? ` / 税抜小計 ${yen(note.subtotalAmount)}` : ""}</p>)}
-        </div>)}
+        <h2 className="font-bold">納品書別のご請求</h2>
+        {rows ? <div className="mt-3 overflow-x-auto"><table className="w-full text-left"><thead><tr className="border-b"><th className="py-2">納品書番号</th><th>納品日</th><th>内容</th><th className="text-right">金額（税込）</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.slipNumber}-${index}`} className="border-b"><td className="py-2">{row.slipNumber}</td><td>{row.date}</td><td>修理 {row.repairCount}点</td><td className="text-right">{yen(row.amount)}</td></tr>)}</tbody></table></div>
+          : <p role="alert" className="mt-3 text-red-800">納品書の確定額を確認できません。</p>}
+        <details className="mt-4 text-xs text-slate-500"><summary>内部照合用の元請求書</summary>{bundle.sources.map(source => <p key={source.id}><Link className="text-blue-700 underline" href={`/documents/invoice/${source.invoiceId}`}>{source.invoiceNumber}</Link>　{yen(source.grossTotalAmount)}</p>)}</details>
         <p className="mt-3 text-xs text-slate-500">集約請求の取消だけでは、元請求書の入金・発行は取り消されません。</p>
       </section>
+      {pdfReady && rows && <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm"><p className="font-bold">新形式PDFプレビュー（管理者専用・未公開）</p><p>保存済みPDFとは別の表示です。共有ページのPDFは保存済みのままです。</p><a className="text-blue-700 underline" href={`/api/invoices/consolidated/${id}/pdf/preview`} target="_blank" rel="noopener noreferrer">新形式PDFを開く</a></div>}
       {pdfReady ? <iframe src={`/api/invoices/consolidated/${id}/pdf`} className="h-[75vh] w-full border-0 bg-white" title="保存済み集約請求書PDF" />
         : <div className="rounded border border-amber-200 bg-amber-50 p-5 text-sm">保存済みPDFがありません。元請求書と入金・送信状態を確認してPDFを生成してください。</div>}
     </div>

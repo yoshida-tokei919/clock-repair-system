@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-api-auth";
 import { prisma } from "@/lib/prisma";
-import { assertConsolidatedSourceUnpaid, buildConsolidatedPdfData, consolidatedBundleInclude, newConsolidatedShareToken, type ConsolidatedBundle } from "@/lib/consolidated-invoice-publication";
+import { assertConsolidatedSourceUnpaid, buildConsolidatedPdfData, consolidatedBundleInclude, consolidatedDeliveryNotePdfFileName, newConsolidatedShareToken, type ConsolidatedBundle } from "@/lib/consolidated-invoice-publication";
 import { renderConsolidatedInvoicePdf } from "@/lib/consolidated-invoice-pdf";
 import { calculateInvoicePdfHash } from "@/lib/invoice-pdf-storage";
 import { deleteConsolidatedPdf, uploadConsolidatedPdf } from "@/lib/r2-consolidated-invoice-pdf";
@@ -58,7 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     console.error("Consolidated PDF rendering failed", { id, error });
     return NextResponse.json({ error: "集約請求PDFを作成できません。" }, { status: 409 });
   }
-  const fileName = `consolidated_invoice_${id}.pdf`;
+  const fileName = consolidatedDeliveryNotePdfFileName(id);
   let publication: { id: number };
   try {
     publication = await prisma.$transaction(async tx => {
