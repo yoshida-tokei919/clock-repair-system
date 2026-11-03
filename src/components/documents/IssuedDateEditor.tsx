@@ -17,7 +17,8 @@ export function IssuedDateEditor({ type, id, issuedDate, hasPdf = false, onSaved
     if (date === issuedDate) { setOpen(false); return; }
     setBusy(true); setError(null);
     try {
-      const pdfUrl = type === "estimate" ? `/api/documents/estimate/${id}/pdf/generate` : `/api/invoices/${id}/pdf/generate`;
+      const pdfUrl = type === "consolidated-invoice" ? `/api/invoices/consolidated/${id}/pdf/reissue`
+        : type === "estimate" ? `/api/documents/estimate/${id}/pdf/generate` : `/api/invoices/${id}/pdf/generate`;
       const editUrl = type === "consolidated-invoice" ? `/api/invoices/consolidated/${id}/issued-date` : `/api/documents/issued-date/${type}/${id}`;
       const response = await fetch(hasPdf ? pdfUrl : editUrl, {
         method: hasPdf ? "POST" : "PATCH", headers: { "Content-Type": "application/json" },
@@ -32,7 +33,7 @@ export function IssuedDateEditor({ type, id, issuedDate, hasPdf = false, onSaved
   }
   return <div className="flex flex-wrap items-center gap-2 text-sm">
     <span>発行日: {issuedDate}</span>
-    <button type="button" className="rounded border px-2 py-1 hover:bg-slate-50" onClick={() => setOpen(true)}>変更</button>
+    <button type="button" className="rounded border px-2 py-1 hover:bg-slate-50" onClick={() => setOpen(true)}>{hasPdf && type === "consolidated-invoice" ? "発行日を変更して再発行" : "変更"}</button>
     {error && <span role="alert" className="text-red-700">{error}</span>}
     <IssuedDateDialog open={open} title="発行日を変更" initialDate={issuedDate} busy={busy}
       onClose={() => setOpen(false)} onConfirm={date => void save(date ?? issuedDate)} />

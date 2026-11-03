@@ -12,7 +12,8 @@ export type ConsolidatedBundle = Prisma.ConsolidatedInvoiceGetPayload<{ include:
 
 export const consolidatedDeliveryNotePdfFileName = (id: number) => `consolidated_invoice_${id}_delivery_notes.pdf`;
 export const isConsolidatedDeliveryNotePdf = (id: number, fileName: string) =>
-  fileName === consolidatedDeliveryNotePdfFileName(id);
+  fileName === consolidatedDeliveryNotePdfFileName(id) ||
+  new RegExp(`^consolidated_invoice_${id}_v(?:[2-9]|[1-9]\\d+)_delivery_notes\\.pdf$`).test(fileName);
 
 type NoteSource = { totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
   deliveryNotes: { slipNumber: string | null; issuedDate: Date | null; repairCount: number; subtotalAmount: number | null }[] };

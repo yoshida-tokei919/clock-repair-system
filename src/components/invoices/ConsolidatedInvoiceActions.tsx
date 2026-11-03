@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function ConsolidatedInvoiceActions({ id, pdfReady, canGenerate, canQueue, canConfirmPayment, shareToken }: {
-  id: number; pdfReady: boolean; canGenerate: boolean; canQueue: boolean; canConfirmPayment: boolean; shareToken: string | null;
+export function ConsolidatedInvoiceActions({ id, pdfReady, canGenerate, canReissue, issuedDate, canQueue, canConfirmPayment, shareToken }: {
+  id: number; pdfReady: boolean; canGenerate: boolean; canReissue: boolean; issuedDate: string | null;
+  canQueue: boolean; canConfirmPayment: boolean; shareToken: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -27,6 +28,11 @@ export function ConsolidatedInvoiceActions({ id, pdfReady, canGenerate, canQueue
       <a className="rounded border px-3 py-2 text-blue-700" href={`/api/invoices/consolidated/${id}/pdf`} target="_blank" rel="noreferrer">PDFを開く・保存</a>
       {shareToken && <a className="rounded border px-3 py-2 text-blue-700" href={`/customer/consolidated-invoices/${shareToken}`} target="_blank" rel="noreferrer">共有ページ</a>}
     </>}
+    {canReissue && issuedDate && <button disabled={busy} onClick={() => {
+      if (window.confirm("現在の発行日のままPDFを再発行します。PDFのversionが増え、旧版は管理者用履歴に残ります。顧客共有URLは変わらず、新しいPDFを表示します。続行しますか？")) {
+        void act("pdf/reissue", { issuedDate });
+      }
+    }} className="rounded border border-blue-600 px-3 py-2 text-blue-700 disabled:opacity-50">発行日そのままでPDF再発行</button>}
     {canQueue && <button disabled={busy} onClick={() => void act("line")} className="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50">LINE送信待ちに登録</button>}
     {canConfirmPayment && <button disabled={busy} onClick={() => {
       if (window.confirm("銀行で全額の入金を確認しましたか？元請求書すべてに入金を登録します。")) void act("payments/manual", { confirmed: true });

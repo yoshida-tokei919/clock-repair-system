@@ -1991,6 +1991,7 @@ model ConsolidatedInvoice {
   billingCustomer Customer @relation("ConsolidatedBillingDestination", fields: [billingCustomerId], references: [id], onDelete: Restrict)
   sources ConsolidatedInvoiceSource[]
   publication ConsolidatedInvoicePublication?
+  pdfHistory ConsolidatedInvoicePdfHistory[]
   issueState ConsolidatedInvoiceIssueState?
 
   @@index([companyId, createdAt])
@@ -2018,6 +2019,23 @@ model ConsolidatedInvoicePublication {
   hash String?
   createdAt DateTime @default(now())
   publishedAt DateTime?
+}
+
+// Previous published bytes and dates are immutable; Publication points at the current PDF.
+model ConsolidatedInvoicePdfHistory {
+  id Int @id @default(autoincrement())
+  consolidatedInvoiceId Int
+  consolidatedInvoice ConsolidatedInvoice @relation(fields: [consolidatedInvoiceId], references: [id], onDelete: Restrict)
+  version Int
+  issuedDate DateTime
+  storageKey String
+  fileName String
+  hash String
+  fileSize Int
+  publishedAt DateTime
+  replacedAt DateTime @default(now())
+
+  @@unique([consolidatedInvoiceId, version], map: "ConsolidatedInvoicePdfHistory_bundle_version_key")
 }
 
 model ConsolidatedInvoiceSource {

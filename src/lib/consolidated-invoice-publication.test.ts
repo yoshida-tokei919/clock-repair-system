@@ -79,6 +79,7 @@ test("public PDF access requires a fully published pointer", () => {
 test("only the delivery-note PDF filename enables the matching public breakdown", () => {
   assert.equal(consolidatedDeliveryNotePdfFileName(1), "consolidated_invoice_1_delivery_notes.pdf");
   assert.equal(isConsolidatedDeliveryNotePdf(1, "consolidated_invoice_1_delivery_notes.pdf"), true);
+  assert.equal(isConsolidatedDeliveryNotePdf(1, "consolidated_invoice_1_v2_delivery_notes.pdf"), true);
   assert.equal(isConsolidatedDeliveryNotePdf(1, "consolidated_invoice_1.pdf"), false);
   assert.equal(isConsolidatedDeliveryNotePdf(1, "consolidated_invoice_2_delivery_notes.pdf"), false);
 });
