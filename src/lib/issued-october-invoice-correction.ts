@@ -242,7 +242,7 @@ export async function stageOctoberCorrection(db: PrismaClient, expectedFingerpri
       oldBundleId: OCTOBER_OLD_BUNDLE_ID, newBundleId: replacement.id,
       mappings: { create: current.invoices.map((old, index) => ({ oldInvoiceId: old.id, newInvoiceId: newInvoices[index].id })) },
     }, include: { mappings: true } });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 60000, maxWait: 5000 });
   await preparePdfBytes(db, batch.id);
   return { batchId: batch.id, status: "ready", newBundleId: batch.newBundleId };
 }
