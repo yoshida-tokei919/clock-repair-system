@@ -45,3 +45,14 @@ export function assertStoredPdfMatches(bytes: Buffer, expectedSize: number | nul
     throw new Error("Stored PDF bytes do not match the issued record");
   }
 }
+
+export function correctionBundlePdfMetadata(row: {
+  bundlePdfStorageKey: string | null; bundlePdfHash: string | null; bundlePdfFileSize: number | null;
+}): { storageKey: string; hash: string; fileSize: number } | null {
+  const { bundlePdfStorageKey: storageKey, bundlePdfHash: hash, bundlePdfFileSize: fileSize } = row;
+  if (storageKey === null && hash === null && fileSize === null) return null;
+  if (!storageKey || !hash || !/^[0-9a-f]{64}$/.test(hash) || !Number.isSafeInteger(fileSize) || fileSize! <= 0) {
+    throw new Error("Correction bundle PDF metadata is incomplete");
+  }
+  return { storageKey, hash, fileSize: fileSize! };
+}

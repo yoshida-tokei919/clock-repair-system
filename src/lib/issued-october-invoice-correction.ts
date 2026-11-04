@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { archivedOctoberNumber, assertCorrectionNotStarted, assertExpectedCorrectionNumber, assertNoOctoberDeliveryOrPayment, assertStoredPdfMatches, OCTOBER_TARGETS, pendingOctoberNumber, verifiedOctoberAmounts } from "./issued-october-invoice-correction-plan";
+import { archivedOctoberNumber, assertCorrectionNotStarted, assertExpectedCorrectionNumber, assertNoOctoberDeliveryOrPayment, assertStoredPdfMatches, correctionBundlePdfMetadata, OCTOBER_TARGETS, pendingOctoberNumber, verifiedOctoberAmounts } from "./issued-october-invoice-correction-plan";
 import { hasConsistentInvoiceSnapshots } from "./invoice-repair-snapshots";
 import { invoicePdfParties } from "./invoice-recipient";
 import { displayIssuedDate } from "./document-issued-date";
@@ -249,7 +249,7 @@ export async function stageOctoberCorrection(db: PrismaClient, expectedFingerpri
 
 export async function preparePdfBytes(db: PrismaClient, batchId: number) {
   const batch = await db.invoiceCorrectionBatch.findUnique({ where: { id: batchId }, include: { mappings: true } });
-  if (!batch || batch.correctionKey !== OCTOBER_CORRECTION_KEY || !batch.newBundleId || batch.status === "activated") fail("訂正準備を確認できません");
+  if (!batch || batch.correctionKey !== OCTOBER_CORRECTION_KEY || !batch.newBundleId || batch.status !== "preparing") fail("訂正準備を確認できません");
   for (const mapping of batch.mappings.sort((a, b) => a.oldInvoiceId - b.oldInvoiceId)) {
     const target = OCTOBER_TARGETS.find(row => row.id === mapping.oldInvoiceId);
     const invoice = await correctionInvoiceForPdf(db, mapping.newInvoiceId);
@@ -278,12 +278,16 @@ export async function preparePdfBytes(db: PrismaClient, batchId: number) {
   }
   const bundle = await db.consolidatedInvoice.findUnique({ where: { id: batch.newBundleId }, include: consolidatedBundleInclude });
   const publication = await db.consolidatedInvoicePublication.findUnique({ where: { consolidatedInvoiceId: batch.newBundleId } });
-  if (!bundle || !publication || publication.status !== "draft") fail("再発行集約請求を確認できません");
+  if (!bundle || !publication || publication.status !== "draft" || publication.storageKey !== null ||
+    publication.hash !== null || publication.fileSize !== null || publication.publishedAt !== null) fail("再発行集約請求を確認できません");
   if (bundle.sources.length !== 2 || bundle.sources.some(source => !["KI-001", "SI-001"].includes(source.invoiceNumber)) ||
     new Set(bundle.sources.map(source => source.invoiceNumber)).size !== 2) fail("再発行集約請求の元番号が一致しません");
-  if (publication.storageKey && publication.hash && publication.fileSize) {
-    const bytes = await downloadConsolidatedPdf(publication.storageKey);
-    if (bytes.length !== publication.fileSize || calculateInvoicePdfHash(bytes) !== publication.hash) fail("準備済み集約PDFが一致しません");
+  let bundlePdfMeta;
+  try { bundlePdfMeta = correctionBundlePdfMetadata(batch); }
+  catch { fail("準備済み集約PDFの記録が不完全です"); }
+  if (bundlePdfMeta) {
+    const bytes = await downloadConsolidatedPdf(bundlePdfMeta.storageKey);
+    if (bytes.length !== bundlePdfMeta.fileSize || calculateInvoicePdfHash(bytes) !== bundlePdfMeta.hash) fail("準備済み集約PDFが一致しません");
   } else {
     const dueDates = await db.invoice.findMany({ where: { id: { in: batch.mappings.filter(row => row.oldInvoiceId === 6 || row.oldInvoiceId === 7).map(row => row.newInvoiceId) } },
       orderBy: { id: "asc" }, select: { paymentDueDate: true } });
@@ -299,11 +303,15 @@ export async function preparePdfBytes(db: PrismaClient, batchId: number) {
     await uploadConsolidatedPdf(key, bytes);
     const verified = await downloadConsolidatedPdf(key);
     if (verified.length !== bytes.length || calculateInvoicePdfHash(verified) !== calculateInvoicePdfHash(bytes)) fail("再発行集約PDFの保存内容が一致しません");
-    const changed = await db.consolidatedInvoicePublication.updateMany({ where: { id: publication.id, status: "draft", storageKey: null },
-      data: { storageKey: key, hash: calculateInvoicePdfHash(bytes), fileSize: bytes.length } });
+    const changed = await db.invoiceCorrectionBatch.updateMany({ where: { id: batch.id, status: "preparing",
+      bundlePdfStorageKey: null, bundlePdfHash: null, bundlePdfFileSize: null },
+      data: { bundlePdfStorageKey: key, bundlePdfHash: calculateInvoicePdfHash(bytes), bundlePdfFileSize: bytes.length } });
     if (changed.count !== 1) fail("再発行集約PDFの準備状態が変わりました");
+    bundlePdfMeta = { storageKey: key, hash: calculateInvoicePdfHash(bytes), fileSize: bytes.length };
   }
-  const changed = await db.invoiceCorrectionBatch.updateMany({ where: { id: batch.id, status: "preparing" }, data: { status: "ready" } });
+  const changed = await db.invoiceCorrectionBatch.updateMany({ where: { id: batch.id, status: "preparing",
+    bundlePdfStorageKey: bundlePdfMeta.storageKey, bundlePdfHash: bundlePdfMeta.hash,
+    bundlePdfFileSize: bundlePdfMeta.fileSize }, data: { status: "ready" } });
   if (changed.count !== 1) fail("訂正準備の状態が変わりました");
 }
 
@@ -317,6 +325,10 @@ export async function activateOctoberCorrection(db: PrismaClient, batchId: numbe
     staged.fingerprint !== expectedFingerprint || !staged.newBundleId || staged.mappings.length !== 6 ||
     staged.mappings.some(mapping => !OCTOBER_TARGETS.some(target => target.id === mapping.oldInvoiceId)) ||
     new Set(staged.mappings.map(mapping => mapping.newInvoiceId)).size !== 6) fail("準備済み訂正を確認できません");
+  let stagedBundlePdfMeta;
+  try { stagedBundlePdfMeta = correctionBundlePdfMetadata(staged); }
+  catch { fail("準備済み集約PDFの記録が不完全です"); }
+  if (!stagedBundlePdfMeta) fail("準備済み集約PDFの記録がありません");
   const stagedPdfMeta = new Map<number, { id: number; storageKey: string; hash: string; fileSize: number }>();
   for (const mapping of staged.mappings) {
     const invoice = await db.invoice.findUnique({ where: { id: mapping.newInvoiceId }, include: { currentPdfFile: true, pdfFiles: true, repairSnapshots: true, paymentAllocations: true, repairs: { select: { id: true } } } });
@@ -335,15 +347,18 @@ export async function activateOctoberCorrection(db: PrismaClient, batchId: numbe
     stagedPdfMeta.set(invoice.id, { id: pdf.id, storageKey: pdf.storageKey, hash: pdf.hash, fileSize: pdf.fileSize });
   }
   const stagedPublication = await db.consolidatedInvoicePublication.findUnique({ where: { consolidatedInvoiceId: staged.newBundleId } });
-  if (!stagedPublication || stagedPublication.status !== "draft" || !stagedPublication.storageKey || !stagedPublication.hash || !stagedPublication.fileSize) fail("準備済み集約PDFを確認できません");
-  const stagedBytes = await downloadConsolidatedPdf(stagedPublication.storageKey);
-  if (stagedBytes.length !== stagedPublication.fileSize || calculateInvoicePdfHash(stagedBytes) !== stagedPublication.hash) fail("再発行集約PDFの保存内容が一致しません");
+  if (!stagedPublication || stagedPublication.status !== "draft" || stagedPublication.storageKey !== null ||
+    stagedPublication.hash !== null || stagedPublication.fileSize !== null || stagedPublication.publishedAt !== null) fail("準備済み集約PDFを確認できません");
+  const stagedBytes = await downloadConsolidatedPdf(stagedBundlePdfMeta.storageKey);
+  if (stagedBytes.length !== stagedBundlePdfMeta.fileSize || calculateInvoicePdfHash(stagedBytes) !== stagedBundlePdfMeta.hash) fail("再発行集約PDFの保存内容が一致しません");
   return db.$transaction(async tx => {
     const current = await inspect(tx, true);
     if (current.fingerprint !== expectedFingerprint) fail("元請求書の状態が変わりました");
     const batch = await tx.invoiceCorrectionBatch.findUnique({ where: { id: batchId }, include: { mappings: true } });
     if (!batch || batch.correctionKey !== OCTOBER_CORRECTION_KEY || batch.status !== "ready" ||
       batch.fingerprint !== expectedFingerprint || batch.newBundleId !== staged.newBundleId ||
+      batch.bundlePdfStorageKey !== stagedBundlePdfMeta.storageKey || batch.bundlePdfHash !== stagedBundlePdfMeta.hash ||
+      batch.bundlePdfFileSize !== stagedBundlePdfMeta.fileSize ||
       batch.mappings.length !== 6 || batch.mappings.some(mapping =>
         staged.mappings.find(row => row.oldInvoiceId === mapping.oldInvoiceId)?.newInvoiceId !== mapping.newInvoiceId)) fail("訂正準備が変わりました");
     const replacement = await tx.consolidatedInvoice.findUnique({ where: { id: batch.newBundleId! }, include: {
@@ -402,12 +417,15 @@ export async function activateOctoberCorrection(db: PrismaClient, batchId: numbe
       await tx.invoice.update({ where: { id: fresh.id }, data: { status: "issued", currentPdfFileId: fresh.pdfFiles[0].id } });
     }
     const pub = await tx.consolidatedInvoicePublication.findUnique({ where: { consolidatedInvoiceId: batch.newBundleId! } });
-    if (!pub || pub.id !== stagedPublication.id || pub.status !== "draft" || pub.storageKey !== stagedPublication.storageKey ||
-      pub.hash !== stagedPublication.hash || pub.fileSize !== stagedPublication.fileSize) fail("再発行集約PDFの状態が変わりました");
+    if (!pub || pub.id !== stagedPublication.id || pub.status !== "draft" || pub.storageKey !== null ||
+      pub.hash !== null || pub.fileSize !== null || pub.publishedAt !== null) fail("再発行集約PDFの状態が変わりました");
     await tx.consolidatedInvoiceSupersession.create({ data: {
       oldBundleId: OCTOBER_OLD_BUNDLE_ID, newBundleId: batch.newBundleId!, correctionBatchId: batch.id,
     } });
-    await tx.consolidatedInvoicePublication.update({ where: { id: pub.id }, data: { status: "current", publishedAt: new Date() } });
+    await tx.consolidatedInvoicePublication.update({ where: { id: pub.id }, data: {
+      status: "current", storageKey: stagedBundlePdfMeta.storageKey, hash: stagedBundlePdfMeta.hash,
+      fileSize: stagedBundlePdfMeta.fileSize, publishedAt: new Date(),
+    } });
     await tx.invoiceCorrectionBatch.update({ where: { id: batch.id }, data: { status: "activated", activatedAt: new Date() } });
     return { batchId: batch.id, status: "activated", newBundleId: batch.newBundleId };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30000, maxWait: 5000 });

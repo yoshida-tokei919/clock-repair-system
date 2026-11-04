@@ -2021,6 +2021,9 @@ model InvoiceCorrectionBatch {
   status String @default("preparing") // preparing, ready, activated
   oldBundleId Int @unique
   newBundleId Int? @unique
+  bundlePdfStorageKey String?
+  bundlePdfHash String?
+  bundlePdfFileSize Int?
   oldBundle ConsolidatedInvoice @relation("CorrectionOldBundle", fields: [oldBundleId], references: [id], onDelete: Restrict)
   newBundle ConsolidatedInvoice? @relation("CorrectionNewBundle", fields: [newBundleId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())

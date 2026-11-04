@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { archivedOctoberNumber, assertCorrectionNotStarted, assertExpectedCorrectionNumber, assertNoOctoberDeliveryOrPayment, assertStoredPdfMatches, OCTOBER_TARGETS, pendingOctoberNumber, verifiedOctoberAmounts } from "./issued-october-invoice-correction-plan";
+import { archivedOctoberNumber, assertCorrectionNotStarted, assertExpectedCorrectionNumber, assertNoOctoberDeliveryOrPayment, assertStoredPdfMatches, correctionBundlePdfMetadata, OCTOBER_TARGETS, pendingOctoberNumber, verifiedOctoberAmounts } from "./issued-october-invoice-correction-plan";
 
 test("all six frozen October amounts and both totals match the 3% correction", () => {
   assert.deepEqual(OCTOBER_TARGETS.map(row => row.id), [1, 3, 4, 5, 6, 7]);
@@ -81,4 +81,34 @@ test("each old invoice PDF and both bundle versions require matching stored byte
     assert.throws(() => assertStoredPdfMatches(Buffer.from("changed"), bytes.length, hash), name);
     assert.throws(() => assertStoredPdfMatches(bytes, bytes.length + 1, hash), name);
   }
+});
+
+test("staged bundle metadata is either absent or complete", () => {
+  const empty = { bundlePdfStorageKey: null, bundlePdfHash: null, bundlePdfFileSize: null };
+  assert.equal(correctionBundlePdfMetadata(empty), null);
+  const complete = { bundlePdfStorageKey: "private/bundle.pdf", bundlePdfHash: "a".repeat(64), bundlePdfFileSize: 10 };
+  assert.deepEqual(correctionBundlePdfMetadata(complete), { storageKey: complete.bundlePdfStorageKey,
+    hash: complete.bundlePdfHash, fileSize: complete.bundlePdfFileSize });
+  for (const broken of [{ bundlePdfStorageKey: null }, { bundlePdfHash: null }, { bundlePdfFileSize: null },
+    { bundlePdfStorageKey: "" }, { bundlePdfHash: "A".repeat(64) }, { bundlePdfFileSize: 0 }]) {
+    assert.throws(() => correctionBundlePdfMetadata({ ...complete, ...broken }));
+  }
+});
+
+test("stage stores bundle metadata on batch and activation publishes all fields atomically", () => {
+  const source = readFileSync(new URL("./issued-october-invoice-correction.ts", import.meta.url), "utf8");
+  const stage = source.slice(source.indexOf("export async function preparePdfBytes"), source.indexOf("export async function activateOctoberCorrection"));
+  const activation = source.slice(source.indexOf("export async function activateOctoberCorrection"));
+  assert.doesNotMatch(stage, /consolidatedInvoicePublication\.update/);
+  assert.match(stage, /bundlePdfStorageKey: null, bundlePdfHash: null, bundlePdfFileSize: null/);
+  assert.match(stage, /bundlePdfStorageKey: key, bundlePdfHash: calculateInvoicePdfHash\(bytes\), bundlePdfFileSize: bytes.length/);
+  assert.match(stage, /publication\.publishedAt !== null/);
+  assert.match(activation, /batch\.bundlePdfStorageKey !== stagedBundlePdfMeta\.storageKey/);
+  assert.match(activation, /pub\.publishedAt !== null/);
+  assert.match(activation, /status: "current", storageKey: stagedBundlePdfMeta\.storageKey, hash: stagedBundlePdfMeta\.hash,\s*fileSize: stagedBundlePdfMeta\.fileSize, publishedAt: new Date\(\)/);
+  const sql = readFileSync(new URL("../../prisma/migrations/20261105_add_correction_batch_bundle_pdf_metadata/migration.sql", import.meta.url), "utf8");
+  for (const column of ["bundlePdfStorageKey", "bundlePdfHash", "bundlePdfFileSize"]) assert.match(sql, new RegExp(`ADD COLUMN "${column}"`));
+  assert.match(sql, /InvoiceCorrectionBatch_bundle_pdf_metadata_complete/);
+  assert.match(sql, /InvoiceCorrectionBatch_ready_bundle_pdf_metadata/);
+  assert.match(sql, /'ready', 'activated'/);
 });
