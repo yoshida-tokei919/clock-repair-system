@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { assertCorrectionNotStarted, assertExpectedCorrectionNumber, assertNoOctoberDeliveryOrPayment, assertStoredPdfMatches, OCTOBER_TARGETS, verifiedOctoberAmounts } from "./issued-october-invoice-correction-plan";
+import { archivedOctoberNumber, assertCorrectionNotStarted, assertExpectedCorrectionNumber, assertNoOctoberDeliveryOrPayment, assertStoredPdfMatches, OCTOBER_TARGETS, pendingOctoberNumber, verifiedOctoberAmounts } from "./issued-october-invoice-correction-plan";
 
 test("all six frozen October amounts and both totals match the 3% correction", () => {
   assert.deepEqual(OCTOBER_TARGETS.map(row => row.id), [1, 3, 4, 5, 6, 7]);
@@ -40,11 +40,16 @@ test("every linked payment kind and status blocks correction", () => {
   }
 });
 
-test("number collision and a changed sequence reject the correction", () => {
-  assert.doesNotThrow(() => assertExpectedCorrectionNumber(2, "OI-002", "O", false));
-  assert.throws(() => assertExpectedCorrectionNumber(2, "OI-002", "O", true));
-  assert.throws(() => assertExpectedCorrectionNumber(3, "OI-003", "O", false));
-  assert.throws(() => assertExpectedCorrectionNumber(2, "JI-002", "O", false));
+test("the six canonical numbers transfer through deterministic unique staging and archive labels", () => {
+  for (const target of OCTOBER_TARGETS) {
+    assert.equal(pendingOctoberNumber(target.number), `CORR-PENDING-${target.number}`);
+    assert.equal(archivedOctoberNumber(target.number), `ARCHIVED-202610-${target.number}`);
+    assert.doesNotThrow(() => assertExpectedCorrectionNumber(1, target.number, false, false));
+    assert.throws(() => assertExpectedCorrectionNumber(2, target.number, false, false));
+    assert.throws(() => assertExpectedCorrectionNumber(1, target.number, true, false));
+    assert.throws(() => assertExpectedCorrectionNumber(1, target.number, false, true));
+  }
+  assert.throws(() => assertExpectedCorrectionNumber(1, "NI-001", false, false));
 });
 
 test("an existing batch makes a repeated stage request fail closed", () => {
@@ -59,6 +64,13 @@ test("correction code cannot mutate immutable bundle/source rows or delete archi
   assert.doesNotMatch(source, /(?:deleteInvoicePdf|deleteConsolidatedPdf)\s*\(/);
   assert.match(source, /verifyOldPdfBytes\(observed\)/);
   assert.match(source, /consolidatedInvoiceSupersession\.create\(/);
+  assert.match(source, /invoiceNumber: archivedOctoberNumber\(target.number\)/);
+  assert.match(source, /invoiceNumber: target.number/);
+  assert.match(source, /fileName: `invoice_\$\{target.number\}\.pdf`/);
+  assert.match(source, /renderInvoicePdfBuffer\(correctionInvoicePdfData\(invoice, target.number\)\)/);
+  assert.match(source, /sourceNumbers = bundle.sources.flatMap\(source => source.deliveryNotes.map\(\(\) => source.invoiceNumber\)\)/);
+  assert.match(source, /description: `\$\{item.description\} \/ \$\{sourceNumbers\[index\]\}`/);
+  assert.doesNotMatch(source, /customer\.update\(/);
 });
 
 test("each old invoice PDF and both bundle versions require matching stored bytes", () => {

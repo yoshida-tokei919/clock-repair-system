@@ -8,7 +8,7 @@ type Preview = {
   invoices: { oldNumber: string; expectedNewNumber: string; old: readonly number[]; corrected: readonly number[] }[];
 };
 
-export default function OctoberCorrection() {
+export default function OctoberCorrection({ onActivated }: { onActivated: () => void }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
@@ -18,6 +18,7 @@ export default function OctoberCorrection() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "状態を取得できません");
     setPreview(data);
+    if (data.batch?.status === "activated") onActivated();
   }
   useEffect(() => { void refresh().catch(error => setMessage(error instanceof Error ? error.message : "状態を取得できません")); }, []);
   async function run(action: "stage" | "resume" | "activate") {
@@ -43,7 +44,8 @@ export default function OctoberCorrection() {
   const action = !preview || status === "activated" ? null : !status ? "stage" : status === "preparing" ? "resume" : status === "ready" ? "activate" : null;
   const phrase = action === "stage" ? "2026年10月請求書を準備" : action === "activate" ? "2026年10月請求書を有効化" : "";
   const yen = (amount: number) => `${amount.toLocaleString("ja-JP")}円`;
-  return <section className="space-y-4 rounded border p-5">
+  if (status === "activated") return null;
+  return <section className="space-y-4 pt-4">
     <h2 className="text-lg font-bold">2026年10月の発行済み請求書訂正</h2>
     <p className="text-sm">6件の合計：{yen(283036)} → {yen(274662)}（{yen(8374)}減額）。集約請求：{yen(82428)} → {yen(79995)}。</p>
     {preview && <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th className="text-left">旧 → 新</th><th className="text-right">旧金額</th><th className="text-right">新金額</th></tr></thead><tbody>

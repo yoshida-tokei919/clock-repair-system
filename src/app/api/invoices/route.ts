@@ -21,6 +21,7 @@ export async function GET() {
     const unauthorized = await requireAdminApi();
     if (unauthorized) return unauthorized;
     const invoices = await prisma.invoice.findMany({
+        where: { status: { not: "correction_preparing" } },
         orderBy: { issuedDate: "desc" },
         include: {
             customer: { select: { id: true, name: true, companyName: true, type: true } },

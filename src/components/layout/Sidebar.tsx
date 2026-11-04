@@ -20,7 +20,6 @@ const NAV_ITEMS = [
   { href: '/settings/scheduler', label: 'スケジューラ設定', icon: '⏱️' },
   { href: '/settings/account', label: 'アカウント', icon: '🔐' },
   { href: '/invoices', label: '請求書管理', icon: '📄' },
-  { href: '/settings/b2b-invoice-discount', label: 'B2B請求割引設定', icon: '％' },
   { href: '/customers', label: '顧客管理', icon: '👤' },
   { href: '/line-users', label: 'LINEユーザー', icon: '💬' },
 ]

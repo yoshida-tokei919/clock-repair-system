@@ -9,6 +9,8 @@ import { b2bPaymentDueDate, parseBillingMonth } from "@/lib/b2b-billing-month";
 import { IssuedDateDialog } from "@/components/documents/IssuedDateDialog";
 import { summarizeB2BInvoicePreview } from "@/lib/b2b-invoice-preview";
 import { percentInputToBps } from "@/lib/b2b-invoice-discount";
+import B2BDiscountSettings from "@/components/invoices/B2BDiscountSettings";
+import OctoberCorrection from "@/components/invoices/OctoberCorrection";
 
 type Partner = {
     id: number;
@@ -94,6 +96,11 @@ export default function InvoicesPage() {
     const [standardRateBps, setStandardRateBps] = useState<number | null>(null);
     const [settingsError, setSettingsError] = useState("");
     const [discountRateBps, setDiscountRateBps] = useState<number | "">("");
+    const [discountSettingsOpen, setDiscountSettingsOpen] = useState(false);
+    const [octoberOpen, setOctoberOpen] = useState(false);
+    const [octoberActivated, setOctoberActivated] = useState(false);
+
+    useEffect(() => { if (window.location.hash === "#discount-settings") setDiscountSettingsOpen(true); }, []);
 
     useEffect(() => {
         fetch("/api/invoices")
@@ -228,8 +235,9 @@ export default function InvoicesPage() {
                                         <div className="flex justify-between items-start">
                                             <div>
                                                 <span className="font-mono font-semibold text-blue-700">
-                                                    {inv.invoiceNumber}
+                                                    {inv.invoiceNumber.startsWith("ARCHIVED-202610-") ? inv.invoiceNumber.replace("ARCHIVED-202610-", "") : inv.invoiceNumber}
                                                 </span>
+                                                {inv.invoiceNumber.startsWith("ARCHIVED-202610-") && <span className="ml-2 text-xs text-red-700">旧版・取消済み</span>}
                                                 <span className="ml-2 text-gray-600 text-sm">
                                                     {inv.customer.companyName || inv.customer.name}
                                                 </span>
@@ -454,6 +462,14 @@ export default function InvoicesPage() {
                 </div>
                 <PostalInvoiceBatchPrint />
                 <ConsolidatedInvoicePanel />
+                <details id="discount-settings" open={discountSettingsOpen} onToggle={event => setDiscountSettingsOpen(event.currentTarget.open)} className="mt-8 rounded-lg border border-gray-200 bg-white p-5">
+                    <summary className="cursor-pointer font-semibold">B2B請求書の標準割引率設定</summary>
+                    <B2BDiscountSettings standardRateBps={standardRateBps} onSaved={setStandardRateBps} />
+                </details>
+                {!octoberActivated && <details className="mt-4 rounded-lg border border-gray-200 bg-white p-5" onToggle={event => setOctoberOpen(event.currentTarget.open)}>
+                    <summary className="cursor-pointer font-semibold">2026年10月の発行済み請求書訂正</summary>
+                    {octoberOpen && <OctoberCorrection onActivated={() => setOctoberActivated(true)} />}
+                </details>}
             </div>
             <IssuedDateDialog open={issueDialogOpen} title="請求書の発行を確認" busy={loading}
                 onClose={() => setIssueDialogOpen(false)} onConfirm={date => void createInvoice(date)} />

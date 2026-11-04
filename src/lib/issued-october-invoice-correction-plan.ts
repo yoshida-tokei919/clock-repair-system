@@ -26,8 +26,11 @@ export function assertNoOctoberDeliveryOrPayment(row: {
   }
 }
 
-export function assertExpectedCorrectionNumber(sequence: number, invoiceNumber: string, expectedPrefix: string, exists: boolean) {
-  if (sequence !== 2 || invoiceNumber !== `${expectedPrefix}I-002` || exists) {
+export function pendingOctoberNumber(canonical: string) { return `CORR-PENDING-${canonical}`; }
+export function archivedOctoberNumber(canonical: string) { return `ARCHIVED-202610-${canonical}`; }
+
+export function assertExpectedCorrectionNumber(sequence: number, canonical: string, pendingExists: boolean, archivedExists: boolean) {
+  if (sequence !== 1 || !OCTOBER_TARGETS.some(row => row.number === canonical) || pendingExists || archivedExists) {
     throw new Error("Correction invoice number is unavailable");
   }
 }

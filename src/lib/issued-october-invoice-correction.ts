@@ -2,14 +2,14 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { assertCorrectionNotStarted, assertExpectedCorrectionNumber, assertNoOctoberDeliveryOrPayment, assertStoredPdfMatches, OCTOBER_TARGETS, verifiedOctoberAmounts } from "./issued-october-invoice-correction-plan";
+import { archivedOctoberNumber, assertCorrectionNotStarted, assertExpectedCorrectionNumber, assertNoOctoberDeliveryOrPayment, assertStoredPdfMatches, OCTOBER_TARGETS, pendingOctoberNumber, verifiedOctoberAmounts } from "./issued-october-invoice-correction-plan";
 import { hasConsistentInvoiceSnapshots } from "./invoice-repair-snapshots";
-import { invoicePdfParties, nextB2BSourceInvoiceNumber } from "./invoice-recipient";
+import { invoicePdfParties } from "./invoice-recipient";
 import { displayIssuedDate } from "./document-issued-date";
 import { buildInvoicePdfStorageKey } from "./invoice-pdf-storage-key";
 import { calculateInvoicePdfHash, downloadInvoicePdf, uploadInvoicePdf } from "./invoice-pdf-storage";
 import { buildConsolidatedPdfData, consolidatedBundleInclude, consolidatedDeliveryNotePdfFileName, newConsolidatedShareToken } from "./consolidated-invoice-publication";
-import { renderConsolidatedInvoicePdf } from "./consolidated-invoice-pdf";
+import { consolidatedInvoiceDocumentData } from "./consolidated-invoice-pdf";
 import { downloadConsolidatedPdf, uploadConsolidatedPdf } from "./r2-consolidated-invoice-pdf";
 import { renderInvoicePdfBuffer } from "./invoice-pdf-render";
 import type { InvoiceDocumentProps } from "@/components/pdf/InvoiceDocument";
@@ -41,7 +41,7 @@ function noteSignature(rows: Array<{ deliveryNoteId: number | null; slipNumber: 
     issuedDate: row.issuedDate, repairCount: row.repairCount, subtotalAmount: row.subtotalAmount })));
 }
 
-function correctionInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof correctionInvoiceForPdf>>>): InvoiceDocumentProps["data"] {
+function correctionInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof correctionInvoiceForPdf>>>, canonicalNumber: string): InvoiceDocumentProps["data"] {
   const parties = invoicePdfParties(invoice);
   const groups = new Map<string, { date: Date; slipNumber: string; count: number; amount: number }>();
   for (const row of invoice.repairSnapshots) {
@@ -51,7 +51,7 @@ function correctionInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof
     if (existing) { existing.count++; existing.amount += row.subtotalAmount; if (date < existing.date) existing.date = date; }
     else groups.set(key, { date, slipNumber: row.deliverySlipNumber ?? "未紐付け", count: 1, amount: row.subtotalAmount });
   }
-  return { invoiceNumber: invoice.invoiceNumber, date: displayIssuedDate(invoice.issuedDate),
+  return { invoiceNumber: canonicalNumber, date: displayIssuedDate(invoice.issuedDate),
     dueDate: invoice.paymentDueDate?.toLocaleDateString("ja-JP") || "",
     customer: parties.recipient, sourceCustomerName: parties.sourceCustomerName,
     items: [...groups.values()].sort((a, b) => a.date.getTime() - b.date.getTime()).map(row => ({
@@ -68,7 +68,7 @@ function correctionInvoiceForPdf(db: PrismaClient, id: number) {
   return db.invoice.findUnique({ where: { id }, include: { customer: true, billingCustomer: true, repairSnapshots: true } });
 }
 
-async function inspect(db: Prisma.TransactionClient | PrismaClient, lock = false, prepared = false) {
+async function inspect(db: Prisma.TransactionClient | PrismaClient, lock = false) {
   if (lock) {
     // The fixed ID set is checked below. Lock rows in stable order before reading state.
     const observed = await db.invoice.findMany({ where: { id: { in: ids } }, select: { customerId: true } });
@@ -102,7 +102,7 @@ async function inspect(db: Prisma.TransactionClient | PrismaClient, lock = false
     if (invoice.id !== target.id || invoice.invoiceNumber !== target.number ||
       invoice.billingMonth !== "2026-10" || invoice.pricingTaxMode !== "EXCLUSIVE" ||
       invoice.discountBasisAmount !== null || invoice.discountRateBps !== null || invoice.discountAmount !== null ||
-      invoice.customer.type !== "business" || invoice.customer.prefix !== target.prefix || invoice.customer.seqInvoice !== (prepared ? 2 : 1) ||
+      invoice.customer.type !== "business" || invoice.customer.prefix !== target.prefix || invoice.customer.seqInvoice !== 1 ||
       invoice.totalAmount !== target.old[0] || invoice.taxAmount !== target.old[1] ||
       invoice.shippingFeeAmount !== target.old[2] || invoice.grossTotalAmount !== target.old[3] ||
       invoice.repairs.length !== target.count || invoice.repairSnapshots.length !== target.count ||
@@ -141,8 +141,7 @@ async function inspect(db: Prisma.TransactionClient | PrismaClient, lock = false
       fail("旧集約請求の監査明細と元請求書が一致しません");
     }
   }
-  // Number reservation is the only expected change to the original rows during staging.
-  const fingerprint = digest({ invoices: invoices.map(invoice => ({ ...invoice, customer: { ...invoice.customer, seqInvoice: 1 } })),
+  const fingerprint = digest({ invoices,
     bundle, repairPayments, bundlePayments, outboxes });
   return { invoices, bundle, fingerprint };
 }
@@ -165,11 +164,11 @@ async function verifyOldPdfBytes(snapshot: Awaited<ReturnType<typeof inspect>>) 
 export async function previewOctoberCorrection(db: PrismaClient) {
   const batch = await db.invoiceCorrectionBatch.findUnique({ where: { correctionKey: OCTOBER_CORRECTION_KEY },
     select: { id: true, status: true, newBundleId: true, fingerprint: true } });
-  const fingerprint = batch?.status === "activated" ? batch.fingerprint : (await inspect(db, false, !!batch)).fingerprint;
+  const fingerprint = batch?.status === "activated" ? batch.fingerprint : (await inspect(db)).fingerprint;
   return { fingerprint, batch, oldTotal: 283036, newTotal: 274662,
     oldBundleId: 1, newBundleTotal: 79995,
     invoices: OCTOBER_TARGETS.map(target => ({ oldInvoiceId: target.id, oldNumber: target.number,
-      expectedNewNumber: `${target.prefix}I-002`, old: target.old, corrected: target.corrected })) };
+      expectedNewNumber: target.number, old: target.old, corrected: target.corrected })) };
 }
 
 export async function stageOctoberCorrection(db: PrismaClient, expectedFingerprint: string) {
@@ -185,10 +184,12 @@ export async function stageOctoberCorrection(db: PrismaClient, expectedFingerpri
     const newInvoices: Awaited<ReturnType<typeof tx.invoice.create>>[] = [];
     for (const [index, old] of current.invoices.entries()) {
       const target = OCTOBER_TARGETS[index];
-      const { sequence, invoiceNumber } = nextB2BSourceInvoiceNumber(old.customer);
-      try { assertExpectedCorrectionNumber(sequence, invoiceNumber, target.prefix,
-        !!await tx.invoice.findUnique({ where: { invoiceNumber }, select: { id: true } })); }
-      catch { fail(`請求書番号 ${invoiceNumber} が使用済みです`); }
+      const invoiceNumber = pendingOctoberNumber(target.number);
+      const archivedNumber = archivedOctoberNumber(target.number);
+      try { assertExpectedCorrectionNumber(old.customer.seqInvoice, target.number,
+        !!await tx.invoice.findUnique({ where: { invoiceNumber }, select: { id: true } }),
+        !!await tx.invoice.findUnique({ where: { invoiceNumber: archivedNumber }, select: { id: true } })); }
+      catch { fail(`訂正用の請求書番号 ${target.number} が使用済みです`); }
       const created = await tx.invoice.create({ data: {
         invoiceNumber, customerId: old.customerId, billingCustomerId: old.billingCustomerId,
         issuedDate: old.issuedDate, billingMonth: old.billingMonth, paymentDueDate: old.paymentDueDate,
@@ -202,7 +203,6 @@ export async function stageOctoberCorrection(db: PrismaClient, expectedFingerpri
           createdAt: row.createdAt,
         })) },
       } });
-      await tx.customer.update({ where: { id: old.customerId }, data: { seqInvoice: sequence } });
       newInvoices.push(created);
     }
     const oldBundle = current.bundle;
@@ -219,7 +219,7 @@ export async function stageOctoberCorrection(db: PrismaClient, expectedFingerpri
         const old = current.invoices[index];
         const fresh = newInvoices[index];
         const oldSource = oldBundle.sources[index - 4];
-        return { invoiceId: fresh.id, invoiceNumber: fresh.invoiceNumber,
+        return { invoiceId: fresh.id, invoiceNumber: OCTOBER_TARGETS[index].number,
           sourceCustomerId: old.customerId, sourceCustomerName: oldSource.sourceCustomerName,
           sourceCompanyName: oldSource.sourceCompanyName, issuedDate: old.issuedDate,
           totalAmount: fresh.totalAmount, discountBasisAmount: fresh.discountBasisAmount,
@@ -251,9 +251,12 @@ export async function preparePdfBytes(db: PrismaClient, batchId: number) {
   const batch = await db.invoiceCorrectionBatch.findUnique({ where: { id: batchId }, include: { mappings: true } });
   if (!batch || batch.correctionKey !== OCTOBER_CORRECTION_KEY || !batch.newBundleId || batch.status === "activated") fail("訂正準備を確認できません");
   for (const mapping of batch.mappings.sort((a, b) => a.oldInvoiceId - b.oldInvoiceId)) {
+    const target = OCTOBER_TARGETS.find(row => row.id === mapping.oldInvoiceId);
     const invoice = await correctionInvoiceForPdf(db, mapping.newInvoiceId);
-    if (!invoice || invoice.status !== "correction_preparing" || !hasConsistentInvoiceSnapshots(invoice)) fail("再発行明細を確認できません");
+    if (!target || !invoice || invoice.invoiceNumber !== pendingOctoberNumber(target.number) ||
+      invoice.status !== "correction_preparing" || !hasConsistentInvoiceSnapshots(invoice)) fail("再発行明細を確認できません");
     const existing = await db.invoicePdfFile.findFirst({ where: { invoiceId: invoice.id, version: 1 } });
+    if (existing && (existing.status !== "draft" || existing.fileName !== `invoice_${target.number}.pdf`)) fail("準備済みPDFの表示番号が一致しません");
     if (existing?.hash && existing.fileSize && existing.storageKey) {
       const bytes = await downloadInvoicePdf(existing.storageKey);
       if (bytes.length !== existing.fileSize || calculateInvoicePdfHash(bytes) !== existing.hash) fail("準備済みPDFが一致しません");
@@ -261,9 +264,9 @@ export async function preparePdfBytes(db: PrismaClient, batchId: number) {
     }
     const pdf = existing ?? await db.invoicePdfFile.create({ data: {
       invoiceId: invoice.id, customerId: invoice.customerId, version: 1, status: "draft",
-      storageKey: "", fileName: `invoice_${invoice.invoiceNumber}.pdf`,
+      storageKey: "", fileName: `invoice_${target.number}.pdf`,
     } });
-    const bytes = await renderInvoicePdfBuffer(correctionInvoicePdfData(invoice));
+    const bytes = await renderInvoicePdfBuffer(correctionInvoicePdfData(invoice, target.number));
     if (bytes.length === 0) fail("再発行PDFが空です");
     const key = buildInvoicePdfStorageKey(invoice.id, pdf.id);
     await uploadInvoicePdf(key, bytes);
@@ -276,13 +279,21 @@ export async function preparePdfBytes(db: PrismaClient, batchId: number) {
   const bundle = await db.consolidatedInvoice.findUnique({ where: { id: batch.newBundleId }, include: consolidatedBundleInclude });
   const publication = await db.consolidatedInvoicePublication.findUnique({ where: { consolidatedInvoiceId: batch.newBundleId } });
   if (!bundle || !publication || publication.status !== "draft") fail("再発行集約請求を確認できません");
+  if (bundle.sources.length !== 2 || bundle.sources.some(source => !["KI-001", "SI-001"].includes(source.invoiceNumber)) ||
+    new Set(bundle.sources.map(source => source.invoiceNumber)).size !== 2) fail("再発行集約請求の元番号が一致しません");
   if (publication.storageKey && publication.hash && publication.fileSize) {
     const bytes = await downloadConsolidatedPdf(publication.storageKey);
     if (bytes.length !== publication.fileSize || calculateInvoicePdfHash(bytes) !== publication.hash) fail("準備済み集約PDFが一致しません");
   } else {
     const dueDates = await db.invoice.findMany({ where: { id: { in: batch.mappings.filter(row => row.oldInvoiceId === 6 || row.oldInvoiceId === 7).map(row => row.newInvoiceId) } },
       orderBy: { id: "asc" }, select: { paymentDueDate: true } });
-    const bytes = await renderConsolidatedInvoicePdf(buildConsolidatedPdfData(bundle, dueDates.map(row => row.paymentDueDate)));
+    const data = buildConsolidatedPdfData(bundle, dueDates.map(row => row.paymentDueDate));
+    const sourceNumbers = bundle.sources.flatMap(source => source.deliveryNotes.map(() => source.invoiceNumber));
+    const document = consolidatedInvoiceDocumentData(data);
+    if (document.items.length !== sourceNumbers.length) fail("再発行集約請求の明細数が一致しません");
+    const bytes = await renderInvoicePdfBuffer({ ...document, items: document.items.map((item, index) => ({
+      ...item, description: `${item.description} / ${sourceNumbers[index]}`,
+    })) });
     if (bytes.length === 0) fail("再発行集約PDFが空です");
     const key = `consolidated-invoices/${bundle.id}/${publication.id}-${randomUUID()}.pdf`;
     await uploadConsolidatedPdf(key, bytes);
@@ -298,12 +309,14 @@ export async function preparePdfBytes(db: PrismaClient, batchId: number) {
 
 export async function activateOctoberCorrection(db: PrismaClient, batchId: number, expectedFingerprint: string) {
   if (!Number.isSafeInteger(batchId) || batchId <= 0 || !/^[0-9a-f]{64}$/.test(expectedFingerprint)) throw new OctoberCorrectionError("確認値が不正です", 400);
-  const observed = await inspect(db, false, true);
+  const observed = await inspect(db);
   if (observed.fingerprint !== expectedFingerprint) fail("元請求書の状態が変わりました");
   await verifyOldPdfBytes(observed);
   const staged = await db.invoiceCorrectionBatch.findUnique({ where: { id: batchId }, include: { mappings: true } });
   if (!staged || staged.correctionKey !== OCTOBER_CORRECTION_KEY || staged.status !== "ready" ||
-    staged.fingerprint !== expectedFingerprint || !staged.newBundleId || staged.mappings.length !== 6) fail("準備済み訂正を確認できません");
+    staged.fingerprint !== expectedFingerprint || !staged.newBundleId || staged.mappings.length !== 6 ||
+    staged.mappings.some(mapping => !OCTOBER_TARGETS.some(target => target.id === mapping.oldInvoiceId)) ||
+    new Set(staged.mappings.map(mapping => mapping.newInvoiceId)).size !== 6) fail("準備済み訂正を確認できません");
   const stagedPdfMeta = new Map<number, { id: number; storageKey: string; hash: string; fileSize: number }>();
   for (const mapping of staged.mappings) {
     const invoice = await db.invoice.findUnique({ where: { id: mapping.newInvoiceId }, include: { currentPdfFile: true, pdfFiles: true, repairSnapshots: true, paymentAllocations: true, repairs: { select: { id: true } } } });
@@ -312,7 +325,8 @@ export async function activateOctoberCorrection(db: PrismaClient, batchId: numbe
     if (!invoice || !target || invoice.status !== "correction_preparing" || invoice.sentAt || invoice.lineSendRetryKey || invoice.lineSendStartedAt ||
       invoice.pdfFiles.length !== 1 || pdf?.sentAt || !pdf?.storageKey || !pdf.hash || !pdf.fileSize ||
       invoice.currentPdfFileId !== null || invoice.publicToken !== null || invoice.repairs.length !== 0 || invoice.paymentAllocations.length !== 0 ||
-      invoice.invoiceNumber !== `${target.prefix}I-002` || invoice.totalAmount !== target.corrected[0] ||
+      invoice.invoiceNumber !== pendingOctoberNumber(target.number) || pdf.fileName !== `invoice_${target.number}.pdf` ||
+      invoice.totalAmount !== target.corrected[0] ||
       invoice.taxAmount !== target.corrected[1] || invoice.shippingFeeAmount !== target.corrected[2] ||
       invoice.grossTotalAmount !== target.corrected[3] || invoice.discountAmount !== target.corrected[4] ||
       !hasConsistentInvoiceSnapshots(invoice)) fail("準備済み請求書を確認できません");
@@ -325,11 +339,13 @@ export async function activateOctoberCorrection(db: PrismaClient, batchId: numbe
   const stagedBytes = await downloadConsolidatedPdf(stagedPublication.storageKey);
   if (stagedBytes.length !== stagedPublication.fileSize || calculateInvoicePdfHash(stagedBytes) !== stagedPublication.hash) fail("再発行集約PDFの保存内容が一致しません");
   return db.$transaction(async tx => {
-    const current = await inspect(tx, true, true);
+    const current = await inspect(tx, true);
     if (current.fingerprint !== expectedFingerprint) fail("元請求書の状態が変わりました");
     const batch = await tx.invoiceCorrectionBatch.findUnique({ where: { id: batchId }, include: { mappings: true } });
     if (!batch || batch.correctionKey !== OCTOBER_CORRECTION_KEY || batch.status !== "ready" ||
-      batch.fingerprint !== expectedFingerprint || batch.newBundleId !== staged.newBundleId) fail("訂正準備が変わりました");
+      batch.fingerprint !== expectedFingerprint || batch.newBundleId !== staged.newBundleId ||
+      batch.mappings.length !== 6 || batch.mappings.some(mapping =>
+        staged.mappings.find(row => row.oldInvoiceId === mapping.oldInvoiceId)?.newInvoiceId !== mapping.newInvoiceId)) fail("訂正準備が変わりました");
     const replacement = await tx.consolidatedInvoice.findUnique({ where: { id: batch.newBundleId! }, include: {
       sources: { orderBy: { invoiceId: "asc" }, include: { invoice: true, deliveryNotes: { orderBy: { id: "asc" } } } }, issueState: true,
     } });
@@ -337,7 +353,11 @@ export async function activateOctoberCorrection(db: PrismaClient, batchId: numbe
       replacement.sources.reduce((sum, source) => sum + source.grossTotalAmount, 0) !== 79995 ||
       replacement.issueState?.issuedDate.getTime() !== current.bundle.issueState!.issuedDate.getTime() ||
       replacement.sources.some(source => !batch.mappings.some(row => row.newInvoiceId === source.invoiceId && [6, 7].includes(row.oldInvoiceId)) ||
-        source.invoice.invoiceNumber !== source.invoiceNumber || source.invoice.customerId !== source.sourceCustomerId ||
+        source.invoice.invoiceNumber !== pendingOctoberNumber(OCTOBER_TARGETS.find(row =>
+          row.id === batch.mappings.find(mapping => mapping.newInvoiceId === source.invoiceId)?.oldInvoiceId)?.number ?? "") ||
+        source.invoiceNumber !== OCTOBER_TARGETS.find(row =>
+          row.id === batch.mappings.find(mapping => mapping.newInvoiceId === source.invoiceId)?.oldInvoiceId)?.number ||
+        source.invoice.customerId !== source.sourceCustomerId ||
         source.invoice.issuedDate.getTime() !== source.issuedDate.getTime() || source.invoice.totalAmount !== source.totalAmount ||
         source.invoice.taxAmount !== source.taxAmount || source.invoice.shippingFeeAmount !== source.shippingFeeAmount ||
         source.invoice.grossTotalAmount !== source.grossTotalAmount || source.invoice.discountBasisAmount !== source.discountBasisAmount ||
@@ -355,7 +375,7 @@ export async function activateOctoberCorrection(db: PrismaClient, batchId: numbe
       const target = OCTOBER_TARGETS.find(row => row.id === mapping.oldInvoiceId);
       if (!old || !fresh || fresh.status !== "correction_preparing" || fresh.customerId !== old.customerId ||
         fresh.sentAt || fresh.lineSendRetryKey || fresh.lineSendStartedAt || fresh.pdfFiles[0]?.sentAt ||
-        !target || fresh.invoiceNumber !== `${target.prefix}I-002` || fresh.issuedDate.getTime() !== old.issuedDate.getTime() ||
+        !target || fresh.invoiceNumber !== pendingOctoberNumber(target.number) || fresh.issuedDate.getTime() !== old.issuedDate.getTime() ||
         fresh.billingCustomerId !== old.billingCustomerId || fresh.billingMonth !== old.billingMonth ||
         fresh.paymentDueDate?.getTime() !== old.paymentDueDate?.getTime() ||
         fresh.totalAmount !== target.corrected[0] || fresh.taxAmount !== target.corrected[1] ||
@@ -363,15 +383,21 @@ export async function activateOctoberCorrection(db: PrismaClient, batchId: numbe
         fresh.discountAmount !== target.corrected[4] || fresh.discountBasisAmount !== old.totalAmount || fresh.discountRateBps !== 300 ||
         fresh.publicToken !== null || fresh.repairs.length !== 0 || fresh.paymentAllocations.length !== 0 ||
         snapshotSignature(fresh.repairSnapshots) !== snapshotSignature(old.repairSnapshots) ||
-        fresh.pdfFiles.length !== 1 || fresh.pdfFiles[0].status !== "draft" ||
+        fresh.pdfFiles.length !== 1 || fresh.pdfFiles[0].status !== "draft" || fresh.pdfFiles[0].fileName !== `invoice_${target.number}.pdf` ||
         !pdfMeta || fresh.pdfFiles[0].id !== pdfMeta.id || fresh.pdfFiles[0].storageKey !== pdfMeta.storageKey ||
         fresh.pdfFiles[0].hash !== pdfMeta.hash || fresh.pdfFiles[0].fileSize !== pdfMeta.fileSize ||
         fresh.currentPdfFileId !== null || !hasConsistentInvoiceSnapshots(fresh)) fail("再発行請求書の状態が変わりました");
+      if (await tx.invoice.findUnique({ where: { invoiceNumber: archivedOctoberNumber(target.number) }, select: { id: true } }))
+        fail("旧版の退避番号が使用済みです");
+      const canceled = await tx.invoice.updateMany({ where: { id: old.id, status: "issued", invoiceNumber: target.number },
+        data: { status: "void", invoiceNumber: archivedOctoberNumber(target.number) } });
+      if (canceled.count !== 1) fail("元請求書の状態が変わりました");
+      const renumbered = await tx.invoice.updateMany({ where: { id: fresh.id, status: "correction_preparing", invoiceNumber: pendingOctoberNumber(target.number) },
+        data: { invoiceNumber: target.number } });
+      if (renumbered.count !== 1) fail("再発行請求書の番号が変わりました");
       const oldIds = old.repairs.map(row => row.id);
       const moved = await tx.repair.updateMany({ where: { id: { in: oldIds }, invoiceId: old.id }, data: { invoiceId: fresh.id } });
       if (moved.count !== oldIds.length) fail("修理案件の請求先が変わりました");
-      const canceled = await tx.invoice.updateMany({ where: { id: old.id, status: "issued" }, data: { status: "void" } });
-      if (canceled.count !== 1) fail("元請求書の状態が変わりました");
       await tx.invoicePdfFile.update({ where: { id: fresh.pdfFiles[0].id }, data: { status: "current" } });
       await tx.invoice.update({ where: { id: fresh.id }, data: { status: "issued", currentPdfFileId: fresh.pdfFiles[0].id } });
     }
