@@ -22,7 +22,7 @@ export async function GET() {
           company: { select: { name: true, billingCustomerId: true } } } } } } },
     orderBy: { issuedDate: "desc" }, take: 300 }),
     prisma.consolidatedInvoice.findMany({ orderBy: { createdAt: "desc" }, take: 100,
-      include: { issueState: { select: { issuedDate: true } }, publication: { select: { status: true, publicToken: true, storageKey: true, hash: true, fileSize: true, publishedAt: true } },
+      include: { supersessionOriginal: { select: { id: true, newBundleId: true } }, issueState: { select: { issuedDate: true } }, publication: { select: { status: true, publicToken: true, storageKey: true, hash: true, fileSize: true, publishedAt: true } },
         sources: { include: { deliveryNotes: true, invoice: { select: { id: true, invoiceNumber: true, customerId: true,
           issuedDate: true, totalAmount: true, taxAmount: true, shippingFeeAmount: true,
           discountBasisAmount: true, discountRateBps: true, discountAmount: true,
@@ -76,7 +76,7 @@ export async function GET() {
     const pdfReady = isCurrentConsolidatedPdf(bundle.publication) && !!bundle.publication.publishedAt &&
       validConsolidatedShareToken(bundle.publication.publicToken);
     sourceSafe &&= sources.reduce((sum, source) => sum + source.grossTotalAmount, 0) === bundle.grossTotalAmount;
-    const operationalSafe = sourceSafe && legacyDeliverySafe;
+    const operationalSafe = !bundle.supersessionOriginal && sourceSafe && legacyDeliverySafe;
     const newDeliverySafe = operationalSafe && unpaidSafe && paymentStatus === "UNPAID";
     const destination = outboxStatus || !pdfReady || !newDeliverySafe ? null : await resolveInvoiceLineDestination(prisma, bundle.billingCustomerId);
     return { ...bundle, issuedDate: bundle.issueState?.issuedDate ?? null, sources, paidAmount, outstandingBalance,

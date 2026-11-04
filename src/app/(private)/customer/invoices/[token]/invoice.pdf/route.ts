@@ -1,11 +1,13 @@
 import { downloadInvoicePdf } from "@/lib/invoice-pdf-storage";
 import { prisma } from "@/lib/prisma";
+import { publicInvoicePdfAllowed } from "@/lib/issued-invoice-public-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type PublicInvoicePdf = {
   id: number;
+  status: string;
   currentPdfFileId: number | null;
   storageKey: string | null;
   fileName: string | null;
@@ -25,6 +27,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   const [invoice] = await prisma.$queryRaw<PublicInvoicePdf[]>`
     SELECT
       i."id",
+      i."status",
       i."currentPdfFileId",
       f."storageKey",
       f."fileName",
@@ -35,7 +38,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     LIMIT 1
   `;
 
-  if (!invoice) {
+  if (!invoice || !publicInvoicePdfAllowed(invoice.status)) {
     return new Response("Not found", { status: 404 });
   }
 

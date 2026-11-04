@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { percentInputToBps } from "@/lib/b2b-invoice-discount";
+import OctoberCorrection from "./OctoberCorrection";
 
 export default function B2BInvoiceDiscountSettingsPage() {
   const [rate, setRate] = useState("");
@@ -24,7 +25,7 @@ export default function B2BInvoiceDiscountSettingsPage() {
     } catch (error) { setMessage(error instanceof Error ? error.message : "保存できません"); }
     finally { setBusy(false); }
   }
-  return <main className="mx-auto max-w-xl p-8 space-y-5">
+  return <main className="mx-auto max-w-3xl p-8 space-y-5">
     <h1 className="text-2xl font-bold">B2B請求書の標準割引率</h1>
     <p className="text-sm text-slate-600">標準割引率の初期値は3%です。2026年9月以前の納品には2%の履歴があります。発行時に対象納品日を確認し、請求書ごとに変更してください。既発行の金額は変わりません。</p>
     <label className="block text-sm">標準割引率（%）
@@ -33,5 +34,6 @@ export default function B2BInvoiceDiscountSettingsPage() {
     </label>
     <button className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50" disabled={busy || rate === ""} onClick={() => void save()}>保存</button>
     {message && <p role="status" className="text-sm">{message}</p>}
+    <OctoberCorrection />
   </main>;
 }

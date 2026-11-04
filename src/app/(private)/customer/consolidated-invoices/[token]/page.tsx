@@ -4,6 +4,7 @@ import { consolidatedDeliveryNoteRows, isConsolidatedNetDeliveryNotePdf, isCurre
 import { calculateInvoicePdfHash } from "@/lib/invoice-pdf-storage";
 import { downloadConsolidatedPdf } from "@/lib/r2-consolidated-invoice-pdf";
 import { formatIssuedDate } from "@/lib/document-issued-date";
+import { consolidatedShareRevoked } from "@/lib/issued-invoice-public-access";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,11 @@ export default async function ConsolidatedCustomerPage({ params }: { params: Pro
   const publication = await prisma.consolidatedInvoicePublication.findUnique({ where: { publicToken: token },
     include: { consolidatedInvoice: { include: { issueState: true, sources: { include: { deliveryNotes: { orderBy: { id: "asc" } } }, orderBy: { id: "asc" } } } } } });
   if (!isCurrentConsolidatedPdf(publication)) return notFound();
+  const supersession = await prisma.consolidatedInvoiceSupersession.findUnique({ where: { oldBundleId: publication.consolidatedInvoiceId }, select: { id: true } });
+  const voidSources = await prisma.invoice.count({ where: { consolidatedSource: { consolidatedInvoiceId: publication.consolidatedInvoiceId }, status: { notIn: ["issued", "paid"] } } });
+  if (consolidatedShareRevoked(supersession) || voidSources > 0) {
+    return <main className="mx-auto max-w-3xl p-6"><h1 className="text-xl font-bold">この集約請求は取り消されました</h1><p className="mt-3">お支払いは不要です。再発行された請求書をご確認ください。</p></main>;
+  }
   try {
     const stored = await downloadConsolidatedPdf(publication.storageKey);
     if (stored.length !== publication.fileSize || calculateInvoicePdfHash(stored) !== publication.hash) return notFound();

@@ -32,6 +32,9 @@ const allocationSelect = { allocatedAmount: true, releases: { select: { amount: 
     refunds: { select: { amount: true, status: true } } } } } as const;
 
 export async function lockAndCheckConsolidatedSources(tx: Prisma.TransactionClient, bundleId: number) {
+  if (await tx.consolidatedInvoiceSupersession.findUnique({ where: { oldBundleId: bundleId }, select: { id: true } })) {
+    throw new ConsolidatedOperationError("取り消された集約請求は送信・入金登録できません。");
+  }
   const bundle = await tx.consolidatedInvoice.findUnique({ where: { id: bundleId }, include: {
     sources: { orderBy: { invoiceId: "asc" } }, publication: true,
   } });

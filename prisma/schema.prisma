@@ -1957,6 +1957,8 @@ model Invoice {
   pdfFiles      InvoicePdfFile[] @relation("InvoicePdfFiles")
   currentPdfFile InvoicePdfFile? @relation("CurrentInvoicePdfFile", fields: [currentPdfFileId], references: [id], onDelete: SetNull)
   consolidatedSource ConsolidatedInvoiceSource?
+  correctionOriginal InvoiceCorrectionMapping? @relation("CorrectionOriginal")
+  correctionReplacement InvoiceCorrectionMapping? @relation("CorrectionReplacement")
   
   totalAmount   Int      @default(0) // Issued pre-tax subtotal, integer JPY (existing meaning)
   discountBasisAmount Int? // Original tax-exclusive subtotal; null on historical invoices
@@ -2003,8 +2005,50 @@ model ConsolidatedInvoice {
   publication ConsolidatedInvoicePublication?
   pdfHistory ConsolidatedInvoicePdfHistory[]
   issueState ConsolidatedInvoiceIssueState?
+  supersessionOriginal ConsolidatedInvoiceSupersession? @relation("SupersededBundle")
+  supersessionReplacement ConsolidatedInvoiceSupersession? @relation("ReplacementBundle")
+  correctionOriginalBatch InvoiceCorrectionBatch? @relation("CorrectionOldBundle")
+  correctionReplacementBatch InvoiceCorrectionBatch? @relation("CorrectionNewBundle")
 
   @@index([companyId, createdAt])
+}
+
+// Server-only, one-time correction journal. Staged rows are never customer payable.
+model InvoiceCorrectionBatch {
+  id Int @id @default(autoincrement())
+  correctionKey String @unique
+  fingerprint String
+  status String @default("preparing") // preparing, ready, activated
+  oldBundleId Int @unique
+  newBundleId Int? @unique
+  oldBundle ConsolidatedInvoice @relation("CorrectionOldBundle", fields: [oldBundleId], references: [id], onDelete: Restrict)
+  newBundle ConsolidatedInvoice? @relation("CorrectionNewBundle", fields: [newBundleId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  activatedAt DateTime?
+  mappings InvoiceCorrectionMapping[]
+  supersession ConsolidatedInvoiceSupersession?
+}
+
+model InvoiceCorrectionMapping {
+  id Int @id @default(autoincrement())
+  batchId Int
+  oldInvoiceId Int @unique
+  newInvoiceId Int @unique
+  batch InvoiceCorrectionBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  oldInvoice Invoice @relation("CorrectionOriginal", fields: [oldInvoiceId], references: [id], onDelete: Restrict)
+  newInvoice Invoice @relation("CorrectionReplacement", fields: [newInvoiceId], references: [id], onDelete: Restrict)
+}
+
+// Inserted only at activation; immutable old bundle, sources, and PDF history remain intact.
+model ConsolidatedInvoiceSupersession {
+  id Int @id @default(autoincrement())
+  oldBundleId Int @unique
+  newBundleId Int @unique
+  correctionBatchId Int @unique
+  correctionBatch InvoiceCorrectionBatch @relation(fields: [correctionBatchId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  oldBundle ConsolidatedInvoice @relation("SupersededBundle", fields: [oldBundleId], references: [id], onDelete: Restrict)
+  newBundle ConsolidatedInvoice @relation("ReplacementBundle", fields: [newBundleId], references: [id], onDelete: Restrict)
 }
 
 // Mutable issue date; the consolidated invoice and source snapshots remain immutable audit rows.
