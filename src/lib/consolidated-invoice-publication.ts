@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { calculateInvoicePaymentSummary } from "./invoice-payment";
 import { formatIssuedDate } from "./document-issued-date";
+import { hasDiscountSnapshot } from "./b2b-invoice-discount";
 
 export const consolidatedBundleInclude = {
   issueState: true,
@@ -20,38 +21,46 @@ export const isConsolidatedDeliveryNotePdf = (id: number, fileName: string) =>
   new RegExp(`^consolidated_invoice_${id}_v(?:[2-9]|[1-9]\\d+)_delivery_notes\\.pdf$`).test(fileName);
 
 type NoteSource = { totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
+  discountBasisAmount?: number | null; discountRateBps?: number | null; discountAmount?: number | null;
   deliveryNotes: { slipNumber: string | null; issuedDate: Date | null; repairCount: number; subtotalAmount: number | null }[] };
 
 export function consolidatedDeliveryNoteRows(bundle: { grossTotalAmount: number; sources: readonly NoteSource[] }) {
   if (bundle.sources.length < 2) throw new Error("Incomplete consolidated invoice");
-  const rows: { slipNumber: string; date: string; repairCount: number; amount: number; taxAmount: number; grossAmount: number }[] = [];
+  const rows: { slipNumber: string; date: string; repairCount: number; originalAmount: number; discountAmount: number; discountRateBps: number | null; amount: number; taxAmount: number; grossAmount: number }[] = [];
   for (const source of bundle.sources) {
     const { totalAmount: net, taxAmount: tax, shippingFeeAmount: shipping, grossTotalAmount: gross } = source;
+    const basis = source.discountBasisAmount ?? net;
+    const discount = source.discountAmount ?? 0;
     if (![net, tax, shipping, gross].every(value => Number.isSafeInteger(value) && value >= 0) || gross !== net + tax + shipping ||
+        !hasDiscountSnapshot(source) ||
         source.deliveryNotes.length === 0) throw new Error("Invalid source invoice snapshot");
     const notes = source.deliveryNotes;
     if (notes.some(note => !note.slipNumber?.trim() || !note.issuedDate || !Number.isFinite(note.issuedDate.getTime()) ||
       !Number.isSafeInteger(note.repairCount) || note.repairCount <= 0 ||
       !Number.isSafeInteger(note.subtotalAmount) || (note.subtotalAmount ?? -1) < 0) ||
-      notes.reduce((sum, note) => sum + note.subtotalAmount!, 0) !== net) throw new Error("Incomplete delivery note snapshot");
+      notes.reduce((sum, note) => sum + note.subtotalAmount!, 0) !== basis) throw new Error("Incomplete delivery note snapshot");
     // Allocate the frozen shipping and tax independently; cumulative division assigns every yen.
-    let cumulativeNet = 0, allocatedShipping = 0, allocatedTax = 0;
+    let cumulativeBasis = 0, allocatedDiscount = 0, allocatedShipping = 0, allocatedTax = 0;
     for (const [index, note] of notes.entries()) {
-      cumulativeNet += note.subtotalAmount!;
-      const allocatedPortion = (value: number) => net === 0
+      cumulativeBasis += note.subtotalAmount!;
+      const allocatedPortion = (value: number) => basis === 0
         ? Number(BigInt(value) * BigInt(index + 1) / BigInt(notes.length))
-        : Number(BigInt(value) * BigInt(cumulativeNet) / BigInt(net));
+        : Number(BigInt(value) * BigInt(cumulativeBasis) / BigInt(basis));
+      const nextDiscount = allocatedPortion(discount);
       const nextShipping = allocatedPortion(shipping);
       const nextTax = allocatedPortion(tax);
-      const amount = note.subtotalAmount! + nextShipping - allocatedShipping;
+      const noteDiscount = nextDiscount - allocatedDiscount;
+      const amount = note.subtotalAmount! - noteDiscount + nextShipping - allocatedShipping;
       const taxAmount = nextTax - allocatedTax;
       const grossAmount = amount + taxAmount;
       if (![amount, taxAmount, grossAmount].every(value => Number.isSafeInteger(value) && value >= 0)) throw new Error("Invalid delivery note allocation");
+      allocatedDiscount = nextDiscount;
       allocatedShipping = nextShipping;
       allocatedTax = nextTax;
-      rows.push({ slipNumber: note.slipNumber!.trim(), date: formatIssuedDate(note.issuedDate!), repairCount: note.repairCount, amount, taxAmount, grossAmount });
+      rows.push({ slipNumber: note.slipNumber!.trim(), date: formatIssuedDate(note.issuedDate!), repairCount: note.repairCount,
+        originalAmount: note.subtotalAmount!, discountAmount: noteDiscount, discountRateBps: source.discountRateBps ?? null, amount, taxAmount, grossAmount });
     }
-    if (allocatedShipping !== shipping || allocatedTax !== tax ||
+    if (allocatedDiscount !== discount || allocatedShipping !== shipping || allocatedTax !== tax ||
         rows.slice(-notes.length).reduce((sum, row) => sum + row.grossAmount, 0) !== gross) throw new Error("Delivery note total mismatch");
   }
   if (rows.reduce((sum, row) => sum + row.grossAmount, 0) !== bundle.grossTotalAmount) throw new Error("Consolidated total mismatch");
@@ -61,8 +70,10 @@ export function consolidatedDeliveryNoteRows(bundle: { grossTotalAmount: number;
 type SnapshotSource = {
   invoiceId: number; invoiceNumber: string; sourceCustomerId: number; issuedDate: Date;
   totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
+  discountBasisAmount?: number | null; discountRateBps?: number | null; discountAmount?: number | null;
   invoice: { id: number; invoiceNumber: string; customerId: number; issuedDate: Date;
-    totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number };
+    totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
+    discountBasisAmount?: number | null; discountRateBps?: number | null; discountAmount?: number | null };
 };
 
 export function hasConsolidatedSourceSnapshotIntegrity(bundle: { grossTotalAmount: number; sources: SnapshotSource[] }) {
@@ -73,6 +84,9 @@ export function hasConsolidatedSourceSnapshotIntegrity(bundle: { grossTotalAmoun
       source.invoice.customerId === source.sourceCustomerId &&
       source.invoice.issuedDate.getTime() === source.issuedDate.getTime() &&
       source.invoice.totalAmount === source.totalAmount && source.invoice.taxAmount === source.taxAmount &&
+      (source.invoice.discountBasisAmount ?? null) === (source.discountBasisAmount ?? null) &&
+      (source.invoice.discountRateBps ?? null) === (source.discountRateBps ?? null) &&
+      (source.invoice.discountAmount ?? null) === (source.discountAmount ?? null) && hasDiscountSnapshot(source) &&
       source.invoice.shippingFeeAmount === source.shippingFeeAmount &&
       source.invoice.grossTotalAmount === source.grossTotalAmount &&
       source.grossTotalAmount > 0 && source.grossTotalAmount === source.totalAmount + source.taxAmount + source.shippingFeeAmount);
@@ -80,13 +94,15 @@ export function hasConsolidatedSourceSnapshotIntegrity(bundle: { grossTotalAmoun
 
 export function buildConsolidatedPdfData(bundle: ConsolidatedBundle, dueDates: (Date | null)[]) {
   if (!bundle.issueState || bundle.sources.length < 2 || dueDates.length !== bundle.sources.length) throw new Error("Incomplete consolidated invoice");
-  let subtotal = 0, tax = 0, shipping = 0, gross = 0;
+  let subtotal = 0, discount = 0, originalSubtotal = 0, tax = 0, shipping = 0, gross = 0;
   for (const source of bundle.sources) {
     if (source.totalAmount < 0 || source.taxAmount < 0 || source.shippingFeeAmount < 0 ||
         source.grossTotalAmount !== source.totalAmount + source.taxAmount + source.shippingFeeAmount) {
       throw new Error("Invalid source invoice snapshot");
     }
     subtotal += source.totalAmount;
+    discount += source.discountAmount ?? 0;
+    originalSubtotal += source.discountBasisAmount ?? source.totalAmount;
     tax += source.taxAmount;
     shipping += source.shippingFeeAmount;
     gross += source.grossTotalAmount;
@@ -95,7 +111,7 @@ export function buildConsolidatedPdfData(bundle: ConsolidatedBundle, dueDates: (
   const dateValues = dueDates.map(date => date?.toISOString().slice(0, 10) ?? null);
   const dueDate = dateValues[0] && dateValues.every(date => date === dateValues[0]) ? dateValues[0] : null;
   const rows = consolidatedDeliveryNoteRows(bundle);
-  return { bundle, subtotal, tax, shipping, gross, dueDate, rows };
+  return { bundle, subtotal, originalSubtotal, discount, tax, shipping, gross, dueDate, rows };
 }
 
 export type ConsolidatedPdfData = ReturnType<typeof buildConsolidatedPdfData>;

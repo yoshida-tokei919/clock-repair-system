@@ -8,12 +8,14 @@ import { PostalInvoiceBatchPrint } from "@/components/invoices/PostalInvoiceBatc
 import { b2bPaymentDueDate, parseBillingMonth } from "@/lib/b2b-billing-month";
 import { IssuedDateDialog } from "@/components/documents/IssuedDateDialog";
 import { summarizeB2BInvoicePreview } from "@/lib/b2b-invoice-preview";
+import { percentInputToBps } from "@/lib/b2b-invoice-discount";
 
 type Partner = {
     id: number;
     name: string;
     companyName: string | null;
     prefix: string | null;
+    invoiceDiscountOverrideBps: number | null;
 };
 
 type PreviewRepair = {
@@ -89,6 +91,9 @@ export default function InvoicesPage() {
     const [previewLoading, setPreviewLoading] = useState(false);
     const [error, setError] = useState("");
     const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+    const [standardRateBps, setStandardRateBps] = useState<number | null>(null);
+    const [settingsError, setSettingsError] = useState("");
+    const [discountRateBps, setDiscountRateBps] = useState<number | "">("");
 
     useEffect(() => {
         fetch("/api/invoices")
@@ -97,6 +102,14 @@ export default function InvoicesPage() {
         fetch("/api/partners")
             .then((r) => r.json())
             .then((data) => setPartners(data.partners || []));
+        fetch("/api/settings/b2b-invoice-discount").then(async r => {
+            if (!r.ok) throw new Error("割引率の設定を取得できませんでした。");
+            const data = await r.json();
+            if (!Number.isInteger(data.standardRateBps) || data.standardRateBps < 0 || data.standardRateBps > 10000) {
+                throw new Error("割引率の設定が不正です。");
+            }
+            setStandardRateBps(data.standardRateBps);
+        }).catch(e => setSettingsError(e instanceof Error ? e.message : "割引率の設定を取得できませんでした。"));
     }, []);
 
     // 取引先または月が変わったらプレビューをリセット
@@ -104,6 +117,10 @@ export default function InvoicesPage() {
         setPreviews(null);
         setSelectedIds(new Set());
     }, [selectedPartnerId, selectedMonth]);
+
+    useEffect(() => {
+        setDiscountRateBps(standardRateBps === null ? "" : partners.find(p => p.id === selectedPartnerId)?.invoiceDiscountOverrideBps ?? standardRateBps);
+    }, [partners, selectedPartnerId, standardRateBps]);
 
     async function loadPreview() {
         if (!selectedPartnerId || !selectedMonth) return;
@@ -137,7 +154,7 @@ export default function InvoicesPage() {
     }
 
     async function createInvoice(issuedDate?: string) {
-        if (!selectedPartnerId || selectedIds.size === 0 || total === null) return;
+        if (!selectedPartnerId || selectedIds.size === 0 || total === null || standardRateBps === null || settingsError) return;
         setLoading(true);
         setError("");
         try {
@@ -149,6 +166,7 @@ export default function InvoicesPage() {
                     repairIds: Array.from(selectedIds),
                     billingMonth: selectedMonth,
                     issuedDate,
+                    discountRateBps,
                 }),
             });
             if (!res.ok) {
@@ -169,10 +187,12 @@ export default function InvoicesPage() {
     const selectedPreviews = previews?.filter((r) => selectedIds.has(r.id)) || [];
     const selectedModes = new Set(selectedPreviews.map(row => row.pricingTaxMode ?? "EXCLUSIVE"));
     const mixedModes = selectedModes.size > 1;
-    const summary = summarizeB2BInvoicePreview(mixedModes ? [] : selectedPreviews);
-    const { subtotal, tax, shippingFeeAmount, unconfirmedNoteIds } = summary;
-    const total = mixedModes ? null : summary.total;
+    const validDiscountRate = discountRateBps !== "" && Number.isInteger(discountRateBps) && discountRateBps >= 0 && discountRateBps <= 10000;
+    const summary = summarizeB2BInvoicePreview(mixedModes ? [] : selectedPreviews, validDiscountRate ? discountRateBps : 0);
+    const { subtotal, discountBasisAmount, discountAmount, netSubtotal, tax, shippingFeeAmount, unconfirmedNoteIds } = summary;
+    const total = mixedModes || !validDiscountRate ? null : summary.total;
     const inclusivePreview = selectedModes.has("INCLUSIVE");
+    const preOctoberDeliveries = selectedPreviews.filter(row => new Date(row.deliveryDate).getTime() < Date.parse("2026-09-30T15:00:00Z"));
 
     const selectedPartner = partners.find((p) => p.id === selectedPartnerId);
 
@@ -281,6 +301,7 @@ export default function InvoicesPage() {
                         >
                             {previewLoading ? "取得中..." : "対象案件を確認する"}
                         </button>
+                        {settingsError && <p className="mb-4 text-sm text-red-600">{settingsError} 請求書を発行できません。</p>}
                         {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
                         {/* ③ 修理案件プレビュー */}
@@ -365,10 +386,25 @@ export default function InvoicesPage() {
                                         </div>
 
                                         {/* 金額サマリー */}
+                                        {preOctoberDeliveries.length > 0 && <div className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                                            2026年9月以前の納品が{preOctoberDeliveries.length}件あります。旧割引率2%の対象か、納品日と契約条件を確認してください。対象月だけで税・割引条件を確定しないでください。
+                                            <button type="button" className="ml-2 underline" onClick={() => setDiscountRateBps(200)}>この請求書に2%を設定</button>
+                                        </div>}
                                         <div className="mt-3 bg-gray-50 rounded-lg px-4 py-3 text-sm">
                                             <div className="flex justify-between text-gray-500">
-                                                 <span>{inclusivePreview ? "課税対象額（税込）" : "小計"}（{selectedIds.size}件）</span>
-                                                <span>¥{subtotal.toLocaleString()}</span>
+                                                 <span>{inclusivePreview ? "元の明細計（税込）" : "割引前小計（税抜）"}（{selectedIds.size}件）</span>
+                                                <span>¥{(inclusivePreview ? subtotal : discountBasisAmount).toLocaleString()}</span>
+                                            </div>
+                                            {inclusivePreview && <div className="flex justify-between text-gray-500"><span>割引前小計（税抜）</span><span>¥{discountBasisAmount.toLocaleString()}</span></div>}
+                                            <label className="flex justify-between text-gray-500">請求書の割引率（%）
+                                                <input type="number" min="0" max="100" step="0.01" className="w-24 rounded border px-2 text-right" value={discountRateBps === "" || !Number.isFinite(discountRateBps) ? "" : discountRateBps / 100}
+                                                    onChange={e => setDiscountRateBps(percentInputToBps(e.target.value))} />
+                                            </label>
+                                            <div className="flex justify-between text-gray-500">
+                                                <span>割引額（税抜）</span><span>-¥{discountAmount.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between text-gray-500">
+                                                <span>割引後小計（税抜）</span><span>¥{netSubtotal.toLocaleString()}</span>
                                             </div>
                                             <div className="flex justify-between text-gray-500">
                                                  <span>{inclusivePreview ? "内消費税（10%）" : "消費税（10%）"}</span>
@@ -384,6 +420,7 @@ export default function InvoicesPage() {
                                             </div>
                                         </div>
                                         {mixedModes && <p className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">税表示方式が異なる見積は同じ請求書にまとめられません。</p>}
+                                        {!validDiscountRate && <p className="mt-3 text-sm text-red-600">割引率は0〜100%の0.01%単位で入力してください。</p>}
                                         {unconfirmedNoteIds.length > 0 && <p className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                                             選択中の納品書の送料が未確定です。先に送料を確定してください: {unconfirmedNoteIds.map((id, index) => <span key={id}>{index > 0 ? "、" : ""}<Link className="underline" href={`/documents/delivery/${id}`}>納品書 #{id}</Link></span>)}
                                         </p>}
@@ -402,7 +439,7 @@ export default function InvoicesPage() {
 
                                         <button
                                             onClick={() => setIssueDialogOpen(true)}
-                                            disabled={loading || total === null}
+                                            disabled={loading || total === null || standardRateBps === null || !!settingsError}
                                             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-sm transition-colors disabled:opacity-50"
                                         >
                                             {loading

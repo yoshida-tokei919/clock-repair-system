@@ -25,6 +25,7 @@ export async function GET() {
       include: { issueState: { select: { issuedDate: true } }, publication: { select: { status: true, publicToken: true, storageKey: true, hash: true, fileSize: true, publishedAt: true } },
         sources: { include: { deliveryNotes: true, invoice: { select: { id: true, invoiceNumber: true, customerId: true,
           issuedDate: true, totalAmount: true, taxAmount: true, shippingFeeAmount: true,
+          discountBasisAmount: true, discountRateBps: true, discountAmount: true,
           sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true, pdfFiles: { select: { sentAt: true } },
           status: true, grossTotalAmount: true,
           paymentAllocations: { select: { allocatedAmount: true, releases: { select: { amount: true } },
@@ -58,6 +59,8 @@ export async function GET() {
       sourceSafe &&= (invoice.status === "issued" || invoice.status === "paid") && invoice.invoiceNumber === source.invoiceNumber &&
         invoice.customerId === source.sourceCustomerId && invoice.issuedDate.getTime() === source.issuedDate.getTime() &&
         invoice.totalAmount === source.totalAmount && invoice.taxAmount === source.taxAmount &&
+        invoice.discountBasisAmount === source.discountBasisAmount && invoice.discountRateBps === source.discountRateBps &&
+        invoice.discountAmount === source.discountAmount &&
         invoice.shippingFeeAmount === source.shippingFeeAmount && invoice.grossTotalAmount === source.grossTotalAmount &&
         source.grossTotalAmount > 0 && source.grossTotalAmount === source.totalAmount + source.taxAmount + source.shippingFeeAmount;
       unpaidSafe &&= invoice.status === "issued" && summary.outstandingBalance === source.grossTotalAmount &&

@@ -1,5 +1,6 @@
 import { assertIntegerYen } from "./invoice-payment";
 import { calculateTaxableAmounts, sumCustomerLines, type PricingTaxMode } from "./pricing-tax";
+import { hasDiscountSnapshot } from "./b2b-invoice-discount";
 
 export type InvoiceRepairSnapshotInput = {
   id: number;
@@ -44,6 +45,9 @@ export function hasConsistentInvoiceSnapshots(invoice: {
   pricingTaxMode?: string;
   shippingFeeAmount?: number;
   grossTotalAmount: number;
+  discountBasisAmount?: number | null;
+  discountRateBps?: number | null;
+  discountAmount?: number | null;
   repairSnapshots: { subtotalAmount: number; grossAmount?: number | null; deliveryNoteId?: number | null; deliveryShippingFee?: number }[];
 }) {
   if (!invoice.repairSnapshots.length) return false;
@@ -52,6 +56,7 @@ export function hasConsistentInvoiceSnapshots(invoice: {
     assertIntegerYen(invoice.taxAmount);
     assertIntegerYen(invoice.shippingFeeAmount ?? 0);
     assertIntegerYen(invoice.grossTotalAmount);
+    if (!hasDiscountSnapshot(invoice)) return false;
     const fees = new Map<number, number>();
     const mode = invoice.pricingTaxMode ?? "EXCLUSIVE";
     if (mode !== "EXCLUSIVE" && mode !== "INCLUSIVE") return false;
@@ -69,14 +74,17 @@ export function hasConsistentInvoiceSnapshots(invoice: {
     }
     const shipping = [...fees.values()].reduce((sum, fee) => sum + fee, 0);
     const taxableGross = invoice.totalAmount + invoice.taxAmount;
-    const expectedTax = mode === "INCLUSIVE"
-      ? Number(BigInt(taxableGross) * BigInt(10) / BigInt(110))
+    const discounted = (invoice.discountAmount ?? 0) > 0;
+    const expectedTax = discounted ? Number(BigInt(invoice.totalAmount) / BigInt(10))
+      : mode === "INCLUSIVE" ? Number(BigInt(taxableGross) * BigInt(10) / BigInt(110))
       : Number(BigInt(invoice.totalAmount) / BigInt(10));
     return invoice.taxAmount === expectedTax
       && shipping === (invoice.shippingFeeAmount ?? 0)
       && invoice.grossTotalAmount === invoice.totalAmount + invoice.taxAmount + shipping
-      && invoice.repairSnapshots.reduce((sum, row) => sum + row.subtotalAmount, 0) === invoice.totalAmount
-      && (mode === "EXCLUSIVE" || invoice.repairSnapshots.reduce((sum, row) => sum + (row.grossAmount ?? 0), 0) === taxableGross);
+      && invoice.repairSnapshots.reduce((sum, row) => sum + row.subtotalAmount, 0) === (invoice.discountBasisAmount ?? invoice.totalAmount)
+      && (mode === "EXCLUSIVE" || (discounted
+        ? calculateTaxableAmounts(invoice.repairSnapshots.reduce((sum, row) => sum + (row.grossAmount ?? 0), 0), "INCLUSIVE").totalAmount === invoice.discountBasisAmount
+        : invoice.repairSnapshots.reduce((sum, row) => sum + (row.grossAmount ?? 0), 0) === taxableGross));
   } catch { return false; }
 }
 

@@ -20,6 +20,7 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
   const bundle = await prisma.consolidatedInvoice.findUnique({ where: { id }, include: {
     publication: true, pdfHistory: { orderBy: { version: "desc" } }, issueState: true, sources: { orderBy: { id: "asc" }, include: { deliveryNotes: { orderBy: { id: "asc" } },
       invoice: { select: { id: true, invoiceNumber: true, customerId: true, issuedDate: true, totalAmount: true, taxAmount: true,
+        discountBasisAmount: true, discountRateBps: true, discountAmount: true,
         shippingFeeAmount: true, grossTotalAmount: true, paymentDueDate: true, status: true, sentAt: true, lineSendRetryKey: true,
         lineSendStartedAt: true, pdfFiles: { select: { sentAt: true } },
         paymentAllocations: { select: { allocatedAmount: true, releases: { select: { amount: true } },
@@ -74,6 +75,7 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
         <p className="mt-2 text-sm">請求先: {bundle.companyName}</p>
         <p className="text-sm">支払期限: {dueDate ?? "未確定（元請求書の期限が一致しません）"}</p>
         <p className="text-sm">請求額: {yen(bundle.grossTotalAmount)}　入金済: {yen(paidAmount)}　未収: {yen(outstanding)} <strong>{paymentStatus}</strong></p>
+        {bundle.sources.some(source => source.discountBasisAmount !== null) && <p className="text-sm">割引前小計: {yen(bundle.sources.reduce((sum, source) => sum + (source.discountBasisAmount ?? source.totalAmount), 0))}　割引: -{yen(bundle.sources.reduce((sum, source) => sum + (source.discountAmount ?? 0), 0))}　割引後小計: {yen(bundle.sources.reduce((sum, source) => sum + source.totalAmount, 0))}　消費税: {yen(bundle.sources.reduce((sum, source) => sum + source.taxAmount, 0))}　送料: {yen(bundle.sources.reduce((sum, source) => sum + source.shippingFeeAmount, 0))}</p>}
         <p className="text-sm">案内: {delivery}</p>
         {!snapshotSafe && <p role="alert" className="mt-2 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">元請求書と作成時の請求内容が一致しません。新しい操作は停止しています。元請求書の内容を確認してください。</p>}
         {bundle.publication && <p className="text-xs text-slate-500">PDF version {bundle.publication.version} / {bundle.publication.status}</p>}
@@ -83,7 +85,7 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
       </header>
       <section className="rounded-lg bg-white p-5 shadow-sm text-sm">
         <h2 className="font-bold">納品書別のご請求</h2>
-        {rows ? <div className="mt-3 overflow-x-auto"><table className="w-full text-left"><thead><tr className="border-b"><th className="py-2">納品書番号</th><th>納品日</th><th>内容</th><th className="text-right">金額</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.slipNumber}-${index}`} className="border-b"><td className="py-2">{row.slipNumber}</td><td>{row.date}</td><td>{row.repairCount}点</td><td className="text-right">{yen(row.amount)}</td></tr>)}</tbody></table></div>
+        {rows ? <div className="mt-3 overflow-x-auto"><table className="w-full text-left"><thead><tr className="border-b"><th className="py-2">納品書番号</th><th>納品日</th><th>内容</th><th className="text-right">割引前</th><th className="text-right">割引</th><th className="text-right">税抜・送料込</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.slipNumber}-${index}`} className="border-b"><td className="py-2">{row.slipNumber}</td><td>{row.date}</td><td>{row.repairCount}点</td><td className="text-right">{yen(row.originalAmount)}</td><td className="text-right">-{yen(row.discountAmount)}</td><td className="text-right">{yen(row.amount)}</td></tr>)}</tbody></table></div>
           : <p role="alert" className="mt-3 text-red-800">納品書の確定額を確認できません。</p>}
         <details className="mt-4 text-xs text-slate-500"><summary>内部照合用の元請求書</summary>{bundle.sources.map(source => <p key={source.id}><Link className="text-blue-700 underline" href={`/documents/invoice/${source.invoiceId}`}>{source.invoiceNumber}</Link>　{yen(source.grossTotalAmount)}</p>)}</details>
         <p className="mt-3 text-xs text-slate-500">集約請求の取消だけでは、元請求書の入金・発行は取り消されません。</p>

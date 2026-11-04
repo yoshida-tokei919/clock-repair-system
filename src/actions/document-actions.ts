@@ -17,6 +17,7 @@ import { getAdminApiIdentity } from "@/lib/admin-api-auth";
 import { resolveIssuedDate } from "@/lib/document-issued-date";
 import { calculateTaxableAmounts, commonEstimateMode, sumCustomerLines } from "@/lib/pricing-tax";
 import { lockEstimateOptions, parseOptionSet } from "@/lib/estimate-options";
+import { invoiceAmountsWithDiscount, resolveDiscountBps } from "@/lib/b2b-invoice-discount";
 
 export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     if (!await getAdminApiIdentity()) throw new Error("認証が必要です");
@@ -32,15 +33,22 @@ export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     for (const [customerId, group] of groups) {
         const mode = commonEstimateMode(group);
         if (group.some(repair => repair.deliveryNote && repair.deliveryNote.pricingTaxMode !== mode)) throw new Error("納品書と見積の税表示方式が一致しません");
-        const gross = calculateIssuedInvoiceAmounts(group.reduce((sum, repair) => sum + calculateInvoiceRepairSubtotal(repair), 0), aggregateDeliveryShipping(group), mode).grossTotalAmount;
+        const lineSum = group.reduce((sum, repair) => sum + calculateInvoiceRepairSubtotal(repair), 0);
         const isB2C = group[0].customer.type === "individual";
+        const standard = isB2C ? null : await prisma.b2BInvoiceDiscountSetting.findUnique({ where: { id: 1 } });
+        if (!isB2C && !standard) throw new Error("請求割引設定を確認できません");
+        const discountRateBps = isB2C ? null : resolveDiscountBps(null, group[0].customer.invoiceDiscountOverrideBps, standard!.standardRateBps);
+        const gross = isB2C ? calculateIssuedInvoiceAmounts(lineSum, aggregateDeliveryShipping(group), mode).grossTotalAmount
+            : invoiceAmountsWithDiscount(lineSum, aggregateDeliveryShipping(group), mode, discountRateBps!).grossTotalAmount;
         const payments = isB2C ? await findEligiblePrepayments(prisma, customerId, group.map(repair => repair.id)) : [];
         const receivedPrepaymentAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
         const availablePrepaymentAmount = payments.reduce((sum, payment) => sum + availablePrepayment(payment), 0);
         const eligible = payments.map(payment => ({ id: payment.id, repairId: payment.repairId, purpose: payment.purpose,
             paidAt: payment.paidAt, receivedAmount: payment.amount,
             availableAmount: availablePrepayment(payment) })).filter(payment => payment.availableAmount > 0);
-        result.push({ customerId, customerName: group[0].customer.name, isB2C, gross,
+        result.push({ customerId, customerName: group[0].customer.name, isB2C, gross, discountRateBps,
+            lineSum, shippingFeeAmount: aggregateDeliveryShipping(group), pricingTaxMode: mode,
+            preOctoberDeliveryCount: group.filter(repair => repair.deliveryNote && repair.deliveryNote.issuedDate < new Date("2026-10-01T00:00:00+09:00")).length,
             receivedPrepaymentAmount, availablePrepaymentAmount,
             repairs: group.map(repair => ({ id: repair.id, inquiryNumber: repair.inquiryNumber })),
             payments: eligible, suggested: suggestPrepaymentAllocations(payments, gross) });
@@ -48,7 +56,7 @@ export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     return result;
 }
 
-export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty', allocationsByCustomer?: Record<number, RequestedAllocation[]>, issueDate?: string, shippingInput?: DeliveryShippingInput) {
+export async function generateBulkDocument(repairIds: number[], type: 'delivery' | 'invoice' | 'estimate' | 'warranty', allocationsByCustomer?: Record<number, RequestedAllocation[]>, issueDate?: string, shippingInput?: DeliveryShippingInput, discountRatesByCustomer?: Record<number, number>) {
     try {
         if (!await getAdminApiIdentity()) throw new Error("認証が必要です");
         const issuedDate = resolveIssuedDate(issueDate);
@@ -159,6 +167,10 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                   if (source.type !== customer.type || source.prefix !== customer.prefix) {
                     throw new Error("請求元の顧客設定が変更されました。再読み込みしてください");
                   }
+                  const standard = isB2C ? null : await tx.b2BInvoiceDiscountSetting.findUnique({ where: { id: 1 } });
+                  const latestCustomer = isB2C ? null : await tx.customer.findUnique({ where: { id: customerId }, select: { invoiceDiscountOverrideBps: true } });
+                  if (!isB2C && (!standard || !latestCustomer)) throw new Error("請求割引設定を確認できません");
+                  const rate = isB2C ? null : resolveDiscountBps(discountRatesByCustomer?.[customerId], latestCustomer!.invoiceDiscountOverrideBps, standard!.standardRateBps);
                   // Serialize issue-date edits with invoice snapshot creation.
                   for (const note of [...new Map(customerRepairs.filter(r => r.deliveryNote).map(r => [r.deliveryNote!.id, r.deliveryNote!])).values()].sort((a, b) => a.id - b.id)) {
                     const [locked] = await tx.$queryRaw<{ issuedDate: Date; shippingFee: number | null }[]>`
@@ -181,7 +193,8 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                         issuedDate,
                         customerId: customerId,
                         billingCustomerId,
-                        ...calculateIssuedInvoiceAmounts(lineSum, aggregateDeliveryShipping(customerRepairs), pricingTaxMode),
+                        ...(isB2C ? calculateIssuedInvoiceAmounts(lineSum, aggregateDeliveryShipping(customerRepairs), pricingTaxMode)
+                          : invoiceAmountsWithDiscount(lineSum, aggregateDeliveryShipping(customerRepairs), pricingTaxMode, rate!)),
                         pricingTaxMode,
                         billingMonth,
                         paymentDueDate: dueDate,

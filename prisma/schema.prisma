@@ -23,6 +23,7 @@ model Customer {
   id           Int      @id @default(autoincrement())
   type         String   // 'individual', 'business'
   pricingTaxMode String @default("EXCLUSIVE") // EXCLUSIVE or INCLUSIVE; business customers only
+  invoiceDiscountOverrideBps Int? // null inherits the app B2B standard; zero is explicit
   rank         Int      @default(1) // 1 to 5
   name         String
   kana         String?
@@ -1958,6 +1959,9 @@ model Invoice {
   consolidatedSource ConsolidatedInvoiceSource?
   
   totalAmount   Int      @default(0) // Issued pre-tax subtotal, integer JPY (existing meaning)
+  discountBasisAmount Int? // Original tax-exclusive subtotal; null on historical invoices
+  discountRateBps Int?
+  discountAmount Int?
   taxAmount     Int      @default(0) // Issued tax, integer JPY
   pricingTaxMode String @default("EXCLUSIVE")
   shippingFeeAmount Int @default(0) // Final customer shipping charge, already tax-included
@@ -1970,6 +1974,12 @@ model Invoice {
 }
 
 // Historical billing bundle; original store invoices remain the financial source records.
+model B2BInvoiceDiscountSetting {
+  id Int @id
+  standardRateBps Int @default(300)
+  updatedAt DateTime @updatedAt
+}
+
 model ConsolidatedInvoice {
   id Int @id @default(autoincrement())
   companyId Int
@@ -2047,6 +2057,9 @@ model ConsolidatedInvoiceSource {
   sourceCustomerName String
   sourceCompanyName String?
   totalAmount Int
+  discountBasisAmount Int?
+  discountRateBps Int?
+  discountAmount Int?
   taxAmount Int
   shippingFeeAmount Int @default(0)
   grossTotalAmount Int

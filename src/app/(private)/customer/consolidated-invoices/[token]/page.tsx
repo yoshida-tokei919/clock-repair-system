@@ -39,11 +39,12 @@ export default async function ConsolidatedCustomerPage({ params }: { params: Pro
           <div><dt className="text-slate-500">発行日</dt><dd className="font-semibold">{formatIssuedDate(bundle.issueState.issuedDate)}</dd></div>
           <div><dt className="text-slate-500">請求先（作成時）</dt><dd className="font-semibold">{bundle.companyName}</dd></div>
           <div className="sm:col-span-2"><dt className="text-slate-500">請求総額（税込）</dt><dd className="text-2xl font-bold text-blue-800">{yen(bundle.grossTotalAmount)}</dd></div>
+          {newFormat && bundle.sources.some(source => source.discountBasisAmount !== null) && <div className="sm:col-span-2 text-sm">割引前小計 {yen(bundle.sources.reduce((sum, source) => sum + (source.discountBasisAmount ?? source.totalAmount), 0))} − 割引 {yen(bundle.sources.reduce((sum, source) => sum + (source.discountAmount ?? 0), 0))} = 割引後小計 {yen(bundle.sources.reduce((sum, source) => sum + source.totalAmount, 0))} / 消費税 {yen(bundle.sources.reduce((sum, source) => sum + source.taxAmount, 0))} / 送料 {yen(bundle.sources.reduce((sum, source) => sum + source.shippingFeeAmount, 0))}</div>}
         </dl>
       </section>
       {rows ? <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
         <h2 className="font-bold">納品書別のご請求</h2>
-        <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="py-2">納品書番号</th><th>納品日</th><th>内容</th><th className="text-right">金額</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.slipNumber}-${index}`} className="border-b"><td className="py-2">{row.slipNumber}</td><td>{row.date}</td><td>{row.repairCount}点</td><td className="text-right">{yen(row.amount)}</td></tr>)}</tbody></table></div>
+        <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="py-2">納品書番号</th><th>納品日</th><th>内容</th><th className="text-right">割引前</th><th className="text-right">割引</th><th className="text-right">税抜・送料込</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.slipNumber}-${index}`} className="border-b"><td className="py-2">{row.slipNumber}</td><td>{row.date}</td><td>{row.repairCount}点</td><td className="text-right">{yen(row.originalAmount)}</td><td className="text-right">-{yen(row.discountAmount)}</td><td className="text-right">{yen(row.amount)}</td></tr>)}</tbody></table></div>
       </section> : <section className="rounded-xl border border-blue-100 bg-white p-5 text-sm shadow-sm">ご請求内容は保存済みPDFをご確認ください。</section>}
       <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
         <h2 className="font-bold">請求書PDF</h2>

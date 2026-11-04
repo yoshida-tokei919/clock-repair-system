@@ -103,6 +103,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
                             <h1 className="font-bold text-lg">請求書: {invoice.invoiceNumber}</h1>
                             {canModifyInvoice && <IssuedDateEditor type="invoice" id={invoice.id} issuedDate={formatIssuedDate(invoice.issuedDate)} hasPdf />}
                             <p className="mt-1 text-sm text-slate-600">請求元: {invoice.customer.companyName || invoice.customer.name}{invoice.billingCustomerId && invoice.billingCustomerId !== invoice.customerId && invoice.billingCustomer ? ` / 請求先: ${invoice.billingCustomer.companyName || invoice.billingCustomer.name}` : ""}</p>
+                            {invoice.discountBasisAmount !== null && <p className="mt-1 text-sm text-slate-600">割引前小計 ¥{invoice.discountBasisAmount.toLocaleString()} − 割引 {invoice.discountRateBps! / 100}% (¥{invoice.discountAmount!.toLocaleString()}) = 割引後小計 ¥{invoice.totalAmount.toLocaleString()} / 消費税 ¥{invoice.taxAmount.toLocaleString()} / 送料 ¥{invoice.shippingFeeAmount.toLocaleString()} / 合計 ¥{invoice.grossTotalAmount.toLocaleString()}</p>}
                             <p className="mt-1 text-xs text-slate-500">
                                 保存済みPDFを表示しています。管理画面と共有画面は同じPDFファイルを参照します。
                             </p>
@@ -150,6 +151,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
                 <h1 className="text-lg font-bold">請求書: {invoice.invoiceNumber}</h1>
                 {canModifyInvoice && <IssuedDateEditor type="invoice" id={invoice.id} issuedDate={formatIssuedDate(invoice.issuedDate)} hasPdf={!!currentPdfFile} />}
                 <p className="mt-1 text-sm">請求元: {invoice.customer.companyName || invoice.customer.name}{invoice.billingCustomerId && invoice.billingCustomerId !== invoice.customerId && invoice.billingCustomer ? ` / 請求先: ${invoice.billingCustomer.companyName || invoice.billingCustomer.name}` : ""}</p>
+                {invoice.discountBasisAmount !== null && <p className="mt-1 text-sm">割引前小計 ¥{invoice.discountBasisAmount.toLocaleString()} − 割引 {invoice.discountRateBps! / 100}% (¥{invoice.discountAmount!.toLocaleString()}) = 割引後小計 ¥{invoice.totalAmount.toLocaleString()} / 消費税 ¥{invoice.taxAmount.toLocaleString()} / 送料 ¥{invoice.shippingFeeAmount.toLocaleString()} / 合計 ¥{invoice.grossTotalAmount.toLocaleString()}</p>}
                 <p className="mt-3 text-sm">保存済みPDFはまだ生成されていません。</p>
                 <p className="mt-1 text-xs text-amber-800">
                     管理画面と共有画面で同じPDFを表示するため、先に請求書PDFを生成してください。

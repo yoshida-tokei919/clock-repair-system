@@ -15,6 +15,7 @@ type Bundle = { id: number; issuedDate: string | null; companyName: string; bill
   billingAddress: string | null; grossTotalAmount: number;
   sources: { id: number; invoiceId: number; invoiceNumber: string; sourceCustomerName: string;
     sourceCompanyName: string | null; grossTotalAmount: number; paidAmount: number; outstandingBalance: number;
+    discountRateBps: number | null; discountAmount: number | null;
     deliveryNotes: { id: number; deliveryNoteId: number | null; slipNumber: string | null;
       repairCount: number; subtotalAmount: number | null }[] }[] };
 
@@ -147,11 +148,11 @@ export function ConsolidatedInvoicePanel() {
         <p>請求先（作成時）: {bundle.billingCompanyName || bundle.billingName} {bundle.billingName}<br />
           〒{bundle.billingZipCode || "—"} {bundle.billingAddress || [bundle.billingPrefecture, bundle.billingCity, bundle.billingStreet, bundle.billingBuilding].filter(Boolean).join("")}</p>
         {bundle.sources.map(source => <div key={source.id} className="bg-gray-50 rounded p-2">
-          <p>{source.sourceCompanyName || source.sourceCustomerName} / <Link className="text-blue-700 underline" href={`/documents/invoice/${source.invoiceId}`}>{source.invoiceNumber}</Link> / 税込 ¥{source.grossTotalAmount.toLocaleString()} / 入金済 ¥{source.paidAmount.toLocaleString()} / 未収 ¥{source.outstandingBalance.toLocaleString()}</p>
+          <p>{source.sourceCompanyName || source.sourceCustomerName} / <Link className="text-blue-700 underline" href={`/documents/invoice/${source.invoiceId}`}>{source.invoiceNumber}</Link> / 税込 ¥{source.grossTotalAmount.toLocaleString()}{source.discountRateBps != null ? ` / 割引 ${source.discountRateBps / 100}% (-¥${(source.discountAmount ?? 0).toLocaleString()})` : ""} / 入金済 ¥{source.paidAmount.toLocaleString()} / 未収 ¥{source.outstandingBalance.toLocaleString()}</p>
           {source.deliveryNotes.length === 0 && <p className="text-gray-500">納品書スナップショットなし</p>}
           {source.deliveryNotes.map(note => <p key={note.id} className="pl-3 text-gray-600">
             納品書 {note.slipNumber || (note.deliveryNoteId ? `#${note.deliveryNoteId}` : "未紐付け")} / 修理 {note.repairCount}件
-            {note.subtotalAmount !== null ? ` / 税抜小計 ¥${note.subtotalAmount.toLocaleString()}` : " / 金額未確定"}
+            {note.subtotalAmount !== null ? ` / ${source.discountRateBps != null ? "割引前" : "税抜"}小計 ¥${note.subtotalAmount.toLocaleString()}` : " / 金額未確定"}
           </p>)}
         </div>)}
         <p className="text-xs text-gray-500">納品書行に税込金額・税額は配賦していません。LINEのAPPROVEDは送信待ちであり、送信済みではありません。</p>

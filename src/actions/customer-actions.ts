@@ -5,6 +5,7 @@ import { deleteCustomerSafely } from "@/lib/customer-deletion-safety";
 import { revalidatePath } from "next/cache";
 import { validateCustomerDefaultShipping } from "@/lib/customer-default-shipping";
 import { assertCustomerCanBecomeIndividual } from "@/lib/invoice-recipient";
+import { parseDiscountBps } from "@/lib/b2b-invoice-discount";
 
 /**
  * 送信された文字列が「ひらがな・全角カタカナ・半角英数字・漢字」のみかチェック
@@ -101,6 +102,9 @@ export async function updateCustomer(id: number, data: any) {
         if (type === 'business' && data.pricingTaxMode !== 'EXCLUSIVE' && data.pricingTaxMode !== 'INCLUSIVE') {
             throw new Error('価格の税表示方式を選択してください');
         }
+        if (type === 'business' && data.invoiceDiscountOverrideBps === '') throw new Error('割引率を入力してください');
+        const invoiceDiscountOverrideBps = type === 'business' && data.invoiceDiscountOverrideBps != null
+            ? parseDiscountBps(Number(data.invoiceDiscountOverrideBps)) : null;
         const defaultShipping = validateCustomerDefaultShipping(type, {
             defaultShippingCarrierCode: data.defaultShippingCarrierCode ?? null,
             defaultShippingServiceCode: data.defaultShippingServiceCode ?? null,
@@ -145,6 +149,7 @@ export async function updateCustomer(id: number, data: any) {
                 rank: parseInt(data.rank || "1"),
                 ...defaultShipping,
                 pricingTaxMode: type === 'business' ? data.pricingTaxMode : 'EXCLUSIVE',
+                invoiceDiscountOverrideBps,
                 invoiceRecipientCustomerId: type === 'individual' ? null : undefined,
             }
           });

@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/use-toast";
 import { B2BCompanySettings } from "@/components/customers/B2BCompanySettings";
 import { InvoiceRecipientSettings } from "@/components/customers/InvoiceRecipientSettings";
 import { LineContactSettings } from "@/components/customers/LineContactSettings";
+import { percentInputToBps } from "@/lib/b2b-invoice-discount";
 
 export default function CustomerEditPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = React.use(params);
@@ -214,6 +215,26 @@ export default function CustomerEditPage({ params }: { params: Promise<{ id: str
             />
           </div>
         </Card>
+
+        {data.type === "business" && (
+          <Card className="p-6 space-y-3 border-zinc-200 shadow-sm">
+            <h3 className="text-sm font-bold">請求書割引率</h3>
+            <label className="block text-sm">適用方法
+              <select className="mt-1 block w-full rounded border p-2"
+                value={data.invoiceDiscountOverrideBps == null ? "inherit" : "own"}
+                onChange={e => setData({ ...data, invoiceDiscountOverrideBps: e.target.value === "inherit" ? null : 300 })}>
+                <option value="inherit">アプリ標準を継承</option>
+                <option value="own">この取引先の割引率</option>
+              </select>
+            </label>
+            {data.invoiceDiscountOverrideBps != null && <label className="block text-sm">割引率（%）
+              <Input type="number" min="0" max="100" step="0.01" className="mt-1"
+                value={Number.isFinite(data.invoiceDiscountOverrideBps) ? data.invoiceDiscountOverrideBps / 100 : ""}
+                onChange={e => setData({ ...data, invoiceDiscountOverrideBps: percentInputToBps(e.target.value) })} />
+            </label>}
+            <p className="text-xs text-zinc-500">0%も指定できます。発行済み請求書の金額は変わりません。</p>
+          </Card>
+        )}
 
         {data.type === "business" && (
           <Card className="p-6 space-y-3 border-zinc-200 shadow-sm">

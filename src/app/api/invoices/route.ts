@@ -14,6 +14,7 @@ import { b2bPaymentDueDate, billingMonthBounds, isB2BBillingRepairEligible, pars
 import { resolveIssuedDate } from "@/lib/document-issued-date";
 import { nextB2BSourceInvoiceNumber, resolveInvoiceRecipientForIssue } from "@/lib/invoice-recipient";
 import { commonEstimateMode } from "@/lib/pricing-tax";
+import { invoiceAmountsWithDiscount, resolveDiscountBps, parseDiscountBps } from "@/lib/b2b-invoice-discount";
 
 // GET /api/invoices — 請求書一覧
 export async function GET() {
@@ -70,12 +71,13 @@ export async function POST(req: NextRequest) {
     const unauthorized = await requireAdminApi();
     if (unauthorized) return unauthorized;
     const body = await req.json();
-    const { customerId, repairIds, billingMonth, issuedDate: issueDate, allocations = [] } = body as {
+    const { customerId, repairIds, billingMonth, issuedDate: issueDate, allocations = [], discountRateBps } = body as {
         customerId: number;
         repairIds: number[];
         billingMonth?: string;
         issuedDate?: string;
         allocations?: RequestedAllocation[];
+        discountRateBps?: number;
     };
     let issuedDate: Date;
     try { issuedDate = resolveIssuedDate(issueDate); }
@@ -92,6 +94,11 @@ export async function POST(req: NextRequest) {
     }
 
     const isB2C = customer.type === "individual";
+    if (discountRateBps !== undefined) {
+        if (isB2C) return NextResponse.json({ error: "個人請求書に割引率は指定できません" }, { status: 400 });
+        try { parseDiscountBps(discountRateBps); }
+        catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
+    }
     if (!isB2C && !parseBillingMonth(billingMonth)) {
         return NextResponse.json({ error: "対象月はYYYY-MM形式で指定してください" }, { status: 400 });
     }
@@ -130,6 +137,11 @@ export async function POST(req: NextRequest) {
     const invoice = await prisma.$transaction(async (tx) => {
         const { source, billingCustomerId } = await resolveInvoiceRecipientForIssue(tx, customerId);
         if (source.type !== customer.type) throw new Error("請求元の顧客区分が変更されました。再読み込みしてください");
+        const discount = isB2C ? null : await tx.b2BInvoiceDiscountSetting.findUnique({ where: { id: 1 } });
+        const latestCustomer = isB2C ? null : await tx.customer.findUnique({ where: { id: customerId }, select: { invoiceDiscountOverrideBps: true } });
+        if (!isB2C && (!discount || !latestCustomer)) throw new Error("請求割引設定を確認できません");
+        const effectiveDiscountBps = isB2C ? null : resolveDiscountBps(discountRateBps,
+            latestCustomer!.invoiceDiscountOverrideBps, discount!.standardRateBps);
         for (const note of [...new Map(repairs.filter(repair => repair.deliveryNote).map(repair => [repair.deliveryNote!.id, repair.deliveryNote!])).values()].sort((a, b) => a.id - b.id)) {
             const [locked] = await tx.$queryRaw<{ issuedDate: Date; shippingFee: number | null }[]>`
                 SELECT "issuedDate", "shippingFee" FROM "DeliveryNote" WHERE "id" = ${note.id} FOR UPDATE`;
@@ -154,7 +166,8 @@ export async function POST(req: NextRequest) {
                 issuedDate,
                 customerId,
                 billingCustomerId,
-                ...calculateIssuedInvoiceAmounts(subtotal, aggregateDeliveryShipping(repairs), pricingTaxMode),
+                ...(isB2C ? calculateIssuedInvoiceAmounts(subtotal, aggregateDeliveryShipping(repairs), pricingTaxMode)
+                    : invoiceAmountsWithDiscount(subtotal, aggregateDeliveryShipping(repairs), pricingTaxMode, effectiveDiscountBps!)),
                 pricingTaxMode,
                 billingMonth: isB2C ? null : billingMonth,
                 paymentDueDate: isB2C ? getB2CPaymentDueDate() : b2bPaymentDueDate(billingMonth!),

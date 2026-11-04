@@ -5,6 +5,7 @@ import { calculateInvoicePaymentSummary } from "./invoice-payment";
 import { buildInvoiceLineMessage, invoiceDeliveryKey, resolveInvoiceLineDestination } from "./invoice-delivery-routing";
 import { lockInvoiceRecipientCustomers } from "./invoice-recipient";
 import { createApprovedLineManagerSendOutbox } from "./line-manager-send-outbox";
+import { hasDiscountSnapshot } from "./b2b-invoice-discount";
 
 export class ConsolidatedOperationError extends Error {
   constructor(message: string, readonly postal = false) { super(message); }
@@ -45,11 +46,14 @@ export async function lockAndCheckConsolidatedSources(tx: Prisma.TransactionClie
     const invoice = await tx.invoice.findUnique({ where: { id: source.invoiceId }, select: {
       id: true, invoiceNumber: true, customerId: true, issuedDate: true, status: true,
       totalAmount: true, taxAmount: true, shippingFeeAmount: true, grossTotalAmount: true,
+      discountBasisAmount: true, discountRateBps: true, discountAmount: true,
       sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true,
       pdfFiles: { select: { sentAt: true } }, paymentAllocations: { select: allocationSelect },
     } });
     if (!invoice || invoice.issuedDate.getTime() !== source.issuedDate.getTime() ||
       invoice.totalAmount !== source.totalAmount || invoice.taxAmount !== source.taxAmount ||
+      invoice.discountBasisAmount !== source.discountBasisAmount || invoice.discountRateBps !== source.discountRateBps ||
+      invoice.discountAmount !== source.discountAmount || !hasDiscountSnapshot(source) ||
       invoice.shippingFeeAmount !== source.shippingFeeAmount ||
       source.grossTotalAmount <= 0 ||
       source.grossTotalAmount !== source.totalAmount + source.taxAmount + source.shippingFeeAmount) {

@@ -12,6 +12,7 @@ import { repairCommentsUrl } from "@/lib/repair-comments";
 import { useToast } from "@/components/ui/use-toast";
 import { ClickToCopy } from "@/components/ui/click-to-copy";
 import { generateBulkDocument, previewBulkInvoiceAllocations } from "@/actions/document-actions";
+import { invoiceAmountsWithDiscount, percentInputToBps } from "@/lib/b2b-invoice-discount";
 import { cn } from "@/lib/utils";
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -99,6 +100,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     }, [repairs, photoIds]);
 
     const [invoicePreview, setInvoicePreview] = useState<Awaited<ReturnType<typeof previewBulkInvoiceAllocations>> | null>(null);
+    const [invoiceDiscountRates, setInvoiceDiscountRates] = useState<Record<number, number | "">>({});
     const [requestedAllocations, setRequestedAllocations] = useState<Record<number, Record<number, number>>>({});
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [tagPreview, setTagPreview] = useState<RepairTagReleasePreview | null>(null);
@@ -210,7 +212,8 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         if (selectedIds.length === 0) return;
         setIsGenerating(true);
         try {
-            const result = await generateBulkDocument(selectedIds, type, allocations, issueDate, shipping);
+            const result = await generateBulkDocument(selectedIds, type, allocations, issueDate, shipping,
+                type === "invoice" ? Object.fromEntries(Object.entries(invoiceDiscountRates).filter(([, rate]) => rate !== "").map(([id, rate]) => [id, Number(rate)])) : undefined);
             if (result.success) {
                 setIssueType(null);
                 setInvoicePreview(null);
@@ -249,7 +252,11 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
         setIsGenerating(true);
         try {
             const preview = await previewBulkInvoiceAllocations(selectedIds);
+            if (preview.some(group => !group.isB2C && (!Number.isInteger(group.discountRateBps) || group.discountRateBps == null || group.discountRateBps < 0 || group.discountRateBps > 10000))) {
+                throw new Error("B2B請求書の割引率を取得できませんでした。設定を確認してから再試行してください。");
+            }
             setInvoicePreview(preview);
+            setInvoiceDiscountRates(Object.fromEntries(preview.filter(group => !group.isB2C).map(group => [group.customerId, group.discountRateBps!])));
             setInvoiceIssueDate(formatIssuedDate(new Date()));
             setInvoiceDateEdited(false);
             setRequestedAllocations(Object.fromEntries(preview.map(group => [group.customerId,
@@ -499,10 +506,16 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                     <div className="space-y-5 text-sm">
                         {invoicePreview?.map(group => {
                             const applied = group.payments.reduce((sum, payment) => sum + (requestedAllocations[group.customerId]?.[payment.id] ?? 0), 0);
-                            return <section key={group.customerId} className="space-y-2 rounded border p-3">
+                             const rate = invoiceDiscountRates[group.customerId];
+                             const amounts = group.isB2C || rate === "" || rate == null || !Number.isInteger(rate) || rate < 0 || rate > 10000 ? null : invoiceAmountsWithDiscount(group.lineSum, group.shippingFeeAmount, group.pricingTaxMode as "EXCLUSIVE" | "INCLUSIVE", rate);
+                             return <section key={group.customerId} className="space-y-2 rounded border p-3">
                                 <h3 className="font-semibold">{group.customerName}（{group.isB2C ? "一般" : "業者"}）</h3>
                                 <p>修理: {group.repairs.map(repair => repair.inquiryNumber).join("、")}</p>
-                                <p>請求総額（修理税込・送料込）: ¥{group.gross.toLocaleString()}</p>
+                                     {!group.isB2C && <><label className="block">請求書の割引率（%） <input type="number" min="0" max="100" step="0.01" className="w-24 rounded border p-1" value={rate === "" || rate == null || !Number.isFinite(rate) ? "" : rate / 100} onChange={event => setInvoiceDiscountRates(previous => ({ ...previous, [group.customerId]: percentInputToBps(event.target.value) }))} /></label>
+                                     {group.preOctoberDeliveryCount > 0 && <p className="rounded bg-amber-50 p-2 text-amber-900">2026年9月以前の納品 {group.preOctoberDeliveryCount}件。旧2%の適用を納品日と契約条件で確認してください。<button type="button" className="ml-2 underline" onClick={() => setInvoiceDiscountRates(previous => ({ ...previous, [group.customerId]: 200 }))}>2%を設定</button></p>}
+                                     {amounts && <p>割引前小計 ¥{amounts.discountBasisAmount.toLocaleString()} − 割引 ¥{amounts.discountAmount.toLocaleString()} = 割引後小計 ¥{amounts.totalAmount.toLocaleString()} / 消費税 ¥{amounts.taxAmount.toLocaleString()} / 送料 ¥{amounts.shippingFeeAmount.toLocaleString()}</p>}
+                                 </>}
+                                 <p>請求総額（修理税込・送料込）: ¥{(amounts?.grossTotalAmount ?? group.gross).toLocaleString()}</p>
                                 {group.isB2C && <>
                                     <p>受領済み前受金: ¥{group.receivedPrepaymentAmount.toLocaleString()}</p>
                                     <p>利用可能前受金: ¥{group.availablePrepaymentAmount.toLocaleString()}</p>
@@ -527,7 +540,9 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                         })}
                     </div>
                     <DialogFooter><Button variant="outline" onClick={() => setInvoicePreview(null)} disabled={isGenerating}>戻る</Button>
-                        <Button onClick={confirmInvoice} disabled={isGenerating || !invoiceIssueDate || invoicePreview?.some(group => {
+                         <Button onClick={confirmInvoice} disabled={isGenerating || !invoiceIssueDate || invoicePreview?.some(group => {
+                             const rate = invoiceDiscountRates[group.customerId];
+                             if (!group.isB2C && (rate === "" || !Number.isInteger(rate) || rate < 0 || rate > 10000)) return true;
                             const amounts = group.payments.map(payment => requestedAllocations[group.customerId]?.[payment.id] ?? 0);
                             return amounts.some((amount, index) => !Number.isSafeInteger(amount) || amount < 0 || amount > group.payments[index].availableAmount)
                                 || amounts.reduce((sum, amount) => sum + amount, 0) > group.gross;

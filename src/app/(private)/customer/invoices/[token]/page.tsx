@@ -187,6 +187,10 @@ export default async function CustomerInvoicePage({
                 <dt className="text-xs font-bold text-blue-700">請求総額（税込）</dt>
                 <dd className="mt-1 text-2xl font-bold tabular-nums text-blue-900">{formatCurrency(invoice.grossTotalAmount)}</dd>
               </div>
+              {invoice.discountBasisAmount !== null && <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
+                <dt className="text-xs font-bold text-slate-500">請求額の内訳</dt>
+                <dd className="mt-1">割引前小計（税抜） {formatCurrency(invoice.discountBasisAmount)} − 割引 {invoice.discountRateBps! / 100}% {formatCurrency(invoice.discountAmount!)} = 割引後小計（税抜） {formatCurrency(invoice.totalAmount)} / 消費税 {formatCurrency(invoice.taxAmount)} / 送料（税込） {formatCurrency(invoice.shippingFeeAmount)} / 合計 {formatCurrency(invoice.grossTotalAmount)}</dd>
+              </div>}
             </> : null}
             <div className="rounded-lg bg-slate-50 p-3">
               <dt className="text-xs font-bold text-slate-500">請求書番号</dt>

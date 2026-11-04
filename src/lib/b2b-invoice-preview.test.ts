@@ -7,7 +7,7 @@ test("monthly preview counts each selected delivery shipping charge once after r
     { subtotal: 10000, deliveryNoteId: 4, shippingFee: 800 },
     { subtotal: 5000, deliveryNoteId: 4, shippingFee: 800 },
     { subtotal: 2000, deliveryNoteId: 5, shippingFee: 0 },
-  ]), { subtotal: 17000, tax: 1700, shippingFeeAmount: 800, total: 19500, unconfirmedNoteIds: [] });
+  ]), { subtotal: 17000, discountBasisAmount: 17000, discountAmount: 0, netSubtotal: 17000, tax: 1700, shippingFeeAmount: 800, total: 19500, unconfirmedNoteIds: [] });
   assert.equal(summarizeB2BInvoicePreview([{ subtotal: 5000, deliveryNoteId: 4, shippingFee: 800 }]).total, 6300);
 });
 
@@ -25,7 +25,7 @@ test("inclusive preview keeps final line gross and reports included tax", () => 
   assert.deepEqual(summarizeB2BInvoicePreview([
     { subtotal: 15000, deliveryNoteId: 4, shippingFee: 800, pricingTaxMode: "INCLUSIVE" },
     { subtotal: 44000, deliveryNoteId: 4, shippingFee: 800, pricingTaxMode: "INCLUSIVE" },
-  ]), { subtotal: 59000, tax: 5363, shippingFeeAmount: 800, total: 59800, unconfirmedNoteIds: [] });
+  ]), { subtotal: 59000, discountBasisAmount: 53637, discountAmount: 0, netSubtotal: 53637, tax: 5363, shippingFeeAmount: 800, total: 59800, unconfirmedNoteIds: [] });
   assert.throws(() => summarizeB2BInvoicePreview([
     { subtotal: 15000, deliveryNoteId: 4, shippingFee: 0, pricingTaxMode: "INCLUSIVE" },
     { subtotal: 10000, deliveryNoteId: 4, shippingFee: 0, pricingTaxMode: "EXCLUSIVE" },

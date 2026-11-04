@@ -2,16 +2,21 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { resolveEffectiveBillingCustomer } from "./b2b-company";
 import { hasConsistentInvoiceSnapshots } from "./invoice-repair-snapshots";
 import { resolveIssuedDate } from "./document-issued-date";
+import { hasDiscountSnapshot } from "./b2b-invoice-discount";
 
 export class ConsolidatedInvoiceError extends Error {}
 
 export function consolidatedSourceAmounts(invoice: {
   totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
+  discountBasisAmount?: number | null; discountRateBps?: number | null; discountAmount?: number | null;
 }) {
-  if (invoice.grossTotalAmount !== invoice.totalAmount + invoice.taxAmount + invoice.shippingFeeAmount) {
+  if (invoice.grossTotalAmount !== invoice.totalAmount + invoice.taxAmount + invoice.shippingFeeAmount || !hasDiscountSnapshot(invoice)) {
     throw new ConsolidatedInvoiceError("元請求書の確定額が一致しません。");
   }
   return { totalAmount: invoice.totalAmount, taxAmount: invoice.taxAmount,
+    discountBasisAmount: invoice.discountBasisAmount ?? null,
+    discountRateBps: invoice.discountRateBps ?? null,
+    discountAmount: invoice.discountAmount ?? null,
     shippingFeeAmount: invoice.shippingFeeAmount, grossTotalAmount: invoice.grossTotalAmount };
 }
 

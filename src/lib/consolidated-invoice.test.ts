@@ -17,7 +17,8 @@ test("selected stores in one company sum canonical source invoice gross totals",
 
 test("a consolidated source preserves shipping and the gross invariant", () => {
   assert.deepEqual(consolidatedSourceAmounts({ totalAmount: 10000, taxAmount: 1000, shippingFeeAmount: 800, grossTotalAmount: 11800 }),
-    { totalAmount: 10000, taxAmount: 1000, shippingFeeAmount: 800, grossTotalAmount: 11800 });
+    { totalAmount: 10000, taxAmount: 1000, shippingFeeAmount: 800, grossTotalAmount: 11800,
+      discountBasisAmount: null, discountRateBps: null, discountAmount: null });
   assert.deepEqual(consolidatedSourceAmounts({ totalAmount: 10000, taxAmount: 1000, shippingFeeAmount: 0, grossTotalAmount: 11000 }).shippingFeeAmount, 0);
   assert.throws(() => consolidatedSourceAmounts({ totalAmount: 10000, taxAmount: 1000, shippingFeeAmount: 800, grossTotalAmount: 11000 }), ConsolidatedInvoiceError);
 });
