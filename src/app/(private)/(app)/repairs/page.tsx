@@ -3,10 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getStatusBadge } from "@/components/status-badge";
-import { RepairListStatusSelect } from "@/components/repairs/RepairListStatusSelect";
 import { RepairsTableClient } from "@/components/repairs/RepairsTableClient";
-import { PlusCircle, Search, Filter, LayoutDashboard, FileText } from "lucide-react";
+import { PlusCircle, Search, Filter } from "lucide-react";
 import { redirect } from "next/navigation";
 import { isR2RepairPhotoKey } from "@/lib/r2-repair-photos";
 export const dynamic = "force-dynamic";
@@ -46,10 +44,16 @@ export default async function RepairsPage({
             watch: {
                 select: {
                     serialNumber: true,
+                    modelNameInput: true,
                     brand: { select: { name: true } },
-                    model: { select: { name: true } }
+                    model: { select: { name: true } },
+                    reference: { select: { name: true } },
+                    caseReference: { select: { name: true } },
                 }
             },
+            estimate: { select: { totalAmount: true, items: { orderBy: { id: "asc" }, select: { id: true, itemName: true, quantity: true, unitPrice: true, b2cDisplayNameSnapshot: true } } } },
+            repairLineItems: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }], select: { id: true, itemNameSnapshot: true, estimateDisplayNameSnapshot: true, b2bDisplayNameSnapshot: true, b2cDisplayNameSnapshot: true, amount: true } },
+            logs: { where: { status: "承認待ち" }, orderBy: [{ changedAt: "desc" }, { id: "desc" }], take: 1, select: { changedAt: true } },
             deliveryNote:     { select: { id: true, slipNumber: true } },
             invoice:          { select: { id: true, invoiceNumber: true } },
             estimateDocument: { select: { id: true, estimateNumber: true } },
@@ -100,10 +104,10 @@ export default async function RepairsPage({
     }
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="flex items-center justify-between space-y-2">
+        <div className="min-w-0 flex-1 space-y-4 p-4 pt-6 lg:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-3xl font-bold tracking-tight">修理案件一覧</h2>
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Link href="/repairs/b2b-intake">
                         <Button variant="outline">B2B一括受付</Button>
                     </Link>
@@ -117,8 +121,8 @@ export default async function RepairsPage({
             </div>
 
             {/* Filter Bar */}
-            <div className="flex items-center gap-4 bg-white p-4 rounded-md border shadow-sm">
-                <form className="flex w-full gap-4 items-center" action={searchAction}>
+            <div className="bg-white p-4 rounded-md border shadow-sm">
+                <form className="flex w-full flex-wrap gap-4 items-center" action={searchAction}>
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input placeholder="検索 (管理番号, 名前, ブランド...)" name="q" defaultValue={query} className="pl-8" />
@@ -155,7 +159,7 @@ export default async function RepairsPage({
             </div>
 
             {/* Data Table */}
-            <RepairsTableClient repairs={repairsWithMessages as any} />
+            <RepairsTableClient repairs={repairsWithMessages} />
         </div>
     );
 }

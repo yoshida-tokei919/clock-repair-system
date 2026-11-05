@@ -1,19 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Repair, Customer, Brand, Model, Watch } from "@prisma/client";
-import { RepairListStatusSelect } from "@/components/repairs/RepairListStatusSelect";
-import { Checkbox } from "@/components/ui/checkbox";
 import { FileText, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { repairCommentsUrl } from "@/lib/repair-comments";
 import { useToast } from "@/components/ui/use-toast";
-import { ClickToCopy } from "@/components/ui/click-to-copy";
 import { generateBulkDocument, previewBulkInvoiceAllocations } from "@/actions/document-actions";
 import { invoiceAmountsWithDiscount, percentInputToBps } from "@/lib/b2b-invoice-discount";
-import { cn } from "@/lib/utils";
 import { useAutoRefreshOnReturn } from "@/hooks/use-auto-refresh-on-return";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { IssuedDateDialog } from "@/components/documents/IssuedDateDialog";
@@ -22,83 +17,13 @@ import { DeliveryIssueDialog } from "@/components/documents/DeliveryIssueDialog"
 import type { DeliveryShippingInput } from "@/lib/delivery-shipping";
 import type { CustomerDefaultShipping } from "@/lib/customer-default-shipping";
 import type { RepairTagReleasePreview } from "@/lib/repair-tag-release";
-
-type RepairWithRelations = Repair & {
-    photo: string | null;
-    customer: Customer;
-    watch: Watch & {
-        brand: Brand;
-        model: Model;
-    };
-    customerMessages?: {
-        id: number;
-        body: string;
-        createdAt: Date;
-    }[];
-};
+import { RepairListView, type ListRepair } from "@/components/repairs/RepairListView";
 
 interface RepairsTableClientProps {
-    repairs: RepairWithRelations[];
-}
-
-const photoProxyPattern = /^\/api\/repair-photos\/([1-9]\d*)$/;
-
-function RepairThumbnail({ photo, signedUrl, batchReady }: { photo: string | null; signedUrl?: string; batchReady: boolean }) {
-    const [failedSignedUrl, setFailedSignedUrl] = useState<string | null>(null);
-    if (!photo) return <div className="h-14 w-14 rounded border bg-slate-100" aria-label="写真なし" />;
-
-    const isProxy = photoProxyPattern.test(photo);
-    if (isProxy && !batchReady) return <div className="h-14 w-14 rounded border bg-slate-100" aria-label="写真を読み込み中" />;
-
-    const useSignedUrl = isProxy && signedUrl && signedUrl !== failedSignedUrl;
-    return <img
-        src={useSignedUrl ? signedUrl : photo}
-        alt="修理写真"
-        loading="lazy"
-        decoding="async"
-        className="h-14 w-14 rounded border object-cover"
-        onError={useSignedUrl ? () => setFailedSignedUrl(signedUrl) : undefined}
-    />;
+    repairs: ListRepair[];
 }
 
 export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
-    const [photoBatch, setPhotoBatch] = useState<{ repairs: RepairWithRelations[]; urls: Record<string, string> } | null>(null);
-    const photoIds = useMemo(() => [...new Set(repairs.flatMap((repair) => {
-        const match = repair.photo?.match(photoProxyPattern);
-        const id = match ? Number(match[1]) : NaN;
-        return Number.isSafeInteger(id) ? [id] : [];
-    }))], [repairs]);
-
-    useEffect(() => {
-        if (photoIds.length === 0) return;
-        const controller = new AbortController();
-        let active = true;
-        void (async () => {
-            try {
-                const response = await fetch("/api/repair-photos/signed-urls", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ids: photoIds }),
-                    cache: "no-store",
-                    signal: controller.signal,
-                });
-                if (!response.ok) throw new Error("Photo URL batch failed");
-                const result: unknown = await response.json();
-                if (!result || typeof result !== "object" || !("urls" in result) ||
-                    !result.urls || typeof result.urls !== "object" || Array.isArray(result.urls)) {
-                    throw new Error("Invalid photo URL batch");
-                }
-                const urls = result.urls as Record<string, unknown>;
-                const validUrls = Object.fromEntries(photoIds.flatMap((id) =>
-                    typeof urls[id] === "string" ? [[id, urls[id]]] : []));
-                if (active) setPhotoBatch({ repairs, urls: validUrls });
-            } catch {
-                if (active) setPhotoBatch({ repairs, urls: {} });
-            }
-        })();
-        return () => { active = false; controller.abort(); };
-    }, [repairs, photoIds]);
-
     const [invoicePreview, setInvoicePreview] = useState<Awaited<ReturnType<typeof previewBulkInvoiceAllocations>> | null>(null);
     const [invoiceDiscountRates, setInvoiceDiscountRates] = useState<Record<number, number | "">>({});
     const [requestedAllocations, setRequestedAllocations] = useState<Record<number, Record<number, number>>>({});
@@ -294,7 +219,7 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
     return (
         <div className="space-y-4">
             {selectedIds.length > 0 && (
-                <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-md animate-in fade-in slide-in-from-top-2">
+                <div className="flex flex-wrap items-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-md animate-in fade-in slide-in-from-top-2">
                     <span className="font-bold text-blue-700">{selectedIds.length}件選択中</span>
                     <div className="h-4 w-px bg-blue-300 mx-2" />
                     <Button size="sm" variant="outline" onClick={() => setIssueType("estimate")} disabled={isGenerating || tagLocked.current}>
@@ -318,170 +243,13 @@ export function RepairsTableClient({ repairs }: RepairsTableClientProps) {
                 </div>
             )}
 
-            <div className="rounded-md border bg-white shadow-sm overflow-hidden">
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 border-b text-slate-500 font-medium">
-                        <tr>
-                            <th
-                                className="px-4 py-3 w-[50px]"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleSelectAll(!(repairs.length > 0 && selectedIds.length === repairs.length));
-                                }}
-                            >
-                                <Checkbox
-                                    checked={repairs.length > 0 && selectedIds.length === repairs.length}
-                                    disabled={tagLocked.current}
-                                    onCheckedChange={toggleSelectAll}
-                                    className="cursor-pointer"
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                            </th>
-                            <th className="px-2 py-3">写真</th>
-                            <th className="px-4 py-3">管理番号</th>
-                            <th className="px-4 py-3">ステータス</th>
-                            <th className="px-4 py-3">お客様名</th>
-                            <th className="px-4 py-3">コメント</th>
-                            <th className="px-4 py-3">時計</th>
-                            <th className="px-4 py-3">日付</th>
-                            <th className="px-4 py-3 text-right">アクション</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {repairs.length === 0 ? (
-                            <tr>
-                                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
-                                    該当する修理案件は見つかりませんでした。
-                                </td>
-                            </tr>
-                        ) : (
-                            repairs.map((repair) => (
-                                <tr
-                                    key={repair.id}
-                                    className={cn(
-                                        "transition-colors cursor-pointer",
-                                        selectedIds.includes(repair.id) ? "bg-blue-50/50" : "hover:bg-slate-50"
-                                    )}
-                                    onClick={() => router.push(`/repairs/${repair.id}`)}
-                                >
-                                    <td
-                                        className="px-4 py-3"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleRepairSelected(repair.id);
-                                        }}
-                                    >
-                                        <Checkbox
-                                            checked={selectedIds.includes(repair.id)}
-                                            disabled={tagLocked.current}
-                                            onCheckedChange={(checked) => setRepairSelected(repair.id, checked)}
-                                            className="cursor-pointer"
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                    </td>
-                                    <td className="px-2 py-3">
-                                        <RepairThumbnail
-                                            photo={repair.photo}
-                                            signedUrl={photoBatch?.repairs === repairs ? photoBatch.urls[repair.photo?.match(photoProxyPattern)?.[1] ?? ""] : undefined}
-                                            batchReady={photoBatch?.repairs === repairs}
-                                        />
-                                    </td>
-                                    <td className="px-4 py-3 font-mono font-bold text-slate-700">
-                                        <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
-                                            <ClickToCopy text={repair.inquiryNumber}>
-                                                <span>{repair.inquiryNumber}</span>
-                                            </ClickToCopy>
-                                            {repair.partnerRef && repair.partnerRef !== "-" && (
-                                                <ClickToCopy text={repair.partnerRef}>
-                                                    <div className="text-[10px] text-blue-600 font-bold bg-blue-50 px-1 rounded border border-blue-100 w-fit italic cursor-copy">
-                                                        {repair.partnerRef}
-                                                    </div>
-                                                </ClickToCopy>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                        <RepairListStatusSelect id={repair.id} currentStatus={repair.status} />
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="font-medium text-slate-900">{repair.customer.name}</div>
-                                        {(repair as any).endUserName && (
-                                            <div className="text-xs text-slate-500 font-bold">{(repair as any).endUserName} 様</div>
-                                        )}
-                                        <div className="text-xs text-slate-400">{repair.customer.type === "business" ? "業者" : "一般"}</div>
-                                    </td>
-                                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                        {(() => {
-                                            const latestMessage = repair.customerMessages?.[0];
-                                            if (!latestMessage) {
-                                                return <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-200" aria-label="未読コメントなし" />;
-                                            }
-
-                                            return (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setActiveMessage({
-                                                            id: latestMessage.id,
-                                                            repairId: repair.id,
-                                                            inquiryNumber: repair.inquiryNumber,
-                                                            body: latestMessage.body,
-                                                            createdAt: latestMessage.createdAt,
-                                                        })
-                                                    }
-                                                    className="inline-flex h-3 w-3 rounded-full bg-blue-500 ring-4 ring-blue-100"
-                                                    aria-label="未読コメントあり"
-                                                />
-                                            );
-                                        })()}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="font-bold text-slate-800">
-                                            {repair.watch.brand?.name || "不明"}
-                                        </div>
-                                        <div className="text-xs text-slate-500">
-                                            {repair.watch.model?.name || "不明"} / {repair.watch.serialNumber || "-"}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-600">
-                                        <div className="text-xs text-slate-400">受: {repair.receptionDate?.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) || "-"}</div>
-                                        {repair.approvalDate && (
-                                            <div className="text-sm font-bold text-blue-600">承: {repair.approvalDate.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>
-                                        )}
-                                        <div className="flex gap-1 mt-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
-                                            {(repair as any).estimateDocument && (
-                                                <Link href={`/documents/estimate/${(repair as any).estimateDocument.id}`} className="text-[10px] bg-green-100 text-green-700 px-1 rounded border border-green-200 hover:underline">
-                                                    {(repair as any).estimateDocument.estimateNumber}
-                                                </Link>
-                                            )}
-                                            {(repair as any).deliveryNote && (
-                                                <Link href={`/documents/delivery/${(repair as any).deliveryNote.id}`} className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded border border-blue-200 hover:underline">
-                                                    {(repair as any).deliveryNote.slipNumber}
-                                                </Link>
-                                            )}
-                                            {(repair as any).invoice && (
-                                                <Link href={`/documents/invoice/${(repair as any).invoice.id}`} className="text-[10px] bg-purple-100 text-purple-700 px-1 rounded border border-purple-200 hover:underline">
-                                                    {(repair as any).invoice.invoiceNumber}
-                                                </Link>
-                                            )}
-                                            {(repair as any).warranty && (
-                                                <Link href={`/documents/warranty/${(repair as any).warranty.id}`} className="text-[10px] bg-teal-100 text-teal-700 px-1 rounded border border-teal-200 hover:underline">
-                                                    {(repair as any).warranty.warrantyNumber}
-                                                </Link>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                                        <Link href={`/repairs/${repair.id}`}>
-                                            <Button size="sm" variant="outline">詳細</Button>
-                                        </Link>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <RepairListView repairs={repairs} selectedIds={selectedIds} tagLocked={tagLocked.current}
+                toggleSelectAll={toggleSelectAll} setRepairSelected={setRepairSelected}
+                toggleRepairSelected={toggleRepairSelected}
+                openMessage={repair => {
+                    const message = repair.customerMessages?.[0];
+                    if (message) setActiveMessage({ ...message, repairId: repair.id, inquiryNumber: repair.inquiryNumber });
+                }} />
             <Dialog open={tagPreview !== null} onOpenChange={open => !open && closeTagPreview()}>
                 <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
                     <DialogHeader><DialogTitle>NFCタグ割当解除の確認</DialogTitle></DialogHeader>
