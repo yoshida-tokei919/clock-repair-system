@@ -82,6 +82,7 @@ export default function InvoicesPage() {
 
     // --- 左ペイン: 請求書一覧 ---
     const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [showHistory, setShowHistory] = useState(false);
 
     // --- 右ペイン: 新規作成フォーム ---
     const [partners, setPartners] = useState<Partner[]>([]);
@@ -202,6 +203,8 @@ export default function InvoicesPage() {
     const preOctoberDeliveries = selectedPreviews.filter(row => new Date(row.deliveryDate).getTime() < Date.parse("2026-09-30T15:00:00Z"));
 
     const selectedPartner = partners.find((p) => p.id === selectedPartnerId);
+    const hiddenCount = invoices.filter((inv) => inv.status === "void" || inv.status === "canceled").length;
+    const visibleInvoices = showHistory ? invoices : invoices.filter((inv) => inv.status !== "void" && inv.status !== "canceled");
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -220,13 +223,16 @@ export default function InvoicesPage() {
                     {/* 左ペイン: 発行済み請求書一覧 */}
                     <div>
                         <h2 className="text-lg font-semibold text-gray-700 mb-4">発行済み請求書</h2>
-                        {invoices.length === 0 ? (
+                        {hiddenCount > 0 && <button type="button" className="mb-3 text-sm text-gray-600 underline hover:text-gray-800" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)}>
+                            {showHistory ? "取消済みの履歴を隠す" : `取消済みの履歴を表示（${hiddenCount}件）`}
+                        </button>}
+                        {visibleInvoices.length === 0 ? (
                             <p className="text-gray-400 text-sm bg-white rounded-lg p-6 border border-gray-200">
-                                まだ請求書がありません
+                                {invoices.length === 0 ? "まだ請求書がありません" : "表示中の請求書はありません。取消済みの履歴を表示できます。"}
                             </p>
                         ) : (
                             <div className="space-y-3">
-                                {invoices.map((inv) => (
+                                {visibleInvoices.map((inv) => (
                                     <Link
                                         key={inv.id}
                                         href={`/documents/invoice/${inv.id}`}
@@ -245,9 +251,9 @@ export default function InvoicesPage() {
                                                     <span className="ml-2 text-blue-700 text-sm">請求先: {inv.billingCustomer.companyName || inv.billingCustomer.name}</span>}
                                             </div>
                                             <span
-                                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${invoiceStatusClass(inv.paymentStatus ?? inv.status)}`}
+                                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${invoiceStatusClass(inv.status === "void" || inv.status === "canceled" ? inv.status : inv.paymentStatus ?? inv.status)}`}
                                             >
-                                                {invoiceStatusLabel(inv.paymentStatus ?? inv.status)}
+                                                {invoiceStatusLabel(inv.status === "void" || inv.status === "canceled" ? inv.status : inv.paymentStatus ?? inv.status)}
                                             </span>
                                         </div>
                                         <div className="mt-2 flex gap-4 text-xs text-gray-500">

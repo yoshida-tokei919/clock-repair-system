@@ -7,6 +7,7 @@ import { IssuedDateDialog } from "@/components/documents/IssuedDateDialog";
 type Candidate = { id: number; invoiceNumber: string; grossTotalAmount: number; sourceCustomerName: string;
   companyId: number; companyName: string; billingCustomerId: number };
 type Bundle = { id: number; issuedDate: string | null; companyName: string; billingName: string;
+  supersessionOriginal?: { id: number; newBundleId: number } | null;
   publication: { status: string; publicToken: string } | null; pdfReady: boolean;
   paidAmount: number; outstandingBalance: number; paymentStatus: string;
   deliveryMethod: string; deliveryStatus: string; operationalSafe: boolean; canConfirmPayment: boolean;
@@ -22,6 +23,7 @@ type Bundle = { id: number; issuedDate: string | null; companyName: string; bill
 export function ConsolidatedInvoicePanel() {
   const [eligible, setEligible] = useState<Candidate[]>([]);
   const [bundles, setBundles] = useState<Bundle[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [companyId, setCompanyId] = useState<number | "">("");
   const [selected, setSelected] = useState<number[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -41,6 +43,8 @@ export function ConsolidatedInvoicePanel() {
   const candidates = eligible.filter(row => row.companyId === companyId);
   const chosen = candidates.filter(row => selected.includes(row.id));
   const billingCustomerId = candidates[0]?.billingCustomerId;
+  const hiddenCount = bundles.filter(bundle => !!bundle.supersessionOriginal).length;
+  const visibleBundles = showHistory ? bundles : bundles.filter(bundle => !bundle.supersessionOriginal);
 
   async function create(issuedDate?: string) {
     if (!companyId || !billingCustomerId || selected.length < 2) return;
@@ -118,20 +122,23 @@ export function ConsolidatedInvoicePanel() {
     </div>}
     {error && <p role="alert" className="text-red-600 text-sm mt-3">{error}</p>}
     <h3 className="font-semibold mt-7 mb-2">作成済み集約請求</h3>
-    {bundles.length === 0 && <p className="text-sm text-gray-500">まだありません。</p>}
-    {bundles.map(bundle => <div key={bundle.id} className="border rounded mb-2 p-3 text-sm">
+    {hiddenCount > 0 && <button type="button" className="mb-3 text-sm text-gray-600 underline hover:text-gray-800" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)}>
+      {showHistory ? "旧版の履歴を隠す" : `旧版の履歴を表示（${hiddenCount}件）`}
+    </button>}
+    {visibleBundles.length === 0 && <p className="text-sm text-gray-500">{bundles.length === 0 ? "まだありません。" : "表示中の集約請求はありません。旧版の履歴を表示できます。"}</p>}
+    {visibleBundles.map(bundle => <div key={bundle.id} className="border rounded mb-2 p-3 text-sm">
       <Link className="flex justify-between rounded hover:text-blue-700" href={`/documents/consolidated-invoice/${bundle.id}`}>
-        <span>集約 #{bundle.id} / {bundle.billingCompanyName || bundle.billingName} / 発行 {bundle.issuedDate ? new Date(bundle.issuedDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "未確認"}</span>
+        <span>集約 #{bundle.id} {bundle.supersessionOriginal && <span className="font-semibold text-red-700">旧版・差替済み</span>} / {bundle.billingCompanyName || bundle.billingName} / 発行 {bundle.issuedDate ? new Date(bundle.issuedDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "未確認"}</span>
         <strong>¥{bundle.grossTotalAmount.toLocaleString()}</strong>
       </Link>
       <div className="mt-1 flex justify-between items-center">
-        <span className={`rounded-full px-2 py-0.5 text-xs ${bundle.paymentStatus === "PAID" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{bundle.paymentStatus === "PAID" ? "入金済み" : bundle.paymentStatus === "PARTIAL" ? "一部入金" : "未入金"}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs ${bundle.supersessionOriginal ? "bg-red-100 text-red-700" : bundle.paymentStatus === "PAID" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{bundle.supersessionOriginal ? "差替済み" : bundle.paymentStatus === "PAID" ? "入金済み" : bundle.paymentStatus === "PARTIAL" ? "一部入金" : "未入金"}</span>
         <button className="text-blue-700 underline" onClick={() => setExpanded(expanded === bundle.id ? null : bundle.id)}>{expanded === bundle.id ? "閉じる" : "一覧で詳細を表示"}</button>
       </div>
       {expanded === bundle.id && <div className="mt-3 border-t pt-3 space-y-3">
         <Link className="text-blue-700 underline" href={`/documents/consolidated-invoice/${bundle.id}`}>集約請求書の詳細を開く</Link>
         <div className="flex flex-wrap gap-3 items-center">
-          {bundle.pdfReady ? <>
+          {bundle.supersessionOriginal ? null : bundle.pdfReady ? <>
             <a className="text-blue-700 underline" href={`/api/invoices/consolidated/${bundle.id}/pdf`} target="_blank" rel="noopener noreferrer">PDFを開く・保存</a>
             <a className="text-blue-700 underline" href={`/customer/consolidated-invoices/${bundle.publication?.publicToken}`} target="_blank" rel="noopener noreferrer">顧客共有ページを開く</a>
           </> : <button className="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-40" disabled={generatingId !== null || bundle.publication !== null} onClick={() => generatePdf(bundle.id)}>
@@ -142,8 +149,8 @@ export function ConsolidatedInvoicePanel() {
         <p>案内: {bundle.deliveryStatus === "CONFIRMED" ? "LINE 履歴確認済み（過去の送信記録）" : bundle.deliveryStatus === "NO_NEW_DELIVERY" ? bundle.paymentStatus === "PARTIAL" ? "一部入金のため新規案内不可（個別確認）" : bundle.paymentStatus === "PAID" ? "入金済みのため新規案内なし" : "入金・前受金などの履歴を要確認（新規案内不可）" : bundle.deliveryMethod === "BLOCKED" ? "要確認（元請求書の状態または送信履歴）" : bundle.deliveryMethod === "POSTAL" ? "POSTAL（郵送対象）" : bundle.deliveryStatus === "APPROVED" ? "LINE 送信待ち" : bundle.deliveryStatus === "POST_UNCONFIRMED" ? "LINE 送信結果未確定" : bundle.deliveryStatus === "CANCELLED" ? "LINE 送信待ち取消済み" : `LINE ${bundle.deliveryStatus}`}</p>
         {!bundle.operationalSafe && <p role="alert" className="text-sm font-semibold text-red-700">この集約請求は現在の元請求書・送信状態と一致しません。請求書としての有効性を確認してください。共有URLの案内は保留してください。</p>}
         <div className="flex flex-wrap gap-2">
-          {bundle.pdfReady && bundle.deliveryStatus === "READY" && <button className="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-40" disabled={actionId !== null} onClick={() => queueLine(bundle.id)}>{actionId === bundle.id ? "処理中..." : "LINE通常トーク送信待ちに登録"}</button>}
-          {bundle.canConfirmPayment && <button className="rounded bg-green-700 px-3 py-2 text-white disabled:opacity-40" disabled={actionId !== null} onClick={() => confirmPayment(bundle.id)}>{actionId === bundle.id ? "処理中..." : "銀行全額入金を確認・登録"}</button>}
+          {!bundle.supersessionOriginal && bundle.pdfReady && bundle.deliveryStatus === "READY" && <button className="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-40" disabled={actionId !== null} onClick={() => queueLine(bundle.id)}>{actionId === bundle.id ? "処理中..." : "LINE通常トーク送信待ちに登録"}</button>}
+          {!bundle.supersessionOriginal && bundle.canConfirmPayment && <button className="rounded bg-green-700 px-3 py-2 text-white disabled:opacity-40" disabled={actionId !== null} onClick={() => confirmPayment(bundle.id)}>{actionId === bundle.id ? "処理中..." : "銀行全額入金を確認・登録"}</button>}
         </div>
         <p>請求先（作成時）: {bundle.billingCompanyName || bundle.billingName} {bundle.billingName}<br />
           〒{bundle.billingZipCode || "—"} {bundle.billingAddress || [bundle.billingPrefecture, bundle.billingCity, bundle.billingStreet, bundle.billingBuilding].filter(Boolean).join("")}</p>
