@@ -2,39 +2,30 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { RepairsTableClient } from "@/components/repairs/RepairsTableClient";
-import { PlusCircle, Search, Filter } from "lucide-react";
-import { redirect } from "next/navigation";
+import { RepairListFilters } from "@/components/repairs/RepairListFilters";
+import { PlusCircle } from "lucide-react";
 import { isR2RepairPhotoKey } from "@/lib/r2-repair-photos";
+import { buildRepairListWhere, normalizeRepairListParams, repairListPage, repairListUrl, REPAIR_LIST_PAGE_SIZE, type RawParams } from "@/lib/repair-list-filters";
 export const dynamic = "force-dynamic";
 
 export default async function RepairsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ q?: string; status?: string }>;
+    searchParams: Promise<RawParams>;
 }) {
-    const { q, status: statusParam } = await searchParams;
-    const query = q || "";
-    const status = statusParam || "all";
-
-    // Build Filters
-    const where: any = {};
-
-    if (query) {
-        where.OR = [
-            { inquiryNumber: { contains: query } },
-            { customer: { name: { contains: query } } },
-            { watch: { brand: { name: { contains: query } } } },
-            { watch: { serialNumber: { contains: query } } },
-        ];
-    }
-
-    if (status !== "all") {
-        where.status = status;
-    }
-
-    // Fetch Data
+    const filters = normalizeRepairListParams(await searchParams);
+    const where = buildRepairListWhere(filters);
+    const [count, customers, brands] = await Promise.all([
+        prisma.repair.count({ where }),
+        prisma.customer.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+        prisma.brand.findMany({ where: { isWatchBrand: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    ]);
+    const pagination = repairListPage(filters.page, count);
+    const visiblePages = [...new Set([1, pagination.totalPages,
+        pagination.currentPage - 2, pagination.currentPage - 1, pagination.currentPage,
+        pagination.currentPage + 1, pagination.currentPage + 2,
+    ])].filter(page => page >= 1 && page <= pagination.totalPages).sort((a, b) => a - b);
     const repairs = await prisma.repair.findMany({
         where,
         orderBy: { id: "desc" },
@@ -59,7 +50,8 @@ export default async function RepairsPage({
             warranty:         { select: { id: true, warrantyNumber: true } },
             photos: { orderBy: { id: "desc" }, take: 1, select: { id: true, storageKey: true } },
         },
-        take: 50,
+        skip: pagination.skip,
+        take: REPAIR_LIST_PAGE_SIZE,
     });
     const repairIds = repairs.map((repair) => repair.id);
     let unreadMessages: { id: number; repairId: number; body: string; createdAt: Date }[] = [];
@@ -92,16 +84,6 @@ export default async function RepairsPage({
         };
     });
 
-    async function searchAction(formData: FormData) {
-        "use server";
-        const q = formData.get("q");
-        const s = formData.get("status");
-        const params = new URLSearchParams();
-        if (q) params.set("q", q.toString());
-        if (s && s !== "all") params.set("status", s.toString());
-        redirect(`/repairs?${params.toString()}`);
-    }
-
     return (
         <div className="min-w-0 flex-1 space-y-4 p-4 pt-6 lg:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -119,46 +101,16 @@ export default async function RepairsPage({
                 </div>
             </div>
 
-            {/* Filter Bar */}
-            <div className="bg-white p-4 rounded-md border shadow-sm">
-                <form className="flex w-full flex-wrap gap-4 items-center" action={searchAction}>
-                    <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="検索 (管理番号, 名前, ブランド...)" name="q" defaultValue={query} className="pl-8" />
-                    </div>
-
-                    <select
-                        name="status"
-                        defaultValue={status}
-                        className="flex h-10 w-[180px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        <option value="all">全てのステータス</option>
-                        <option value="送付待ち">送付待ち</option>
-                        <option value="受付">受付</option>
-                        <option value="見積中">見積中</option>
-                        <option value="承認待ち">承認待ち</option>
-                        <option value="部品待ち(未注文)">部品待ち(未注文)</option>
-                        <option value="部品待ち(注文済み)">部品待ち(注文済み)</option>
-                        <option value="部品入荷済み">部品入荷済み</option>
-                        <option value="作業待ち">作業待ち</option>
-                        <option value="作業中">作業中</option>
-                        <option value="作業完了">作業完了</option>
-                        <option value="納品済み">納品済み</option>
-                        <option value="キャンセル">キャンセル</option>
-                        <option value="修理不可返却">修理不可返却</option>
-                        <option value="キャンセル返却">キャンセル返却</option>
-                        <option value="保留">保留</option>
-                    </select>
-
-                    <Button type="submit" variant="outline">
-                        <Filter className="mr-2 h-4 w-4" />
-                        絞り込み
-                    </Button>
-                </form>
-            </div>
+            <RepairListFilters filters={filters} customers={customers} brands={brands} count={count} />
 
             {/* Data Table */}
-            <RepairsTableClient repairs={repairsWithMessages} />
+            <RepairsTableClient key={repairListUrl(filters, pagination.currentPage)} repairs={repairsWithMessages} />
+            <nav aria-label="修理案件のページ移動" className="flex flex-wrap items-center justify-center gap-2 text-sm">
+                {pagination.currentPage > 1 && <Link className="rounded border px-3 py-2" href={repairListUrl(filters, pagination.currentPage - 1)}>前へ</Link>}
+                {visiblePages.map(page => <Link key={page} className="rounded border px-3 py-2" aria-current={page === pagination.currentPage ? "page" : undefined} href={repairListUrl(filters, page)}>{page}</Link>)}
+                {pagination.currentPage < pagination.totalPages && <Link className="rounded border px-3 py-2" href={repairListUrl(filters, pagination.currentPage + 1)}>次へ</Link>}
+                <span>{pagination.currentPage} / {pagination.totalPages} ページ</span>
+            </nav>
         </div>
     );
 }
