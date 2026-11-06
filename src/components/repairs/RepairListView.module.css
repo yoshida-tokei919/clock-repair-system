@@ -5,11 +5,12 @@
 .wide { grid-column: 1 / -1; }
 .customer { grid-column: 2; }
 .photoCell { grid-column: 3; }
+.messageCell { grid-column: 3; text-align: right; }
 .photo { width: 136px; height: 136px; object-fit: cover; }
 @container (min-width: 1120px) {
   .header, .row { display: grid; grid-template-columns: var(--repair-columns); gap: 8px; align-items: start; }
   .header { padding: 10px 12px; }
   .row { min-height: 160px; }
   .wide { grid-column: auto; }
-  .customer, .photoCell { grid-column: auto; }
+  .customer, .photoCell, .messageCell { grid-column: auto; }
 }
