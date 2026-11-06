@@ -52,7 +52,6 @@ export default async function RepairsPage({
                 }
             },
             estimate: { select: { totalAmount: true, items: { orderBy: { id: "asc" }, select: { id: true, itemName: true, quantity: true, unitPrice: true, b2cDisplayNameSnapshot: true } } } },
-            repairLineItems: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }], select: { id: true, itemNameSnapshot: true, estimateDisplayNameSnapshot: true, b2bDisplayNameSnapshot: true, b2cDisplayNameSnapshot: true, amount: true } },
             logs: { where: { status: "承認待ち" }, orderBy: [{ changedAt: "desc" }, { id: "desc" }], take: 1, select: { changedAt: true } },
             deliveryNote:     { select: { id: true, slipNumber: true } },
             invoice:          { select: { id: true, invoiceNumber: true } },

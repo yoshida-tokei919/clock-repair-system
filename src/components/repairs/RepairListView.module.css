@@ -3,10 +3,13 @@
 .row { display: grid; grid-template-columns: 34px minmax(0, 1fr) 112px; gap: 8px; padding: 12px; border-top: 1px solid #e2e8f0; min-width: 0; }
 .cell { min-width: 0; overflow-wrap: anywhere; }
 .wide { grid-column: 1 / -1; }
+.customer { grid-column: 2; }
+.photoCell { grid-column: 3; }
 .photo { width: 112px; height: 112px; object-fit: cover; }
 @container (min-width: 1120px) {
   .header, .row { display: grid; grid-template-columns: var(--repair-columns); gap: 8px; align-items: start; }
   .header { padding: 10px 12px; }
   .row { min-height: 138px; }
   .wide { grid-column: auto; }
+  .customer, .photoCell { grid-column: auto; }
 }
