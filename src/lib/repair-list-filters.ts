@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 
 export const REPAIR_LIST_PAGE_SIZE = 50;
 export const REPAIR_STATUSES = ["送付待ち", "受付", "見積中", "承認待ち", "部品待ち(未注文)", "部品待ち(注文済み)", "部品入荷済み", "作業待ち", "作業中", "作業完了", "納品済み", "キャンセル", "修理不可返却", "キャンセル返却", "保留"] as const;
-export const FILTER_KEYS = ["q", "type", "customer", "brand", "status", "delivery", "receptionFrom", "receptionTo", "approvalFrom", "approvalTo", "pendingFrom", "pendingTo", "deliveredFrom", "deliveredTo", "amountMin", "amountMax"] as const;
+export const FILTER_KEYS = ["q", "type", "customer", "brand", "status", "delivery", "partEntries", "orderRequest", "receptionFrom", "receptionTo", "approvalFrom", "approvalTo", "pendingFrom", "pendingTo", "deliveredFrom", "deliveredTo", "amountMin", "amountMax"] as const;
 export type FilterKey = typeof FILTER_KEYS[number];
 export type RawParams = Record<string, string | string[] | undefined>;
 export type RepairListFilters = Record<FilterKey, string> & { page: number };
@@ -26,6 +26,8 @@ export function normalizeRepairListParams(raw: RawParams): RepairListFilters {
     result.status = statuses(result.status === "all" ? "" : result.status);
     result.type = ["business", "individual"].includes(result.type) ? result.type : "";
     result.delivery = ["delivered", "undelivered"].includes(result.delivery) ? result.delivery : "";
+    result.partEntries = ["with", "without"].includes(result.partEntries) ? result.partEntries : "";
+    result.orderRequest = ["pending", "ordered", "received", "partial", "noRequest"].includes(result.orderRequest) ? result.orderRequest : "";
     for (const prefix of dateKeys) {
         const from = `${prefix}From` as FilterKey;
         const to = `${prefix}To` as FilterKey;
@@ -69,6 +71,22 @@ export function buildRepairListWhere(filters: RepairListFilters): Prisma.RepairW
     if (filters.brand) and.push({ watch: { brandId: { in: filters.brand.split(",").map(Number) } } });
     if (filters.status) and.push({ status: { in: filters.status.split(",") } });
     if (filters.delivery) and.push({ status: filters.delivery === "delivered" ? "納品済み" : { not: "納品済み" } });
+    if (filters.partEntries === "with") and.push({ OR: [
+        { repairLineItems: { some: { lineType: "PART" } } },
+        { estimate: { items: { some: { type: "part" } } } },
+    ] });
+    if (filters.partEntries === "without") and.push({
+        repairLineItems: { none: { lineType: "PART" } },
+        NOT: { estimate: { items: { some: { type: "part" } } } },
+    });
+    if (filters.orderRequest === "pending" || filters.orderRequest === "ordered" || filters.orderRequest === "received") {
+        and.push({ orderRequests: { some: { status: filters.orderRequest } } });
+    }
+    if (filters.orderRequest === "partial") and.push({ AND: [
+        { orderRequests: { some: { status: "pending" } } },
+        { orderRequests: { some: { status: { in: ["ordered", "received"] } } } },
+    ] });
+    if (filters.orderRequest === "noRequest") and.push({ orderRequests: { none: {} } });
     const reception = tokyoDayRange(filters.receptionFrom, filters.receptionTo);
     const approval = tokyoDayRange(filters.approvalFrom, filters.approvalTo);
     const pending = tokyoDayRange(filters.pendingFrom, filters.pendingTo);

@@ -7,7 +7,9 @@ import { FILTER_KEYS, REPAIR_STATUSES, type RepairListFilters, repairListUrl, no
 type Option = { id: number; name: string };
 type SavedView = { name: string; filters: RepairListFilters };
 const STORAGE_KEY = "repair-list-saved-views-v1";
-const labels: Record<string, string> = { q: "検索", type: "顧客区分", customer: "顧客", brand: "ブランド", status: "ステータス", delivery: "納品状態", receptionFrom: "受付日から", receptionTo: "受付日まで", approvalFrom: "承認日から", approvalTo: "承認日まで", pendingFrom: "承認待ち履歴から", pendingTo: "承認待ち履歴まで", deliveredFrom: "実納品日から", deliveredTo: "実納品日まで", amountMin: "見積額下限", amountMax: "見積額上限" };
+const labels: Record<string, string> = { q: "検索", type: "顧客区分", customer: "顧客", brand: "ブランド", status: "ステータス", delivery: "納品状態", partEntries: "記録済み部品行", orderRequest: "発注依頼", receptionFrom: "受付日から", receptionTo: "受付日まで", approvalFrom: "承認日から", approvalTo: "承認日まで", pendingFrom: "承認待ち履歴から", pendingTo: "承認待ち履歴まで", deliveredFrom: "実納品日から", deliveredTo: "実納品日まで", amountMin: "見積額下限", amountMax: "見積額上限" };
+const partEntryLabels: Record<string, string> = { with: "あり", without: "なし" };
+const orderRequestLabels: Record<string, string> = { pending: "未発注の依頼あり", ordered: "注文済みの依頼あり", received: "入荷済みの依頼あり", partial: "未発注と注文済み・入荷済みが混在", noRequest: "依頼記録なし" };
 
 export function RepairListFilters({ filters, customers, brands, count }: { filters: RepairListFilters; customers: Option[]; brands: Option[]; count: number }) {
     const router = useRouter();
@@ -39,6 +41,8 @@ export function RepairListFilters({ filters, customers, brands, count }: { filte
         if (key === "brand") return brands.find(v => String(v.id) === value)?.name ?? value;
         if (key === "type") return value === "business" ? "B2B" : "B2C";
         if (key === "delivery") return value === "delivered" ? "納品済み" : "未納品";
+        if (key === "partEntries") return partEntryLabels[value] ?? value;
+        if (key === "orderRequest") return orderRequestLabels[value] ?? value;
         return value;
     };
     const multi = (key: "customer" | "brand" | "status", title: string, options: { value: string; label: string }[]) => (
@@ -80,6 +84,8 @@ export function RepairListFilters({ filters, customers, brands, count }: { filte
                 <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <label className="text-sm">顧客区分<select name="type" defaultValue={filters.type} className="mt-1 block h-9 w-full rounded border px-2"><option value="">すべて</option><option value="business">B2B</option><option value="individual">B2C</option></select></label>
                     <label className="text-sm">納品状態<select name="delivery" defaultValue={filters.delivery} className="mt-1 block h-9 w-full rounded border px-2"><option value="">すべて</option><option value="undelivered">未納品（現在の状態が「納品済み」以外）</option><option value="delivered">納品済み（現在の状態）</option></select></label>
+                    <label className="min-w-0 text-sm">記録済み部品行<select name="partEntries" defaultValue={filters.partEntries} className="mt-1 block h-9 w-full min-w-0 rounded border px-2"><option value="">すべて</option><option value="with">あり</option><option value="without">なし</option></select></label>
+                    <label className="min-w-0 text-sm">発注依頼<select name="orderRequest" defaultValue={filters.orderRequest} className="mt-1 block h-9 w-full min-w-0 rounded border px-2"><option value="">すべて</option>{Object.entries(orderRequestLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                     {multi("customer", "顧客（複数選択可）", customers.map(v => ({ value: String(v.id), label: v.name })))}
                     {multi("brand", "ブランド（複数選択可）", brands.map(v => ({ value: String(v.id), label: v.name })))}
                     {multi("status", "ステータス（複数選択可）", REPAIR_STATUSES.map(v => ({ value: v, label: v })))}
@@ -91,6 +97,7 @@ export function RepairListFilters({ filters, customers, brands, count }: { filte
                     <label className="text-sm">見積額 上限<input name="amountMax" type="number" min="0" max="999999999" defaultValue={filters.amountMax} className="mt-1 block h-9 w-full rounded border px-2" /></label>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">異なる条件はすべて一致、同じ項目の複数選択はいずれか一致。日付は東京時間の開始日・終了日を含みます。</p>
+                <p className="text-xs text-muted-foreground">部品行は修理明細または見積明細の記録で判定します。発注依頼は案件に紐づく依頼の状態で判定し、「依頼記録なし」は未発注を意味しません（在庫使用・旧データなど）。見積明細の発注状態とは照合していません。</p>
             </details>
             {validationError && <p role="alert" className="text-sm text-red-700">{validationError}</p>}
         </form>
