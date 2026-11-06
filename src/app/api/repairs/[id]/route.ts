@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { findOrCreateCaliber, findOrCreateWatchReference, resolveBrand } from "@/lib/master-normalize";
 import { resolveRepairMovementMaker } from "@/lib/repair-movement-maker";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+import { normalizeQuantityUnit } from "@/lib/quantity-unit";
 import { mergeWatchRefs, resolvePatchCaseRef, resolvePatchProductRef } from "@/lib/parts-master-compatibility";
 import { parseTimepieceType, TimepieceTypeError } from "@/lib/timepiece-type";
 import { getRepairPartType, isExistingRepairPartLink, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
@@ -433,6 +434,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                                 type: item.type,
                                 unitPrice: Math.floor(Number(item.price) || 0),
                                 quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+                                 quantityUnit: normalizeQuantityUnit(item.quantityUnit),
                                 partsMasterId: item.partsMasterId ? Number(item.partsMasterId) : null,
                             }))
                         });

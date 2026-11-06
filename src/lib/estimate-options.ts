@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { assertYen, sumCustomerLines, type PricingTaxMode } from "@/lib/pricing-tax";
 import { selectedOptionTotal } from "@/lib/estimate-option-totals";
+import { normalizeQuantityUnit } from "@/lib/quantity-unit";
 export { selectedOptionTotal } from "@/lib/estimate-option-totals";
 
 export type OptionLineInput = {
@@ -20,6 +21,7 @@ export type OptionLineInput = {
   repairWorkActionId?: number | null;
   targetPartNameId?: string | null;
   quantity: number;
+  quantityUnit?: string | null;
   unitPrice: number;
 };
 export type OptionChoiceInput = { kind: "PLAN" | "ADD_ON"; name: string; notes?: string | null; recommended: boolean; lines: OptionLineInput[] };
@@ -68,7 +70,7 @@ export function parseOptionSet(value: unknown): OptionSetInput {
           partsMasterId: optionalId(line.partsMasterId), pricingRuleId: optionalId(line.pricingRuleId),
           repairWorkCategoryId: optionalId(line.repairWorkCategoryId), repairWorkActionId: optionalId(line.repairWorkActionId),
           targetPartNameId: shortText(line.targetPartNameId, "対象部品ID"),
-          quantity: line.quantity as number, unitPrice: line.unitPrice as number,
+          quantity: line.quantity as number, quantityUnit: normalizeQuantityUnit(line.quantityUnit), unitPrice: line.unitPrice as number,
         };
         if (parsed.lineType === "LABOR" && parsed.partsMasterId != null) throw new Error("作業明細に在庫部品を指定できません。");
         if (parsed.lineType === "PART" && (parsed.repairWorkCategoryId || parsed.repairWorkActionId || parsed.pricingRuleId)) throw new Error("部品明細に作業マスタを指定できません。");
@@ -101,7 +103,7 @@ type IssuedOptionRepair = {
   customerNote?: string | null;
   watch?: { timepieceType: string | null; timepieceTypeLabel: string | null; serialNumber: string | null;
     brand: { name: string } | null; model: { name: string } | null; reference: { name: string } | null; caseReference: { name: string } | null };
-  estimate: { pricingTaxMode: string; totalAmount: number; taxAmount: number; discountAmount: number; shipping: number; items: { id: number; itemName: string; type: string; unitPrice: number; quantity: number; partsMasterId: number | null; partsMaster?: { grade: string | null; notes2: string | null } | null; sourceAreaSnapshot: string | null; categoryNameSnapshot: string | null; targetPartNameSnapshot: string | null; actionNameSnapshot: string | null; detailLabelSnapshot: string | null; b2cDisplayNameSnapshot: string | null; gradeNameSnapshot: string | null }[] } | null;
+  estimate: { pricingTaxMode: string; totalAmount: number; taxAmount: number; discountAmount: number; shipping: number; items: { id: number; itemName: string; type: string; unitPrice: number; quantity: number; quantityUnit?: string | null; partsMasterId: number | null; partsMaster?: { grade: string | null; notes2: string | null } | null; sourceAreaSnapshot: string | null; categoryNameSnapshot: string | null; targetPartNameSnapshot: string | null; actionNameSnapshot: string | null; detailLabelSnapshot: string | null; b2cDisplayNameSnapshot: string | null; gradeNameSnapshot: string | null }[] } | null;
   estimateOptionSet: { id: number; title: string; notes: string | null; isActive: boolean; choices: { id: number; kind: string; name: string; notes: string | null; recommended: boolean; sortOrder: number; lines: { id: number; sortOrder: number; lineType: string; itemNameSnapshot: string; displayNameSnapshot: string | null; notesForCustomerSnapshot: string | null; workTypeSnapshot: string | null; categoryNameSnapshot: string | null; actionNameSnapshot: string | null; targetPartNameSnapshot: string | null; detailLabelSnapshot: string | null; partsMasterId: number | null; pricingRuleId: number | null; repairWorkCategoryId: number | null; repairWorkActionId: number | null; targetPartNameId: string | null; quantity: number; unitPrice: number }[] }[] } | null;
 };
 
@@ -126,7 +128,7 @@ export function issuedOptionSourceHash(document: { id: number; customerId: numbe
     estimateTotal: estimate?.totalAmount, estimateTax: estimate?.taxAmount,
     estimateDiscount: estimate?.discountAmount, estimateShipping: estimate?.shipping,
     commonLines: estimate?.items.map(item => ({
-      id: item.id, itemName: item.itemName, type: item.type, unitPrice: item.unitPrice, quantity: item.quantity,
+      id: item.id, itemName: item.itemName, type: item.type, unitPrice: item.unitPrice, quantity: item.quantity, quantityUnit: item.quantityUnit ?? null,
       partsMasterId: item.partsMasterId, partsMaster: item.partsMaster && { grade: item.partsMaster.grade, notes2: item.partsMaster.notes2 },
       sourceAreaSnapshot: item.sourceAreaSnapshot, categoryNameSnapshot: item.categoryNameSnapshot,
       targetPartNameSnapshot: item.targetPartNameSnapshot, actionNameSnapshot: item.actionNameSnapshot,

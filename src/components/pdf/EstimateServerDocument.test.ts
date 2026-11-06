@@ -61,3 +61,16 @@ test("ordinary B2B estimate keeps standard rows without option labels", () => {
   assert.doesNotMatch(output, /プラン|共通＋|追加額/);
   assert.equal(flatten(tree).filter(node => node.type === "View" && node.props.wrap === false).length, 0);
 });
+
+test("estimate PDF shows quantity, unit price, and extended amount for each line", () => {
+  const data: EstimateServerDocumentProps["data"] = { ...base, jobs: [{
+    ...base.jobs[0], items: [
+      { name: "G-002", price: 1500, quantity: 2, quantityUnit: "か所" },
+      { name: "交換部品", price: 1000, quantity: 2, quantityUnit: "本" },
+    ],
+  }] };
+  const output = texts(createEstimateServerDocumentElement(runtime, renderer, data)).join(" ");
+  assert.match(output, /G-002 数量 2か所 × 単価 ¥1,500 = 金額 ¥3,000/);
+  assert.match(output, /交換部品 数量 2本 × 単価 ¥1,000 = 金額 ¥2,000/);
+  assert.match(output, /¥5,000/);
+});

@@ -60,6 +60,7 @@ type FormData = {
   baseMakerId: string
   // 部品情報
   nameJp: string
+  defaultQuantityUnit: string
   nameEn: string
   partRefs: string
   cousinsNumber: string
@@ -88,7 +89,7 @@ const INITIAL: FormData = {
   subcategory: '',
   brandId: '', modelId: '', watchRefs: '',
   caliberId: '', baseCaliberId: '', movementMakerId: '', baseMakerId: '',
-  nameJp: '', nameEn: '', partRefs: '', cousinsNumber: '',
+  nameJp: '', defaultQuantityUnit: '', nameEn: '', partRefs: '', cousinsNumber: '',
   grade: '純正', size: '', photoKey: '', notes1: '', notes2: '',
   costCurrency: 'JPY', costOriginal: '0', latestCostYen: '0',
   markupRate: '1.3', retailPrice: '0',
@@ -201,6 +202,7 @@ export default function PartsForm({ partId }: { partId?: number }) {
         movementMakerId: d.movementMakerId?.toString() ?? '',
         baseMakerId: d.baseMakerId?.toString() ?? '',
         nameJp: d.nameJp ?? '',
+        defaultQuantityUnit: d.defaultQuantityUnit ?? '',
         nameEn: d.nameEn ?? '',
         partRefs: d.partRefs ?? '',
         cousinsNumber: d.cousinsNumber ?? '',
@@ -606,6 +608,11 @@ export default function PartsForm({ partId }: { partId?: number }) {
           <div>
             <label className="label-sm">部品名（日本語）<span className="text-red-500">*</span></label>
             <input className="input-base" value={form.nameJp} onChange={e => set('nameJp', e.target.value)} placeholder="例: 主ゼンマイ" />
+          </div>
+          <div>
+            <label className="label-sm">既定の数量単位（任意）</label>
+            <input className="input-base" list="parts-quantity-units" maxLength={20} value={form.defaultQuantityUnit} onChange={e => set('defaultQuantityUnit', e.target.value)} placeholder="例: 本" />
+            <datalist id="parts-quantity-units"><option value="か所" /><option value="本" /><option value="個" /><option value="式" /><option value="回" /></datalist>
           </div>
           <div>
             <label className="label-sm">部品名（英語）</label>

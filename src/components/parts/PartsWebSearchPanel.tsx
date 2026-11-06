@@ -109,6 +109,7 @@ type GrowthCommitResult = {
     notes1: string | null
     notes2: string | null
     retailPrice: number
+    defaultQuantityUnit?: string | null
     latestCostYen: number
     stockQuantity: number
     supplier: { name: string } | null
@@ -132,6 +133,7 @@ type ResolvedPartSelection = {
   cousinsNumber: string
   price: number
   retailPrice?: number
+  defaultQuantityUnit?: string | null
   cost: number
   latestCostYen?: number
   stockQuantity: number
@@ -284,6 +286,7 @@ function toResolvedPartSelection(result: GrowthCommitResult): ResolvedPartSelect
     cousinsNumber: part.cousinsNumber ?? '',
     price: part.retailPrice,
     retailPrice: part.retailPrice,
+    defaultQuantityUnit: part.defaultQuantityUnit,
     cost: part.latestCostYen,
     latestCostYen: part.latestCostYen,
     stockQuantity: part.stockQuantity ?? 0,

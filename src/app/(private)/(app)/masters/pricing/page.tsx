@@ -132,6 +132,7 @@ export default function PricingManagerPage() {
     const [workName, setWorkName] = useState("");
     const [minPrice, setMinPrice] = useState("");
     const [maxPrice, setMaxPrice] = useState("");
+    const [defaultQuantityUnit, setDefaultQuantityUnit] = useState("");
     const [customerType, setCustomerType] = useState("individual");
     const [notes, setNotes] = useState("");
 
@@ -213,6 +214,7 @@ export default function PricingManagerPage() {
         setWorkName("");
         setMinPrice("");
         setMaxPrice("");
+        setDefaultQuantityUnit("");
         setNotes("");
     };
 
@@ -224,6 +226,7 @@ export default function PricingManagerPage() {
         setWorkName(rule.workName);
         setMinPrice(String(rule.minPrice));
         setMaxPrice(String(rule.maxPrice));
+        setDefaultQuantityUnit(rule.defaultQuantityUnit ?? "");
         setCustomerType(rule.customerType);
         setNotes(rule.notes);
     };
@@ -253,6 +256,7 @@ export default function PricingManagerPage() {
             workName,
             minPrice,
             maxPrice: maxPrice || minPrice,
+            defaultQuantityUnit,
             customerType,
             notes
         };
@@ -403,6 +407,11 @@ export default function PricingManagerPage() {
                                 <Label className="text-xs font-bold">最高価格 (¥)</Label>
                                 <Input type="number" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} placeholder="任意" className="font-mono text-right" />
                             </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-bold">既定の数量単位（任意）</Label>
+                            <Input list="pricing-quantity-units" maxLength={20} value={defaultQuantityUnit} onChange={e => setDefaultQuantityUnit(e.target.value)} placeholder="例: か所" />
+                            <datalist id="pricing-quantity-units"><option value="か所" /><option value="本" /><option value="個" /><option value="式" /><option value="回" /></datalist>
                         </div>
 
                         <div className="space-y-1.5">

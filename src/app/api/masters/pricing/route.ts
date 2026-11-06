@@ -2,6 +2,7 @@ import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { findOrCreateBrand, findOrCreateCaliber } from "@/lib/master-normalize";
+import { normalizeQuantityUnit } from "@/lib/quantity-unit";
 
 // GET /api/masters/pricing
 export async function GET(request: Request) {
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
             workName: r.suggestedWorkName,
             minPrice: r.minPrice,
             maxPrice: r.maxPrice,
+            defaultQuantityUnit: r.defaultQuantityUnit,
             customerType: r.customerType,
             notes: r.notes || ""
         }));
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
     if (unauthorized) return unauthorized;
     try {
         const body = await request.json();
-        const { brandName, modelName, caliberName, workName, minPrice, maxPrice, customerType, notes } = body;
+        const { brandName, modelName, caliberName, workName, minPrice, maxPrice, customerType, notes, defaultQuantityUnit } = body;
 
         if (!workName) return NextResponse.json({ error: "Work Name is required" }, { status: 400 });
 
@@ -79,6 +81,7 @@ export async function POST(request: Request) {
                 suggestedWorkName: workName,
                 minPrice: parseInt(minPrice) || 0,
                 maxPrice: parseInt(maxPrice) || parseInt(minPrice) || 0,
+                defaultQuantityUnit: normalizeQuantityUnit(defaultQuantityUnit),
                 customerType: customerType || "individual",
                 notes: notes || ""
             }

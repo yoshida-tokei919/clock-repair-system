@@ -100,7 +100,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const existingLines = await tx.repairLineItem.findMany({ where: { repairId: repair.id }, select: { sortOrder: true } });
       const firstSortOrder = Math.max(-1, ...existingLines.map(line => line.sortOrder)) + 1;
       await tx.estimateItem.createMany({ data: selectedLines.map(line => ({
-        estimateId: repair.estimate!.id, itemName: line.itemNameSnapshot, quantity: line.quantity, unitPrice: line.unitPrice,
+        estimateId: repair.estimate!.id, itemName: line.itemNameSnapshot, quantity: line.quantity, quantityUnit: line.quantityUnit, unitPrice: line.unitPrice,
         type: line.lineType === "PART" ? "part" : "labor", partsMasterId: line.partsMasterId,
         sourceAreaSnapshot: line.workTypeSnapshot?.toLowerCase() ?? null, categoryNameSnapshot: line.categoryNameSnapshot,
         targetPartNameSnapshot: line.targetPartNameSnapshot, actionNameSnapshot: line.actionNameSnapshot,
@@ -112,7 +112,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         itemNameSnapshot: line.itemNameSnapshot, estimateDisplayNameSnapshot: line.displayNameSnapshot ?? line.itemNameSnapshot,
         b2bDisplayNameSnapshot: line.displayNameSnapshot ?? line.itemNameSnapshot, notesForCustomerSnapshot: line.notesForCustomerSnapshot,
         categoryNameSnapshot: line.categoryNameSnapshot, actionNameSnapshot: line.actionNameSnapshot, targetPartNameSnapshot: line.targetPartNameSnapshot,
-        detailLabelSnapshot: line.detailLabelSnapshot, quantity: line.quantity, unitPrice: line.unitPrice,
+        detailLabelSnapshot: line.detailLabelSnapshot, quantity: line.quantity, quantityUnit: line.quantityUnit, unitPrice: line.unitPrice,
         amount: assertYen(line.quantity * line.unitPrice), showPriceB2b: true, sortOrder: firstSortOrder + index,
       })) });
       const technicalFee = assertYen(repair.estimate.technicalFee + sumCustomerLines(selectedLines.filter(line => line.lineType === "LABOR")));

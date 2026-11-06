@@ -45,7 +45,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         watch: { include: { brand: true, model: true, reference: true, caseReference: true } },
         customer: { select: { type: true, prefix: true, companyName: true, pricingTaxMode: true } },
         estimate: { select: { pricingTaxMode: true, totalAmount: true, taxAmount: true,
-          items: { orderBy: { id: "asc" }, select: { itemName: true, quantity: true, unitPrice: true } } } },
+          items: { orderBy: { id: "asc" }, select: { itemName: true, quantity: true, quantityUnit: true, unitPrice: true } } } },
         estimateDocument: { select: { currentPdfFileId: true, pdfFiles: { select: { id: true }, take: 1 } } },
       } });
       if (!repair) throw new Error("案件が見つかりません。");

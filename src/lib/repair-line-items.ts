@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient, RepairLineItemType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { normalizeQuantityUnit } from "@/lib/quantity-unit";
 
 type DbLike = PrismaClient | Prisma.TransactionClient;
 
@@ -23,6 +24,7 @@ export type RepairLineItemInput = {
     targetPartNameSnapshot?: string | null;
     actionNameSnapshot?: string | null;
     quantity?: number | null;
+    quantityUnit?: string | null;
     unitPrice?: number | null;
     showPriceB2b?: boolean;
     showPriceB2c?: boolean;
@@ -40,6 +42,7 @@ export type EstimateItemLikeInput = {
     unitPrice?: number | string | null;
     price?: number | string | null;
     quantity?: number | string | null;
+    quantityUnit?: string | null;
     partsMasterId?: number | string | null;
     pricingRuleId?: number | string | null;
     repairWorkCategoryId?: number | string | null;
@@ -86,6 +89,7 @@ export type NormalizedRepairLineItemInput = {
     targetPartNameSnapshot: string | null;
     actionNameSnapshot: string | null;
     quantity: number;
+    quantityUnit: string | null;
     unitPrice: number;
     amount: number;
     showPriceB2b: boolean;
@@ -191,6 +195,7 @@ export function normalizeRepairLineItemInput(
         targetPartNameSnapshot: cleanText(input.targetPartNameSnapshot),
         actionNameSnapshot: cleanText(input.actionNameSnapshot),
         quantity,
+        quantityUnit: normalizeQuantityUnit(input.quantityUnit),
         unitPrice,
         amount: calculateLineAmount(quantity, unitPrice),
         showPriceB2b: input.showPriceB2b ?? false,
@@ -239,6 +244,7 @@ export function estimateItemLikeToRepairLineItemInput(
         targetPartNameSnapshot: cleanText(item.targetPartNameSnapshot),
         actionNameSnapshot: cleanText(item.actionNameSnapshot),
         quantity: parseNullableNumber(item.quantity),
+        quantityUnit: normalizeQuantityUnit(item.quantityUnit),
         unitPrice,
         showPriceB2b: item.showPriceB2b ?? false,
         showPriceB2c: item.showPriceB2c ?? false,
@@ -283,6 +289,7 @@ function toCreateInput(
         targetPartNameSnapshot: input.targetPartNameSnapshot,
         actionNameSnapshot: input.actionNameSnapshot,
         quantity: input.quantity,
+        quantityUnit: input.quantityUnit,
         unitPrice: input.unitPrice,
         amount: input.amount,
         showPriceB2b: input.showPriceB2b,

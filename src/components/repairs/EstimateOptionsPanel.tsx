@@ -3,21 +3,22 @@
 import { useEffect, useId, useState } from "react";
 import { displayEstimateOptionContactNote } from "@/lib/estimate-option-contact-text";
 import { selectedOptionTotal } from "@/lib/estimate-option-totals";
+import { QUANTITY_UNITS } from "@/lib/quantity-unit";
 
 type Line = {
   lineType: "LABOR" | "PART"; itemNameSnapshot: string; displayNameSnapshot: string;
   notesForCustomerSnapshot: string; workTypeSnapshot: "INTERNAL" | "EXTERNAL" | null;
   categoryNameSnapshot: string; actionNameSnapshot: string; targetPartNameSnapshot: string;
-  detailLabelSnapshot: string; quantity: number; unitPrice: number;
+  detailLabelSnapshot: string; quantity: number; quantityUnit: string; unitPrice: number;
   partsMasterId: number | null; pricingRuleId: number | null; repairWorkCategoryId: number | null;
   repairWorkActionId: number | null; targetPartNameId: string | null;
 };
 type Choice = { kind: "PLAN" | "ADD_ON"; name: string; notes: string; recommended: boolean; lines: Line[] };
 type SetDraft = { title: string; notes: string; isActive: boolean; choices: Choice[] };
-type CommonLine = { itemName: string; quantity: number; unitPrice: number };
+type CommonLine = { itemName: string; quantity: number; quantityUnit?: string | null; unitPrice: number };
 
 const newLine = (lineType: Line["lineType"] = "PART"): Line => ({ lineType, itemNameSnapshot: "", displayNameSnapshot: "", notesForCustomerSnapshot: "", workTypeSnapshot: null,
-  categoryNameSnapshot: "", actionNameSnapshot: "", targetPartNameSnapshot: "", detailLabelSnapshot: "", quantity: 1, unitPrice: 0,
+  categoryNameSnapshot: "", actionNameSnapshot: "", targetPartNameSnapshot: "", detailLabelSnapshot: "", quantity: 1, quantityUnit: "", unitPrice: 0,
   partsMasterId: null, pricingRuleId: null, repairWorkCategoryId: null, repairWorkActionId: null, targetPartNameId: null });
 const newChoice = (kind: Choice["kind"], name = ""): Choice => ({ kind, name, notes: "", recommended: false, lines: [newLine()] });
 const yen = (value: number) => `${value.toLocaleString("ja-JP")}円`;
@@ -48,6 +49,7 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
           displayNameSnapshot: line.displayNameSnapshot ?? "", notesForCustomerSnapshot: line.notesForCustomerSnapshot ?? "",
           categoryNameSnapshot: line.categoryNameSnapshot ?? "", actionNameSnapshot: line.actionNameSnapshot ?? "",
           targetPartNameSnapshot: line.targetPartNameSnapshot ?? "", detailLabelSnapshot: line.detailLabelSnapshot ?? "",
+          quantityUnit: line.quantityUnit ?? "",
         })) })) } : { title: "", notes: "", isActive: false, choices: [] };
       setDraft(nextDraft); setSavedDraft(JSON.stringify(nextDraft));
       setContactText(typeof data.contactText === "string" ? data.contactText : null);
@@ -96,12 +98,13 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
   };
   const inputClass = "w-full min-w-0 rounded border border-zinc-300 bg-white px-2 py-2 text-sm";
   return <section className="m-3 space-y-4 rounded border bg-white p-4" aria-label="見積選択肢">
+    <datalist id={`${formId}-quantity-units`}>{QUANTITY_UNITS.map(unit => <option key={unit} value={unit} />)}</datalist>
     <div><h2 className="text-lg font-bold">見積の選択肢</h2><p className="text-sm text-zinc-600">共通作業は全プランに含まれます。変更はメインの修理見積で行い、各プランへ再入力しないでください。</p></div>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {loaded && <>
       <div className="rounded-lg border bg-zinc-50 p-4">
         <h3 className="font-semibold">共通作業（全プランに含む）</h3>
-        {commonLines.length ? <ul className="mt-2 divide-y text-sm">{commonLines.map((line, index) => <li key={index} className="flex flex-wrap justify-between gap-2 py-2"><span>{line.itemName} × {line.quantity}</span><span>{yen(lineAmount(line))}</span></li>)}</ul>
+        {commonLines.length ? <ul className="mt-2 divide-y text-sm">{commonLines.map((line, index) => <li key={index} className="flex flex-wrap justify-between gap-2 py-2"><span>{line.itemName} × {line.quantity}{line.quantityUnit ?? ""}</span><span>{yen(lineAmount(line))}</span></li>)}</ul>
           : <p className="mt-2 text-sm text-zinc-600">共通明細はまだありません。メインの修理見積で追加できます。</p>}
         <p className="mt-2 text-right font-semibold">共通合計 {yen(commonTotal)}（{mode === "INCLUSIVE" ? "税込入力額" : "税抜入力額"}）</p>
       </div>
@@ -135,9 +138,10 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
               <button type="button" className="text-sm text-red-700 underline" onClick={() => setDraft((current) => ({ ...current, choices: current.choices.filter((_, at) => at !== index) }))}>この選択肢を削除</button>
             </div>
             <div className="mt-3 space-y-3">{choice.lines.map((line, lineIndex) => <div key={lineIndex} className="rounded border bg-white p-3">
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_5rem_8rem_auto]">
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_5rem_5rem_8rem_auto]">
                 <label className="text-xs">内容<input className={inputClass} value={line.itemNameSnapshot} placeholder="部品・作業名" onChange={(event) => changeLine(index, lineIndex, { itemNameSnapshot: event.target.value })} /></label>
                 <label className="text-xs">数量<input className={inputClass} type="number" min="1" max="10000" value={line.quantity} onChange={(event) => changeLine(index, lineIndex, { quantity: Number(event.target.value) })} /></label>
+                <label className="text-xs">単位<input className={inputClass} list={`${formId}-quantity-units`} maxLength={20} value={line.quantityUnit} onChange={(event) => changeLine(index, lineIndex, { quantityUnit: event.target.value })} /></label>
                 <label className="text-xs">単価（{mode === "INCLUSIVE" ? "税込" : "税抜"}）<input className={inputClass} type="number" min="0" value={line.unitPrice} onChange={(event) => changeLine(index, lineIndex, { unitPrice: Number(event.target.value) })} /></label>
                 <div className="self-end text-right text-sm font-medium">{yen(lineAmount(line))}</div>
               </div>

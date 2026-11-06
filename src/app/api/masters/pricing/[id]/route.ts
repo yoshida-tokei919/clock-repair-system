@@ -2,6 +2,7 @@ import { requireAdminApi } from "@/lib/admin-api-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { findOrCreateBrand } from "@/lib/master-normalize";
+import { normalizeQuantityUnit } from "@/lib/quantity-unit";
 
 // PUT /api/masters/pricing/[id]
 export async function PUT(
@@ -13,7 +14,7 @@ export async function PUT(
     try {
         const id = parseInt((await params).id);
         const body = await request.json();
-        const { brandName, modelName, caliberName, workName, minPrice, maxPrice, customerType, notes } = body;
+        const { brandName, modelName, caliberName, workName, minPrice, maxPrice, customerType, notes, defaultQuantityUnit } = body;
 
         if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
@@ -43,6 +44,7 @@ export async function PUT(
                 suggestedWorkName: workName,
                 minPrice: parseInt(minPrice) || 0,
                 maxPrice: parseInt(maxPrice) || parseInt(minPrice) || 0,
+                ...(defaultQuantityUnit !== undefined ? { defaultQuantityUnit: normalizeQuantityUnit(defaultQuantityUnit) } : {}),
                 customerType: customerType || "individual",
                 notes: notes || ""
             }

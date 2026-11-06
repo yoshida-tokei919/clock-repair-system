@@ -6,6 +6,7 @@ import { nextB2cInquiryNumber } from "@/lib/b2c-inquiry-number";
 import { addConfirmedRepairStatusLog, canAllocateRepairParts, reconcileRepairPartAllocations, syncExistingPendingRepairOrders } from "@/lib/repair-part-allocation";
 import { findOrCreateBrand, findOrCreateCaliber, findOrCreateWatchReference, resolveBrand } from "@/lib/master-normalize";
 import { createOrUpdatePartsMaster } from "@/lib/parts-master";
+import { normalizeQuantityUnit } from "@/lib/quantity-unit";
 import { mergeWatchRefs } from "@/lib/parts-master-compatibility";
 import { parseTimepieceType, timepieceTypeUpdateForCreateReuse, TimepieceTypeError } from "@/lib/timepiece-type";
 import { getRepairPartType, RepairPartValidationError, validateRepairPartItem } from "@/lib/repair-part-validation";
@@ -554,6 +555,7 @@ export async function POST(req: Request) {
                                 type: item.type,
                                 unitPrice: Math.floor(Number(item.price) || 0),
                                 quantity: item.quantity || 1,
+                                 quantityUnit: normalizeQuantityUnit(item.quantityUnit),
                                 partsMasterId: item.partsMasterId ? Number(item.partsMasterId) : null,
                             }))
                         }

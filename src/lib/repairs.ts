@@ -67,6 +67,7 @@ export async function getRepairDataForPDF(id: number) {
                 items: repair.estimate?.items.map(item => ({
                     name: item.itemName,
                     qty: item.quantity,
+                    quantityUnit: item.quantityUnit,
                     quantity: item.quantity,
                     price: item.unitPrice,
                     type: item.type as 'technical' | 'parts' | 'other',

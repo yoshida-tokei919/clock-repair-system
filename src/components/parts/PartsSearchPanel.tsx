@@ -14,6 +14,7 @@ type Part = {
   notes1: string | null
   notes2: string | null
   retailPrice: number
+  defaultQuantityUnit?: string | null
   latestCostYen: number
   stockQuantity: number
   caliber?: { name: string } | null
@@ -73,6 +74,7 @@ type PartSelection = {
   cousinsNumber: string
   price: number
   retailPrice?: number
+  defaultQuantityUnit?: string | null
   cost: number
   latestCostYen?: number
   stockQuantity: number
@@ -272,6 +274,7 @@ export default function PartsSearchPanel({
         cousinsNumber: part.cousinsNumber ?? '',
         price: part.retailPrice,
         retailPrice: part.retailPrice,
+        defaultQuantityUnit: part.defaultQuantityUnit,
         cost: part.latestCostYen,
         latestCostYen: part.latestCostYen,
         stockQuantity: part.stockQuantity ?? 0,

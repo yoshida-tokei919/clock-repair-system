@@ -80,6 +80,7 @@ import {
 } from "@/actions/master-actions";
 import { searchRepairCustomers } from "@/actions/customer-actions";
 import { calculateTaxableAmounts, laborCustomerUnitPrice, partCustomerUnitPrice, type PricingTaxMode } from "@/lib/pricing-tax";
+import { QUANTITY_UNITS } from "@/lib/quantity-unit";
 
 // --- COMPONENTS ---
 import { QuickRegisterDialog } from "@/components/repairs/QuickRegisterDialog";
@@ -334,6 +335,7 @@ const AdvancedCombobox: React.FC<{
         meta?: string,
         notes?: string,
         price?: number,
+        defaultQuantityUnit?: string | null,
         cost?: number,
         partRef?: string,
         partId?: number,
@@ -371,6 +373,7 @@ const AdvancedCombobox: React.FC<{
         meta?: string,
         notes?: string,
         price?: number,
+        defaultQuantityUnit?: string | null,
         cost?: number,
         partRef?: string,
         partId?: number,
@@ -658,6 +661,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
         basePrice?: number; // New PartsMaster tax-exclusive price, never inferred from displayed gross
         cost?: number;   // 仕入値（管理者のみ）
         quantity: number; // 個数
+        quantityUnit?: string | null;
         partRef?: string;
         spec?: string;
         grade?: string;
@@ -693,6 +697,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
                     name: i.itemName,
                     price: i.unitPrice,
                     quantity: i.quantity || 1,
+                    quantityUnit: i.quantityUnit ?? null,
                     spec: i.notes,
                     repairWorkCategoryId: i.repairWorkCategoryId ?? null,
                     repairWorkActionId: i.repairWorkActionId ?? null,
@@ -712,6 +717,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
                     name: i.itemName,
                     price: i.unitPrice,
                     quantity: i.quantity || 1,
+                    quantityUnit: i.quantityUnit ?? null,
                     spec: i.notes,
                     partsMasterId: i.partsMasterId ?? null,
                     standardPartNameId: i.partsMaster?.standardPartNameId ?? null,
@@ -764,6 +770,8 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
     const [newItemCost, setNewItemCost] = useState("");
     const [newItemPrice, setNewItemPrice] = useState("");
     const [newItemQty, setNewItemQty] = useState("1");
+    const [newItemUnit, setNewItemUnit] = useState("");
+    const [newItemUnitManuallyEdited, setNewItemUnitManuallyEdited] = useState(false);
     const [newItemSpec, setNewItemSpec] = useState("");
     const [selectedWorkOption, setSelectedWorkOption] = useState<any | null>(null);
     const [newItemPriceManuallyEdited, setNewItemPriceManuallyEdited] = useState(false);
@@ -961,6 +969,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
             basePrice: part.price ?? part.retailPrice ?? base.price,
             cost: part.cost ?? part.latestCostYen ?? base.cost,
             grade: part.grade ?? base.grade,
+            quantityUnit: base.quantityUnit ?? null,
             spec: part.grade || base.spec,
             category: resolvedCategory,
             partType: resolvedPartType,
@@ -1866,6 +1875,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
                     price: laborCustomerUnitPrice(r.minPrice),
+                    defaultQuantityUnit: r.defaultQuantityUnit,
                     maxPrice: r.maxPrice,
                     pricingRuleId: r.id,
                     caliberId: r.caliberId,
@@ -1880,6 +1890,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
                      price: laborCustomerUnitPrice(r.minPrice),
+                    defaultQuantityUnit: r.defaultQuantityUnit,
                     maxPrice: r.maxPrice,
                     pricingRuleId: r.id,
                     caliberId: r.caliberId,
@@ -1928,6 +1939,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
                     label: r.suggestedWorkName,
                     value: r.suggestedWorkName,
                     price: laborCustomerUnitPrice(r.minPrice),
+                    defaultQuantityUnit: r.defaultQuantityUnit,
                     maxPrice: r.maxPrice,
                     pricingRuleId: r.id,
                     caliberId: r.caliberId,
@@ -1969,6 +1981,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
                         value: p.nameJp || p.name,
                         name: p.nameJp || p.name,
                         price: p.retailPrice,
+                        defaultQuantityUnit: p.defaultQuantityUnit,
                         cost: p.latestCostYen,
                         partsMasterId: p.id,
                         partId: p.id,
@@ -2033,6 +2046,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
         if (match.price === undefined) return;
 
         setNewItemPrice(String(match.price));
+        if (!newItemUnitManuallyEdited) setNewItemUnit(match.defaultQuantityUnit ?? "");
         autoFilledPricingRuleIdRef.current = match.pricingRuleId ?? null;
     }, [
         addItemCategory,
@@ -2043,6 +2057,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
         newWorkDetailLabel,
         customerTypeSelection,
         rawPricingRuleCandidates,
+        newItemUnitManuallyEdited,
         selectedWorkOption,
         newItemPrice,
         newItemPriceManuallyEdited,
@@ -2254,6 +2269,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
                         repairLineItemId: i.category.includes('part') ? i.repairLineItemId ?? null : null,
                         standardPartNameId: i.category.includes('part') ? i.standardPartNameId ?? null : null,
                         quantity: i.quantity ?? 1,
+                         quantityUnit: i.quantityUnit ?? null,
                         repairWorkCategoryId: i.category.includes('part') ? null : i.repairWorkCategoryId ?? null,
                         repairWorkActionId: i.category.includes('part') ? null : i.repairWorkActionId ?? null,
                         targetPartNameId: i.category.includes('part') ? null : i.targetPartNameId ?? null,
@@ -3273,7 +3289,7 @@ ${shopName}
                                     <div className="col-span-6">項目 / 部品</div>
                                     <div className="col-span-1 text-right">仕入値</div>
                                     <div className="col-span-2 text-right">{pricingTaxMode === "INCLUSIVE" ? "単価（税込・最終）" : "上代（税抜）"}</div>
-                                    <div className="col-span-1 text-center">個数</div>
+                                     <div className="col-span-1 text-center">数量</div>
                                     <div className="col-span-1 text-center">🔍</div>
                                     <div className="col-span-1 text-right">操作</div>
                                 </div>
@@ -3354,10 +3370,10 @@ ${shopName}
                                                 ))}
                                             />
                                             <div className="mt-0.5 text-right text-xs text-zinc-400">
-                                                 {pricingTaxMode === "INCLUSIVE" && isPartItem && !item.partsMasterId ? "部品上代（税抜）→ 税込小計" : pricingTaxMode === "INCLUSIVE" ? "税込小計" : "税抜小計"} ¥{(item.price * (item.quantity || 1)).toLocaleString()}
+                                                 {pricingTaxMode === "INCLUSIVE" && isPartItem && !item.partsMasterId ? "部品上代（税抜）→ 税込金額" : pricingTaxMode === "INCLUSIVE" ? "税込金額" : "税抜金額"} ¥{(item.price * (item.quantity || 1)).toLocaleString()}
                                             </div>
                                         </div>
-                                        <div className="col-span-1">
+                                         <div className="col-span-1 flex flex-col gap-1">
                                             <input
                                                 type="number"
                                                 className="h-8 w-full text-center text-sm border border-zinc-200 rounded px-1.5"
@@ -3367,6 +3383,7 @@ ${shopName}
                                                     i === idx ? { ...li, quantity: parseInt(e.target.value) || 1 } : li
                                                 ))}
                                             />
+                                             <input list="estimate-quantity-units" maxLength={20} aria-label="数量単位" placeholder="単位なし" className="h-7 w-full rounded border border-zinc-200 px-1 text-center text-xs" value={item.quantityUnit ?? ""} onChange={e => setLineItems(lineItems.map((li, i) => i === idx ? { ...li, quantityUnit: e.target.value } : li))} />
                                         </div>
                                         {/* 🔍 部品検索 */}
                                         <div className="col-span-1 text-center">
@@ -3442,6 +3459,8 @@ ${shopName}
                                                 setSelectedWorkOption(null);
                                                 const match = workOpts.find(w => w.value === v);
                                                 if (match) {
+                                                     setNewItemUnit(match.defaultQuantityUnit ?? "");
+                                                     setNewItemUnitManuallyEdited(false);
                                                     if (match.price !== undefined) {
                                                         setNewItemPrice(String(match.price));
                                                         setNewItemPriceManuallyEdited(false);
@@ -3452,6 +3471,8 @@ ${shopName}
                                             }}
                                             onSelectOption={(option) => {
                                                 setSelectedWorkOption(option);
+                                                 setNewItemUnit(option.defaultQuantityUnit ?? "");
+                                                 setNewItemUnitManuallyEdited(false);
                                                 if (isAddingLaborItem) {
                                                     const categoryId = Number(option.repairWorkCategoryId);
                                                     if (Number.isInteger(categoryId) && categoryId > 0) {
@@ -3605,6 +3626,8 @@ ${shopName}
                                             }} />
                                         </div>
                                         <Input className="h-9 text-sm w-14 text-center font-mono" placeholder="1" value={newItemQty} onChange={e => setNewItemQty(e.target.value)} type="number" min={1} />
+                                         <input list="estimate-quantity-units" maxLength={20} aria-label="新規明細の数量単位" placeholder="単位" className="h-9 w-16 rounded border border-zinc-300 px-1 text-center text-xs" value={newItemUnit} onChange={e => { setNewItemUnit(e.target.value); setNewItemUnitManuallyEdited(true); }} />
+                                         <datalist id="estimate-quantity-units">{QUANTITY_UNITS.map(unit => <option key={unit} value={unit} />)}</datalist>
                                         <Button size="sm" className="h-9 w-10 p-0 bg-blue-600 hover:bg-blue-700" onClick={() => {
                                             if (isAddingPartItem && (!selectedPartCategoryKey || !selectedPartNameKey || !selectedPartNameMaster?.id)) {
                                                 setPartSelectionError("部品カテゴリと標準部品名を選択してください。");
@@ -3648,6 +3671,7 @@ ${shopName}
                                                  price: isAddingPartItem ? partCustomerUnitPrice(parseInt(newItemPrice) || 0, pricingTaxMode) : parseInt(newItemPrice) || 0,
                                                  ...(isAddingPartItem ? { basePrice: parseInt(newItemPrice) || 0 } : {}),
                                                 quantity: parseInt(newItemQty) || 1,
+                                                quantityUnit: newItemUnit.trim() || null,
                                                 spec: newItemSpec,
                                                 ...(isAddingLaborItem ? {
                                                     repairWorkCategoryId: newWorkCategoryId ? Number(newWorkCategoryId) : null,
@@ -3676,6 +3700,8 @@ ${shopName}
                                             setNewItemPriceManuallyEdited(false);
                                             autoFilledPricingRuleIdRef.current = null;
                                             setNewItemQty("1");
+                                             setNewItemUnit("");
+                                             setNewItemUnitManuallyEdited(false);
                                             setNewItemSpec("");
                                             setSelectedWorkOption(null);
                                             setSelectedPartNameKey("");
@@ -3801,7 +3827,7 @@ ${shopName}
                                             }
                                             const nextItems = lineItems.map((li, i) =>
                                                 i === partsPanelRowIdx
-                                                    ? finalizePartLineItem(buildPartLineItem(li, {
+                                                     ? finalizePartLineItem(buildPartLineItem({ ...li, quantityUnit: resolvedPart.defaultQuantityUnit ?? null }, {
                                                         ...resolvedPart,
                                                         standardPartNameId: resolvedPart.standardPartNameId ?? selectedId,
                                                     }), true)

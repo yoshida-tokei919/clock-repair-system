@@ -4,6 +4,7 @@ import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/rendere
 import { formatPartDisplay } from '@/lib/formatPartDisplay';
 import { formatWatchInformation } from '@/lib/timepiece-type';
 import type { TimepieceType } from '@prisma/client';
+import { formatQuantity } from '@/lib/quantity-unit';
 
 Font.register({
   family: 'Noto Sans JP',
@@ -44,7 +45,7 @@ export interface EstimateDocumentProps {
       endUserName?: string;
       customerNote?: string;
       watch: { brand: string; model: string; ref?: string; caseRef?: string; serial?: string; timepieceType?: TimepieceType | null; timepieceTypeLabel?: string | null; };
-      items: { name: string; price: number; qty?: number; type?: string; grade?: string; note2?: string; displayName?: string; }[];
+       items: { name: string; price: number; qty?: number; quantityUnit?: string | null; type?: string; grade?: string; note2?: string; displayName?: string; }[];
     }[];
   }
 }
@@ -103,7 +104,7 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
             <Text wrap={false} style={[styles.colInquiry, { width: '8.5%', fontSize: 8 }]}>貴社管理No</Text>
             <Text wrap={false} style={[styles.colEndUser, { width: '9%', fontSize: 8, paddingRight: 5 }]}>顧客名</Text>
             <Text wrap={false} style={[styles.colWatch, { width: '20.5%', fontSize: 8, paddingRight: 2 }]}>時計情報</Text>
-            <Text wrap={false} style={[{ width: '44%' }, { fontSize: 9, borderLeftWidth: 1, borderColor: '#ccc', paddingLeft: 0, marginLeft: 1 }]}>作業明細・交換部品 / 単価</Text>
+            <Text wrap={false} style={[{ width: '44%' }, { fontSize: 8, borderLeftWidth: 1, borderColor: '#ccc', paddingLeft: 0, marginLeft: 1 }]}>作業明細・交換部品 / 数量・単価・金額</Text>
             <Text style={[styles.colTotal, { width: '10%' }]}>{data.pricingTaxMode === "INCLUSIVE" ? "金額(税込)" : "小計(税抜)"}</Text>
           </View>
 
@@ -125,9 +126,9 @@ export function EstimateDocument({ data }: EstimateDocumentProps) {
                   {/* 作業明細 */}
                   <View style={{ width: '44%', paddingLeft: 0, borderLeftWidth: 1, borderColor: '#eee' }}>
                     {job.items.map((item, i) => (
-                      <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', columnGap: 1, marginBottom: 1 }}>
-                        <Text style={{ fontSize: 7, width: '78%' }}>・{item.displayName || (item.type === 'part' ? formatPartDisplay({ name: item.name, grade: item.grade, note2: item.note2 }) : item.name)}</Text>
-                        <Text style={{ fontSize: 7, width: '22%', textAlign: 'right', fontFamily: 'Helvetica' }}>¥{item.price.toLocaleString()}</Text>
+                      <View key={i} style={{ marginBottom: 2 }}>
+                        <Text style={{ fontSize: 7 }}>・{item.displayName || (item.type === 'part' ? formatPartDisplay({ name: item.name, grade: item.grade, note2: item.note2 }) : item.name)}</Text>
+                        <Text style={{ fontSize: 7, textAlign: 'right' }}>数量 {formatQuantity(item.qty ?? 1, item.quantityUnit)} × 単価 ¥{item.price.toLocaleString()} = 金額 ¥{(item.price * (item.qty ?? 1)).toLocaleString()}</Text>
                       </View>
                     ))}
                   </View>

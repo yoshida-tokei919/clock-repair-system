@@ -282,7 +282,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
               >
                 <section className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">{isDedicatedReturnStatus(repair.status) ? "返却・最終精算内容" : "見積内容"}</h2>{repair.estimateDocument && readToken && <PdfLinkButton href={`/customer/repairs/${readToken}/estimate.pdf`} />}</div>
-                  <div className="mt-3 divide-y divide-slate-100">{estimateItems.length === 0 ? <p className="py-3 text-sm text-slate-500">見積明細はまだありません。</p> : estimateItems.map((item: any) => <div key={item.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div className="min-w-0 font-medium">{item.type === "part" ? formatPartDisplay({ name: item.itemName, grade: item.partsMaster?.grade, note2: item.partsMaster?.notes2 }) : item.itemName}{item.quantity > 1 && <span className="ml-2 text-slate-500">数量 {item.quantity}</span>}</div><span className="shrink-0 font-mono font-bold">¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}</span></div>)}</div>
+                   <div className="mt-3 divide-y divide-slate-100">{estimateItems.length === 0 ? <p className="py-3 text-sm text-slate-500">見積明細はまだありません。</p> : estimateItems.map((item: any) => <div key={item.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div className="min-w-0 font-medium">{item.type === "part" ? formatPartDisplay({ name: item.itemName, grade: item.partsMaster?.grade, note2: item.partsMaster?.notes2 }) : item.itemName}<div className="text-xs font-normal text-slate-500">数量 {item.quantity || 1}{item.quantityUnit ?? ""} × 単価 ¥{item.unitPrice.toLocaleString()}</div></div><span className="shrink-0 font-mono font-bold">¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}</span></div>)}</div>
                   <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm"><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "課税対象額（税込）" : "税抜小計"}</span><span className="font-mono">¥{(repair.estimate?.pricingTaxMode === "INCLUSIVE" ? total : subtotal).toLocaleString()}</span></div><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "内消費税（10%）" : "消費税（10%）"}</span><span className="font-mono">¥{taxAmount.toLocaleString()}</span></div><div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2"><span className="font-bold">税込合計</span><span className="font-mono text-xl font-bold text-blue-700">¥{total.toLocaleString()}</span></div></div>
                 </section>
 
@@ -545,7 +545,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                                     })
                                   : item.itemName}
                               </div>
-                              {item.quantity > 1 && <div className="text-sm text-slate-500">数量 {item.quantity}</div>}
+                               <div className="text-sm text-slate-500">数量 {item.quantity || 1}{item.quantityUnit ?? ""} × 単価 ¥{item.unitPrice.toLocaleString()}</div>
                             </div>
                             <div className="shrink-0 whitespace-nowrap font-mono font-bold">
                               ¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}
@@ -725,7 +725,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                                   })
                                 : item.itemName}
                             </div>
-                            {item.quantity > 1 && <div className="text-xs text-slate-500">数量 {item.quantity}</div>}
+                             <div className="text-xs text-slate-500">数量 {item.quantity || 1}{item.quantityUnit ?? ""} × 単価 ¥{item.unitPrice.toLocaleString()}</div>
                           </div>
                           <div className="shrink-0 whitespace-nowrap font-mono font-bold">
                             ¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}

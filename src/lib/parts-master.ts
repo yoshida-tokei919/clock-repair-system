@@ -8,6 +8,7 @@ import {
 } from "@/lib/master-normalize";
 import { hasCompleteInternalPartContext, hasPartRefOverlap, matchesInternalPartCandidate, matchesStandardPartNameIdentity, mergeWatchRefs, preserveStandardPartNameId, splitWatchRefs, watchRefsAllowIdentity } from "@/lib/parts-master-compatibility";
 import { RepairPartValidationError } from "@/lib/repair-part-validation";
+import { normalizeQuantityUnit } from "@/lib/quantity-unit";
 
 type DbLike = PrismaClient | Prisma.TransactionClient;
 
@@ -53,6 +54,7 @@ export type PartsMasterInput = ResolveMasterRefsInput & {
     latestCostYen?: number | string | null;
     markupRate?: number | string | null;
     retailPrice?: number | string | null;
+    defaultQuantityUnit?: string | null;
     stockQuantity?: number | string | null;
     minStockAlert?: number | string | null;
     minStockAlertEnabled?: boolean | null;
@@ -224,6 +226,9 @@ function buildNormalizedPartsMasterData(input: PartsMasterInput, refs: Awaited<R
         baseMakerId: refs.baseMakerId,
         name: nameJp,
         nameJp,
+        ...(input.defaultQuantityUnit !== undefined && !input.repairLinkedMaster
+            ? { defaultQuantityUnit: normalizeQuantityUnit(input.defaultQuantityUnit) }
+            : {}),
         nameEn,
         partRefs,
         cousinsNumber: cleanText(input.cousinsNumber),

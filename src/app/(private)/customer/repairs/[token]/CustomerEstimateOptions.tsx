@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { selectedOptionTotal } from "@/lib/estimate-option-totals";
 import type { PricingTaxMode } from "@/lib/pricing-tax";
 
-type Line = { id: number; itemNameSnapshot: string; displayNameSnapshot: string | null; quantity: number; unitPrice: number };
+type Line = { id: number; itemNameSnapshot: string; displayNameSnapshot: string | null; quantity: number; quantityUnit?: string | null; unitPrice: number };
 type Choice = { id: number; kind: string; name: string; notes: string | null; recommended: boolean; lines: Line[] };
 
 export function CustomerEstimateOptions(props: {
@@ -54,7 +54,7 @@ export function CustomerEstimateOptions(props: {
         <span className="flex items-center gap-2"><input type="radio" name={`plan-${props.repairId}`} checked={planId === choice.id} onChange={() => { setPlanId(choice.id); setConfirming(false); }} />
           <span className="font-bold">{choice.name}</span>{choice.recommended && <span className="text-xs text-blue-700">推奨</span>}</span>
         {choice.notes && <span className="ml-6 block text-sm text-slate-600">{choice.notes}</span>}
-        {choice.lines.map(line => <span key={line.id} className="ml-6 flex justify-between gap-3 text-sm"><span>{line.displayNameSnapshot || line.itemNameSnapshot} × {line.quantity}</span><span>{money(line.unitPrice * line.quantity)}</span></span>)}
+        {choice.lines.map(line => <span key={line.id} className="ml-6 flex justify-between gap-3 text-sm"><span>{line.displayNameSnapshot || line.itemNameSnapshot} × {line.quantity}{line.quantityUnit ?? ""}</span><span>{money(line.unitPrice * line.quantity)}</span></span>)}
       </label>)}
     </fieldset>}
     {addOns.length > 0 && <fieldset className="mt-4 space-y-2" disabled={!props.available || props.approved || submitting}>
@@ -63,7 +63,7 @@ export function CustomerEstimateOptions(props: {
         <span className="flex items-center gap-2"><input type="checkbox" checked={addOnIds.includes(choice.id)} onChange={event => { setAddOnIds(current => event.target.checked ? [...current, choice.id] : current.filter(id => id !== choice.id)); setConfirming(false); }} />
           <span className="font-bold">{choice.name}</span></span>
         {choice.notes && <span className="ml-6 block text-sm text-slate-600">{choice.notes}</span>}
-        {choice.lines.map(line => <span key={line.id} className="ml-6 flex justify-between gap-3 text-sm"><span>{line.displayNameSnapshot || line.itemNameSnapshot} × {line.quantity}</span><span>{money(line.unitPrice * line.quantity)}</span></span>)}
+        {choice.lines.map(line => <span key={line.id} className="ml-6 flex justify-between gap-3 text-sm"><span>{line.displayNameSnapshot || line.itemNameSnapshot} × {line.quantity}{line.quantityUnit ?? ""}</span><span>{money(line.unitPrice * line.quantity)}</span></span>)}
       </label>)}
     </fieldset>}
     <div className="mt-4 rounded-lg bg-blue-50 p-3 text-sm">
