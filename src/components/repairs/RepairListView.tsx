@@ -39,7 +39,7 @@ const defaults: Preferences = {
     watchFields: { modelRef: true, caseRef: true, serial: true },
 };
 const columnLabels: Record<OptionalColumn, string> = { photo: "写真", watch: "時計", work: "見積", customer: "お客様", dates: "日付", documents: "帳票", status: "ステータス" };
-const columnWidths: Record<OptionalColumn, string> = { photo: "112px", watch: "minmax(130px, 1.3fr)", work: "minmax(170px, 1.7fr)", customer: "minmax(130px, 1fr)", dates: "minmax(95px, .9fr)", documents: "minmax(70px, .75fr)", status: "minmax(90px, .9fr)" };
+const columnWidths: Record<OptionalColumn, string> = { photo: "136px", watch: "minmax(130px, 1.3fr)", work: "minmax(170px, 1.7fr)", customer: "minmax(130px, 1fr)", dates: "minmax(95px, .9fr)", documents: "minmax(70px, .75fr)", status: "minmax(90px, .9fr)" };
 const columnOrder: OptionalColumn[] = ["customer", "photo", "watch", "work", "dates", "documents", "status"];
 const date = (value: Date | string | null | undefined) => value ? new Date(value).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "-";
 const yen = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
@@ -57,7 +57,7 @@ function Lines({ repair }: { repair: ListRepair }) {
     const isBusiness = repair.customer.type === "business";
     const estimateLines = repair.estimate?.items.map(item => ({ id: `e${item.id}`, name: !isBusiness && item.b2cDisplayNameSnapshot || item.itemName, amount: item.quantity * item.unitPrice })) ?? [];
     const shown = expanded ? estimateLines : estimateLines.slice(0, 2);
-    return <div className="space-y-1 text-xs">
+    return <div className="space-y-1">
         {shown.map(line => <div key={line.id} className="flex min-w-0 justify-between gap-2"><span className="min-w-0 break-words">{line.name}</span><span className="shrink-0">{yen(line.amount)}</span></div>)}
         {estimateLines.length > 2 && <button type="button" className="text-blue-700 underline" onClick={event => { event.stopPropagation(); setExpanded(!expanded); }}>{expanded ? "閉じる" : `ほか${estimateLines.length - 2}件`}</button>}
         {repair.estimate && <div className="font-semibold">見積合計: {yen(repair.estimate.totalAmount)}</div>}
@@ -111,7 +111,7 @@ export function RepairListView({ repairs, selectedIds, tagLocked, toggleSelectAl
     }, [repairs, photoIds]);
 
     const visible = columnOrder.filter(column => prefs.columns[column]);
-    const layout = { "--repair-columns": ["34px", "minmax(100px, .9fr)", ...visible.map(column => columnWidths[column])].join(" ") } as CSSProperties;
+    const layout = { "--repair-columns": ["34px", "88px", ...visible.map(column => columnWidths[column])].join(" ") } as CSSProperties;
     const cell = (extra = "") => `${styles.cell} ${styles.wide} ${extra}`;
     return <div className="space-y-2">
         <div className="relative flex justify-end"><Button type="button" size="sm" variant="outline" onClick={() => setSettingsOpen(!settingsOpen)} aria-expanded={settingsOpen}><Settings2 className="mr-1 h-4 w-4" />表示項目</Button>
@@ -124,21 +124,21 @@ export function RepairListView({ repairs, selectedIds, tagLocked, toggleSelectAl
             </div>}
         </div>
         <div className={`${styles.list} overflow-hidden rounded-md border bg-white shadow-sm`} style={layout}>
-            <div className={`${styles.header} border-b bg-slate-50 text-xs font-medium text-slate-600`} style={layout}>
+            <div className={`${styles.header} border-b bg-slate-50 text-sm font-medium text-slate-600`} style={layout}>
                 <div><Checkbox checked={repairs.length > 0 && selectedIds.length === repairs.length} disabled={tagLocked} onCheckedChange={checked => toggleSelectAll(checked === true)} aria-label="全件選択" /></div><div>管理番号</div>
                 {visible.map(column => <div key={column}>{columnLabels[column]}</div>)}
             </div>
             {repairs.length === 0 && <div className="p-8 text-center text-slate-500">該当する修理案件は見つかりませんでした。</div>}
             {repairs.map(repair => <div key={repair.id} className={`${styles.row} cursor-pointer ${selectedIds.includes(repair.id) ? "bg-blue-50/50" : "hover:bg-slate-50"}`} style={layout} onClick={() => router.push(`/repairs/${repair.id}`)}>
                 <div className={styles.cell} onClick={event => { event.stopPropagation(); toggleRepairSelected(repair.id); }}><Checkbox checked={selectedIds.includes(repair.id)} disabled={tagLocked} onCheckedChange={checked => setRepairSelected(repair.id, checked)} onClick={event => event.stopPropagation()} aria-label={`${repair.inquiryNumber}を選択`} /></div>
-                <div className={`${styles.cell} font-mono font-semibold text-slate-800`} onClick={event => event.stopPropagation()}><ClickToCopy text={repair.inquiryNumber}><span className="cursor-copy">{repair.inquiryNumber}</span></ClickToCopy>{repair.customerMessages?.[0] && <button type="button" onClick={() => openMessage(repair)} className="mt-2 block rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800" aria-label={`${repair.inquiryNumber}の未読コメントを開く`}>未読</button>}</div>
-                {prefs.columns.customer && <div className={`${cell("text-sm")} ${styles.customer}`}><div className="font-medium">{repair.customer.name}</div>{repair.endUserName?.trim() && (repair.customer.type === "business" || repair.endUserName.trim() !== repair.customer.name.trim()) && <div>{repair.endUserName.trim()} 様</div>}{repair.partnerRef?.trim() && repair.partnerRef.trim() !== "-" && <div className="text-xs text-blue-700" onClick={event => event.stopPropagation()}>取引先管理番号: <ClickToCopy text={repair.partnerRef.trim()}><span className="cursor-copy">{repair.partnerRef.trim()}</span></ClickToCopy></div>}</div>}
+                <div className={`${styles.cell} font-mono font-semibold text-slate-800`} onClick={event => event.stopPropagation()}><ClickToCopy text={repair.inquiryNumber}><span className="cursor-copy">{repair.inquiryNumber}</span></ClickToCopy>{repair.customerMessages?.[0] && <button type="button" onClick={() => openMessage(repair)} className="mt-2 block rounded-full bg-blue-100 px-2 py-1 font-semibold text-blue-800" aria-label={`${repair.inquiryNumber}の未読コメントを開く`}>未読</button>}</div>
+                {prefs.columns.customer && <div className={`${cell()} ${styles.customer}`}><div className="font-medium">{repair.customer.name}</div>{repair.endUserName?.trim() && (repair.customer.type === "business" || repair.endUserName.trim() !== repair.customer.name.trim()) && <div>{repair.endUserName.trim()} 様</div>}{repair.partnerRef?.trim() && repair.partnerRef.trim() !== "-" && <div className="text-blue-700" onClick={event => event.stopPropagation()}><ClickToCopy text={repair.partnerRef.trim()}><span className="cursor-copy">{repair.partnerRef.trim()}</span></ClickToCopy></div>}</div>}
                 {prefs.columns.photo && <div className={`${styles.cell} ${styles.photoCell}`}><Link href={`/repairs/${repair.id}`} aria-label={`${repair.inquiryNumber}の詳細を開く`} onClick={event => event.stopPropagation()} className="inline-block"><Thumbnail photo={repair.photo} signedUrl={photoBatch?.repairs === repairs ? photoBatch.urls[repair.photo?.match(proxyPattern)?.[1] ?? ""] : undefined} batchReady={photoBatch?.repairs === repairs} /></Link></div>}
-                {prefs.columns.watch && <div className={cell("space-y-0.5 text-sm font-medium text-slate-800")}><div>{repair.watch.brand?.name || "不明"}</div><div>{repair.watch.model?.name || repair.watch.modelNameInput || "不明"}</div>{prefs.watchFields.modelRef && <div>モデルRef: {repair.watch.reference?.name || "-"}</div>}{prefs.watchFields.caseRef && <div>ケースRef: {repair.watch.caseReference?.name || "-"}</div>}{prefs.watchFields.serial && <div>シリアル: {repair.watch.serialNumber || "-"}</div>}</div>}
+                {prefs.columns.watch && <div className={cell("space-y-0.5 font-medium text-slate-800")}><div>{repair.watch.brand?.name || "不明"}</div><div>{repair.watch.model?.name || repair.watch.modelNameInput || "不明"}</div>{prefs.watchFields.modelRef && <div>モデルRef: {repair.watch.reference?.name || "-"}</div>}{prefs.watchFields.caseRef && <div>ケースRef: {repair.watch.caseReference?.name || "-"}</div>}{prefs.watchFields.serial && <div>シリアル: {repair.watch.serialNumber || "-"}</div>}</div>}
                 {prefs.columns.work && <div className={cell()} onClick={event => event.stopPropagation()}><Lines repair={repair} /></div>}
-                {prefs.columns.dates && <div className={cell("space-y-1 text-xs text-slate-700")}><div>受付: {date(repair.receptionDate)}</div><div>承認待ち: {date(repair.logs[0]?.changedAt)}</div><div>承認: {date(repair.approvalDate)}</div></div>}
-                {prefs.columns.documents && <div className={cell("flex flex-wrap gap-1 text-xs")} onClick={event => event.stopPropagation()}>{repair.estimateDocument && <Link className="text-green-700 underline" href={`/documents/estimate/${repair.estimateDocument.id}`}>{repair.estimateDocument.estimateNumber}</Link>}{repair.deliveryNote && <Link className="text-blue-700 underline" href={`/documents/delivery/${repair.deliveryNote.id}`}>{repair.deliveryNote.slipNumber}</Link>}{repair.invoice && <Link className="text-purple-700 underline" href={`/documents/invoice/${repair.invoice.id}`}>{repair.invoice.invoiceNumber}</Link>}{repair.warranty && <Link className="text-teal-700 underline" href={`/documents/warranty/${repair.warranty.id}`}>{repair.warranty.warrantyNumber}</Link>}</div>}
-                {prefs.columns.status && <div className={cell()} onClick={event => event.stopPropagation()}><RepairListStatusSelect id={repair.id} currentStatus={repair.status} /></div>}
+                {prefs.columns.dates && <div className={cell("space-y-1 text-slate-700")}><div>受付: {date(repair.receptionDate)}</div><div>承認待ち: {date(repair.logs[0]?.changedAt)}</div><div>承認: {date(repair.approvalDate)}</div></div>}
+                {prefs.columns.documents && <div className={cell("flex flex-wrap gap-1")} onClick={event => event.stopPropagation()}>{repair.estimateDocument && <Link className="text-green-700 underline" href={`/documents/estimate/${repair.estimateDocument.id}`}>{repair.estimateDocument.estimateNumber}</Link>}{repair.deliveryNote && <Link className="text-blue-700 underline" href={`/documents/delivery/${repair.deliveryNote.id}`}>{repair.deliveryNote.slipNumber}</Link>}{repair.invoice && <Link className="text-purple-700 underline" href={`/documents/invoice/${repair.invoice.id}`}>{repair.invoice.invoiceNumber}</Link>}{repair.warranty && <Link className="text-teal-700 underline" href={`/documents/warranty/${repair.warranty.id}`}>{repair.warranty.warrantyNumber}</Link>}</div>}
+                {prefs.columns.status && <div className={cell()} onClick={event => event.stopPropagation()}><RepairListStatusSelect id={repair.id} currentStatus={repair.status} badgeClassName="text-[15px]" /></div>}
             </div>)}
         </div>
     </div>;

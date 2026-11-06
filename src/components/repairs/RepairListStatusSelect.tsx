@@ -55,9 +55,10 @@ type Warning = {
 interface Props {
   id: number;
   currentStatus: string;
+  badgeClassName?: string;
 }
 
-export function RepairListStatusSelect({ id, currentStatus }: Props) {
+export function RepairListStatusSelect({ id, currentStatus, badgeClassName = '' }: Props) {
   const [status, setStatus] = useState(currentStatus);
   const [isPending, setIsPending] = useState(false);
   const [warnings, setWarnings] = useState<Warning[]>([]);
@@ -113,7 +114,7 @@ export function RepairListStatusSelect({ id, currentStatus }: Props) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger className="focus:outline-none" asChild>
-          <Badge className={`cursor-pointer ${colorClass} ${isPending ? 'opacity-70' : ''}`}>
+          <Badge className={`cursor-pointer ${colorClass} ${isPending ? 'opacity-70' : ''} ${badgeClassName}`}>
             {isPending && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
             {status}
           </Badge>
