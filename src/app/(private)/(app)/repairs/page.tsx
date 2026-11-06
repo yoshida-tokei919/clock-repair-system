@@ -6,6 +6,7 @@ import { RepairsTableClient } from "@/components/repairs/RepairsTableClient";
 import { RepairListFilters } from "@/components/repairs/RepairListFilters";
 import { PlusCircle } from "lucide-react";
 import { isR2RepairPhotoKey } from "@/lib/r2-repair-photos";
+import { selectRepairListPhoto } from "@/lib/repair-list-photo";
 import { buildRepairListWhere, normalizeRepairListParams, repairListPage, repairListUrl, REPAIR_LIST_PAGE_SIZE, type RawParams } from "@/lib/repair-list-filters";
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,16 @@ export default async function RepairsPage({
         take: REPAIR_LIST_PAGE_SIZE,
     });
     const repairIds = repairs.map((repair) => repair.id);
+    const frontPhotos = repairIds.length ? await prisma.repairPhoto.findMany({
+        where: { repairId: { in: repairIds }, category: "FRONT" },
+        select: { id: true, repairId: true, stage: true, storageKey: true },
+    }) : [];
+    const frontPhotosByRepairId = new Map<number, typeof frontPhotos>();
+    for (const photo of frontPhotos) {
+        const photos = frontPhotosByRepairId.get(photo.repairId) ?? [];
+        photos.push(photo);
+        frontPhotosByRepairId.set(photo.repairId, photos);
+    }
     let unreadMessages: { id: number; repairId: number; body: string; createdAt: Date }[] = [];
     if (repairIds.length) {
         try {
@@ -73,14 +84,18 @@ export default async function RepairsPage({
     const repairsWithMessages = repairs.map((repair) => {
         const { photos, ...repairData } = repair;
         const unreadMessage = unreadMessageByRepairId.get(repair.id);
+        const selectedPhoto = selectRepairListPhoto(photos[0], frontPhotosByRepairId.get(repair.id) ?? []);
+        const photo = selectedPhoto
+            ? isR2RepairPhotoKey(selectedPhoto.storageKey)
+                ? `/api/repair-photos/${selectedPhoto.id}`
+                : /^(https?:|data:|blob:)/i.test(selectedPhoto.storageKey)
+                    ? selectedPhoto.storageKey
+                    : null
+            : null;
         return {
             ...repairData,
             customerMessages: unreadMessage ? [unreadMessage] : [],
-            photo: isR2RepairPhotoKey(photos[0]?.storageKey)
-                ? `/api/repair-photos/${photos[0].id}`
-                : /^(https?:|data:|blob:)/i.test(photos[0]?.storageKey ?? "")
-                    ? photos[0].storageKey
-                    : null,
+            photo,
         };
     });
 
