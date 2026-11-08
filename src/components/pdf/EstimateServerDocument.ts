@@ -1,6 +1,6 @@
 import { formatWatchInformation } from '@/lib/timepiece-type';
 import type { TimepieceType } from '@prisma/client';
-import { formatQuantity } from '@/lib/quantity-unit';
+import { formatEstimateLinePrice } from './estimate-line-price';
 
 export interface EstimateServerDocumentProps {
   data: {
@@ -192,7 +192,7 @@ export function createEstimateServerDocumentElement(
           el(Text, { wrap: false, style: { width: columns.partnerRef, fontSize: 7, paddingLeft: 2 } }, "貴社管理No"),
           el(Text, { wrap: false, style: { width: columns.endUser, fontSize: 7, textAlign: "right", paddingRight: 5 } }, "お客様名"),
           el(Text, { wrap: false, style: { width: columns.watch, fontSize: 7, textAlign: "right", paddingRight: 4, fontWeight: "bold" } }, "時計情報"),
-          el(Text, { wrap: false, style: { width: columns.items, fontSize: 7, borderLeftWidth: 1, borderColor: "#ccc", paddingLeft: 4 } }, "作業明細・交換部品 / 数量・単価・金額"),
+          el(Text, { wrap: false, style: { width: columns.items, fontSize: 7, borderLeftWidth: 1, borderColor: "#ccc", paddingLeft: 4 } }, "作業明細・交換部品 / 金額"),
           el(Text, { wrap: false, style: { width: columns.total, textAlign: "right", fontSize: 7, fontWeight: "bold" } }, inclusive ? "金額(税込)" : "金額(税抜)")
         ),
         isB2C
@@ -239,11 +239,9 @@ export function createEstimateServerDocumentElement(
                   el(
                     View,
                     { key: itemIndex, style: styles.itemRow },
-                    el(View, { style: { width: "100%" } },
-                      el(Text, { style: { fontSize: 7 } }, `・${item.displayName || item.name}`),
-                      el(Text, { style: { fontSize: 7, textAlign: "right" } },
-                        `数量 ${formatQuantity(item.quantity ?? 1, item.quantityUnit)} × 単価 ¥${item.price.toLocaleString()} = 金額 ¥${(item.price * (item.quantity ?? 1)).toLocaleString()}`)
-                    )
+                    el(Text, { style: { fontSize: 7, flexGrow: 1, flexShrink: 1, paddingRight: 4 } }, `・${item.displayName || item.name}`),
+                    el(Text, { wrap: false, style: { fontSize: 7, textAlign: "right", flexShrink: 0 } },
+                      formatEstimateLinePrice(item.price, item.quantity ?? 1))
                   )
                 )
               ),
@@ -260,8 +258,11 @@ export function createEstimateServerDocumentElement(
                 el(Text, { style: { fontWeight: "bold" } },
                   `${choice.kind === "PLAN" ? "プラン" : "追加作業"}: ${choice.name}${choice.recommended ? "【推奨】" : ""}`),
                 choice.notes ? el(Text, null, `条件: ${choice.notes}`) : null,
-                choice.lines.map((line, lineIndex) => el(Text, { key: lineIndex },
-                  `・${line.name} 数量 ${formatQuantity(line.quantity, line.quantityUnit)} × 単価 ¥${line.price.toLocaleString()} = 金額 ¥${(line.price * line.quantity).toLocaleString()}${line.notes ? ` (${line.notes})` : ""}`)),
+                choice.lines.map((line, lineIndex) => el(View, { key: lineIndex, style: styles.itemRow },
+                  el(Text, { style: { flexGrow: 1, flexShrink: 1, paddingRight: 4 } },
+                    `・${line.name}${line.notes ? ` (${line.notes})` : ""}`),
+                  el(Text, { wrap: false, style: { textAlign: "right", flexShrink: 0 } },
+                    formatEstimateLinePrice(line.price, line.quantity)))),
                 el(Text, { style: { textAlign: "right", fontWeight: "bold" } },
                   choice.kind === "PLAN"
                     ? `差額 ¥${choice.deltaAmount.toLocaleString()} / 共通＋このプラン ¥${choice.totalAmount.toLocaleString()}${inclusive ? "(税込)" : "(税抜)"}`

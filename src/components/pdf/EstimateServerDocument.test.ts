@@ -49,6 +49,9 @@ for (const mode of ["EXCLUSIVE", "INCLUSIVE"] as const) test(`${mode} B2B option
   assert.match(output, /納期は要相談/);
   assert.match(output, /部品在庫次第/);
   assert.match(output, /ご確認ください/);
+  assert.match(output, /追加作業 \(ご確認ください\) ¥2,000 × 2/);
+  assert.match(output, /追加作業 \(ご確認ください\) ¥8,000/);
+  assert.doesNotMatch(output, /数量|単価| = 金額/);
   assert.equal(flatten(tree).find(node => node.type === "Page")?.props.size, "A4");
   assert.equal(flatten(tree).filter(node => node.type === "View" && node.props.wrap === false).length, 1);
 });
@@ -62,15 +65,33 @@ test("ordinary B2B estimate keeps standard rows without option labels", () => {
   assert.equal(flatten(tree).filter(node => node.type === "View" && node.props.wrap === false).length, 0);
 });
 
-test("estimate PDF shows quantity, unit price, and extended amount for each line", () => {
+test("estimate PDF uses compact line prices and keeps the per-watch aggregate", () => {
   const data: EstimateServerDocumentProps["data"] = { ...base, jobs: [{
     ...base.jobs[0], items: [
-      { name: "G-002", price: 1500, quantity: 2, quantityUnit: "か所" },
+      { name: "点検作業", price: 8000, quantity: 1, quantityUnit: "回" },
+      { name: "G-002", price: 500, quantity: 2, quantityUnit: "か所" },
       { name: "交換部品", price: 1000, quantity: 2, quantityUnit: "本" },
     ],
   }] };
-  const output = texts(createEstimateServerDocumentElement(runtime, renderer, data)).join(" ");
-  assert.match(output, /G-002 数量 2か所 × 単価 ¥1,500 = 金額 ¥3,000/);
-  assert.match(output, /交換部品 数量 2本 × 単価 ¥1,000 = 金額 ¥2,000/);
-  assert.match(output, /¥5,000/);
+  const rendered = texts(createEstimateServerDocumentElement(runtime, renderer, data));
+  const output = rendered.join(" ");
+  assert.match(output, /点検作業 ¥8,000/);
+  assert.match(output, /G-002 ¥500 × 2/);
+  assert.match(output, /交換部品 ¥1,000 × 2/);
+  assert.ok(rendered.includes("¥11,000"));
+  assert.doesNotMatch(output, /数量|単価| = 金額|2か所|2本/);
+  const tree = createEstimateServerDocumentElement(runtime, renderer, data);
+  const line = flatten(tree).find(node => node.type === "View" &&
+    node.children.some(child => (child as Node)?.children?.includes("・G-002")));
+  assert.equal((line?.props.style as { flexDirection?: string })?.flexDirection, "row");
+  assert.equal((line?.children[1] as Node)?.props.wrap, false);
+});
+
+test("single multi-quantity line keeps its extended total in the watch column", () => {
+  const data: EstimateServerDocumentProps["data"] = { ...base, jobs: [{
+    ...base.jobs[0], items: [{ name: "交換部品", price: 500, quantity: 2, quantityUnit: "本" }],
+  }] };
+  const rendered = texts(createEstimateServerDocumentElement(runtime, renderer, data));
+  assert.ok(rendered.includes("¥500 × 2"));
+  assert.ok(rendered.includes("¥1,000"));
 });
