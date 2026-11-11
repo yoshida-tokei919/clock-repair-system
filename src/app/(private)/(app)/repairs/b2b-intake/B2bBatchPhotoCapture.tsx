@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectDialog } from "@/components/repairs/MobileConnectDialog";
+import { CameraAlignmentGuide } from "@/components/repairs/CameraAlignmentGuide";
 
 type Repair = { id: number; inquiryNumber: string };
 
@@ -146,7 +147,7 @@ export function B2bBatchPhotoCapture({ repairs }: { repairs: Repair[] }) {
     </li>)}</ul>
     {cameraOpen && selected && <div className="mt-4 rounded border p-3">
       <p className="font-medium">撮影・保存先: {selected.inquiryNumber}（ID: {selected.id}）</p>
-      {!preview && <video ref={videoRef} autoPlay playsInline muted className="mt-2 max-h-96 w-full bg-black object-contain" />}
+      {!preview && <CameraAlignmentGuide className="mt-2"><video ref={videoRef} autoPlay playsInline muted className="block max-h-96 w-full bg-black object-contain" /></CameraAlignmentGuide>}
       {preview && <img src={preview} alt={`${selected.inquiryNumber}の撮影プレビュー`} className="mt-2 max-h-96 w-full bg-black object-contain" />}
       <canvas ref={canvasRef} className="hidden" />
       {resolution && <p className="mt-2 text-xs text-zinc-600">{resolution}</p>}

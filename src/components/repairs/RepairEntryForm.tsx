@@ -85,6 +85,7 @@ import { QUANTITY_UNITS } from "@/lib/quantity-unit";
 // --- COMPONENTS ---
 import { QuickRegisterDialog } from "@/components/repairs/QuickRegisterDialog";
 import { MobileConnectDialog } from "@/components/repairs/MobileConnectDialog";
+import { CameraAlignmentGuide } from "@/components/repairs/CameraAlignmentGuide";
 import PartsSearchPanel from "@/components/parts/PartsSearchPanel";
 
 // Dynamically import PDF Dialog (Client only)
@@ -4284,11 +4285,12 @@ ${shopName}
                             </div>
                         )}
 
-                        <div className="min-h-0 flex-1 overflow-hidden bg-zinc-950">
+                        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-zinc-950">
                             {capturedPreview ? (
                                 <img src={capturedPreview} alt="撮影プレビュー" className="h-full w-full object-contain" />
                             ) : (
-                                <video
+                                <CameraAlignmentGuide className="min-h-0 flex-1">
+                                  <video
                                     ref={videoRef}
                                     autoPlay
                                     playsInline
@@ -4298,7 +4300,8 @@ ${shopName}
                                         const video = videoRef.current;
                                         if (video) setCameraInfo((current) => `${current} / 映像: ${video.videoWidth} × ${video.videoHeight} / 表示: ${video.clientWidth} × ${video.clientHeight}`);
                                     }}
-                                />
+                                  />
+                                </CameraAlignmentGuide>
                             )}
                         </div>
 

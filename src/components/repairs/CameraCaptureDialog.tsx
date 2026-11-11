@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Camera, RefreshCw, Check, X, CameraOff, Loader2, RotateCcw } from "lucide-react";
+import { CameraAlignmentGuide } from "@/components/repairs/CameraAlignmentGuide";
 
 // 入力映像の解像度を維持してWebP品質92%で保存する。
 const WEBP_QUALITY = 0.92;
@@ -217,7 +218,7 @@ export function CameraCaptureDialog({
                 </DialogHeader>
 
                 {/* メイン表示エリア */}
-                <div className="relative aspect-video bg-zinc-950 flex items-center justify-center">
+                <div className="relative aspect-video bg-zinc-950 flex flex-col items-center justify-center">
                     {/* エラー表示 */}
                     {error && phase === 'preview' ? (
                         <div className="text-center p-8">
@@ -246,23 +247,21 @@ export function CameraCaptureDialog({
                     ) : (
                         /* ライブプレビュー */
                         <>
-                            <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="w-full h-full object-contain"
-                                onLoadedMetadata={() => {
-                                    const video = videoRef.current;
-                                    if (video) setInputInfo((current) => `${current} / 映像: ${video.videoWidth} × ${video.videoHeight} / 表示: ${video.clientWidth} × ${video.clientHeight}`);
-                                }}
-                            />
-                            {/* フォーカスガイド */}
-                            <div className="absolute inset-0 pointer-events-none border border-white/10 flex items-center justify-center">
-                                <div className="w-32 h-32 border border-white/20 rounded-full" />
-                                <div className="absolute top-3 left-3 text-[10px] font-mono text-white/40 bg-black/40 px-2 py-0.5 rounded">
-                                    {inputInfo || 'カメラ入力を確認中…'}
-                                </div>
+                            <CameraAlignmentGuide className="min-h-0 w-full flex-1">
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    className="w-full h-full object-contain"
+                                    onLoadedMetadata={() => {
+                                        const video = videoRef.current;
+                                        if (video) setInputInfo((current) => `${current} / 映像: ${video.videoWidth} × ${video.videoHeight} / 表示: ${video.clientWidth} × ${video.clientHeight}`);
+                                    }}
+                                />
+                            </CameraAlignmentGuide>
+                            <div className="pointer-events-none absolute left-3 top-3 max-w-[80%] rounded bg-black/40 px-2 py-0.5 text-[10px] text-white/60">
+                                {inputInfo || 'カメラ入力を確認中…'}
                             </div>
                         </>
                     )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CameraAlignmentGuide } from "@/components/repairs/CameraAlignmentGuide";
 
 export type CapturedPhoto = {
   key: string; rowKey: number; file: File; url: string;
@@ -116,7 +117,7 @@ export function B2bPreIntakeCamera({ rowKey, watchNumber, photos, disabled, onAd
     </div>
     {open && <div className="mt-3 rounded border bg-white p-3">
       <p className="text-lg font-bold text-blue-900">撮影対象：時計 {watchNumber}</p>
-      {!draft && <video ref={videoRef} autoPlay playsInline muted className="mt-2 max-h-96 w-full bg-black object-contain" />}
+      {!draft && <CameraAlignmentGuide className="mt-2"><video ref={videoRef} autoPlay playsInline muted className="block max-h-96 w-full bg-black object-contain" /></CameraAlignmentGuide>}
       {draft && <img src={draft.url} alt={`時計 ${watchNumber} の確認画像`} className="mt-2 max-h-96 w-full bg-black object-contain" />}
       {resolution && <p className="mt-2 text-xs">{resolution}</p>}
       <div className="mt-2 flex flex-wrap gap-2">
