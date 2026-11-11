@@ -1,4 +1,5 @@
 import Link from "next/link";
+import RecentCasesMobileAutoscroll from "./recent-cases-mobile-autoscroll";
 import type { Metadata } from "next";
 import { JsonLd, homeJsonLd } from "@/lib/seo";
 import {
@@ -331,7 +332,6 @@ header {
     width: max-content;
     animation: recentCasesSlide var(--recent-cases-duration) linear infinite;
 }
-.recent-cases-swipe-hint { display: none; }
 .recent-cases-track:hover .recent-cases-track-inner {
     animation-play-state: paused;
 }
@@ -718,20 +718,13 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
         margin-right: -20px;
         padding-right: 20px;
         overflow-x: auto;
-        scroll-snap-type: x proximity;
+        scroll-snap-type: none;
         scrollbar-width: thin;
         scrollbar-color: #c8d4e1 transparent;
         -webkit-overflow-scrolling: touch;
     }
     .recent-cases-track-inner { animation: none; }
-    .recent-cases-set:nth-child(2) { display: none; }
-    .recent-cases-swipe-hint {
-        display: block;
-        margin: -12px 0 12px;
-        color: #53657b;
-        font-size: 0.82rem;
-        text-align: right;
-    }
+    .recent-cases-set:nth-child(2) { display: flex; }
     .recent-cases-button { width: 100%; box-sizing: border-box; }
     .homepage-flow-section {
         padding: 0 20px 60px;
@@ -923,7 +916,6 @@ function buildAboutPriceHtml(recentRepairCases: HomeRecentCase[]): string {
     <div class="recent-cases-inner">
         <h2 id="recent-cases-heading" class="recent-cases-heading">修理事例を探す</h2>
         <p class="recent-cases-lead">ブランドや症状から修理事例をご覧いただけます。</p>
-        <p class="recent-cases-swipe-hint">横にスワイプして事例を見る →</p>
         <div class="recent-cases-track" aria-label="最近の修理事例">
             <div class="recent-cases-track-inner" style="--recent-cases-duration: ${Math.max(1, recentRepairCases.length) * 4.2}s">
             ${[0, 1]
@@ -1103,6 +1095,7 @@ export default async function TopPage() {
             </section>
 
             <div dangerouslySetInnerHTML={{ __html: buildAboutPriceHtml(recentRepairCases) }} />
+            <RecentCasesMobileAutoscroll />
 
             <div dangerouslySetInnerHTML={{ __html: HTML_FLOW_FOOTER }} />
         </>
