@@ -12,6 +12,7 @@ test("issue route authenticates before body parsing or DB access", async () => {
     "@/lib/physical-tag-issue": [
       "export const parsePhysicalTagIssue = body => { globalThis.__issueParses++; return body; };",
       "export const issuePhysicalTag = async () => { globalThis.__issueWrites++; return { shortCode: 'PT-000001' }; };",
+      "export const preflightPhysicalTagIssue = async () => { globalThis.__issuePreflights++; return { status: 'AVAILABLE' }; };",
       "export const physicalTagIssueFailure = () => ({ status: 500, message: 'failed' });",
     ].join("\n"),
   };
@@ -33,10 +34,11 @@ test("issue route authenticates before body parsing or DB access", async () => {
   new Function("exports", "require", "module", code)(module.exports, localRequire, module);
   const globals = globalThis as typeof globalThis & {
     __issueSession: unknown; __issueDbReads: number; __issueParses: number;
-    __issueWrites: number; __issueJsonReads: number; __issueAdmin: { id: number } | null;
+    __issueWrites: number; __issueJsonReads: number; __issuePreflights: number;
+    __issueAdmin: { id: number } | null;
   };
   globals.__issueSession = null;
-  globals.__issueDbReads = globals.__issueParses = globals.__issueWrites = globals.__issueJsonReads = 0;
+  globals.__issueDbReads = globals.__issueParses = globals.__issueWrites = globals.__issueJsonReads = globals.__issuePreflights = 0;
   const request = { json: async () => { globals.__issueJsonReads++; return { repairId: 10 }; } };
   assert.equal(module.exports.dynamic, "force-dynamic");
   assert.deepEqual(await module.exports.POST(request), { body: { error: "認証が必要です。" }, status: 401 });
@@ -44,6 +46,8 @@ test("issue route authenticates before body parsing or DB access", async () => {
   assert.equal(globals.__issueDbReads, 0);
   assert.equal(globals.__issueParses, 0);
   assert.equal(globals.__issueWrites, 0);
+  assert.equal((await module.exports.PUT(request)).status, 401);
+  assert.equal(globals.__issueJsonReads, 0);
   globals.__issueSession = { user: { email: "admin@example.test" } };
   globals.__issueAdmin = null;
   assert.equal((await module.exports.POST(request)).status, 401);
@@ -56,4 +60,7 @@ test("issue route authenticates before body parsing or DB access", async () => {
   assert.equal(globals.__issueJsonReads, 1);
   assert.equal(globals.__issueDbReads, 2);
   assert.equal(globals.__issueWrites, 1);
+  const uidRequest = { json: async () => ({ repairId: 10, nfcUid: "04333F" }) };
+  assert.deepEqual(await module.exports.PUT(uidRequest), { body: { status: "AVAILABLE" }, status: 200 });
+  assert.equal(globals.__issuePreflights, 1);
 });
