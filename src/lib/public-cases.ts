@@ -553,27 +553,38 @@ export async function getB2CBrandOptionsForGallery() {
   return toBrandOptions(publishedCases);
 }
 
-export async function getLatestB2CPublicCasesForHome(limit = 10) {
-  const publishedCases = await findB2CPublicCases(
-    {
-      b2cPublishStatus: "PUBLISHED",
-      reviewStatus: "APPROVED",
-      showPriceB2c: false,
-    },
-    limit,
-  );
+export async function getLatestB2CPublicCasesForHome(limit = 30) {
+  const cases: B2CPublicCaseForGallery[] = [];
+  const take = Math.min(Math.max(0, Math.trunc(limit)), 30);
+  let skip = 0;
 
-  if (publishedCases.length > 0 || !isLocalDatabaseUrl()) {
-    return publishedCases;
+  while (cases.length < take) {
+    const candidates = await prisma.publicCase.findMany({
+      where: {
+        b2cPublishStatus: "PUBLISHED",
+        reviewStatus: "APPROVED",
+        showPriceB2c: false,
+        NOT: buildPublicCaseCopyKeywordWhere(),
+        images: { some: { url: { not: null } } },
+      },
+      include: {
+        workItems: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+        images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }, { id: "asc" }] },
+      },
+      orderBy: [{ b2cPublishedAt: { sort: "desc", nulls: "last" } }, { id: "desc" }],
+      skip,
+      take: 30,
+    });
+
+    cases.push(...candidates.filter((publicCase) =>
+      !containsCopyKeyword(publicCase) &&
+      publicCase.images.some((image) => image.url?.trim()),
+    ).slice(0, take - cases.length));
+    skip += candidates.length;
+    if (candidates.length < 30) break;
   }
 
-  return findB2CPublicCases(
-    {
-      sourceType: "FMP",
-      showPriceB2c: false,
-    },
-    limit,
-  );
+  return cases;
 }
 
 async function findB2BPublicCases(

@@ -202,12 +202,6 @@ header {
     background: rgba(255, 255, 255, 0.16);
     color: #ffffff;
 }
-@media (prefers-reduced-motion: reduce) {
-    .recent-cases-track-inner {
-        animation: none !important;
-    }
-}
-
 /* スライドナビゲーション */
 .dots-container {
     position: absolute; bottom: 30px; width: 100%; text-align: center; z-index: 2;
@@ -329,18 +323,15 @@ header {
 }
 .recent-cases-track {
     display: flex;
-    gap: 18px;
-    overflow-x: auto;
+    overflow-x: hidden;
     padding: 4px 2px 18px;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: thin;
-    scrollbar-color: #c8d4e1 transparent;
 }
 .recent-cases-track-inner {
     display: flex;
     width: max-content;
-    animation: recentCasesSlide 42s linear infinite;
+    animation: recentCasesSlide var(--recent-cases-duration) linear infinite;
 }
+.recent-cases-swipe-hint { display: none; }
 .recent-cases-track:hover .recent-cases-track-inner {
     animation-play-state: paused;
 }
@@ -378,11 +369,6 @@ header {
     height: 100%;
     display: block;
     object-fit: cover;
-}
-.recent-case-placeholder {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, #eef2f6, #e5e7eb);
 }
 .recent-case-body {
     padding: 20px 20px 22px;
@@ -445,6 +431,14 @@ header {
     to {
         transform: translateX(-50%);
     }
+}
+@media (prefers-reduced-motion: reduce) {
+    .recent-cases-track {
+        overflow-x: auto;
+        scroll-snap-type: x proximity;
+    }
+    .recent-cases-track-inner { animation: none; }
+    .recent-cases-set:nth-child(2) { display: none; }
 }
 
 .homepage-flow-section {
@@ -723,6 +717,20 @@ footer { background-color: #15213a; color: rgba(255,255,255,0.6); padding: 60px 
     .recent-cases-track {
         margin-right: -20px;
         padding-right: 20px;
+        overflow-x: auto;
+        scroll-snap-type: x proximity;
+        scrollbar-width: thin;
+        scrollbar-color: #c8d4e1 transparent;
+        -webkit-overflow-scrolling: touch;
+    }
+    .recent-cases-track-inner { animation: none; }
+    .recent-cases-set:nth-child(2) { display: none; }
+    .recent-cases-swipe-hint {
+        display: block;
+        margin: -12px 0 12px;
+        color: #53657b;
+        font-size: 0.82rem;
+        text-align: right;
     }
     .recent-cases-button { width: 100%; box-sizing: border-box; }
     .homepage-flow-section {
@@ -797,7 +805,7 @@ type HomeRecentCase = {
     model: string;
     meta: string;
     repair: string;
-    image?: string;
+    image: string;
     alt: string;
     href: string;
 };
@@ -851,7 +859,7 @@ function toHomeRecentCase(publicCase: B2CPublicCaseForGallery): HomeRecentCase {
     const repair = getWorkDisplayName(publicCase);
     const brand = getBrandDisplayName(publicCase);
     const model = getCaseTitle(publicCase, repair);
-    const image = text(publicCase.images[0]?.url);
+    const image = text(publicCase.images.find((item) => item.url?.trim())?.url);
 
     return {
         id: publicCase.id,
@@ -859,7 +867,7 @@ function toHomeRecentCase(publicCase: B2CPublicCaseForGallery): HomeRecentCase {
         model,
         meta: getCaseMeta(publicCase),
         repair,
-        image: image || undefined,
+        image,
         alt: `${brand ? `${brand} ` : ""}${model}`,
         href: `/cases/gallery/${publicCase.id}`,
     };
@@ -915,20 +923,19 @@ function buildAboutPriceHtml(recentRepairCases: HomeRecentCase[]): string {
     <div class="recent-cases-inner">
         <h2 id="recent-cases-heading" class="recent-cases-heading">修理事例を探す</h2>
         <p class="recent-cases-lead">ブランドや症状から修理事例をご覧いただけます。</p>
+        <p class="recent-cases-swipe-hint">横にスワイプして事例を見る →</p>
         <div class="recent-cases-track" aria-label="最近の修理事例">
-            <div class="recent-cases-track-inner">
+            <div class="recent-cases-track-inner" style="--recent-cases-duration: ${Math.max(1, recentRepairCases.length) * 4.2}s">
             ${[0, 1]
                 .map(
-                    () => `
-                <div class="recent-cases-set">
+                    (index) => `
+                <div class="recent-cases-set"${index === 1 ? ' aria-hidden="true"' : ""}>
                 ${recentRepairCases
                     .map(
                         (repairCase) => `
-            <a class="recent-case-card" href="${escapeHtml(repairCase.href)}">
+            <a class="recent-case-card" href="${escapeHtml(repairCase.href)}"${index === 1 ? ' tabindex="-1"' : ""}>
                 <div class="recent-case-image">
-                    ${repairCase.image
-                        ? `<img src="${escapeHtml(repairCase.image)}" alt="${escapeHtml(repairCase.alt)}">`
-                        : `<div class="recent-case-placeholder" aria-hidden="true"></div>`}
+                    <img src="${escapeHtml(repairCase.image)}" alt="${escapeHtml(repairCase.alt)}" width="275" height="206" loading="lazy" decoding="async">
                 </div>
                 <div class="recent-case-body">
                     ${repairCase.brand ? `<p class="recent-case-brand">${escapeHtml(repairCase.brand)}</p>` : ""}
@@ -1058,7 +1065,7 @@ const HTML_FLOW_FOOTER = `
 const heroImage = "/img/watch-submariner.jpg";
 
 export default async function TopPage() {
-    const recentRepairCases = (await getLatestB2CPublicCasesForHome(10)).map(toHomeRecentCase);
+    const recentRepairCases = (await getLatestB2CPublicCasesForHome(30)).map(toHomeRecentCase);
 
     return (
         <>
