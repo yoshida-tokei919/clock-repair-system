@@ -55,6 +55,7 @@ export interface DeliveryDocumentProps {
         subtotalAmount?: number;
         taxAmount?: number;
         shippingFee: number; // Added
+        historicalRefunds?: { inquiryNumber: string; originalSaleReference: string; amount: number; method: 'OFFSET' | 'BANK'; status: string; taxStatus: string; reason: string }[];
     }
 }
 
@@ -64,6 +65,8 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
     const subTotal = data.subtotalAmount ?? data.jobs.reduce((sum, job) => sum + job.items.reduce((s, i) => s + i.price * (i.quantity ?? 1), 0), 0);
     const tax = data.taxAmount ?? Math.floor(subTotal * data.taxRate);
     const grandTotal = subTotal + tax + (data.shippingFee || 0);
+    const activeRefunds = (data.historicalRefunds ?? []).filter(refund => refund.status !== 'CANCELLED');
+    const refundTotal = activeRefunds.reduce((sum, refund) => sum + refund.amount, 0);
 
     return (
         <Document>
@@ -149,9 +152,21 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
                         <Text style={styles.summaryValue}>¥{(data.shippingFee || 0).toLocaleString()}</Text>
                     </View>
                     <View style={[styles.summaryRow, styles.grandTotal]}>
-                        <Text style={[styles.summaryLabel, { fontWeight: 'bold' }]}>合計金額</Text>
+                        <Text style={[styles.summaryLabel, { fontWeight: 'bold' }]}>{activeRefunds.length ? '今回納品額' : '合計金額'}</Text>
                         <Text style={[styles.summaryValue, { fontWeight: 'bold', fontSize: 12 }]}>¥{grandTotal.toLocaleString()}</Text>
                     </View>
+                    {activeRefunds.map((refund, index) => <View key={index} style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>過去修理返金予定（{refund.inquiryNumber} / {refund.originalSaleReference}）</Text>
+                        <Text style={styles.summaryValue}>-¥{refund.amount.toLocaleString()}</Text>
+                    </View>)}
+                    {activeRefunds.length > 0 && <>
+                        <View style={[styles.summaryRow, styles.grandTotal]}>
+                            <Text style={styles.summaryLabel}>差引表示額</Text>
+                            <Text style={styles.summaryValue}>{grandTotal - refundTotal < 0 ? '-¥' : '¥'}{Math.abs(grandTotal - refundTotal).toLocaleString()}</Text>
+                        </View>
+                        <Text style={{ fontSize: 8, marginTop: 4 }}>返金予定の記録です。返金・請求相殺の完了を示すものではありません。</Text>
+                        <Text style={{ fontSize: 8 }}>{[...new Set(activeRefunds.map(refund => refund.method === 'OFFSET' ? '請求相殺予定' : '銀行返金予定'))].join(' / ')} / {activeRefunds.some(refund => refund.taxStatus === 'PENDING') ? '税務確認待ち' : '税務確認済み'}・適格返還請求書ではありません</Text>
+                    </>}
                 </View>
             </Page>
         </Document>

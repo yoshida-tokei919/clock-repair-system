@@ -6,6 +6,7 @@ import { IssuedDateEditor } from "@/components/documents/IssuedDateEditor";
 import { displayIssuedDate, formatIssuedDate } from "@/lib/document-issued-date";
 import { DeliveryShippingEditor } from "@/components/documents/DeliveryShippingEditor";
 import { sumCustomerLines } from "@/lib/pricing-tax";
+import { HistoricalRefundPanel } from "@/components/documents/HistoricalRefundPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
         where: { id },
         include: {
             customer: true,
+            historicalRefunds: { include: { repair: { select: { inquiryNumber: true } } } },
             repairs: {
                 include: {
                     watch: { include: { brand: true, model: true, reference: true, caseReference: true } },
@@ -82,10 +84,18 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
         pricingTaxMode: note.pricingTaxMode,
         subtotalAmount: note.totalAmount,
         taxAmount: note.taxAmount,
-        shippingFee: note.shippingFee ?? 0
+        shippingFee: note.shippingFee ?? 0,
+        historicalRefunds: note.customer.type === "business" ? note.historicalRefunds.map(refund => ({
+            inquiryNumber: refund.repair.inquiryNumber, originalSaleReference: refund.originalSaleReference,
+            amount: refund.amount, method: refund.method, status: refund.status, taxStatus: refund.taxStatus, reason: refund.reason,
+        })) : [],
     };
 
     return <div><div className="bg-white px-6 py-2"><IssuedDateEditor type="delivery" id={note.id} issuedDate={formatIssuedDate(note.issuedDate)} />
         <DeliveryShippingEditor id={note.id} carrierCode={note.shippingCarrierCode} size={note.shippingSize} calculatedFee={note.shippingCalculatedFee} fee={note.shippingFee} locked={snapshotCount > 0 || linkedCount > 0} /></div>
+        {note.customer.type === "business" && <HistoricalRefundPanel noteId={note.id} repairs={note.repairs.map(repair => ({
+            id: repair.id, inquiryNumber: repair.inquiryNumber,
+            refund: note.historicalRefunds.find(refund => refund.repairId === repair.id),
+        }))} />}
         <DeliveryPDFClientLoader data={pdfData} allowFixedPrint={note.customer.type === "business"} /></div>;
 }

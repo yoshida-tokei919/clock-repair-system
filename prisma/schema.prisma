@@ -65,6 +65,7 @@ model Customer {
   repairs           Repair[]
   shipments         Shipment[]
   deliveryNotes     DeliveryNote[]
+  historicalRefunds B2BHistoricalRefund[]
   invoices          Invoice[]
   billingInvoices   Invoice[] @relation("InvoiceBillingCustomer")
   estimateDocuments EstimateDocument[]
@@ -1005,6 +1006,7 @@ model Repair {
   shipmentRepairs ShipmentRepair[]
   deliveryPreference RepairDeliveryPreference?
   prepayments Payment[] @relation("RepairPrepayments")
+  historicalRefund B2BHistoricalRefund?
   communicationAiBriefs CommunicationAiBrief[]
 
   deliveryNoteId Int?
@@ -1925,6 +1927,7 @@ model DeliveryNote {
   customer     Customer @relation(fields: [customerId], references: [id])
   
   repairs      Repair[]
+  historicalRefunds B2BHistoricalRefund[]
   
   totalAmount  Int      @default(0) // Cache for speed
   taxAmount    Int      @default(0)
@@ -1934,6 +1937,55 @@ model DeliveryNote {
   shippingSize Int?
   shippingCalculatedFee Int?
   shippingFee Int?
+}
+
+enum B2BHistoricalRefundMethod {
+  OFFSET
+  BANK
+}
+
+enum B2BHistoricalRefundSaleSource {
+  LEGACY
+  CURRENT
+}
+
+enum B2BHistoricalRefundStatus {
+  PLANNED
+  AWAITING_OFFSET
+  OFFSET_SETTLED
+  BANK_SETTLED
+  CANCELLED
+}
+
+enum B2BHistoricalRefundTaxStatus {
+  PENDING
+  CONFIRMED
+}
+
+// Historical sale liability, independent of PaymentRefund and current repair sales.
+model B2BHistoricalRefund {
+  id Int @id @default(autoincrement())
+  customerId Int
+  deliveryNoteId Int
+  repairId Int @unique
+  originalSaleReference String
+  originalSaleSource B2BHistoricalRefundSaleSource
+  originalSaleDate DateTime?
+  originalSaleGrossAmount Int
+  amount Int
+  reason String
+  method B2BHistoricalRefundMethod
+  status B2BHistoricalRefundStatus @default(PLANNED)
+  taxStatus B2BHistoricalRefundTaxStatus @default(PENDING)
+  internalNotes String?
+  idempotencyKey String @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  deliveryNote DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Restrict)
+  repair Repair @relation(fields: [repairId], references: [id], onDelete: Restrict)
+
+  @@index([deliveryNoteId, status])
 }
 
 model Invoice {
