@@ -40,7 +40,7 @@ export function RepairListFilters({ filters, customers, brands, count }: { filte
         if (key === "customer") return customers.find(v => String(v.id) === value)?.name ?? value;
         if (key === "brand") return brands.find(v => String(v.id) === value)?.name ?? value;
         if (key === "type") return value === "business" ? "B2B" : "B2C";
-        if (key === "delivery") return value === "delivered" ? "納品済み" : "未納品";
+        if (key === "delivery") return value === "all" ? "すべて" : value === "delivered" ? "納品済み" : "未納品";
         if (key === "partEntries") return partEntryLabels[value] ?? value;
         if (key === "orderRequest") return orderRequestLabels[value] ?? value;
         return value;
@@ -79,11 +79,11 @@ export function RepairListFilters({ filters, customers, brands, count }: { filte
                 <input id="repair-list-q" name="q" defaultValue={filters.q} maxLength={100} placeholder="管理番号・顧客・時計・Ref・Calなど" className="h-10 min-w-0 flex-1 rounded border px-3 text-sm sm:max-w-md" />
                 <button type="submit" className="h-10 rounded border px-4 text-sm">検索・適用</button>
             </div>
-            <details className="min-w-0" open={chips.length > (filters.q ? 1 : 0)}>
+            <details className="min-w-0" open={chips.some(chip => chip.key !== "q" && !(chip.key === "delivery" && repairListUrl(filters) === "/repairs"))}>
                 <summary className="cursor-pointer text-sm font-medium">詳細条件</summary>
                 <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <label className="text-sm">顧客区分<select name="type" defaultValue={filters.type} className="mt-1 block h-9 w-full rounded border px-2"><option value="">すべて</option><option value="business">B2B</option><option value="individual">B2C</option></select></label>
-                    <label className="text-sm">納品状態<select name="delivery" defaultValue={filters.delivery} className="mt-1 block h-9 w-full rounded border px-2"><option value="">すべて</option><option value="undelivered">未納品（現在の状態が「納品済み」以外）</option><option value="delivered">納品済み（現在の状態）</option></select></label>
+                    <label className="text-sm">納品状態<select name="delivery" defaultValue={filters.delivery} className="mt-1 block h-9 w-full rounded border px-2"><option value="all">すべて</option><option value="undelivered">未納品（現在の状態が「納品済み」以外）</option><option value="delivered">納品済み（現在の状態）</option></select></label>
                     <label className="min-w-0 text-sm">記録済み部品行<select name="partEntries" defaultValue={filters.partEntries} className="mt-1 block h-9 w-full min-w-0 rounded border px-2"><option value="">すべて</option><option value="with">あり</option><option value="without">なし</option></select></label>
                     <label className="min-w-0 text-sm">発注依頼<select name="orderRequest" defaultValue={filters.orderRequest} className="mt-1 block h-9 w-full min-w-0 rounded border px-2"><option value="">すべて</option>{Object.entries(orderRequestLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                     {multi("customer", "顧客（複数選択可）", customers.map(v => ({ value: String(v.id), label: v.name })))}
@@ -102,8 +102,8 @@ export function RepairListFilters({ filters, customers, brands, count }: { filte
             {validationError && <p role="alert" className="text-sm text-red-700">{validationError}</p>}
         </form>
         <div className="flex flex-wrap items-center gap-2 text-sm" aria-live="polite"><span>{count}件</span>
-            {chips.map(({ key, value }) => <button key={`${key}:${value}`} type="button" className="max-w-full rounded-full border bg-slate-50 px-2 py-1 text-left break-all" aria-label={`${labels[key]} ${chipLabel(key, value)}を解除`} onClick={() => navigate({ ...filters, [key]: ["customer", "brand", "status"].includes(key) ? filters[key].split(",").filter(v => v !== value).join(",") : "", page: 1 })}>{labels[key]}: {chipLabel(key, value)} ×</button>)}
-            {chips.length > 0 && <button type="button" className="underline" onClick={() => router.push("/repairs")}>すべて解除</button>}
+            {chips.map(({ key, value }) => <button key={`${key}:${value}`} type="button" className="max-w-full rounded-full border bg-slate-50 px-2 py-1 text-left break-all" aria-label={`${labels[key]} ${chipLabel(key, value)}を解除`} onClick={() => navigate({ ...filters, [key]: key === "delivery" ? value === "undelivered" ? "all" : "undelivered" : ["customer", "brand", "status"].includes(key) ? filters[key].split(",").filter(v => v !== value).join(",") : "", page: 1 })}>{labels[key]}: {chipLabel(key, value)} ×</button>)}
+            {chips.length > 0 && <button type="button" className="underline" onClick={() => router.push("/repairs")}>初期表示に戻す</button>}
         </div>
         <div className="flex flex-wrap items-end gap-2 text-sm">
             <label>保存した検索<select value={selectedView} onChange={event => { const name = event.target.value; setSelectedView(name); const view = views.find(v => v.name === name); if (view) navigate(normalizeRepairListParams({ ...view.filters, page: "1" })); }} className="ml-2 h-9 max-w-52 rounded border px-2"><option value="">選択</option>{views.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}</select></label>

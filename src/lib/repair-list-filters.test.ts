@@ -14,6 +14,30 @@ test("normalizes allowlisted, bounded URL parameters", () => {
     assert.equal(filters.q.length, 100);
 });
 
+test("bare and empty-only URLs default to undelivered", () => {
+    for (const raw of [{}, { q: "  ", page: "1" }, { type: "bad", status: "unknown" }]) {
+        const filters = normalizeRepairListParams(raw);
+        assert.equal(filters.delivery, "undelivered");
+        assert.deepEqual(buildRepairListWhere(filters), { AND: [{ status: { not: "納品済み" } }] });
+        assert.equal(repairListUrl(filters), "/repairs");
+    }
+});
+
+test("delivery choices and legacy links preserve their meaning", () => {
+    assert.deepEqual(buildRepairListWhere(normalizeRepairListParams({ delivery: "all" })), {});
+    assert.deepEqual(buildRepairListWhere(normalizeRepairListParams({ delivery: "" })), {});
+    assert.deepEqual(buildRepairListWhere(normalizeRepairListParams({ delivery: "delivered" })), { AND: [{ status: "納品済み" }] });
+    assert.deepEqual(buildRepairListWhere(normalizeRepairListParams({ delivery: "undelivered" })), { AND: [{ status: { not: "納品済み" } }] });
+    assert.equal(normalizeRepairListParams({ q: "watch" }).delivery, "all");
+    assert.equal(normalizeRepairListParams({ q: "watch", delivery: "" }).delivery, "all");
+    for (const delivery of ["all", "delivered", "undelivered"] as const) {
+        const filters = normalizeRepairListParams({ q: "watch", delivery });
+        const url = repairListUrl(filters);
+        assert.equal(new URL(url, "https://example.test").searchParams.get("delivery"), delivery);
+        assert.deepEqual(normalizeRepairListParams(Object.fromEntries(new URL(url, "https://example.test").searchParams)), filters);
+    }
+});
+
 test("recorded part lines match either source, while without excludes both", () => {
     assert.deepEqual(buildRepairListWhere(normalizeRepairListParams({ partEntries: "with" })), { AND: [{ OR: [
         { repairLineItems: { some: { lineType: "PART" } } },
@@ -55,7 +79,7 @@ test("part and request filters combine with customer and status", () => {
 test("new selections round-trip through the saved URL and reset the page", () => {
     const selected = normalizeRepairListParams({ partEntries: "with", orderRequest: "partial", page: "3" });
     const url = repairListUrl(selected);
-    assert.equal(url, "/repairs?partEntries=with&orderRequest=partial");
+    assert.equal(url, "/repairs?delivery=all&partEntries=with&orderRequest=partial");
     assert.deepEqual(normalizeRepairListParams(Object.fromEntries(new URL(url, "https://example.test").searchParams)), {
         ...selected, page: 1,
     });

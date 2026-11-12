@@ -25,7 +25,7 @@ export function normalizeRepairListParams(raw: RawParams): RepairListFilters {
     result.brand = ids(result.brand);
     result.status = statuses(result.status === "all" ? "" : result.status);
     result.type = ["business", "individual"].includes(result.type) ? result.type : "";
-    result.delivery = ["delivered", "undelivered"].includes(result.delivery) ? result.delivery : "";
+    result.delivery = ["all", "delivered", "undelivered"].includes(result.delivery) ? result.delivery : "all";
     result.partEntries = ["with", "without"].includes(result.partEntries) ? result.partEntries : "";
     result.orderRequest = ["pending", "ordered", "received", "partial", "noRequest"].includes(result.orderRequest) ? result.orderRequest : "";
     for (const prefix of dateKeys) {
@@ -40,6 +40,7 @@ export function normalizeRepairListParams(raw: RawParams): RepairListFilters {
     if (result.amountMin && result.amountMax && Number(result.amountMin) > Number(result.amountMax)) {
         result.amountMin = ""; result.amountMax = "";
     }
+    if (raw.delivery === undefined && !FILTER_KEYS.some(key => key !== "delivery" && result[key])) result.delivery = "undelivered";
     const pageText = scalar(raw.page);
     const page = /^[1-9]\d{0,5}$/.test(pageText) ? Number(pageText) : 1;
     return { ...result, page };
@@ -70,7 +71,8 @@ export function buildRepairListWhere(filters: RepairListFilters): Prisma.RepairW
     if (filters.customer) and.push({ customerId: { in: filters.customer.split(",").map(Number) } });
     if (filters.brand) and.push({ watch: { brandId: { in: filters.brand.split(",").map(Number) } } });
     if (filters.status) and.push({ status: { in: filters.status.split(",") } });
-    if (filters.delivery) and.push({ status: filters.delivery === "delivered" ? "納品済み" : { not: "納品済み" } });
+    if (filters.delivery === "delivered") and.push({ status: "納品済み" });
+    if (filters.delivery === "undelivered") and.push({ status: { not: "納品済み" } });
     if (filters.partEntries === "with") and.push({ OR: [
         { repairLineItems: { some: { lineType: "PART" } } },
         { estimate: { items: { some: { type: "part" } } } },
@@ -110,7 +112,7 @@ export function repairListPage(page: number, count: number) {
 
 export function repairListUrl(filters: RepairListFilters, page = 1) {
     const params = new URLSearchParams();
-    for (const key of FILTER_KEYS) if (filters[key]) params.set(key, filters[key]);
+    for (const key of FILTER_KEYS) if (filters[key] && !(key === "delivery" && filters.delivery === "undelivered" && !FILTER_KEYS.some(other => other !== "delivery" && filters[other]))) params.set(key, filters[key]);
     if (page > 1) params.set("page", String(page));
     return `/repairs${params.size ? `?${params}` : ""}`;
 }
