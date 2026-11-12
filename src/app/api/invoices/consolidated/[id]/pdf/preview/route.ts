@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/prisma";
 import { buildConsolidatedPdfData, hasConsolidatedSourceSnapshotIntegrity, isCurrentConsolidatedPdf } from "@/lib/consolidated-invoice-publication";
 import { renderConsolidatedInvoicePdf } from "@/lib/consolidated-invoice-pdf";
+import { historicalRefundAllocationSelect } from "@/lib/b2b-historical-refund-allocation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     publication: true, issueState: true, sources: { orderBy: { id: "asc" }, include: { deliveryNotes: { orderBy: { id: "asc" } }, invoice: { select: {
       id: true, invoiceNumber: true, customerId: true, issuedDate: true, totalAmount: true,
       taxAmount: true, shippingFeeAmount: true, grossTotalAmount: true, paymentDueDate: true,
+      discountBasisAmount: true, discountRateBps: true, discountAmount: true,
+      historicalRefundAllocations: { select: historicalRefundAllocationSelect, orderBy: { id: "asc" } },
     } } } },
   } });
   if (!bundle || !isCurrentConsolidatedPdf(bundle.publication)) return new Response("Not found", { status: 404 });

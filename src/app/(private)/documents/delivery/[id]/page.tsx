@@ -18,7 +18,8 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
         where: { id },
         include: {
             customer: true,
-            historicalRefunds: { include: { repair: { select: { inquiryNumber: true } } } },
+            historicalRefunds: { include: { repair: { select: { inquiryNumber: true } },
+                allocations: { select: { amount: true, status: true } } } },
             repairs: {
                 include: {
                     watch: { include: { brand: true, model: true, reference: true, caseReference: true } },

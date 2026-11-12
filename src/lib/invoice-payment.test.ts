@@ -33,7 +33,7 @@ test("only successful allocations are summed; overpayment is visible", () => {
   assert.deepEqual(calculateInvoicePaymentSummary({ grossTotalAmount: 1000 }, [
     { allocatedAmount: 500, payment: { status: "SUCCEEDED" } },
     { allocatedAmount: 600, payment: { status: "SUCCEEDED" } },
-  ]), { invoiceTotal: 1000, paidAmount: 1100, prepaymentAppliedAmount: 0,
+  ]), { invoiceTotal: 1000, refundCreditAmount: 0, paidAmount: 1100, prepaymentAppliedAmount: 0,
     invoiceRefundedAmount: 0, invoiceRefundPendingAmount: 0, outstandingBalance: -100 });
 });
 

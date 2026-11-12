@@ -64,6 +64,29 @@ test("consolidated PDF totals use immutable source snapshots", () => {
   assert.throws(() => buildConsolidatedPdfData({ ...fixture, sources: [{ ...fixture.sources[0], taxAmount: 0 }, fixture.sources[1]] }, [due, due]));
 });
 
+test("grouped PDF applies a frozen source credit once after gross", () => {
+  const credited = { ...fixture, sources: [
+    { ...fixture.sources[0], offsetCreditAmount: 14014, offsetCreditReference: "OLD-T027" },
+    { ...fixture.sources[1], offsetCreditAmount: 0, offsetCreditReference: null },
+  ] } as ConsolidatedBundle;
+  const data = buildConsolidatedPdfData(credited, [due, due]);
+  const pdfData = consolidatedInvoiceDocumentData(data);
+  assert.equal(data.gross, 82428);
+  assert.equal(data.offsetCreditAmount, 14014);
+  assert.equal(pdfData.grossTotalAmount, 82428);
+  assert.deepEqual(pdfData.historicalRefundCredits, [{ amount: 14014, reference: "架空A店 / OLD-T027" }]);
+  assert.match(documentText(InvoiceDocument({ data: pdfData })), /68,414/);
+});
+
+test("fully credited B2B PDF says no transfer is needed and omits bank details", () => {
+  const credited = { ...fixture, sources: fixture.sources.map(source => ({ ...source,
+    offsetCreditAmount: source.grossTotalAmount, offsetCreditReference: `OLD-${source.invoiceId}` })) } as ConsolidatedBundle;
+  const pdfData = consolidatedInvoiceDocumentData(buildConsolidatedPdfData(credited, [due, due]));
+  const content = documentText(InvoiceDocument({ data: pdfData }));
+  assert.match(content, /お振込は不要です/);
+  assert.doesNotMatch(content, /三井住友銀行|3602468/);
+});
+
 test("missing or conflicting due dates do not become a fake payment deadline", () => {
   assert.equal(buildConsolidatedPdfData(fixture, [due, null]).dueDate, null);
   assert.equal(buildConsolidatedPdfData(fixture, [due, new Date("2027-01-31T00:00:00Z")]).dueDate, null);

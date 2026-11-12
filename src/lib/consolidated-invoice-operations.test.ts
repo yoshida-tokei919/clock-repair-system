@@ -25,18 +25,23 @@ test("individual invoice outbox blocks date changes in every state", async () =>
 const token = "a".repeat(43);
 const issuedDate = new Date("2026-11-01T00:00:00Z");
 const makeSource = (id: number) => ({ invoiceId: id, invoiceNumber: `I-${id}`, sourceCustomerId: id + 100,
-  issuedDate, totalAmount: 1000, taxAmount: 100, shippingFeeAmount: 0, grossTotalAmount: 1100 });
+  issuedDate, totalAmount: 1000, taxAmount: 100, shippingFeeAmount: 0, grossTotalAmount: 1100,
+  offsetCreditAmount: 0, offsetCreditReference: null as string | null });
 
 function fixture(options: { pdf?: boolean; user?: boolean; outbox?: string | null; stale?: boolean;
-  allocation?: boolean; refund?: boolean; prepayment?: boolean; individualDelivery?: boolean; failOnCreate?: number } = {}) {
+  allocation?: boolean; refund?: boolean; prepayment?: boolean; individualDelivery?: boolean; failOnCreate?: number;
+  credit?: number } = {}) {
   const sources = [makeSource(1), makeSource(2)];
+  sources[0].offsetCreditAmount = options.credit ?? 0;
+  sources[0].offsetCreditReference = options.credit ? "LEGACY-1" : null;
   const bundle = { id: 9, billingCustomerId: 90, grossTotalAmount: 2200, sources,
     publication: options.pdf === false ? null : { id: 3, status: "current", publicToken: token,
       storageKey: "frozen.pdf", hash: "hash", fileSize: 50, publishedAt: issuedDate } };
   const invoices = sources.map(source => ({ id: source.invoiceId, invoiceNumber: source.invoiceNumber,
     customerId: source.sourceCustomerId, issuedDate, status: "issued", totalAmount: options.stale && source.invoiceId === 2 ? 999 : 1000,
     taxAmount: 100, shippingFeeAmount: 0, grossTotalAmount: 1100, sentAt: null, lineSendRetryKey: null,
-    lineSendStartedAt: null, pdfFiles: [], paymentAllocations: options.allocation || options.refund ? [{ allocatedAmount: 1,
+    lineSendStartedAt: null, pdfFiles: [], historicalRefundAllocations: source.offsetCreditAmount ? [{ amount: source.offsetCreditAmount,
+      status: "ACTIVE", refund: { originalSaleReference: "LEGACY-1", customerId: source.sourceCustomerId } }] : [], paymentAllocations: options.allocation || options.refund ? [{ allocatedAmount: 1,
       releases: [], payment: { customerId: source.sourceCustomerId, status: options.refund ? "SUCCEEDED" : "PENDING",
         kind: "INVOICE", provider: options.refund ? "MANUAL" : "STRIPE",
         refunds: options.refund ? [{ amount: 1, status: "PENDING" }] : [] } }] : [] }));
@@ -48,6 +53,7 @@ function fixture(options: { pdf?: boolean; user?: boolean; outbox?: string | nul
   let outboxCreates = 0;
   const recipientLookups: number[] = [];
   const tx = {
+    consolidatedInvoiceSupersession: { findUnique: async () => null },
     $queryRaw: async (parts: TemplateStringsArray, id: number) => parts[0].includes('"Customer"')
       ? [{ id, type: "business" }]
       : parts[0].includes('"LineUser"') ? [{ linkedCustomerId: 90 }]
@@ -150,6 +156,17 @@ test("full receipt writes one original-customer allocation per invoice atomicall
     await assert.rejects(confirmConsolidatedBankReceipt(blocked.db, 9));
     assert.deepEqual(blocked.writes, []);
   }
+});
+
+test("bundle receipt collects only positive net due and never creates offset cash", async () => {
+  const partial = fixture({ credit: 400 });
+  assert.equal((await confirmConsolidatedBankReceipt(partial.db, 9)).amount, 1800);
+  assert.deepEqual(partial.writes.map(row => row.amount), [700, 1100]);
+  const fullSource = fixture({ credit: 1100 });
+  assert.equal((await confirmConsolidatedBankReceipt(fullSource.db, 9)).amount, 1100);
+  assert.deepEqual(fullSource.writes.map(row => row.invoiceId), [2]);
+  assert.deepEqual(consolidatedPaymentTotals([{ paidAmount: 0, outstandingBalance: 0, refundCreditAmount: 1100 }]),
+    { paidAmount: 0, outstandingBalance: 0, paymentStatus: "CREDITED" });
 });
 
 test("both mutation routes authenticate before parsing and contain no direct send or payment API", () => {

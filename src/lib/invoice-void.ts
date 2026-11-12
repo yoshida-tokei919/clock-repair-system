@@ -14,10 +14,12 @@ export async function voidInvoice(db: PrismaClient, invoiceId: number, adminId: 
       SELECT "id", "lineSendStartedAt" FROM "Invoice" WHERE "id" = ${invoiceId} FOR UPDATE`;
     if (rows.length !== 1) throw new InvoiceVoidError("請求書が見つかりません", 404);
     const invoice = await tx.invoice.findUnique({ where: { id: invoiceId }, select: { status: true,
+      historicalRefundAllocations: { where: { status: "ACTIVE" }, select: { id: true } },
       paymentAllocations: { select: { id: true, paymentId: true, allocatedAmount: true,
         releases: { select: { amount: true } }, payment: { select: { kind: true, status: true, amount: true,
           refunds: { select: { amount: true, status: true } } } } } } } });
     if (!invoice || !["issued", "paid"].includes(invoice.status)) throw new InvoiceVoidError("発行済み請求書のみ取消できます");
+    if (invoice.historicalRefundAllocations.length) throw new InvoiceVoidError("履歴返金を相殺した請求書は訂正手順が未対応のため取消できません");
     if (rows[0].lineSendStartedAt) throw new InvoiceVoidError("LINE送信結果が未確定のため請求書を取消できません");
     if (await hasUnresolvedInvoiceLineOutbox(tx, invoiceId)) {
       throw new InvoiceVoidError("Invoice LINE delivery is unresolved; invoice cannot be voided");

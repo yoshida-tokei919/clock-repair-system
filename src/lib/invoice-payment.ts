@@ -1,5 +1,6 @@
 import type { PaymentMethod, PaymentProvider, PaymentStatus, Prisma, PrismaClient } from "@prisma/client";
 import { effectiveAllocation, refundTotals, type RefundAmount, type AllocationAmount } from "./payment-accounting";
+import { activeHistoricalRefundCredit } from "./b2b-historical-refund-allocation";
 
 export function assertIntegerYen(value: number): number {
   if (!Number.isSafeInteger(value) || value < 0 || value > 2_147_483_647) {
@@ -11,8 +12,11 @@ export function assertIntegerYen(value: number): number {
 export function calculateInvoicePaymentSummary(
   invoice: { grossTotalAmount: number },
   allocations: (AllocationAmount & { payment: { status: PaymentStatus; kind?: string; refunds?: RefundAmount[] } })[],
+  historicalCredits: readonly { amount: number; status: string }[] = [],
 ) {
   const invoiceTotal = assertIntegerYen(invoice.grossTotalAmount);
+  const refundCreditAmount = activeHistoricalRefundCredit(historicalCredits);
+  if (refundCreditAmount > invoiceTotal) throw new Error("履歴返金の相殺額が請求額を超えています");
   let prepaymentAppliedAmount = 0;
   let invoiceRefundedAmount = 0;
   let invoiceRefundPendingAmount = 0;
@@ -35,8 +39,8 @@ export function calculateInvoicePaymentSummary(
     return amount;
   }, 0);
   // Preserve a negative result so an inconsistent overpayment is not hidden.
-  return { invoiceTotal, paidAmount, prepaymentAppliedAmount, invoiceRefundedAmount, invoiceRefundPendingAmount,
-    outstandingBalance: invoiceTotal - paidAmount };
+  return { invoiceTotal, refundCreditAmount, paidAmount, prepaymentAppliedAmount, invoiceRefundedAmount, invoiceRefundPendingAmount,
+    outstandingBalance: invoiceTotal - refundCreditAmount - paidAmount };
 }
 
 /** Server-side DB helper. The caller must authorize access to the invoice. */
@@ -48,6 +52,7 @@ export async function getInvoiceOutstandingBalance(
     where: { id: invoiceId },
     select: {
       grossTotalAmount: true,
+      historicalRefundAllocations: { select: { amount: true, status: true } },
       paymentAllocations: {
         where: { payment: { status: "SUCCEEDED" } },
         select: { allocatedAmount: true, releases: { select: { amount: true } },
@@ -56,7 +61,7 @@ export async function getInvoiceOutstandingBalance(
     },
   });
   if (!invoice) throw new Error("請求書が見つかりません");
-  return calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations).outstandingBalance;
+  return calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations, invoice.historicalRefundAllocations).outstandingBalance;
 }
 
 type CreateInvoicePaymentInput = {
@@ -94,13 +99,14 @@ export async function createInvoicePayment(db: PrismaClient, input: CreateInvoic
     const invoice = await tx.invoice.findUnique({
       where: { id: input.invoiceId },
       select: { id: true, customerId: true, grossTotalAmount: true, status: true,
+        historicalRefundAllocations: { select: { amount: true, status: true } },
         paymentAllocations: { select: { allocatedAmount: true, releases: { select: { amount: true } },
           payment: { select: { status: true, kind: true, refunds: { select: { amount: true, status: true } } } } } } },
     });
     if (!invoice) throw new Error("請求書が見つかりません");
     if (invoice.customerId !== input.customerId) throw new Error("請求書と支払いの顧客が一致しません");
     if (invoice.status !== "issued") throw new Error("この請求書は支払いを作成できません");
-    const summary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
+    const summary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations, invoice.historicalRefundAllocations);
     if (summary.outstandingBalance <= 0) throw new Error("この請求書に未払い残高はありません");
     if (invoice.paymentAllocations.some(allocation => allocation.payment.status === "PENDING")) {
       throw new Error("この請求書には処理中の支払いがあります");

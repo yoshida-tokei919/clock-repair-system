@@ -15,6 +15,7 @@ import { resolveIssuedDate } from "@/lib/document-issued-date";
 import { nextB2BSourceInvoiceNumber, resolveInvoiceRecipientForIssue } from "@/lib/invoice-recipient";
 import { commonEstimateMode } from "@/lib/pricing-tax";
 import { invoiceAmountsWithDiscount, resolveDiscountBps, parseDiscountBps } from "@/lib/b2b-invoice-discount";
+import { allocateHistoricalRefunds, historicalRefundAllocationSelect } from "@/lib/b2b-historical-refund-allocation";
 
 // GET /api/invoices — 請求書一覧
 export async function GET() {
@@ -40,6 +41,7 @@ export async function GET() {
                     },
                 },
             },
+            historicalRefundAllocations: { select: historicalRefundAllocationSelect },
         },
     });
 
@@ -51,7 +53,11 @@ export async function GET() {
                 payment: { status: allocation.payment.status },
             })),
         };
-        if (invoice.customer.type !== "individual") return responseInvoice;
+        if (invoice.customer.type !== "individual") {
+            const summary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations, invoice.historicalRefundAllocations);
+            return { ...responseInvoice, refundCreditAmount: summary.refundCreditAmount,
+                outstandingBalance: summary.outstandingBalance };
+        }
 
         const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
         const paymentStatus = invoice.status === "void" || invoice.status === "canceled"
@@ -186,6 +192,7 @@ export async function POST(req: NextRequest) {
             invoiceId: created.id, customerId, repairIds: uniqueRepairIds,
             gross: created.grossTotalAmount, requested: allocations,
         });
+        else await allocateHistoricalRefunds(tx, created);
         await tx.customer.update({
             where: { id: customerId },
             data: { seqInvoice: newSeq },

@@ -18,6 +18,7 @@ import { resolveIssuedDate } from "@/lib/document-issued-date";
 import { calculateTaxableAmounts, commonEstimateMode, sumCustomerLines } from "@/lib/pricing-tax";
 import { lockEstimateOptions, parseOptionSet } from "@/lib/estimate-options";
 import { invoiceAmountsWithDiscount, resolveDiscountBps } from "@/lib/b2b-invoice-discount";
+import { allocateHistoricalRefunds } from "@/lib/b2b-historical-refund-allocation";
 
 export async function previewBulkInvoiceAllocations(repairIds: number[]) {
     if (!await getAdminApiIdentity()) throw new Error("認証が必要です");
@@ -212,6 +213,7 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                     invoiceId: created.id, customerId, repairIds: customerRepairs.map(r => r.id),
                     gross: created.grossTotalAmount, requested: allocationsByCustomer?.[customerId] ?? [],
                   });
+                  else await allocateHistoricalRefunds(tx, created);
                   await tx.customer.update({ where: { id: customerId }, data: { seqInvoice: invoiceSeq } });
                   return created;
                 });

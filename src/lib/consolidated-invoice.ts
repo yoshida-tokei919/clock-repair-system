@@ -3,6 +3,7 @@ import { resolveEffectiveBillingCustomer } from "./b2b-company";
 import { hasConsistentInvoiceSnapshots } from "./invoice-repair-snapshots";
 import { resolveIssuedDate } from "./document-issued-date";
 import { hasDiscountSnapshot } from "./b2b-invoice-discount";
+import { historicalCreditSnapshot, historicalRefundAllocationSelect } from "./b2b-historical-refund-allocation";
 
 export class ConsolidatedInvoiceError extends Error {}
 
@@ -95,6 +96,7 @@ export async function createConsolidatedInvoice(
       customer: { select: { id: true, name: true, companyName: true } },
       repairSnapshots: { orderBy: { id: "asc" } },
       consolidatedSource: { select: { id: true } },
+      historicalRefundAllocations: { select: historicalRefundAllocationSelect, orderBy: { id: "asc" } },
     } });
     const ordered = ids.map(id => invoices.find(invoice => invoice.id === id)).filter((invoice): invoice is typeof invoices[number] => !!invoice);
     const resolutions = await Promise.all(ordered.map(invoice => resolveEffectiveBillingCustomer(tx, invoice.customerId)));
@@ -118,7 +120,7 @@ export async function createConsolidatedInvoice(
       sources: { create: ordered.map(invoice => ({ invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber, sourceCustomerId: invoice.customerId,
         sourceCustomerName: invoice.customer.name, sourceCompanyName: invoice.customer.companyName,
-        ...consolidatedSourceAmounts(invoice), issuedDate: invoice.issuedDate,
+        ...consolidatedSourceAmounts(invoice), ...historicalCreditSnapshot(invoice.customerId, invoice.historicalRefundAllocations), issuedDate: invoice.issuedDate,
         deliveryNotes: { create: deliveryNoteBreakdown(invoice.repairSnapshots,
           hasConsistentInvoiceSnapshots(invoice)) },
       })) },

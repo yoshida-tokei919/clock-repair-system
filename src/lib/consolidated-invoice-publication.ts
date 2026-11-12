@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { calculateInvoicePaymentSummary } from "./invoice-payment";
 import { formatIssuedDate } from "./document-issued-date";
 import { hasDiscountSnapshot } from "./b2b-invoice-discount";
+import { historicalCreditSnapshot, type HistoricalRefundCredit } from "./b2b-historical-refund-allocation";
 
 export const consolidatedBundleInclude = {
   issueState: true,
@@ -69,11 +70,13 @@ export function consolidatedDeliveryNoteRows(bundle: { grossTotalAmount: number;
 
 type SnapshotSource = {
   invoiceId: number; invoiceNumber: string; sourceCustomerId: number; issuedDate: Date;
+  offsetCreditAmount?: number; offsetCreditReference?: string | null;
   totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
   discountBasisAmount?: number | null; discountRateBps?: number | null; discountAmount?: number | null;
   invoice: { id: number; invoiceNumber: string; customerId: number; issuedDate: Date;
     totalAmount: number; taxAmount: number; shippingFeeAmount: number; grossTotalAmount: number;
-    discountBasisAmount?: number | null; discountRateBps?: number | null; discountAmount?: number | null };
+    discountBasisAmount?: number | null; discountRateBps?: number | null; discountAmount?: number | null;
+    historicalRefundAllocations?: HistoricalRefundCredit[] };
 };
 
 export function hasConsolidatedSourceSnapshotIntegrity(bundle: { grossTotalAmount: number; sources: SnapshotSource[] }) {
@@ -89,6 +92,11 @@ export function hasConsolidatedSourceSnapshotIntegrity(bundle: { grossTotalAmoun
       (source.invoice.discountAmount ?? null) === (source.discountAmount ?? null) && hasDiscountSnapshot(source) &&
       source.invoice.shippingFeeAmount === source.shippingFeeAmount &&
       source.invoice.grossTotalAmount === source.grossTotalAmount &&
+      (source.invoice.historicalRefundAllocations ? (() => {
+        const snapshot = historicalCreditSnapshot(source.sourceCustomerId, source.invoice.historicalRefundAllocations);
+        return snapshot.offsetCreditAmount === (source.offsetCreditAmount ?? 0) &&
+          snapshot.offsetCreditReference === (source.offsetCreditReference ?? null);
+      })() : (source.offsetCreditAmount ?? 0) === 0) &&
       source.grossTotalAmount > 0 && source.grossTotalAmount === source.totalAmount + source.taxAmount + source.shippingFeeAmount);
 }
 
@@ -111,7 +119,13 @@ export function buildConsolidatedPdfData(bundle: ConsolidatedBundle, dueDates: (
   const dateValues = dueDates.map(date => date?.toISOString().slice(0, 10) ?? null);
   const dueDate = dateValues[0] && dateValues.every(date => date === dateValues[0]) ? dateValues[0] : null;
   const rows = consolidatedDeliveryNoteRows(bundle);
-  return { bundle, subtotal, originalSubtotal, discount, tax, shipping, gross, dueDate, rows };
+  const offsetCredits = bundle.sources.filter(source => source.offsetCreditAmount > 0).map(source => ({
+    amount: source.offsetCreditAmount, reference: source.offsetCreditReference ?? source.invoiceNumber,
+    sourceCustomerName: source.sourceCustomerName,
+  }));
+  const offsetCreditAmount = offsetCredits.reduce((sum, row) => sum + row.amount, 0);
+  if (offsetCreditAmount > gross) throw new Error("Consolidated credit exceeds gross");
+  return { bundle, subtotal, originalSubtotal, discount, tax, shipping, gross, dueDate, rows, offsetCredits, offsetCreditAmount };
 }
 
 export type ConsolidatedPdfData = ReturnType<typeof buildConsolidatedPdfData>;
@@ -120,10 +134,12 @@ type PaymentCheckInvoice = {
   id: number; invoiceNumber: string; customerId: number; grossTotalAmount: number; status: string;
   paymentAllocations: (Parameters<typeof calculateInvoicePaymentSummary>[1][number] &
     { payment: { customerId: number } })[];
+  historicalRefundAllocations?: HistoricalRefundCredit[];
 };
 
 export function assertConsolidatedSourceUnpaid(
-  source: { invoiceId: number; invoiceNumber: string; sourceCustomerId: number; grossTotalAmount: number },
+  source: { invoiceId: number; invoiceNumber: string; sourceCustomerId: number; grossTotalAmount: number;
+    offsetCreditAmount?: number; offsetCreditReference?: string | null },
   invoice: PaymentCheckInvoice | undefined,
 ) {
   if (!invoice || invoice.id !== source.invoiceId || invoice.invoiceNumber !== source.invoiceNumber ||
@@ -133,8 +149,12 @@ export function assertConsolidatedSourceUnpaid(
         allocation.payment.refunds?.some(refund => refund.status === "PENDING"))) {
     throw new Error("元請求書の入金・状態を確認できません");
   }
-  const summary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
-  if (summary.outstandingBalance !== source.grossTotalAmount || summary.invoiceRefundPendingAmount !== 0) {
+  const credit = invoice.historicalRefundAllocations ? historicalCreditSnapshot(invoice.customerId, invoice.historicalRefundAllocations) :
+    { offsetCreditAmount: 0, offsetCreditReference: null };
+  if (source.offsetCreditAmount !== undefined && (credit.offsetCreditAmount !== source.offsetCreditAmount ||
+      credit.offsetCreditReference !== (source.offsetCreditReference ?? null))) throw new Error("元請求書の相殺額が変更されました");
+  const summary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations, invoice.historicalRefundAllocations);
+  if (summary.outstandingBalance !== source.grossTotalAmount - credit.offsetCreditAmount || summary.invoiceRefundPendingAmount !== 0) {
     throw new Error("元請求書に入金または返金があります");
   }
 }

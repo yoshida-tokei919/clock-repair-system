@@ -9,6 +9,7 @@ import { calculateInvoicePdfHash } from "@/lib/invoice-pdf-storage";
 import { deleteConsolidatedPdf, uploadConsolidatedPdf } from "@/lib/r2-consolidated-invoice-pdf";
 import { consolidatedDeliveryKey, lockAndCheckConsolidatedSources } from "@/lib/consolidated-invoice-operations";
 import { invoiceDeliveryKey } from "@/lib/invoice-delivery-routing";
+import { historicalRefundAllocationSelect } from "@/lib/b2b-historical-refund-allocation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ async function checkSources(tx: Prisma.TransactionClient, bundle: ConsolidatedBu
     for (const sourceId of ids) await tx.$queryRaw`SELECT "id" FROM "Invoice" WHERE "id" = ${sourceId} FOR UPDATE`;
     const invoices = await tx.invoice.findMany({ where: { id: { in: ids } }, select: {
       id: true, invoiceNumber: true, customerId: true, grossTotalAmount: true, status: true, paymentDueDate: true,
+      historicalRefundAllocations: { select: historicalRefundAllocationSelect, orderBy: { id: "asc" } },
       paymentAllocations: { select: { allocatedAmount: true, releases: { select: { amount: true } },
         payment: { select: { customerId: true, status: true, kind: true,
           refunds: { select: { amount: true, status: true } } } } } },

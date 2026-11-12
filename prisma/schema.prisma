@@ -1984,6 +1984,7 @@ model B2BHistoricalRefund {
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   deliveryNote DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Restrict)
   repair Repair @relation(fields: [repairId], references: [id], onDelete: Restrict)
+  allocations B2BHistoricalRefundAllocation[]
 
   @@index([deliveryNoteId, status])
 }
@@ -2011,6 +2012,7 @@ model Invoice {
   repairs       Repair[]
   repairSnapshots InvoiceRepairSnapshot[]
   paymentAllocations PaymentAllocation[]
+  historicalRefundAllocations B2BHistoricalRefundAllocation[]
   pdfFiles      InvoicePdfFile[] @relation("InvoicePdfFiles")
   currentPdfFile InvoicePdfFile? @relation("CurrentInvoicePdfFile", fields: [currentPdfFileId], references: [id], onDelete: SetNull)
   consolidatedSource ConsolidatedInvoiceSource?
@@ -2030,6 +2032,24 @@ model Invoice {
   sentAt        DateTime?
 
   @@index([billingCustomerId])
+}
+
+// Reserved legacy refund credit. A voided row remains as an audit record.
+model B2BHistoricalRefundAllocation {
+  id Int @id @default(autoincrement())
+  refundId Int
+  invoiceId Int
+  amount Int
+  status String @default("ACTIVE") // ACTIVE, VOID
+  createdAt DateTime @default(now())
+  voidedAt DateTime?
+  voidReason String?
+  refund B2BHistoricalRefund @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@unique([refundId, invoiceId])
+  @@index([invoiceId, status])
+  @@index([refundId, status])
 }
 
 // Historical billing bundle; original store invoices remain the financial source records.
@@ -2167,6 +2187,8 @@ model ConsolidatedInvoiceSource {
   taxAmount Int
   shippingFeeAmount Int @default(0)
   grossTotalAmount Int
+  offsetCreditAmount Int @default(0)
+  offsetCreditReference String?
   issuedDate DateTime
   deliveryNotes ConsolidatedInvoiceDeliveryNote[]
 

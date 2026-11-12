@@ -15,6 +15,7 @@ import { publishInvoicePdf } from "@/lib/invoice-pdf-publication";
 import { prisma } from "@/lib/prisma";
 import { displayIssuedDate, parseIssuedDate } from "@/lib/document-issued-date";
 import { invoicePdfParties } from "@/lib/invoice-recipient";
+import { historicalCreditSnapshot, historicalRefundAllocationSelect } from "@/lib/b2b-historical-refund-allocation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -105,6 +106,8 @@ function buildInvoicePdfData(invoice: NonNullable<Awaited<ReturnType<typeof find
     taxAmount: invoice.taxAmount,
     shippingFeeAmount: invoice.shippingFeeAmount,
     grossTotalAmount: invoice.grossTotalAmount,
+    historicalRefundCredits: invoice.customer.type === "business" ? invoice.historicalRefundAllocations
+      .filter(row => row.status === "ACTIVE").map(row => ({ amount: row.amount, reference: row.refund.originalSaleReference })) : [],
     prepaymentAppliedAmount: invoice.paymentAllocations.reduce((sum, allocation) =>
       sum + (allocation.payment.kind === "REPAIR_PREPAYMENT" && allocation.payment.status === "SUCCEEDED"
         ? allocation.allocatedAmount - allocation.releases.reduce((released, row) => released + row.amount, 0) : 0), 0),
@@ -122,6 +125,7 @@ function findInvoiceForPdf(invoiceId: number) {
       repairSnapshots: true,
       paymentAllocations: { select: { allocatedAmount: true, releases: { select: { amount: true } },
         payment: { select: { kind: true, status: true } } } },
+      historicalRefundAllocations: { select: historicalRefundAllocationSelect, orderBy: { id: "asc" } },
       repairs: {
         include: {
           watch: { include: { brand: true, model: true, reference: true, caseReference: true } },
@@ -168,6 +172,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       { ok: false, error: "発行時明細が未保存、または確定額と一致しないため再生成できません。保存済みPDFをご確認ください。" },
       { status: 409 },
     );
+  }
+  if (invoice.customer.type === "business") {
+    try {
+      const credit = historicalCreditSnapshot(invoice.customerId, invoice.historicalRefundAllocations);
+      if (credit.offsetCreditAmount > invoice.grossTotalAmount) throw new Error("credit exceeds gross");
+    } catch {
+      return NextResponse.json({ ok: false, error: "履歴返金の相殺額を確認できません" }, { status: 409 });
+    }
   }
 
   let pdfBuffer: Buffer;

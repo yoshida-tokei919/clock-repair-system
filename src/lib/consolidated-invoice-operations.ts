@@ -6,6 +6,7 @@ import { buildInvoiceLineMessage, invoiceDeliveryKey, resolveInvoiceLineDestinat
 import { lockInvoiceRecipientCustomers } from "./invoice-recipient";
 import { createApprovedLineManagerSendOutbox } from "./line-manager-send-outbox";
 import { hasDiscountSnapshot } from "./b2b-invoice-discount";
+import { historicalRefundAllocationSelect } from "./b2b-historical-refund-allocation";
 
 export class ConsolidatedOperationError extends Error {
   constructor(message: string, readonly postal = false) { super(message); }
@@ -20,11 +21,13 @@ export async function hasIndividualInvoiceOutbox(tx: Prisma.TransactionClient, i
   });
 }
 
-export function consolidatedPaymentTotals(sources: readonly { paidAmount: number; outstandingBalance: number }[]) {
+export function consolidatedPaymentTotals(sources: readonly { paidAmount: number; outstandingBalance: number; refundCreditAmount?: number }[]) {
   const paidAmount = sources.reduce((sum, row) => sum + row.paidAmount, 0);
   const outstandingBalance = sources.reduce((sum, row) => sum + row.outstandingBalance, 0);
+  const refundCreditAmount = sources.reduce((sum, row) => sum + (row.refundCreditAmount ?? 0), 0);
   return { paidAmount, outstandingBalance,
-    paymentStatus: outstandingBalance === 0 ? "PAID" as const : paidAmount > 0 ? "PARTIAL" as const : "UNPAID" as const };
+    paymentStatus: outstandingBalance === 0 ? (paidAmount > 0 ? "PAID" as const : refundCreditAmount > 0 ? "CREDITED" as const : "PAID" as const)
+      : paidAmount > 0 ? "PARTIAL" as const : "UNPAID" as const };
 }
 
 const allocationSelect = { allocatedAmount: true, releases: { select: { amount: true } },
@@ -52,6 +55,7 @@ export async function lockAndCheckConsolidatedSources(tx: Prisma.TransactionClie
       discountBasisAmount: true, discountRateBps: true, discountAmount: true,
       sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true,
       pdfFiles: { select: { sentAt: true } }, paymentAllocations: { select: allocationSelect },
+       historicalRefundAllocations: { select: historicalRefundAllocationSelect, orderBy: { id: "asc" } },
     } });
     if (!invoice || invoice.issuedDate.getTime() !== source.issuedDate.getTime() ||
       invoice.totalAmount !== source.totalAmount || invoice.taxAmount !== source.taxAmount ||
@@ -132,15 +136,19 @@ export async function confirmConsolidatedBankReceipt(db: PrismaClient, id: numbe
     if (prior) throw new ConsolidatedOperationError("この集約請求の入金登録履歴があります。確認してください。");
     const paidAt = new Date();
     const payments = [];
+    let receivedAmount = 0;
     for (const invoice of invoices) {
-      const summary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
-      if (summary.outstandingBalance !== invoice.grossTotalAmount) throw new ConsolidatedOperationError("元請求書の未収額が変更されました。");
+      const summary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations, invoice.historicalRefundAllocations);
+      if (summary.outstandingBalance !== invoice.grossTotalAmount - summary.refundCreditAmount) throw new ConsolidatedOperationError("元請求書の未収額が変更されました。");
+      if (summary.outstandingBalance === 0) continue;
+      receivedAmount += summary.outstandingBalance;
       payments.push(await tx.payment.create({ data: { customerId: invoice.customerId, kind: "INVOICE",
-        purpose, amount: invoice.grossTotalAmount, currency: "JPY", provider: "MANUAL", method: "BANK_TRANSFER",
+        purpose, amount: summary.outstandingBalance, currency: "JPY", provider: "MANUAL", method: "BANK_TRANSFER",
         status: "SUCCEEDED", paidAt,
-        allocations: { create: { invoiceId: invoice.id, allocatedAmount: invoice.grossTotalAmount } },
+        allocations: { create: { invoiceId: invoice.id, allocatedAmount: summary.outstandingBalance } },
       }, select: { id: true } }));
     }
-    return { paymentIds: payments.map(row => row.id), paidAt, amount: bundle.grossTotalAmount };
+    if (!payments.length) throw new ConsolidatedOperationError("振込額が0円の集約請求は入金確認できません。相殺のみで精算されています。");
+    return { paymentIds: payments.map(row => row.id), paidAt, amount: receivedAmount };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

@@ -132,7 +132,7 @@ export function ConsolidatedInvoicePanel() {
         <strong>¥{bundle.grossTotalAmount.toLocaleString()}</strong>
       </Link>
       <div className="mt-1 flex justify-between items-center">
-        <span className={`rounded-full px-2 py-0.5 text-xs ${bundle.supersessionOriginal ? "bg-red-100 text-red-700" : bundle.paymentStatus === "PAID" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{bundle.supersessionOriginal ? "差替済み" : bundle.paymentStatus === "PAID" ? "入金済み" : bundle.paymentStatus === "PARTIAL" ? "一部入金" : "未入金"}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs ${bundle.supersessionOriginal ? "bg-red-100 text-red-700" : bundle.paymentStatus === "PAID" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{bundle.supersessionOriginal ? "差替済み" : bundle.paymentStatus === "PAID" ? "入金済み" : bundle.paymentStatus === "CREDITED" ? "相殺済み（入金なし）" : bundle.paymentStatus === "PARTIAL" ? "一部入金" : "未入金"}</span>
         <button className="text-blue-700 underline" onClick={() => setExpanded(expanded === bundle.id ? null : bundle.id)}>{expanded === bundle.id ? "閉じる" : "一覧で詳細を表示"}</button>
       </div>
       {expanded === bundle.id && <div className="mt-3 border-t pt-3 space-y-3">
@@ -145,7 +145,7 @@ export function ConsolidatedInvoicePanel() {
             {generatingId === bundle.id ? "PDF生成中..." : "PDF生成"}
           </button>}
         </div>
-        <p>入金: {bundle.paymentStatus === "PAID" ? "全額入金済み" : bundle.paymentStatus === "PARTIAL" ? "一部入金（個別確認）" : "未入金"} / 入金済 ¥{bundle.paidAmount.toLocaleString()} / 未収 ¥{bundle.outstandingBalance.toLocaleString()}</p>
+        <p>入金: {bundle.paymentStatus === "PAID" ? "全額入金済み" : bundle.paymentStatus === "CREDITED" ? "返金相殺済み（入金なし）" : bundle.paymentStatus === "PARTIAL" ? "一部入金（個別確認）" : "未入金"} / 入金済 ¥{bundle.paidAmount.toLocaleString()} / 未収 ¥{bundle.outstandingBalance.toLocaleString()}</p>
         <p>案内: {bundle.deliveryStatus === "CONFIRMED" ? "LINE 履歴確認済み（過去の送信記録）" : bundle.deliveryStatus === "NO_NEW_DELIVERY" ? bundle.paymentStatus === "PARTIAL" ? "一部入金のため新規案内不可（個別確認）" : bundle.paymentStatus === "PAID" ? "入金済みのため新規案内なし" : "入金・前受金などの履歴を要確認（新規案内不可）" : bundle.deliveryMethod === "BLOCKED" ? "要確認（元請求書の状態または送信履歴）" : bundle.deliveryMethod === "POSTAL" ? "POSTAL（郵送対象）" : bundle.deliveryStatus === "APPROVED" ? "LINE 送信待ち" : bundle.deliveryStatus === "POST_UNCONFIRMED" ? "LINE 送信結果未確定" : bundle.deliveryStatus === "CANCELLED" ? "LINE 送信待ち取消済み" : `LINE ${bundle.deliveryStatus}`}</p>
         {!bundle.operationalSafe && <p role="alert" className="text-sm font-semibold text-red-700">この集約請求は現在の元請求書・送信状態と一致しません。請求書としての有効性を確認してください。共有URLの案内は保留してください。</p>}
         <div className="flex flex-wrap gap-2">

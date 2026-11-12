@@ -28,6 +28,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
         include: {
             customer: true,
             billingCustomer: true,
+            historicalRefundAllocations: { select: { amount: true, status: true } },
             paymentAllocations: {
                 select: {
                     allocatedAmount: true,
@@ -42,7 +43,8 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
     if (!invoice) return notFound();
     const delivery = await getInvoiceDeliveryState(prisma, invoice.id);
 
-    const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
+    const paymentSummary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations,
+        invoice.customer.type === "business" ? invoice.historicalRefundAllocations : []);
     const prepaymentAppliedAmount = paymentSummary.prepaymentAppliedAmount;
     const paymentStatus = invoice.status === "void" || invoice.status === "canceled"
         ? "void"
@@ -70,6 +72,9 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
             invoicePayments={invoice.paymentAllocations.filter(row => row.payment.kind === "INVOICE").map(row => row.payment)}
         />
     );
+    const b2bCreditSummary = invoice.customer.type === "business" && paymentSummary.refundCreditAmount > 0
+        ? <p className="mt-2 text-sm">過去売上返金相殺: −¥{paymentSummary.refundCreditAmount.toLocaleString()} / 今回のお振込額: ¥{(invoice.grossTotalAmount - paymentSummary.refundCreditAmount).toLocaleString()} / 未収: ¥{paymentSummary.outstandingBalance.toLocaleString()}</p>
+        : null;
     const canModifyInvoice = invoice.status === "issued" || invoice.status === "paid";
     const canVoidInvoice = canModifyInvoice;
 
@@ -116,7 +121,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
                             <p className="mt-1">紐づいていた納品書は未請求状態に戻されています。</p>
                         </div>
                     ) : null}
-                    {paymentSummaryPanel}
+                    {b2bCreditSummary}{paymentSummaryPanel}
                     <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600">
                         <div className="flex gap-1">
                             <dt className="font-medium text-slate-800">version:</dt>
@@ -165,7 +170,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
                         <p className="mt-1">紐づいていた納品書は未請求状態に戻されています。</p>
                     </div>
                 ) : null}
-                {paymentSummaryPanel}
+                {b2bCreditSummary}{paymentSummaryPanel}
             </div>
         </div>
     );

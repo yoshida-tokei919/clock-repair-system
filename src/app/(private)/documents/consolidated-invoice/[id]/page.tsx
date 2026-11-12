@@ -9,6 +9,7 @@ import { IssuedDateEditor } from "@/components/documents/IssuedDateEditor";
 import { ConsolidatedInvoiceActions } from "@/components/invoices/ConsolidatedInvoiceActions";
 import { invoiceDeliveryKey } from "@/lib/invoice-delivery-routing";
 import { resolveInvoiceLineDestination } from "@/lib/invoice-delivery-routing";
+import { historicalRefundAllocationSelect } from "@/lib/b2b-historical-refund-allocation";
 
 export const dynamic = "force-dynamic";
 const yen = (amount: number) => `¥${amount.toLocaleString("ja-JP")}`;
@@ -23,6 +24,7 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
         discountBasisAmount: true, discountRateBps: true, discountAmount: true,
         shippingFeeAmount: true, grossTotalAmount: true, paymentDueDate: true, status: true, sentAt: true, lineSendRetryKey: true,
         lineSendStartedAt: true, pdfFiles: { select: { sentAt: true } },
+        historicalRefundAllocations: { select: historicalRefundAllocationSelect, orderBy: { id: "asc" } },
         paymentAllocations: { select: { allocatedAmount: true, releases: { select: { amount: true } },
           payment: { select: { status: true, kind: true, refunds: { select: { amount: true, status: true } } } } } } } } } },
   } });
@@ -36,16 +38,17 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
     prisma.lineManagerSendOutbox.count({ where: { idempotencyKey: { in: sourceIds.map(invoiceDeliveryKey) } } }),
     resolveInvoiceLineDestination(prisma, bundle.billingCustomerId),
   ]);
-  const paidAmount = bundle.sources.reduce((sum, source) => sum + calculateInvoicePaymentSummary(source.invoice, source.invoice.paymentAllocations).paidAmount, 0);
-  const outstanding = bundle.sources.reduce((sum, source) => sum + calculateInvoicePaymentSummary(source.invoice, source.invoice.paymentAllocations).outstandingBalance, 0);
-  const paymentStatus = outstanding === 0 ? "入金済み" : paidAmount > 0 ? "一部入金" : "未入金";
+  const paidAmount = bundle.sources.reduce((sum, source) => sum + calculateInvoicePaymentSummary(source.invoice, source.invoice.paymentAllocations, source.invoice.historicalRefundAllocations).paidAmount, 0);
+  const creditAmount = bundle.sources.reduce((sum, source) => sum + source.offsetCreditAmount, 0);
+  const outstanding = bundle.sources.reduce((sum, source) => sum + calculateInvoicePaymentSummary(source.invoice, source.invoice.paymentAllocations, source.invoice.historicalRefundAllocations).outstandingBalance, 0);
+  const paymentStatus = outstanding === 0 ? paidAmount > 0 ? "入金済み" : "相殺済み（入金なし）" : paidAmount > 0 ? "一部入金" : "未入金";
   const dueDates = bundle.sources.map(source => source.invoice.paymentDueDate?.getTime() ?? null);
   const dueDate = dueDates.length > 0 && dueDates[0] !== null && dueDates.every(value => value === dueDates[0])
     ? formatIssuedDate(new Date(dueDates[0])) : null;
   const pdfReady = isCurrentConsolidatedPdf(bundle.publication) && !!bundle.publication.publishedAt && validConsolidatedShareToken(bundle.publication.publicToken);
   const individuallyDelivered = individualOutboxCount > 0 || bundle.sources.some(source => source.invoice.sentAt || source.invoice.lineSendRetryKey || source.invoice.lineSendStartedAt || source.invoice.pdfFiles.some(file => file.sentAt));
   const snapshotSafe = !!bundle.issueState && hasConsolidatedSourceSnapshotIntegrity(bundle);
-  const unpaidSafe = outstanding === bundle.grossTotalAmount && paidAmount === 0 && prepaymentCount === 0 && bundle.sources.every(source => source.invoice.status === "issued" && source.invoice.paymentAllocations.length === 0);
+  const unpaidSafe = outstanding === bundle.grossTotalAmount - creditAmount && paidAmount === 0 && prepaymentCount === 0 && bundle.sources.every(source => source.invoice.status === "issued" && source.invoice.paymentAllocations.length === 0);
   let rows: ReturnType<typeof consolidatedDeliveryNoteRows> | null = null;
   try { rows = consolidatedDeliveryNoteRows(bundle); } catch { /* Incomplete snapshots cannot produce delivery note rows. */ }
   const canGenerate = snapshotSafe && !!rows && !bundle.publication && !outbox && !individuallyDelivered && unpaidSafe;
@@ -58,7 +61,7 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
     }
   } catch { /* Invalid stored dates must not enable reissue. */ }
   const canReissue = snapshotSafe && !!rows && pdfReady && !!currentIssuedDate && !outbox && !individuallyDelivered && unpaidSafe;
-  const canConfirmPayment = snapshotSafe && !individuallyDelivered && unpaidSafe;
+  const canConfirmPayment = snapshotSafe && !individuallyDelivered && unpaidSafe && outstanding > 0;
   const canQueue = snapshotSafe && pdfReady && !!destination && !outbox && !individuallyDelivered && unpaidSafe;
   const delivery = outbox?.status === "CONFIRMED" ? "LINE送信確認済み" : outbox?.status === "APPROVED" ? "LINE送信待ち（未送信）"
     : outbox ? `LINE ${outbox.status}` : individuallyDelivered ? "元請求書の個別送信履歴あり" : pdfReady ? "PDF発行済み・送信前" : "PDF未発行";
@@ -74,7 +77,7 @@ export default async function ConsolidatedInvoicePage({ params }: { params: Prom
           : <IssuedDateEditor type="consolidated-invoice" id={id} issuedDate={formatIssuedDate(bundle.issueState.issuedDate)} />}
         <p className="mt-2 text-sm">請求先: {bundle.companyName}</p>
         <p className="text-sm">支払期限: {dueDate ?? "未確定（元請求書の期限が一致しません）"}</p>
-        <p className="text-sm">請求額: {yen(bundle.grossTotalAmount)}　入金済: {yen(paidAmount)}　未収: {yen(outstanding)} <strong>{paymentStatus}</strong></p>
+        <p className="text-sm">請求額: {yen(bundle.grossTotalAmount)}　過去売上返金相殺: -{yen(creditAmount)}　今回のお振込額: {yen(bundle.grossTotalAmount - creditAmount)}　入金済: {yen(paidAmount)}　未収: {yen(outstanding)} <strong>{paymentStatus}</strong></p>
         {bundle.sources.some(source => source.discountBasisAmount !== null) && <p className="text-sm">割引前小計: {yen(bundle.sources.reduce((sum, source) => sum + (source.discountBasisAmount ?? source.totalAmount), 0))}　割引: -{yen(bundle.sources.reduce((sum, source) => sum + (source.discountAmount ?? 0), 0))}　割引後小計: {yen(bundle.sources.reduce((sum, source) => sum + source.totalAmount, 0))}　消費税: {yen(bundle.sources.reduce((sum, source) => sum + source.taxAmount, 0))}　送料: {yen(bundle.sources.reduce((sum, source) => sum + source.shippingFeeAmount, 0))}</p>}
         <p className="text-sm">案内: {delivery}</p>
         {!snapshotSafe && <p role="alert" className="mt-2 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">元請求書と作成時の請求内容が一致しません。新しい操作は停止しています。元請求書の内容を確認してください。</p>}

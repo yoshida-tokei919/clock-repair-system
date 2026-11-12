@@ -45,6 +45,7 @@ export default async function ConsolidatedCustomerPage({ params }: { params: Pro
           <div><dt className="text-slate-500">発行日</dt><dd className="font-semibold">{formatIssuedDate(bundle.issueState.issuedDate)}</dd></div>
           <div><dt className="text-slate-500">請求先（作成時）</dt><dd className="font-semibold">{bundle.companyName}</dd></div>
           <div className="sm:col-span-2"><dt className="text-slate-500">請求総額（税込）</dt><dd className="text-2xl font-bold text-blue-800">{yen(bundle.grossTotalAmount)}</dd></div>
+          {bundle.sources.some(source => source.offsetCreditAmount > 0) && <div className="sm:col-span-2">過去売上返金相殺: -{yen(bundle.sources.reduce((sum, source) => sum + source.offsetCreditAmount, 0))} / 今回のお振込額: {yen(bundle.grossTotalAmount - bundle.sources.reduce((sum, source) => sum + source.offsetCreditAmount, 0))}</div>}
           {newFormat && bundle.sources.some(source => source.discountBasisAmount !== null) && <div className="sm:col-span-2 text-sm">割引前小計 {yen(bundle.sources.reduce((sum, source) => sum + (source.discountBasisAmount ?? source.totalAmount), 0))} − 割引 {yen(bundle.sources.reduce((sum, source) => sum + (source.discountAmount ?? 0), 0))} = 割引後小計 {yen(bundle.sources.reduce((sum, source) => sum + source.totalAmount, 0))} / 消費税 {yen(bundle.sources.reduce((sum, source) => sum + source.taxAmount, 0))} / 送料 {yen(bundle.sources.reduce((sum, source) => sum + source.shippingFeeAmount, 0))}</div>}
         </dl>
       </section>

@@ -4,7 +4,7 @@ import { voidInvoice } from "./invoice-void";
 import { releaseAllocation } from "./allocation-release";
 
 function fixture(rows: any[], lineSendStartedAt: Date | null = null, lineSendRetryKey: string | null = null,
-  outboxStatus: string | null = null, consolidatedStatus: string | null = null) {
+  outboxStatus: string | null = null, consolidatedStatus: string | null = null, credited = false) {
   const releases: any[] = [];
   const queries: { sql: string; values: unknown[] }[] = [];
   let status = "issued";
@@ -18,7 +18,8 @@ function fixture(rows: any[], lineSendStartedAt: Date | null = null, lineSendRet
       }
       return [{ id: 1, lineSendStartedAt, lineSendRetryKey }];
     },
-    invoice: { findUnique: async () => ({ status, paymentAllocations: rows }),
+    invoice: { findUnique: async () => ({ status, paymentAllocations: rows,
+      historicalRefundAllocations: credited ? [{ id: 99 }] : [] }),
       update: async ({ data }: any) => { status = data.status; return { id: 1, invoiceNumber: "TI-1", status }; } },
     paymentAllocation: { findMany: async () => rows,
       findUnique: async ({ where, include }: any) => { const row = rows.find(r => r.id === where.id);
@@ -36,6 +37,13 @@ function row(kind: "INVOICE" | "REPAIR_PREPAYMENT", amount: number, refunds: any
   return { id: 1, paymentId: 2, allocatedAmount: amount, releases: [],
     payment: { kind, status: "SUCCEEDED", amount, refunds } };
 }
+
+test("credited invoice void is blocked before repair release", async () => {
+  const state = fixture([], null, null, null, null, true);
+  await assert.rejects(voidInvoice(state.db, 1, 1), /訂正手順が未対応/);
+  assert.equal(state.getStatus(), "issued");
+  assert.deepEqual(state.releases, []);
+});
 
 test("prepayment-only invoice void releases credit without deleting allocation", async () => {
   const original = row("REPAIR_PREPAYMENT", 5000);

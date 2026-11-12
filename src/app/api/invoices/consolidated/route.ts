@@ -6,6 +6,7 @@ import { calculateInvoicePaymentSummary } from "@/lib/invoice-payment";
 import { consolidatedDeliveryKey, consolidatedPaymentTotals } from "@/lib/consolidated-invoice-operations";
 import { invoiceDeliveryKey, resolveInvoiceLineDestination } from "@/lib/invoice-delivery-routing";
 import { isCurrentConsolidatedPdf, validConsolidatedShareToken } from "@/lib/consolidated-invoice-publication";
+import { historicalRefundAllocationSelect } from "@/lib/b2b-historical-refund-allocation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export async function GET() {
           discountBasisAmount: true, discountRateBps: true, discountAmount: true,
           sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true, pdfFiles: { select: { sentAt: true } },
           status: true, grossTotalAmount: true,
+           historicalRefundAllocations: { select: historicalRefundAllocationSelect, orderBy: { id: "asc" } },
           paymentAllocations: { select: { allocatedAmount: true, releases: { select: { amount: true } },
             payment: { select: { status: true, kind: true, refunds: { select: { amount: true, status: true } } } } } } } } }, orderBy: { id: "asc" } } } }),
   ]);
@@ -55,7 +57,7 @@ export async function GET() {
     let legacyDeliverySafe = true;
     let unpaidSafe = true;
     const sources = bundle.sources.map(({ invoice, ...source }) => {
-      const summary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations);
+      const summary = calculateInvoicePaymentSummary(invoice, invoice.paymentAllocations, invoice.historicalRefundAllocations);
       sourceSafe &&= (invoice.status === "issued" || invoice.status === "paid") && invoice.invoiceNumber === source.invoiceNumber &&
         invoice.customerId === source.sourceCustomerId && invoice.issuedDate.getTime() === source.issuedDate.getTime() &&
         invoice.totalAmount === source.totalAmount && invoice.taxAmount === source.taxAmount &&
@@ -63,13 +65,15 @@ export async function GET() {
         invoice.discountAmount === source.discountAmount &&
         invoice.shippingFeeAmount === source.shippingFeeAmount && invoice.grossTotalAmount === source.grossTotalAmount &&
         source.grossTotalAmount > 0 && source.grossTotalAmount === source.totalAmount + source.taxAmount + source.shippingFeeAmount;
-      unpaidSafe &&= invoice.status === "issued" && summary.outstandingBalance === source.grossTotalAmount &&
+      sourceSafe &&= summary.refundCreditAmount === source.offsetCreditAmount;
+      unpaidSafe &&= invoice.status === "issued" && summary.outstandingBalance === source.grossTotalAmount - source.offsetCreditAmount &&
         invoice.paymentAllocations.length === 0 && !prepaymentInvoiceIds.has(invoice.id);
       legacyDeliverySafe &&= !invoice.sentAt && !invoice.lineSendRetryKey &&
         !invoice.lineSendStartedAt && !invoice.pdfFiles.some(file => file.sentAt) &&
         !deliveryByKey.has(invoiceDeliveryKey(invoice.id));
       return { ...source, paidAmount: summary.paidAmount, outstandingBalance: summary.outstandingBalance,
-        paymentStatus: summary.outstandingBalance === 0 ? "PAID" : summary.paidAmount > 0 ? "PARTIAL" : "UNPAID" };
+        refundCreditAmount: summary.refundCreditAmount,
+        paymentStatus: summary.outstandingBalance === 0 ? summary.paidAmount > 0 ? "PAID" : "CREDITED" : summary.paidAmount > 0 ? "PARTIAL" : "UNPAID" };
     });
     const { paidAmount, outstandingBalance, paymentStatus } = consolidatedPaymentTotals(sources);
     const outboxStatus = deliveryByKey.get(consolidatedDeliveryKey(bundle.id));
@@ -77,13 +81,13 @@ export async function GET() {
       validConsolidatedShareToken(bundle.publication.publicToken);
     sourceSafe &&= sources.reduce((sum, source) => sum + source.grossTotalAmount, 0) === bundle.grossTotalAmount;
     const operationalSafe = !bundle.supersessionOriginal && sourceSafe && legacyDeliverySafe;
-    const newDeliverySafe = operationalSafe && unpaidSafe && paymentStatus === "UNPAID";
+    const newDeliverySafe = operationalSafe && unpaidSafe;
     const destination = outboxStatus || !pdfReady || !newDeliverySafe ? null : await resolveInvoiceLineDestination(prisma, bundle.billingCustomerId);
     return { ...bundle, issuedDate: bundle.issueState?.issuedDate ?? null, sources, paidAmount, outstandingBalance,
       paymentStatus,
       deliveryMethod: outboxStatus ? "LINE" : !operationalSafe ? "BLOCKED" : !newDeliverySafe ? "NONE" : destination ? "LINE" : "POSTAL",
       deliveryStatus: outboxStatus ?? (!operationalSafe ? "BLOCKED" : !newDeliverySafe ? "NO_NEW_DELIVERY" : destination ? "READY" : "PRINT_PENDING"), pdfReady,
-      canConfirmPayment: operationalSafe && unpaidSafe && paymentStatus === "UNPAID", operationalSafe };
+      canConfirmPayment: operationalSafe && unpaidSafe && outstandingBalance > 0, operationalSafe };
   }));
   return NextResponse.json({ eligible, bundles: result });
 }

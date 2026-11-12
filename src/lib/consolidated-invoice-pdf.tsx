@@ -22,6 +22,8 @@ export function consolidatedInvoiceDocumentData(data: ConsolidatedPdfData): Invo
     taxAmount: data.tax,
     shippingFeeAmount: hasDiscountSnapshots ? data.shipping : 0,
     grossTotalAmount: data.gross,
+    historicalRefundCredits: (data.offsetCredits ?? []).map(row => ({ amount: row.amount,
+      reference: `${row.sourceCustomerName} / ${row.reference}` })),
     bankInfo: "三井住友銀行　店番411\n普通 3602468\nヨシダ シュウヘイ",
   };
 }

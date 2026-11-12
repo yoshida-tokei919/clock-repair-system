@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { resolveLockedLineContact } from "./line-contact";
 import { businessEstimateLineKey, resolveLockedBusinessEstimateDestination } from "./estimate-line-confirmation";
 import { assertConsolidatedSourceUnpaid, isCurrentConsolidatedPdf, validConsolidatedShareToken } from "./consolidated-invoice-publication";
+import { historicalRefundAllocationSelect } from "./b2b-historical-refund-allocation";
 
 export class LineContactDestinationInvalidError extends Error {}
 
@@ -71,6 +72,7 @@ async function assertConsolidatedOutboxCurrent(tx: Prisma.TransactionClient, id:
       id: true, invoiceNumber: true, customerId: true, issuedDate: true, status: true,
       totalAmount: true, taxAmount: true, shippingFeeAmount: true, grossTotalAmount: true,
       sentAt: true, lineSendRetryKey: true, lineSendStartedAt: true, pdfFiles: { select: { sentAt: true } },
+      historicalRefundAllocations: { select: historicalRefundAllocationSelect, orderBy: { id: "asc" } },
       paymentAllocations: { select: { allocatedAmount: true, releases: { select: { amount: true } },
         payment: { select: { customerId: true, status: true, kind: true, provider: true,
           refunds: { select: { amount: true, status: true } } } } } },

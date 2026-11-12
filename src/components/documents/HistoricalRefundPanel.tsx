@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 
-type RepairOption = { id: number; inquiryNumber: string; refund?: { amount: number; status: string; method: string; taxStatus: string; originalSaleGrossAmount: number } };
+type RepairOption = { id: number; inquiryNumber: string; refund?: { amount: number; status: string; method: string; taxStatus: string; originalSaleGrossAmount: number;
+  allocations?: { amount: number; status: string }[] } };
 
 export function unsettledHistoricalRefundAmount(amount: number, status: string): number {
   return status === "PLANNED" || status === "AWAITING_OFFSET" ? amount : 0;
@@ -44,7 +45,7 @@ export function HistoricalRefundPanel({ noteId, repairs }: { noteId: number; rep
     <h2 className="font-semibold">過去修理の返金予定</h2>
     <p className="text-gray-600">売上・請求額には反映しません。相殺または銀行返金の完了は別途確認が必要です。登録後の訂正・取消は後続Taskで扱います。</p>
     {repairs.filter(repair => repair.refund).map(repair => <p key={repair.id} className="mt-1">
-      {repair.inquiryNumber}: 返金登録額 ¥{repair.refund!.amount.toLocaleString()} / 未精算返金額 ¥{unsettledHistoricalRefundAmount(repair.refund!.amount, repair.refund!.status).toLocaleString()} / 元売上税込額 ¥{repair.refund!.originalSaleGrossAmount.toLocaleString()} / 方法: {repair.refund!.method === "OFFSET" ? "請求相殺" : "銀行返金"} / 状態: {statusLabels[repair.refund!.status] ?? "状態不明"} / 税務{repair.refund!.taxStatus === "PENDING" ? "確認待ち" : "確認済み"}
+      {repair.inquiryNumber}: 返金登録額 ¥{repair.refund!.amount.toLocaleString()} / 請求相殺予約額 ¥{(repair.refund!.allocations ?? []).filter(row => row.status === "ACTIVE").reduce((sum, row) => sum + row.amount, 0).toLocaleString()} / 今後の相殺可能額 ¥{Math.max(0, unsettledHistoricalRefundAmount(repair.refund!.amount, repair.refund!.status) - (repair.refund!.allocations ?? []).filter(row => row.status === "ACTIVE").reduce((sum, row) => sum + row.amount, 0)).toLocaleString()} / 元売上税込額 ¥{repair.refund!.originalSaleGrossAmount.toLocaleString()} / 方法: {repair.refund!.method === "OFFSET" ? "請求相殺" : "銀行返金"} / 状態: {statusLabels[repair.refund!.status] ?? "状態不明"} / 税務{repair.refund!.taxStatus === "PENDING" ? "確認待ち" : "確認済み"}
     </p>)}
     {available && <form onSubmit={submit} className="mt-3 flex flex-wrap items-end gap-2">
       <label>対象案件<select className="ml-1 border p-1" value={repairId} onChange={event => setRepairId(Number(event.target.value))}>{repairs.filter(repair => !repair.refund).map(repair => <option key={repair.id} value={repair.id}>{repair.inquiryNumber}</option>)}</select></label>
