@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimepieceType } from "@prisma/client";
 import { Check, ChevronDown, ChevronUp, Clipboard, Link as LinkIcon, Plus, RefreshCw, Save, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -268,6 +268,10 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
   const [replyText, setReplyText] = useState("");
   const [replySubmitting, setReplySubmitting] = useState(false);
   const replyIntentRef = useRef<{ text: string; idempotencyKey: string } | null>(null);
+  const lineRequestRef = useRef<AbortController | null>(null);
+  const lineRequestVersion = useRef(0);
+  const lineMutationCountRef = useRef(0);
+  const lineHasPayloadRef = useRef(false);
 
   async function load() {
     setLoading(true);
@@ -288,22 +292,69 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
 
   useEffect(() => { void load(); }, [inquiryId]);
 
-  async function loadLine() {
-    setLineLoading(true);
-    setLineError(null);
+  const loadLine = useCallback(async (background = false) => {
+    if (background && (document.visibilityState !== "visible" || lineRequestRef.current || lineMutationCountRef.current > 0)) return;
+    lineRequestRef.current?.abort();
+    const controller = new AbortController();
+    const version = ++lineRequestVersion.current;
+    lineRequestRef.current = controller;
+    if (!background) {
+      setLineLoading(true);
+      setLineError(null);
+    }
     try {
-      const response = await fetch(`/api/inquiries/${inquiryId}/line`, { cache: "no-store" });
+      const response = await fetch(`/api/inquiries/${inquiryId}/line`, { cache: "no-store", signal: controller.signal });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "LINE履歴を読み込めませんでした。");
+      if (controller.signal.aborted || version !== lineRequestVersion.current) return;
       setLinePayload(data);
+      lineHasPayloadRef.current = true;
     } catch (loadError) {
-      setLineError(loadError instanceof Error ? loadError.message : "LINE履歴を読み込めませんでした。");
+      if (!background && !controller.signal.aborted && version === lineRequestVersion.current) {
+        setLineError(loadError instanceof Error ? loadError.message : "LINE履歴を読み込めませんでした。");
+      }
     } finally {
-      setLineLoading(false);
+      if (version === lineRequestVersion.current) {
+        lineRequestRef.current = null;
+        if (!background) setLineLoading(false);
+      }
     }
-  }
+  }, [inquiryId]);
 
-  useEffect(() => { void loadLine(); }, [inquiryId]);
+  useEffect(() => {
+    let timer: number | null = null;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadLine(lineHasPayloadRef.current);
+        timer = window.setInterval(() => { void loadLine(true); }, 30_000);
+      } else {
+        if (timer !== null) window.clearInterval(timer);
+        timer = null;
+        lineRequestRef.current?.abort();
+        lineRequestRef.current = null;
+        lineRequestVersion.current++;
+        setLineLoading(false);
+      }
+    };
+    onVisibilityChange();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      if (timer !== null) window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      lineRequestRef.current?.abort();
+      lineRequestRef.current = null;
+      lineRequestVersion.current++;
+      lineHasPayloadRef.current = false;
+    };
+  }, [loadLine]);
+
+  const pauseLineRefresh = () => {
+    lineMutationCountRef.current++;
+    lineRequestRef.current?.abort();
+    lineRequestRef.current = null;
+    lineRequestVersion.current++;
+    setLineLoading(false);
+  };
 
   const updateReplyText = (value: string) => {
     setReplyText(value);
@@ -323,6 +374,7 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
 
     setReplySubmitting(true);
     setLineError(null);
+    pauseLineRefresh();
     try {
       const response = await fetch(`/api/inquiries/${inquiryId}/line`, {
         method: "POST",
@@ -338,6 +390,7 @@ export function InquiryReviewScreen({ inquiryId }: { inquiryId: number }) {
     } catch (sendError) {
       setLineError(sendError instanceof Error ? sendError.message : "LINE送信待ちを作成できませんでした。");
     } finally {
+      lineMutationCountRef.current--;
       setReplySubmitting(false);
     }
   }
@@ -617,6 +670,8 @@ ${intakeUrl}` : "";
                     setNotice("LINEメッセージの関連時計を保存しました。");
                     await loadLine();
                   }}
+                  onClassificationSaving={pauseLineRefresh}
+                  onClassificationFinished={() => { lineMutationCountRef.current--; }}
                 />
               ))
             )}
@@ -814,11 +869,15 @@ function LineTimelineEntry({
   item,
   watchOptions,
   onClassificationSaved,
+  onClassificationSaving,
+  onClassificationFinished,
 }: {
   inquiryId: number;
   item: LineTimelineItem;
   watchOptions: LineWatchOption[];
   onClassificationSaved: () => Promise<void>;
+  onClassificationSaving: () => void;
+  onClassificationFinished: () => void;
 }) {
   if (item.kind === "outbox") {
     const isError = item.outbox.status === "PRE_SEND_FAILED";
@@ -877,6 +936,8 @@ function LineTimelineEntry({
             message={message}
             watchOptions={watchOptions}
             onSaved={onClassificationSaved}
+            onSaving={onClassificationSaving}
+            onFinished={onClassificationFinished}
           />
         </details>
       </div>
@@ -920,28 +981,37 @@ function LineClassificationEditor({
   message,
   watchOptions,
   onSaved,
+  onSaving,
+  onFinished,
 }: {
   inquiryId: number;
   message: LineMessage;
   watchOptions: LineWatchOption[];
   onSaved: () => Promise<void>;
+  onSaving: () => void;
+  onFinished: () => void;
 }) {
   const [scope, setScope] = useState<LineClassificationScope>(message.classification?.scope ?? "UNASSIGNED");
   const [watchIds, setWatchIds] = useState<number[]>(message.classification?.watchIds ?? []);
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const dirtyRef = useRef(false);
+  const classificationKey = JSON.stringify(message.classification);
 
   useEffect(() => {
+    if (dirtyRef.current) return;
     setScope(message.classification?.scope ?? "UNASSIGNED");
     setWatchIds(message.classification?.watchIds ?? []);
-  }, [message.classification]);
+  }, [classificationKey]);
 
   const changeScope = (nextScope: LineClassificationScope) => {
+    dirtyRef.current = true;
     setScope(nextScope);
     if (nextScope !== "WATCHES") setWatchIds([]);
   };
 
   const toggleWatch = (watchId: number) => {
+    dirtyRef.current = true;
     setScope("WATCHES");
     setWatchIds((current) => current.includes(watchId)
       ? current.filter((id) => id !== watchId)
@@ -956,6 +1026,7 @@ function LineClassificationEditor({
 
     setSaving(true);
     setLocalError(null);
+    onSaving();
     try {
       const response = await fetch(`/api/inquiries/${inquiryId}/line`, {
         method: "PATCH",
@@ -964,10 +1035,12 @@ function LineClassificationEditor({
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "関連付けを保存できませんでした。");
+      dirtyRef.current = false;
       await onSaved();
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "関連付けを保存できませんでした。");
     } finally {
+      onFinished();
       setSaving(false);
     }
   };

@@ -26,19 +26,68 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const intentRef = useRef<{ text: string; idempotencyKey: string } | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const requestVersion = useRef(0);
+  const mutationCountRef = useRef(0);
+  const hasPayloadRef = useRef(false);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const refresh = useCallback(async (background = false) => {
+    if (background && (document.visibilityState !== "visible" || requestRef.current || mutationCountRef.current > 0)) return;
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    const version = ++requestVersion.current;
+    requestRef.current = controller;
+    if (!background) { setLoading(true); setError(null); }
     try {
-      const response = await fetch(`/api/repairs/${repairId}/line`, { cache: "no-store" });
+      const response = await fetch(`/api/repairs/${repairId}/line`, { cache: "no-store", signal: controller.signal });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "LINE履歴を読み込めませんでした。");
+      if (controller.signal.aborted || version !== requestVersion.current) return;
       setPayload(data);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "LINE履歴を読み込めませんでした。"); }
-    finally { setLoading(false); }
+      hasPayloadRef.current = true;
+    } catch (cause) {
+      if (!background && !controller.signal.aborted && version === requestVersion.current) setError(cause instanceof Error ? cause.message : "LINE履歴を読み込めませんでした。");
+    } finally {
+      if (version === requestVersion.current) {
+        requestRef.current = null;
+        if (!background) setLoading(false);
+      }
+    }
   }, [repairId]);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    let timer: number | null = null;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refresh(hasPayloadRef.current);
+        timer = window.setInterval(() => { void refresh(true); }, 30_000);
+      } else {
+        if (timer !== null) window.clearInterval(timer);
+        timer = null;
+        requestRef.current?.abort();
+        requestRef.current = null;
+        requestVersion.current++;
+        setLoading(false);
+      }
+    };
+    onVisibilityChange();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      if (timer !== null) window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      requestRef.current?.abort();
+      requestRef.current = null;
+      requestVersion.current++;
+      hasPayloadRef.current = false;
+    };
+  }, [refresh]);
+
+  const pauseRefresh = () => {
+    mutationCountRef.current++;
+    requestRef.current?.abort();
+    requestRef.current = null;
+    requestVersion.current++;
+    setLoading(false);
+  };
 
   const timeline: Item[] = payload ? [
     ...payload.messages.map((message) => ({ kind: "message" as const, key: `message-${message.id}`, sortTie: message.id, at: message.receivedAt ?? message.sentAt ?? message.createdAt, relatedToCurrentRepair: message.relatedToCurrentRepair, message })),
@@ -55,6 +104,7 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
     let intent = intentRef.current;
     if (!intent || intent.text !== replyText) intent = intentRef.current = { text: replyText, idempotencyKey: crypto.randomUUID() };
     setSending(true); setError(null); setNotice(null);
+    pauseRefresh();
     try {
       const response = await fetch(`/api/repairs/${repairId}/line`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(intent) });
       const data = await response.json();
@@ -63,7 +113,7 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
       setNotice("LINE送信待ちに追加しました。実際の送信確認はまだ完了していません。");
       await refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "LINE送信待ちを作成できませんでした。"); }
-    finally { setSending(false); }
+    finally { mutationCountRef.current--; setSending(false); }
   }
 
   const repairLabel = (id: number) => {
@@ -112,7 +162,7 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
               {item.kind === "message" && item.message.messageType === "FILE" && <p className="text-zinc-500">ファイルメッセージ</p>}
               {item.kind === "message" && item.message.messageType === "OTHER" && <p className="text-zinc-500">その他のLINEメッセージ</p>}
               <div className="mt-2 text-right text-xs text-zinc-500">{item.kind === "outbox" ? statusLabels[item.outbox.status] : outgoing ? "送信済み" : "受信"} · {displayTime(item.at)}</div>
-              {item.kind === "message" && item.message.editable && <ClassificationEditor key={`${item.message.id}-${classification?.confirmedAt ?? "none"}`} inquiryId={item.message.inquiryId} message={item.message} watchOptions={payload.watchOptions} onSaved={refresh} />}
+              {item.kind === "message" && item.message.editable && <ClassificationEditor key={item.message.id} inquiryId={item.message.inquiryId} message={item.message} watchOptions={payload.watchOptions} onSaved={refresh} onSaving={pauseRefresh} onFinished={() => { mutationCountRef.current--; }} />}
             </div></div>
           </div>;
         })}
@@ -127,25 +177,33 @@ export function RepairLineConversation({ repairId }: { repairId: number }) {
   </section>;
 }
 
-function ClassificationEditor({ inquiryId, message, watchOptions, onSaved }: { inquiryId: number; message: Message; watchOptions: Payload["watchOptions"]; onSaved: () => Promise<void> }) {
+function ClassificationEditor({ inquiryId, message, watchOptions, onSaved, onSaving, onFinished }: { inquiryId: number; message: Message; watchOptions: Payload["watchOptions"]; onSaved: () => Promise<void>; onSaving: () => void; onFinished: () => void }) {
   const [scope, setScope] = useState<"WATCHES" | "COMMON" | "UNASSIGNED">(message.classification?.scope ?? "UNASSIGNED");
   const [watchIds, setWatchIds] = useState<number[]>(message.classification?.watchIds ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dirtyRef = useRef(false);
+  const classificationKey = JSON.stringify(message.classification);
+  useEffect(() => {
+    if (dirtyRef.current) return;
+    setScope(message.classification?.scope ?? "UNASSIGNED");
+    setWatchIds(message.classification?.watchIds ?? []);
+  }, [classificationKey]);
   async function save() {
     if (scope === "WATCHES" && watchIds.length === 0) { setError("時計を1件以上選択してください。"); return; }
-    setSaving(true); setError(null);
+    setSaving(true); setError(null); onSaving();
     try {
       const response = await fetch(`/api/inquiries/${inquiryId}/line`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messageId: message.id, scope, watchIds }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "関連付けを保存できませんでした。");
+      dirtyRef.current = false;
       await onSaved();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "関連付けを保存できませんでした。"); }
-    finally { setSaving(false); }
+    finally { onFinished(); setSaving(false); }
   }
   return <details className="mt-2 border-t pt-2"><summary className="cursor-pointer text-xs text-blue-700">関連を変更</summary><div className="mt-2 space-y-2 text-xs">
-    <div className="flex gap-2"><Button type="button" size="sm" variant={scope === "UNASSIGNED" ? "default" : "outline"} onClick={() => { setScope("UNASSIGNED"); setWatchIds([]); }}>未特定</Button><Button type="button" size="sm" variant={scope === "COMMON" ? "default" : "outline"} onClick={() => { setScope("COMMON"); setWatchIds([]); }}>共通</Button></div>
-    <p>時計に関連</p><div className="grid gap-1 sm:grid-cols-2">{watchOptions.map((watch) => <label key={watch.id} className="flex gap-2 rounded border p-2"><input type="checkbox" checked={watchIds.includes(watch.id)} onChange={() => { setScope("WATCHES"); setWatchIds((current) => current.includes(watch.id) ? current.filter((id) => id !== watch.id) : [...current, watch.id]); }} />時計{watch.position}{watch.label ? `・${watch.label}` : ""}</label>)}</div>
+    <div className="flex gap-2"><Button type="button" size="sm" variant={scope === "UNASSIGNED" ? "default" : "outline"} onClick={() => { dirtyRef.current = true; setScope("UNASSIGNED"); setWatchIds([]); }}>未特定</Button><Button type="button" size="sm" variant={scope === "COMMON" ? "default" : "outline"} onClick={() => { dirtyRef.current = true; setScope("COMMON"); setWatchIds([]); }}>共通</Button></div>
+    <p>時計に関連</p><div className="grid gap-1 sm:grid-cols-2">{watchOptions.map((watch) => <label key={watch.id} className="flex gap-2 rounded border p-2"><input type="checkbox" checked={watchIds.includes(watch.id)} onChange={() => { dirtyRef.current = true; setScope("WATCHES"); setWatchIds((current) => current.includes(watch.id) ? current.filter((id) => id !== watch.id) : [...current, watch.id]); }} />時計{watch.position}{watch.label ? `・${watch.label}` : ""}</label>)}</div>
     {error && <p className="text-red-700">{error}</p>}<Button type="button" size="sm" disabled={saving || (scope === "WATCHES" && watchIds.length === 0)} onClick={() => void save()}>{saving ? "保存中…" : "この関連を確定"}</Button>
   </div></details>;
 }
