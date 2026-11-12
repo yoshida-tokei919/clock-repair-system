@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleLineInquiryImage } from "@/lib/line-inquiry-image";
 import { resolveLineProfileDisplayName } from "@/lib/line-profile";
+import { checkLineInboxHealth } from "@/lib/line-inbox-health";
 import {
   claimLineWebhookInboxBatch,
   processLineWebhookInboxItem,
@@ -48,11 +49,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  let health: Awaited<ReturnType<typeof checkLineInboxHealth>> | { status: "unavailable" };
+  try {
+    health = await checkLineInboxHealth(prisma);
+  } catch {
+    console.warn("LINE inbox health check unavailable.");
+    health = { status: "unavailable" };
+  }
+
   return NextResponse.json({
     ok: failed.length === 0,
     scanned: claimedIds.length,
     processed,
     skipped,
     failed,
+    health,
   });
 }
