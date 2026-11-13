@@ -48,6 +48,8 @@ deploy_key.pub
 # Playwright MCP / 動作確認用スクリーンショット
 .playwright-mcp/
 *.png
+!src/app/icon.png
+!src/app/apple-icon.png
 !public/images/app-background-watch.png
 !docs/manual/assets/screenshots/*.png
 tsconfig.tsbuildinfo
