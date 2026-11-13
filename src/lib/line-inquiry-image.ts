@@ -12,6 +12,24 @@ export type LineInquiryImageDb = Pick<PrismaClient, "inquiryFile">;
 
 const MAX_LINE_IMAGE_BYTES = 20 * 1024 * 1024;
 
+export async function readLineImageStream(stream: ReadableStream<Uint8Array>) {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const part = await reader.read();
+    if (part.done) break;
+    size += part.value.byteLength;
+    if (size > MAX_LINE_IMAGE_BYTES) {
+      await reader.cancel().catch(() => {});
+      throw new Error("LINE image exceeds the allowed size.");
+    }
+    chunks.push(part.value);
+  }
+  if (size === 0) throw new Error("LINE image is empty.");
+  return Buffer.concat(chunks, size);
+}
+
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message.slice(0, 1000);
   return String(error).slice(0, 1000);
@@ -40,15 +58,12 @@ async function downloadLineImage(messageId: string) {
 
   const contentLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > MAX_LINE_IMAGE_BYTES) {
+    await response.body?.cancel().catch(() => {});
     throw new Error("LINE image exceeds the allowed size.");
   }
 
-  const body = Buffer.from(await response.arrayBuffer());
-  if (body.length > MAX_LINE_IMAGE_BYTES) {
-    throw new Error("LINE image exceeds the allowed size.");
-  }
-
-  return body;
+  if (!response.body) throw new Error("LINE image response has no body.");
+  return readLineImageStream(response.body);
 }
 
 export async function prepareInquiryImage(body: Buffer) {
