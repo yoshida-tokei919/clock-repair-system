@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { assertApprovalReturnAddress } from "@/lib/return-address";
@@ -11,8 +12,11 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const started = Date.now();
+  let outcome = "error";
   const repairId = await findRepairIdByPublicToken((await params).id);
   if (!repairId) {
+    console.info("public_approval", { route: "approve", elapsedMs: Date.now() - started, outcome });
     return NextResponse.json({ error: "修理案件が見つかりません。" }, { status: 404 });
   }
 
@@ -20,6 +24,7 @@ export async function POST(
   const result = await prisma.$transaction(async (tx) => {
     await lockEstimateOptions(tx, repairId);
     await assertNoUnansweredAlternatives(tx, repairId);
+    await tx.$queryRaw`SELECT "id" FROM "Repair" WHERE "id" = ${repairId} FOR UPDATE`;
     const repair = await tx.repair.findUnique({
       where: { id: repairId },
       include: {
@@ -45,6 +50,9 @@ export async function POST(
     if (["修理不可返却", "キャンセル返却"].includes(repair.status)) {
       throw new Error("返却処理済みの案件は承認できません。");
     }
+    if (repair.approvalStatus === "approved") {
+      throw new Error("この案件はすでに承認済みです。");
+    }
     await assertFreshReopenEstimate(tx, repairId, repair);
 
     if (repair.customer.type === "individual") {
@@ -64,21 +72,31 @@ export async function POST(
       },
     });
 
-    if (updateResult.count === 0) {
-      throw new Error("この案件はすでに承認済みです。");
-    }
+    if (updateResult.count === 0) throw new Error("承認状態が変更されました。");
 
     await reconcileRepairPartAllocations(tx, repair.id, {
       allowAdvanceFromApproval: true,
     });
 
-    return tx.repair.findUniqueOrThrow({ where: { id: repair.id } });
-  });
+    return await tx.repair.findUniqueOrThrow({ where: { id: repair.id } });
+  }, { timeout: 20_000 });
 
+  outcome = "success";
   return NextResponse.json({ success: true, repair: result });
   } catch (error) {
     if (error instanceof ReopenApprovalError) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof UnansweredEstimateOptionsError) return NextResponse.json({ error: error.message }, { status: 409 });
-    throw error;
+    if (error instanceof Error && ["この案件はすでに承認済みです。", "キャンセル済みの案件は承認できません。", "返却処理済みの案件は承認できません。",
+      "返送先を確認・入力してから承認してください。", "承認状態が変更されました。"].includes(error.message)) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028") {
+      console.error("Public repair approval transaction expired", { code: error.code });
+      return NextResponse.json({ error: "承認処理が時間内に完了しませんでした。時間をおいて再試行してください。" }, { status: 503 });
+    }
+    console.error("Public repair approval failed", { kind: error instanceof Error ? error.constructor.name : "unknown" });
+    return NextResponse.json({ error: "承認状態を確認できませんでした。" }, { status: 500 });
+  } finally {
+    console.info("public_approval", { route: "approve", elapsedMs: Date.now() - started, outcome });
   }
 }

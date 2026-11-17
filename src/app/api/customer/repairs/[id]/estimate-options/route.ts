@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { commonEstimateAmountMatches, documentTokenIncludesRepair, isIssuedOptionPdfCurrent, isSameOptionApproval, issuedOptionSourceHash, lockEstimateOptions, parseOptionSet, selectedOptionTotal, validateOptionSelection } from "@/lib/estimate-options";
 import { assertYen, sumCustomerLines } from "@/lib/pricing-tax";
@@ -16,6 +16,8 @@ class OptionApprovalConflict extends Error {
 type Submission = { repairId?: unknown; planChoiceId?: unknown; addOnChoiceIds?: unknown; approverName?: unknown; pdfFileId?: unknown; optionSourceHash?: unknown };
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const started = Date.now();
+  let outcome = "error";
   const token = (await params).id.trim();
   if (!token || token.length > 256) return NextResponse.json({ error: "共有URLが不正です。" }, { status: 404 });
   let body: Submission;
@@ -130,13 +132,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const reconciled = await reconcileRepairPartAllocations(tx, repair.id, { allowAdvanceFromApproval: true });
       await addStatusLogIfMissing(tx, repair.id, reconciled.status, approvedAt);
       return { alreadyApproved: false, grossAmount: totals.grossAmount, taxAmount: totals.taxAmount };
-    });
+    }, { timeout: 20_000 });
+    outcome = result.alreadyApproved ? "already_approved" : "success";
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     if (error instanceof ReopenApprovalError) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof OptionApprovalConflict) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof Error && /選択|金額|プラン|追加作業/.test(error.message)) return NextResponse.json({ error: error.message }, { status: 409 });
-    console.error("Public estimate option approval failed", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028") {
+      console.error("Public estimate option approval transaction expired", { code: error.code });
+      return NextResponse.json({ error: "承認処理が時間内に完了しませんでした。時間をおいて再試行してください。" }, { status: 503 });
+    }
+    console.error("Public estimate option approval failed", { kind: error instanceof Error ? error.constructor.name : "unknown" });
     return NextResponse.json({ error: "承認を保存できませんでした。" }, { status: 500 });
+  } finally {
+    console.info("public_approval", { route: "estimate-options", elapsedMs: Date.now() - started, outcome });
   }
 }

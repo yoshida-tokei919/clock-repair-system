@@ -387,6 +387,10 @@ export async function reconcileRepairPartAllocations(
         select: { partsMasterId: true, quantity: true, state: true },
     }) as AllocationRow[];
     const allocationByPart = new Map(allocations.map(row => [row.partsMasterId, row]));
+    const masterByPart = new Map<number, {
+        nameJp: string; nameEn: string | null; partRefs: string | null;
+        cousinsNumber: string | null; supplierId: number | null;
+    }>();
     const partIds = new Set<number>([
         ...Array.from(requiredByPart.keys()),
         ...allocations.map(row => row.partsMasterId),
@@ -406,9 +410,10 @@ export async function reconcileRepairPartAllocations(
         const reservedQuantity = current?.state === "RESERVED" ? current.quantity : 0;
         const master = await tx.partsMaster.findUnique({
             where: { id: partsMasterId },
-            select: { stockQuantity: true },
+            select: { stockQuantity: true, nameJp: true, nameEn: true, partRefs: true, cousinsNumber: true, supplierId: true },
         });
         if (!master) continue;
+        masterByPart.set(partsMasterId, master);
 
         const plan = getRepairPartAllocationPlan({
             requiredQuantity,
@@ -443,6 +448,7 @@ export async function reconcileRepairPartAllocations(
                 where: { repairId_partsMasterId: { repairId, partsMasterId } },
                 data: { quantity: 0, state: "RELEASED", releasedAt: new Date() },
             });
+            allocationByPart.set(partsMasterId, { partsMasterId, quantity: 0, state: "RELEASED" });
         } else if (requiredQuantity > 0) {
             await tx.repairPartAllocation.upsert({
                 where: { repairId_partsMasterId: { repairId, partsMasterId } },
@@ -458,6 +464,7 @@ export async function reconcileRepairPartAllocations(
                     releasedAt: null,
                 },
             });
+            allocationByPart.set(partsMasterId, { partsMasterId, quantity: plan.nextReservedQuantity, state: "RESERVED" });
         }
     }
 
@@ -468,10 +475,7 @@ export async function reconcileRepairPartAllocations(
 
     for (const partsMasterId of Array.from(partIds)) {
         const requiredQuantity = requiredByPart.get(partsMasterId) ?? 0;
-        const allocation = await tx.repairPartAllocation.findUnique({
-            where: { repairId_partsMasterId: { repairId, partsMasterId } },
-            select: { quantity: true, state: true },
-        });
+        const allocation = allocationByPart.get(partsMasterId);
         const allocatedQuantity = allocation?.state === "RESERVED" || allocation?.state === "CONSUMED"
             ? allocation.quantity
             : 0;
@@ -489,10 +493,7 @@ export async function reconcileRepairPartAllocations(
                 await tx.orderRequest.update({ where: { id: pending.id }, data: { status: "cancelled" } });
             }
         } else if (pendingTarget > 0) {
-            const master = await tx.partsMaster.findUnique({
-                where: { id: partsMasterId },
-                select: { nameJp: true, nameEn: true, partRefs: true, cousinsNumber: true, supplierId: true },
-            });
+            const master = masterByPart.get(partsMasterId);
             if (master) {
                 await tx.orderRequest.create({
                     data: {

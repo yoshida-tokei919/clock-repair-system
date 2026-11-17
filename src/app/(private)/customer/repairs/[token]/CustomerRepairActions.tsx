@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle, Clipboard, Copy, FileText, MessageCircle, Share2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { createApprovalSubmitLatch } from "@/lib/customer-approval-submit-latch";
+import { canRecoverApprovedStatus, isTerminalApprovalRepairStatus } from "@/lib/customer-approval-recovery";
 
 type CustomerMessage = {
   id: number;
@@ -224,6 +226,10 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
   const [approved, setApproved] = useState(isApproved);
+  const [approvalChecking, setApprovalChecking] = useState(false);
+  const [approvalNotice, setApprovalNotice] = useState("");
+  const approvalSubmitLatch = useRef(createApprovalSubmitLatch());
+  const approvalUncertain = useRef(false);
   const [postingOptOut, setPostingOptOut] = useState(photoPostingOptOut);
   const [uncontrolledApprovalDialogOpen, setUncontrolledApprovalDialogOpen] = useState(false);
   const [cancelReturnDialogOpen, setCancelReturnDialogOpen] = useState(false);
@@ -264,7 +270,7 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(result.error || "処理に失敗しました。");
+        throw Object.assign(new Error(result.error || "処理に失敗しました。"), { status: response.status });
       }
       return result;
     } finally {
@@ -290,19 +296,44 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
   };
 
   const handleApprove = async () => {
-    if (approved || loading || approvalDisabled || (!isBusiness && !completeApprovalAddress)) return;
+    if (approvalUncertain.current || approved || loading || approvalDisabled || (!isBusiness && !completeApprovalAddress) || !approvalSubmitLatch.current.tryStart()) return;
+    setApprovalChecking(true);
+    setApprovalNotice("承認を確認しています…");
     try {
-      await postAction("approve");
+      const result = await postAction("approve");
+      if (!result.success) throw new Error("承認結果を確認できませんでした。");
+      approvalUncertain.current = true;
       setApproved(true);
       setApprovalDialogOpen(false);
       router.refresh();
-      alert("承認しました。");
+      setApprovalNotice(result.alreadyApproved ? "この案件はすでに承認済みです。" : "承認しました。");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "承認に失敗しました。");
+      approvalUncertain.current = true;
+      try {
+        const response = await fetch(`/api/customer/repairs/${encodeURIComponent(token)}/approval-status`, { cache: "no-store" });
+        if (!response.ok) throw new Error("status unavailable");
+        const status = await response.json();
+        if (isTerminalApprovalRepairStatus(status.repairStatus)) {
+          setApprovalNotice("案件の状態が変更されました。ページを読み直して状態をご確認ください。");
+        } else if (canRecoverApprovedStatus(status)) {
+          setApproved(true);
+          setApprovalDialogOpen(false);
+          setApprovalNotice("この案件はすでに承認済みです。");
+          router.refresh();
+        } else {
+          setApprovalNotice(status.approvalStatus === "pending"
+            ? `${(error as Error & { status?: number })?.status === 409 && error instanceof Error ? `${error.message} ` : ""}現在は未承認です。処理中の可能性があるため、ページを読み直してから状態をご確認ください。`
+            : "承認状態を確認してください。ページを読み直してください。");
+        }
+      } catch {
+        setApprovalNotice("承認結果を確認できません。ページを読み直してから状態をご確認ください。");
+      }
     }
+    finally { approvalSubmitLatch.current.finish(); setApprovalChecking(false); }
   };
 
   const handleReject = async () => {
+    if (approvalChecking) return;
     if (!comment.trim()) {
       if (isBusiness) {
         setCommentPrompt("修正を依頼する内容を入力してください。");
@@ -327,7 +358,7 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
   };
 
   const handleCancelReturn = async () => {
-    if (!isBusiness || loading) return;
+    if (!isBusiness || loading || approvalChecking) return;
     try {
       await postAction("cancel-return");
       setCancelReturnDialogOpen(false);
@@ -365,16 +396,17 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
             {showApproval && <button
               type="button"
               onClick={handleApprove}
-              disabled={approved || !!loading}
+               disabled={approved || !!loading || approvalChecking || !!approvalNotice}
               className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckCircle className="h-5 w-5" />
-              <span>{approved ? "承認済み" : "この内容で承認する"}</span>
+               <span>{approved ? "承認済み" : approvalChecking ? "承認を確認中…" : "この内容で承認する"}</span>
             </button>}
+            {approvalNotice && <p role="status" className="text-sm text-slate-700">{approvalNotice}</p>}
             {!(isApproved && !showApproval) && <button
               type="button"
               onClick={() => { setCorrectionMode(true); setCommentPrompt(""); setCommentDialogOpen(true); }}
-              disabled={!!loading}
+              disabled={!!loading || approvalChecking}
               className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               <span>修正を依頼する</span>
@@ -382,7 +414,7 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
             <button
               type="button"
               onClick={() => setCancelReturnDialogOpen(true)}
-              disabled={!!loading || ["送付待ち", "納品済み", "キャンセル"].includes(repairStatus)}
+              disabled={!!loading || approvalChecking || ["送付待ち", "納品済み", "キャンセル"].includes(repairStatus)}
               className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-3 text-sm font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span>キャンセル・返却する</span>
@@ -400,7 +432,7 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
             </DialogHeader>
             <DialogFooter className="gap-2">
               <button type="button" onClick={() => setCancelReturnDialogOpen(false)} disabled={!!loading} className="h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">戻る</button>
-              <button type="button" onClick={() => void handleCancelReturn()} disabled={!!loading} className="h-11 rounded-lg bg-red-600 px-4 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
+              <button type="button" onClick={() => void handleCancelReturn()} disabled={!!loading || approvalChecking} className="h-11 rounded-lg bg-red-600 px-4 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
                 {loading === "cancel-return" ? "処理中..." : "キャンセル・返却を確定"}
               </button>
             </DialogFooter>
@@ -445,7 +477,7 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
               <textarea id={`comment-input-${inquiryNumber}`} value={comment} onChange={(event) => setComment(event.target.value.slice(0, 500))} className="max-h-32 min-h-12 w-full resize-y rounded-lg border border-slate-300 p-2 text-base leading-6 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder={correctionMode ? "修正してほしい内容を入力" : "コメントを入力してください"} maxLength={500} />
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span className="text-xs text-slate-500">{comment.length}/500文字</span>
-                <button type="button" onClick={() => void (correctionMode ? handleReject() : handleComment())} disabled={!!loading || !comment.trim()} className="min-h-10 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50">{loading ? "送信中..." : correctionMode ? "修正依頼を送信" : "コメント送信"}</button>
+                <button type="button" onClick={() => void (correctionMode ? handleReject() : handleComment())} disabled={!!loading || (correctionMode && approvalChecking) || !comment.trim()} className="min-h-10 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50">{loading ? "送信中..." : correctionMode ? "修正依頼を送信" : "コメント送信"}</button>
               </div>
             </div>
           </DialogContent>
@@ -469,10 +501,10 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
             <button
               type="button"
               onClick={() => setApprovalDialogOpen(true)}
-              disabled={approved || !!loading}
+               disabled={approved || !!loading || approvalChecking || !!approvalNotice}
               className="h-12 w-full rounded-lg bg-blue-600 px-4 text-base font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {approved ? "承認済み" : "この内容で進める"}
+               {approved ? "承認済み" : approvalChecking ? "承認を確認中…" : "この内容で進める"}
             </button>
           </div>
 
@@ -485,11 +517,12 @@ export function CustomerRepairActions({ token, isBusiness, isApproved = false, s
               {completeApprovalAddress ? <div className="rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-800"><p className="font-bold">{approvalAddress?.recipientName}</p><p>〒{approvalAddress?.postalCode}</p><p>{[approvalAddress?.prefecture, approvalAddress?.city, approvalAddress?.street, approvalAddress?.building].filter(Boolean).join("")}</p><p>TEL {approvalAddress?.phone}</p></div> : <p className="text-sm leading-6 text-slate-600">返送先が登録されていません。<br />承認前に返送先をご入力ください。</p>}
               <DialogFooter className="gap-2 sm:flex-col sm:items-stretch">
                 <button type="button" onClick={() => { setApprovalDialogOpen(false); onEditReturnAddress?.(); }} className="h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">{completeApprovalAddress ? "返送先を変更する" : "返送先を入力する"}</button>
-                <button type="button" onClick={() => void handleApprove()} disabled={approved || !!loading || approvalDisabled || !completeApprovalAddress} className="h-11 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50">この返送先で承認する</button>
+                <button type="button" onClick={() => void handleApprove()} disabled={approved || !!loading || approvalChecking || !!approvalNotice || approvalDisabled || !completeApprovalAddress} className="h-11 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white disabled:opacity-50">{approvalChecking ? "承認を確認中…" : "この返送先で承認する"}</button>
                 <button type="button" onClick={() => setApprovalDialogOpen(false)} className="h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">キャンセル</button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          {approvalNotice && <p role="status" className="mt-3 text-sm text-slate-700">{approvalNotice}</p>}
 
           {lineUrl && <a href={lineUrl} target="_blank" rel="noopener noreferrer" className="mt-4 flex h-12 items-center justify-center rounded-lg border border-[#06c755] bg-white px-4 text-base font-bold text-[#078a3f] hover:bg-[#f0fbf4]">LINEで相談する</a>}
 

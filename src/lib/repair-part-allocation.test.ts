@@ -212,6 +212,57 @@ test("approval reconciliation counts received units through current stock only",
     }
 });
 
+test("approval reconciles three part lines and a repeat does not reserve stock twice", async () => {
+    const stock = new Map([[1, 2], [2, 0], [3, 1]]);
+    const allocated = new Map<number, { partsMasterId: number; quantity: number; state: "RESERVED" }>();
+    const orders: Array<{ id: number; partsMasterId: number; quantity: number; status: string }> = [];
+    let masterReads = 0;
+    const tx = {
+        repair: {
+            findUnique: async () => ({ status: "承認待ち", approvalStatus: "approved", partsAllocationLegacy: false, customer: { type: "business" } }),
+            update: async () => undefined,
+        },
+        estimateItem: { findMany: async () => [1, 2, 3].map(partsMasterId => ({ partsMasterId, quantity: partsMasterId === 2 ? 2 : 1 })) },
+        repairPartAllocation: {
+            findMany: async () => [...allocated.values()],
+            findUnique: () => { throw new Error("allocation must not be read again per part"); },
+            upsert: async ({ create, update }: { create: { partsMasterId: number; quantity: number }; update: { quantity: number } }) => {
+                allocated.set(create.partsMasterId, { partsMasterId: create.partsMasterId, quantity: update.quantity, state: "RESERVED" });
+            },
+        },
+        partsMaster: {
+            findUnique: async ({ where }: { where: { id: number } }) => {
+                masterReads++;
+                return { stockQuantity: stock.get(where.id)!, nameJp: `part ${where.id}`, nameEn: null, partRefs: null, cousinsNumber: null, supplierId: null };
+            },
+            updateMany: async ({ where, data }: { where: { id: number; stockQuantity: { gte: number } }; data: { stockQuantity: { decrement: number } } }) => {
+                const current = stock.get(where.id)!;
+                if (current < where.stockQuantity.gte) return { count: 0 };
+                stock.set(where.id, current - data.stockQuantity.decrement);
+                return { count: 1 };
+            },
+        },
+        orderRequest: {
+            findMany: async () => [...orders],
+            create: async ({ data }: { data: { partsMasterId: number; quantity: number } }) => {
+                orders.push({ id: orders.length + 1, partsMasterId: data.partsMasterId, quantity: data.quantity, status: "pending" });
+            },
+            update: async () => undefined,
+        },
+        repairStatusLog: { findFirst: async () => ({ status: "承認待ち" }), create: async () => undefined },
+    } as unknown as Prisma.TransactionClient;
+
+    await reconcileRepairPartAllocations(tx, 7, { allowAdvanceFromApproval: true });
+    assert.deepEqual([...stock], [[1, 1], [2, 0], [3, 0]]);
+    assert.deepEqual([...allocated.values()].map(row => row.quantity), [1, 0, 1]);
+    assert.deepEqual(orders.map(order => [order.partsMasterId, order.quantity]), [[2, 2]]);
+    assert.equal(masterReads, 3);
+
+    await reconcileRepairPartAllocations(tx, 7, { allowAdvanceFromApproval: true });
+    assert.deepEqual([...stock], [[1, 1], [2, 0], [3, 0]]);
+    assert.equal(orders.length, 1);
+});
+
 test("stock 2 / required 1 reserves exactly one", () => {
     assert.deepEqual(getRepairPartAllocationPlan({ requiredQuantity: 1, reservedQuantity: 0, availableStock: 2 }), {
         reserveQuantity: 1, releaseQuantity: 0, nextReservedQuantity: 1, orderShortage: 0,
