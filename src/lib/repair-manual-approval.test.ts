@@ -8,7 +8,7 @@ import { addConfirmedRepairStatusLog } from "./repair-part-allocation";
 
 function fixture(customerType: "business" | "individual" = "business") {
   const repair = {
-    id: 8, status: "見積中", approvalStatus: "pending", approvalDate: null as Date | null,
+    id: 8, status: "見積中", approvalStatus: "pending", approvalDate: null as Date | null, estimateDocumentId: null,
     customer: { type: customerType }, estimate: { items: [{ itemName: "作業", quantity: 1, unitPrice: 1000 }] },
     returnRecipientName: customerType === "individual" ? "顧客" : null,
     returnPostalCode: customerType === "individual" ? "1000001" : null,
@@ -67,16 +67,46 @@ test("oral B2B approval records actor and date without backdating the work statu
   assert.equal(f.logs.length, 3, "audit events do not fabricate another status transition");
 });
 
-test("B2C approval requires return address and saved estimate", async () => {
+test("B2C offline approval records the confirmed date without a return address", async () => {
   const f = fixture("individual");
+  f.repair.returnRecipientName = null;
+  f.repair.returnPostalCode = null;
+  f.repair.returnPrefecture = null;
+  f.repair.returnCity = null;
   f.repair.returnStreet = null;
-  await assert.rejects(recordManualApproval(f.tx as never, 8, new Date(), 42, f.reconcile as never), /返送先/);
-  f.repair.returnStreet = "千代田1-1";
+  f.repair.returnPhone = null;
+  const approvalDate = new Date("2026-10-14T01:00:00Z");
+  await recordManualApproval(f.tx as never, 8, approvalDate, 42, f.reconcile as never);
+  assert.equal(f.repair.approvalStatus, "approved");
+  assert.equal(f.repair.approvalDate?.toISOString(), approvalDate.toISOString());
+  assert.equal(f.logs.at(-1)?.status, `EVENT:APPROVAL_RECORDED:${approvalDate.toISOString()}`);
+  assert.equal(f.logs.at(-1)?.changedBy, 42);
+});
+
+test("B2C approval still requires saved estimate lines", async () => {
+  const f = fixture("individual");
   f.repair.estimate.items = [];
   await assert.rejects(recordManualApproval(f.tx as never, 8, new Date(), 42, f.reconcile as never), /見積明細/);
-  f.repair.estimate.items = [{ itemName: "作業", quantity: 1, unitPrice: 1000 }];
-  await recordManualApproval(f.tx as never, 8, new Date("2026-10-14T01:00:00Z"), 42, f.reconcile as never);
-  assert.equal(f.repair.approvalStatus, "approved");
+  assert.equal(f.repair.approvalStatus, "pending");
+  assert.equal(f.getReconcileCalls(), 0);
+});
+
+test("canceled and returned repairs still reject manual approval", async () => {
+  for (const status of ["キャンセル", "修理不可返却", "キャンセル返却"]) {
+    const f = fixture("individual");
+    f.repair.status = status;
+    await assert.rejects(recordManualApproval(f.tx as never, 8, new Date(), 42, f.reconcile as never), /承認できません/);
+    assert.equal(f.repair.approvalStatus, "pending");
+    assert.equal(f.getReconcileCalls(), 0);
+  }
+});
+
+test("reopened repair still requires a fresh estimate document", async () => {
+  const f = fixture("individual");
+  f.logs.push({ id: 2, repairId: 8, status: "EVENT:REOPENED:1", changedAt: new Date("2026-10-13T00:00:00Z"), changedBy: 42 });
+  await assert.rejects(recordManualApproval(f.tx as never, 8, new Date(), 42, f.reconcile as never), /再開後の見積明細/);
+  assert.equal(f.repair.approvalStatus, "pending");
+  assert.equal(f.getReconcileCalls(), 0);
 });
 
 test("approval date correction appends actor event and does not allocate again", async () => {

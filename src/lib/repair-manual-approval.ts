@@ -2,7 +2,6 @@ import type { Prisma } from "@prisma/client";
 
 import { approvalAuditStatus, APPROVAL_EVENT_PREFIX } from "@/lib/repair-approval-audit";
 import { addConfirmedRepairStatusLog, reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
-import { assertApprovalReturnAddress } from "@/lib/return-address";
 import { assertNoUnansweredAlternatives } from "@/lib/estimate-options";
 import { assertFreshReopenEstimate } from "@/lib/repair-reopen-approval";
 
@@ -15,7 +14,7 @@ export async function recordManualApproval(
 ) {
   const current = await tx.repair.findUnique({
     where: { id: repairId },
-    include: { customer: { select: { type: true } }, estimate: { include: { items: true } } },
+    include: { estimate: { include: { items: true } } },
   });
   if (!current) throw new Error("修理案件が見つかりません。");
   await assertNoUnansweredAlternatives(tx, repairId);
@@ -24,10 +23,6 @@ export async function recordManualApproval(
   await assertFreshReopenEstimate(tx, repairId, current);
   if (!current.estimate?.items.some((item) => item.itemName.trim() && item.quantity > 0 && item.unitPrice >= 0)) {
     throw new Error("承認前に見積明細を保存してください。");
-  }
-  if (current.customer.type === "individual") {
-    try { assertApprovalReturnAddress(current.customer.type, current); }
-    catch { throw new Error("返送先を確認・入力してから承認してください。"); }
   }
   if (current.approvalStatus === "approved" && current.approvalDate?.getTime() === approvalDate.getTime()) {
     return current;
