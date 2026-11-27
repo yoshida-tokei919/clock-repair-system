@@ -120,7 +120,7 @@ function getEstimateTotal(repair: any) {
   return getEstimateItems(repair).reduce((sum: number, item: any) => sum + item.unitPrice * (item.quantity || 1), 0);
 }
 
-const estimatePendingMessage = "お見積はPDF発行後にご案内します。";
+const estimatePendingMessage = "現在、お見積りを準備しております。お見積りができ次第、改めてご案内いたします。";
 const estimateChangedMessage = "現在の見積内容を確認中です。発行済みPDFをご確認ください。";
 const estimateApprovedMessage = "お見積りは承認済みです。発行済みPDFと修理状況をご確認ください。";
 
