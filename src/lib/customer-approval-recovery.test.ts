@@ -10,6 +10,7 @@ const committed = { approvalStatus: "approved", repairStatus: "承認待ち", op
 
 test("a lost response can confirm the committed selection without another POST", () => {
   assert.equal(matchesApprovedOptionSelection(committed, attempt), true);
+  assert.equal(matchesApprovedOptionSelection(committed, { pdfFileId: 7, optionSourceHash: "issued-v2", planChoiceId: 3, addOnChoiceIds: [5, 9] }), true);
 });
 
 test("pending or unknown status cannot be shown as approved", () => {
@@ -23,6 +24,9 @@ test("a different choice, PDF, or issued estimate cannot confirm the attempted a
   assert.equal(matchesApprovedOptionSelection(committed, { ...attempt, pdfFileId: 8 }), false);
   assert.equal(matchesApprovedOptionSelection(committed, { ...attempt, optionSourceHash: "issued-v3" }), false);
   assert.equal(matchesApprovedOptionSelection(committed, { ...attempt, approverName: "別の担当者" }), false);
+  const individualAttempt = { pdfFileId: 7, optionSourceHash: "issued-v2", planChoiceId: 3, addOnChoiceIds: [5, 9] };
+  assert.equal(matchesApprovedOptionSelection(committed, { ...individualAttempt, optionSourceHash: "other" }), false);
+  assert.equal(matchesApprovedOptionSelection(committed, { ...individualAttempt, addOnChoiceIds: [5] }), false);
 });
 
 test("terminal repair outcomes cannot be recovered as approval success", () => {

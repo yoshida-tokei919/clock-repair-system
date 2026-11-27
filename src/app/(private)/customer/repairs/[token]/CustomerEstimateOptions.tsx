@@ -17,6 +17,7 @@ export function CustomerEstimateOptions(props: {
   commonLines: Line[]; choices: Choice[]; mode: PricingTaxMode;
   pdfFileId: number | null; optionSourceHash: string; available: boolean; approved: boolean;
   pdfHref?: string;
+  customerType: "individual" | "business";
   unavailableMessage?: string;
   returnAddress?: ReturnAddress;
   approvedPlanId?: number | null; approvedAddOnIds?: number[];
@@ -44,7 +45,8 @@ export function CustomerEstimateOptions(props: {
   const lineLabel = (line: Line) => customerOptionLineLabel(line.displayNameSnapshot || line.itemNameSnapshot, line.lineType);
   const planName = (choice: Choice) => customerPlanName(choice.name, plans.indexOf(choice));
   const canReview = props.available && !props.approved && !resolved && !uncertain && (!plans.length || !!plan) &&
-    (props.commonLines.length > 0 || Boolean(plan?.lines.length) || selectedAddOns.some(choice => choice.lines.length > 0)) && !!approverName.trim();
+    (props.commonLines.length > 0 || Boolean(plan?.lines.length) || selectedAddOns.some(choice => choice.lines.length > 0)) &&
+    (props.customerType === "individual" || !!approverName.trim());
   const submit = async () => {
     if (submitBlocked.current || !confirming || !canReview || !props.pdfFileId || submitting || !submitLatch.current.tryStart()) return;
     setSubmitting(true); setError("");
@@ -54,7 +56,8 @@ export function CustomerEstimateOptions(props: {
       const response = await fetch(`/api/customer/repairs/${encodeURIComponent(props.token)}/estimate-options`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ repairId: props.repairId, planChoiceId: planId, addOnChoiceIds: requestedAddOns,
-          approverName: approverName.trim(), pdfFileId: props.pdfFileId, optionSourceHash: props.optionSourceHash }),
+          ...(props.customerType === "business" ? { approverName: approverName.trim() } : {}),
+          pdfFileId: props.pdfFileId, optionSourceHash: props.optionSourceHash }),
       });
       const result = await response.json();
       if (!response.ok || !result.ok) {
@@ -73,7 +76,8 @@ export function CustomerEstimateOptions(props: {
         if (!response.ok) throw new Error("status unavailable");
         const status = await response.json();
         const same = matchesApprovedOptionSelection(status, { pdfFileId: props.pdfFileId, optionSourceHash: props.optionSourceHash,
-          planChoiceId: planId, addOnChoiceIds: requestedAddOns, approverName: approverName.trim() });
+          planChoiceId: planId, addOnChoiceIds: requestedAddOns,
+          ...(props.customerType === "business" ? { approverName: approverName.trim() } : {}) });
         if (isTerminalApprovalRepairStatus(status.repairStatus)) {
           setError("案件の状態が変更されました。ページを読み直して状態をご確認ください。");
         } else if (status.approvalStatus === "approved" && same) {
@@ -125,9 +129,9 @@ export function CustomerEstimateOptions(props: {
     {props.approved || resolved ? <p className="mt-4 font-bold text-green-700">この選択内容は承認済みです。改訂・再承認は工房へご相談ください。</p> : <>
       <p className="mt-4 text-sm text-slate-600">見積内容の変更が必要な場合はコメントで工房へご相談ください。発行後のプラン改訂はこの画面では対応していません。</p>
       {address && <button type="button" className="mt-4 block text-sm text-blue-700 underline" onClick={() => setAddressOpen(true)}>返送先を確認・編集する</button>}
-      <label className="mt-4 block text-sm font-bold">承認者のお名前{address ? "" : "（取引先ご担当者）"}<input className="mt-1 w-full rounded border border-slate-300 p-2" value={approverName} maxLength={100} disabled={!props.available || submitting || uncertain} onChange={event => { setApproverName(event.target.value); setConfirming(false); }} /></label>
+      {props.customerType === "business" && <label className="mt-4 block text-sm font-bold">承認者のお名前（取引先ご担当者）<input className="mt-1 w-full rounded border border-slate-300 p-2" value={approverName} maxLength={100} disabled={!props.available || submitting || uncertain} onChange={event => { setApproverName(event.target.value); setConfirming(false); }} /></label>}
       {!confirming ? <button type="button" className="mt-4 rounded bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50" disabled={!canReview} onClick={() => setConfirming(true)}>選択内容を確認する</button>
-        : <div className="mt-4 rounded border border-blue-300 p-3"><p className="font-bold">承認内容の最終確認</p><p>プラン: {plan ? planName(plan) : "なし"}</p><p>追加作業: {selectedAddOns.map(choice => choice.name).join("、") || "なし"}</p><p>承認者: {approverName.trim()}</p><p className="font-bold">税込合計: {money(totals.grossAmount)}</p><button type="button" className="mt-3 rounded bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50" disabled={submitting || uncertain} onClick={submit}>{submitting ? "承認を確認中…" : "この内容で承認を確定する"}</button><button type="button" className="ml-3 text-sm underline" disabled={submitting || uncertain} onClick={() => setConfirming(false)}>選択に戻る</button></div>}
+        : <div className="mt-4 rounded border border-blue-300 p-3"><p className="font-bold">承認内容の最終確認</p><p>プラン: {plan ? planName(plan) : "なし"}</p><p>追加作業: {selectedAddOns.map(choice => choice.name).join("、") || "なし"}</p>{props.customerType === "business" && <p>承認者: {approverName.trim()}</p>}<p className="font-bold">税込合計: {money(totals.grossAmount)}</p><button type="button" className="mt-3 rounded bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50" disabled={submitting || uncertain} onClick={submit}>{submitting ? "承認を確認中…" : "この内容で承認を確定する"}</button><button type="button" className="ml-3 text-sm underline" disabled={submitting || uncertain} onClick={() => setConfirming(false)}>選択に戻る</button></div>}
     </>}
     {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="mt-3 text-sm text-green-700">{notice}</p>}

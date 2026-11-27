@@ -12,12 +12,12 @@ export type ApprovalStatusSnapshot = {
 
 export function matchesApprovedOptionSelection(
   snapshot: ApprovalStatusSnapshot,
-  attempt: { pdfFileId: number; optionSourceHash: string; planChoiceId: number | null; addOnChoiceIds: number[]; approverName: string },
+  attempt: { pdfFileId: number; optionSourceHash: string; planChoiceId: number | null; addOnChoiceIds: number[]; approverName?: string },
 ): boolean {
   const saved = snapshot.optionApproval;
   return canRecoverApprovedStatus(snapshot) && !!saved &&
     saved.pdfFileId === attempt.pdfFileId && saved.optionSourceHash === attempt.optionSourceHash &&
-    saved.approverName === attempt.approverName &&
+    (attempt.approverName === undefined || saved.approverName === attempt.approverName) &&
     saved.planChoiceId === attempt.planChoiceId && Array.isArray(saved.addOnChoiceIds) &&
     saved.addOnChoiceIds.every((id: unknown) => Number.isSafeInteger(id)) &&
     JSON.stringify([...saved.addOnChoiceIds].sort((a: number, b: number) => a - b)) ===

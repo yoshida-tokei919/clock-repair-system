@@ -7,12 +7,14 @@ import { reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { addStatusLogIfMissing } from "../_workflow";
 import { assertFreshReopenEstimate, isEstimateDocumentArchived, ReopenApprovalError } from "@/lib/repair-reopen-approval";
 import { assertApprovalReturnAddress } from "@/lib/return-address";
+import { optionApproverName } from "@/lib/option-approver-name";
 
 export const runtime = "nodejs";
 
 class OptionApprovalConflict extends Error {
   status = 409;
 }
+class OptionApprovalInputError extends Error {}
 
 type Submission = { repairId?: unknown; planChoiceId?: unknown; addOnChoiceIds?: unknown; approverName?: unknown; pdfFileId?: unknown; optionSourceHash?: unknown };
 
@@ -25,9 +27,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: "回答が不正です。" }, { status: 400 }); }
   if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "回答が不正です。" }, { status: 400 });
-  const approverName = typeof body.approverName === "string" ? body.approverName.trim() : "";
-  if (!approverName || approverName.length > 100 || !Number.isSafeInteger(body.pdfFileId) || typeof body.optionSourceHash !== "string") {
-    return NextResponse.json({ error: "承認者名と見積内容を確認してください。" }, { status: 400 });
+  if (!Number.isSafeInteger(body.pdfFileId) || typeof body.optionSourceHash !== "string") {
+    return NextResponse.json({ error: "見積内容を確認してください。" }, { status: 400 });
   }
 
   try {
@@ -64,6 +65,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             customerId: repair.customerId, customerType: repair.customer.type, estimateDocumentId: repair.estimateDocumentId })) {
         throw new OptionApprovalConflict("共有URLの対象案件が一致しません。");
       }
+      const approverName = optionApproverName(repair.customer.type, document.customer.name, body.approverName);
+      if (!approverName) throw new OptionApprovalInputError("承認者名と見積内容を確認してください。");
       if (await isEstimateDocumentArchived(tx, documentId)) {
         throw new OptionApprovalConflict("再開前の見積書は履歴です。新しい見積書を確認してください。");
       }
@@ -138,6 +141,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     outcome = result.alreadyApproved ? "already_approved" : "success";
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
+    if (error instanceof OptionApprovalInputError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof ReopenApprovalError) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof OptionApprovalConflict) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof Error && /選択|金額|プラン|追加作業/.test(error.message)) return NextResponse.json({ error: error.message }, { status: 409 });

@@ -306,6 +306,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
                 </section>}
 
                 {activeOptions && repairToken && <CustomerEstimateOptions token={repairToken} repairId={repair.id} inquiryNumber={repair.inquiryNumber}
+                  customerType="individual"
                   title={activeOptions.title} notes={activeOptions.notes}
                   commonLines={getOptionCommonLines(repair)}
                   choices={activeOptions.choices.map((choice: any) => ({ id: choice.id, kind: choice.kind, name: choice.name, notes: choice.notes,
@@ -606,6 +607,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
 
                   {activeOptions && <CustomerEstimateOptions
                     token={repair.publicToken || token} repairId={repair.id} inquiryNumber={repair.inquiryNumber}
+                    customerType="business"
                     title={activeOptions.title} notes={activeOptions.notes}
                     commonLines={getOptionCommonLines(repair)}
                     choices={activeOptions.choices.map((choice: any) => ({ id: choice.id, kind: choice.kind, name: choice.name,
