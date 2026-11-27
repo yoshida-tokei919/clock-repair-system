@@ -12,6 +12,7 @@ type PublicEstimateDocument = {
   id: number;
   currentPdfFileId: number | null;
   storageKey: string | null;
+  status: string | null;
   fileName: string | null;
   contentType: string | null;
 };
@@ -31,6 +32,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
       d."id",
       d."currentPdfFileId",
       f."storageKey",
+      f."status",
       f."fileName",
       f."contentType"
     FROM "EstimateDocument" d
@@ -47,6 +49,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
         d."id",
         d."currentPdfFileId",
         f."storageKey",
+        f."status",
         f."fileName",
         f."contentType"
       FROM "Repair" r
@@ -63,7 +66,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     estimateDocument = repairTokenEstimateDocument;
   }
 
-  if (!estimateDocument.currentPdfFileId || !estimateDocument.storageKey) {
+  if (!estimateDocument.currentPdfFileId || !estimateDocument.storageKey || estimateDocument.status !== "current") {
     return pdfNotGenerated();
   }
 

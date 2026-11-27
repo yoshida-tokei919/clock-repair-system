@@ -215,7 +215,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   let pdfFile: { id: number; version: number } | undefined;
   const sourceFingerprint = estimatePdfSourceFingerprint(estimateDocument);
-  const optionSourceHashes = Object.fromEntries(estimateDocument.repairs.filter(repair => repair.estimateOptionSet?.isActive)
+  const optionSourceHashes = Object.fromEntries(estimateDocument.repairs
     .map(repair => [String(repair.id), issuedOptionSourceHash({ ...estimateDocument, issuedDate: requestedDate ?? estimateDocument.issuedDate }, repair)]));
 
   try {

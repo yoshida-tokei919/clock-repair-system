@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { PaymentStatus } from "@prisma/client";
 
@@ -26,6 +25,8 @@ import { visibleCustomerCommentTarget } from "@/lib/b2b-repair-comment-notice";
 import { isIssuedOptionPdfCurrent, issuedOptionSourceHash, visibleCustomerOptionSet } from "@/lib/estimate-options";
 import { CustomerEstimateOptions } from "./CustomerEstimateOptions";
 import { displayEstimateOptionContactNote, sharedEstimateExplanation } from "@/lib/estimate-option-contact-text";
+import { hasCurrentPublishedEstimate, hasIssuedPdf, publishedApprovedEstimate, type PublishedApprovedEstimate } from "@/lib/customer-estimate-publication";
+import { customerOptionLineLabel, customerOptionLineQuantity } from "@/lib/customer-option-line-label";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,10 @@ function getOptionCommonLines(repair: any) {
 function getEstimateTotal(repair: any) {
   return getEstimateItems(repair).reduce((sum: number, item: any) => sum + item.unitPrice * (item.quantity || 1), 0);
 }
+
+const estimatePendingMessage = "お見積はPDF発行後にご案内します。";
+const estimateChangedMessage = "現在の見積内容を確認中です。発行済みPDFをご確認ください。";
+const estimateApprovedMessage = "お見積りは承認済みです。発行済みPDFと修理状況をご確認ください。";
 
 function getEstimateAmounts(repair: any) {
   const lineSum = getEstimateTotal(repair);
@@ -229,6 +234,25 @@ function CustomerShipmentStatusSection({ shipments }: { shipments: ReturnType<ty
   );
 }
 
+function ApprovedEstimateSection({ snapshot, pdfHref }: { snapshot: PublishedApprovedEstimate; pdfHref?: string }) {
+  return <section className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h2 className="text-lg font-bold">承認済みのお見積り</h2>
+      {pdfHref && <PdfLinkButton href={pdfHref} />}
+    </div>
+    <div className="mt-3 divide-y divide-slate-100">
+      {snapshot.lines.map((line, index) => <div key={index} className="flex items-start justify-between gap-3 py-2 text-sm">
+        <span className="min-w-0 break-words">{customerOptionLineLabel(line.name, line.lineType)}{customerOptionLineQuantity(line.quantity, line.quantityUnit)}</span>
+        <span className="shrink-0 font-mono">¥{(line.unitPrice * line.quantity).toLocaleString("ja-JP")}</span>
+      </div>)}
+    </div>
+    <div className="mt-3 flex items-center justify-between border-t border-emerald-200 pt-3 font-bold">
+      <span>承認済み税込合計</span>
+      <span className="font-mono text-xl text-emerald-800">¥{snapshot.grossAmount.toLocaleString("ja-JP")}</span>
+    </div>
+  </section>;
+}
+
 type ShippingDecisionView = { choice: "SHIP_COMPLETED" | "WAIT_ALL" | null; repairs: { inquiryNumber: string; completedAtRequest: boolean }[] };
 type GroupDeliveryView = Awaited<ReturnType<typeof getPublicIntakeDeliveryPreference>>;
 function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn, documentTokenAccess, shippingDecision, groupDelivery }: { token: string; repairs: any[]; documentMeta: { estimateNumber: string; issuedDate: Date } | null; prepaymentReturn?: string; documentTokenAccess: boolean; shippingDecision?: ShippingDecisionView; groupDelivery?: GroupDeliveryView }) {
@@ -239,7 +263,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
         <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-bold tracking-wide text-slate-500">時計修理のご案内</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">修理状況・お見積</h1>
-          {documentMeta && <p className="mt-2 text-sm text-slate-500">{documentMeta.estimateNumber} / {new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo" }).format(documentMeta.issuedDate)}</p>}
+          {documentMeta && repairs.some(hasIssuedPdf) && <p className="mt-2 text-sm text-slate-500">{documentMeta.estimateNumber} / {new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo" }).format(documentMeta.issuedDate)}</p>}
         </header>
 
         {prepaymentReturn === "success" && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">前受金のお支払い結果を確認中です。反映まで少し時間がかかる場合があります。</p>}
@@ -268,20 +292,23 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
             const optionHash = activeOptions && repair.estimateDocument && repair.estimate
               ? issuedOptionSourceHash(repair.estimateDocument, repair) : "";
             const optionPdf = repair.estimateDocument?.currentPdfFile;
+            const issuedPdf = hasIssuedPdf(repair);
+            const publishedEstimate = hasCurrentPublishedEstimate(repair);
+            const approvedSnapshot = publishedApprovedEstimate(repair);
             const optionAvailable = Boolean(repairToken && activeOptions && !repair.partsAllocationLegacy &&
               repair.customerId === repair.estimateDocument?.customerId && repair.approvalStatus === "pending" &&
               repair.status === "承認待ち" && repair.estimateDocument &&
-              isIssuedOptionPdfCurrent(optionPdf, repair.estimateDocument.id, repair.id, optionPdf?.id ?? -1, optionHash));
+              publishedEstimate);
             const readToken = repairToken ?? (documentTokenAccess ? token : null);
             const prepaymentToken = repairToken ?? (documentTokenAccess ? token : null);
             const primaryPhotoUrl = getRepairPhotoUrl(receptionPhotos[0], readToken ?? undefined);
-            const status = getCustomerStatus(repair.status);
+            const status = repair.status === "承認待ち" && !publishedEstimate ? getCustomerStatus("見積中") : getCustomerStatus(repair.status);
             const watchName = getWatchBrandModelLine(repair);
             const identifiers = [
               repair.watch?.reference?.name && `Ref. ${repair.watch.reference.name}`,
               repair.watch?.caliber?.name && `Cal. ${repair.watch.caliber.name}`,
             ].filter(Boolean);
-            const explanationText = displayEstimateOptionContactNote(repair.customerNote);
+            const explanationText = publishedEstimate ? displayEstimateOptionContactNote(repair.customerNote) : "";
 
             return (
               <CustomerRepairAccordionItem
@@ -294,18 +321,18 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-lg font-bold leading-6 text-slate-950">{watchName || "時計情報を確認中"}</p>
                       {identifiers.length > 0 && <p className="mt-1 break-words text-sm leading-5 text-slate-500">{identifiers.join(" / ")}</p>}
-                      {!(activeOptions && repair.approvalStatus === "pending") && <div className="mt-3"><p className="text-xs font-bold text-slate-500">税込合計</p><p className="font-mono text-2xl font-bold text-blue-700">¥{total.toLocaleString()}</p></div>}
+                      {publishedEstimate && !(activeOptions && repair.approvalStatus === "pending") && <div className="mt-3"><p className="text-xs font-bold text-slate-500">税込合計</p><p className="font-mono text-2xl font-bold text-blue-700">¥{total.toLocaleString()}</p></div>}
                     </div>
                   </div>
                 }
               >
-                {!(activeOptions && repair.approvalStatus === "pending") && <section className="rounded-xl border border-slate-200 bg-white p-4">
+                {publishedEstimate && !(activeOptions && repair.approvalStatus === "pending") && <section className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">{isDedicatedReturnStatus(repair.status) ? "返却・最終精算内容" : activeOptions && repair.approvalStatus === "pending" ? "共通見積内容（選択前）" : "見積内容"}</h2>{repair.estimateDocument && readToken && <PdfLinkButton href={`/customer/repairs/${readToken}/estimate.pdf`} />}</div>
                    <div className="mt-3 divide-y divide-slate-100">{estimateItems.length === 0 ? <p className="py-3 text-sm text-slate-500">{activeOptions ? "共通明細はありません。各プランの内容をご確認ください。" : "見積明細はまだありません。"}</p> : estimateItems.map((item: any) => <div key={item.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div className="min-w-0 font-medium">{item.type === "part" ? formatPartDisplay({ name: item.itemName, grade: item.partsMaster?.grade, note2: item.partsMaster?.notes2 }) : item.itemName}<div className="text-xs font-normal text-slate-500">数量 {item.quantity || 1}{item.quantityUnit ?? ""} × 単価 ¥{item.unitPrice.toLocaleString()}</div></div><span className="shrink-0 font-mono font-bold">¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}</span></div>)}</div>
                   <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm"><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "課税対象額（税込）" : "税抜小計"}</span><span className="font-mono">¥{(repair.estimate?.pricingTaxMode === "INCLUSIVE" ? total : subtotal).toLocaleString()}</span></div><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "内消費税（10%）" : "消費税（10%）"}</span><span className="font-mono">¥{taxAmount.toLocaleString()}</span></div><div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2"><span className="font-bold">{activeOptions && repair.approvalStatus === "pending" ? "共通見積の税込額（選択前）" : "税込合計"}</span><span className="font-mono text-xl font-bold text-blue-700">¥{total.toLocaleString()}</span></div></div>
                 </section>}
 
-                {activeOptions && repairToken && <CustomerEstimateOptions token={repairToken} repairId={repair.id} inquiryNumber={repair.inquiryNumber}
+                {publishedEstimate && activeOptions && repair.approvalStatus === "pending" && repairToken && <CustomerEstimateOptions token={repairToken} repairId={repair.id} inquiryNumber={repair.inquiryNumber}
                   customerType="individual"
                   title={activeOptions.title} notes={activeOptions.notes}
                   commonLines={getOptionCommonLines(repair)}
@@ -320,6 +347,9 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
                   returnAddress={{ recipientName: repair.returnRecipientName || "", postalCode: repair.returnPostalCode || "",
                     prefecture: repair.returnPrefecture || "", city: repair.returnCity || "", street: repair.returnStreet || "",
                     building: repair.returnBuilding || "", phone: repair.returnPhone || "" }} />}
+
+                {approvedSnapshot && <ApprovedEstimateSection snapshot={approvedSnapshot} pdfHref={readToken ? `/customer/repairs/${readToken}/estimate.pdf` : undefined} />}
+                {!publishedEstimate && !approvedSnapshot && <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">{repair.approvalStatus === "approved" ? estimateApprovedMessage : issuedPdf ? estimateChangedMessage : estimatePendingMessage}{issuedPdf && readToken && <div className="mt-3"><PdfLinkButton href={`/customer/repairs/${readToken}/estimate.pdf`} /></div>}</section>}
 
                 {repair.prepayments.length > 0 && (
                   <section className="rounded-xl border border-blue-200 bg-white p-4">
@@ -344,7 +374,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
 
                 {customerPhotos.length > 0 && readToken && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{customerPhotos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo, readToken); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
 
-                {repairToken && <CustomerB2CApprovalPanel token={repairToken} isApproved={repair.approvalStatus === "approved"} showApproval={!activeOptions && needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} photoPostingOptOut={repair.photoPostingOptOut} address={{ recipientName: repair.returnRecipientName || "", postalCode: repair.returnPostalCode || "", prefecture: repair.returnPrefecture || "", city: repair.returnCity || "", street: repair.returnStreet || "", building: repair.returnBuilding || "", phone: repair.returnPhone || "" }} />}
+                {repairToken && <CustomerB2CApprovalPanel token={repairToken} isApproved={repair.approvalStatus === "approved"} showApproval={publishedEstimate && !activeOptions && needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} photoPostingOptOut={repair.photoPostingOptOut} address={{ recipientName: repair.returnRecipientName || "", postalCode: repair.returnPostalCode || "", prefecture: repair.returnPrefecture || "", city: repair.returnCity || "", street: repair.returnStreet || "", building: repair.returnBuilding || "", phone: repair.returnPhone || "" }} />}
               </CustomerRepairAccordionItem>
             );
           })}
@@ -424,10 +454,9 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
   const customerName = isBusiness
     ? primaryRepair.customer.companyName || primaryRepair.customer.name
     : primaryRepair.customer.name;
-  const pageTotal = repairs.reduce((sum, repair) => sum + getEstimateTotal(repair), 0);
   const explanations = isBusiness
-    ? repairs.map(repair => sharedEstimateExplanation(repair, repair.customer))
-    : repairs.map(repair => displayEstimateOptionContactNote(repair.customerNote));
+    ? repairs.map(repair => hasCurrentPublishedEstimate(repair) ? sharedEstimateExplanation(repair, repair.customer) : "")
+    : repairs.map(repair => hasCurrentPublishedEstimate(repair) ? displayEstimateOptionContactNote(repair.customerNote) : "");
   const exportRepairs = repairs.map((repair, index) => {
     const amountToken = repair.publicToken || `${token}:${repair.id}`;
     const repairActionToken = repair.publicToken || token;
@@ -442,7 +471,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
       model: repair.watch?.model?.name || "",
       reference: repair.watch?.reference?.name || "",
       serialNumber: repair.watch?.serialNumber || "",
-      shopEstimate: getEstimateTotal(repair),
+      shopEstimate: hasCurrentPublishedEstimate(repair) ? getEstimateTotal(repair) : 0,
       customerEstimate: "",
       explanation: explanations[index],
       privateMemo: "",
@@ -464,7 +493,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                 <h1 className="text-2xl font-bold tracking-tight">お見積確認ページ</h1>
               </div>
               <p className="mt-3 text-base text-slate-700">共有先: {customerName} 様</p>
-              {documentMeta && (
+              {documentMeta && repairs.some(hasIssuedPdf) && (
                 <p className="mt-1 text-sm text-slate-500">
                   {documentMeta?.estimateNumber} / {documentMeta?.issuedDate.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                 </p>
@@ -517,9 +546,12 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
               const optionHash = activeOptions && repair.estimateDocument && repair.estimate
                 ? issuedOptionSourceHash(repair.estimateDocument, repair) : "";
               const optionPdf = repair.estimateDocument?.currentPdfFile;
+              const issuedPdf = hasIssuedPdf(repair);
+              const publishedEstimate = hasCurrentPublishedEstimate(repair);
+              const approvedSnapshot = publishedApprovedEstimate(repair);
               const optionAvailable = Boolean(activeOptions && !repair.partsAllocationLegacy && repair.customerId === repair.estimateDocument?.customerId &&
                 repair.approvalStatus === "pending" && repair.status === "承認待ち" &&
-                repair.estimateDocument && isIssuedOptionPdfCurrent(optionPdf, repair.estimateDocument.id, repair.id, optionPdf?.id ?? -1, optionHash));
+                publishedEstimate);
 
               const repairHeader = (
                 <div className="min-w-0 space-y-2">
@@ -551,11 +583,11 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                       <span className={`inline-flex rounded-full border px-4 py-2 text-lg font-bold shadow-sm ${getStatusBadgeClass(repair.status)}`}>
                         {repair.status}
                       </span>
-                      <p className="text-sm font-medium text-slate-700">{getStatusMessage(repair.status)}</p>
+                      <p className="text-sm font-medium text-slate-700">{repair.status === "承認待ち" && !publishedEstimate ? estimatePendingMessage : getStatusMessage(repair.status)}</p>
                     </div>
                   }
                 >
-                  {!(activeOptions && repair.approvalStatus === "pending") && <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  {publishedEstimate && !(activeOptions && repair.approvalStatus === "pending") && <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="-mx-4 -mt-4 mb-4 flex items-center justify-between gap-3 bg-[#f2f7ff] px-4 py-3">
                       <h2 className="text-lg font-bold text-slate-900">{isDedicatedReturnStatus(repair.status) ? "返却・最終精算内容" : activeOptions && repair.approvalStatus === "pending" ? "共通見積内容（選択前）" : "見積内容"}</h2>
                       {repair.estimateDocument && <PdfLinkButton href={publicPdfHref} />}
@@ -605,7 +637,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                     </div>
                   </section>}
 
-                  {activeOptions && <CustomerEstimateOptions
+                  {publishedEstimate && activeOptions && repair.approvalStatus === "pending" && <CustomerEstimateOptions
                     token={repair.publicToken || token} repairId={repair.id} inquiryNumber={repair.inquiryNumber}
                     customerType="business"
                     title={activeOptions.title} notes={activeOptions.notes}
@@ -623,7 +655,10 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                     approvedAddOnIds={Array.isArray(repair.estimateOptionApproval?.addOnChoiceIds) ? repair.estimateOptionApproval.addOnChoiceIds as number[] : []}
                   />}
 
-                  {explanationText && (
+                  {approvedSnapshot && <ApprovedEstimateSection snapshot={approvedSnapshot} pdfHref={publicPdfHref} />}
+                  {!publishedEstimate && !approvedSnapshot && <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">{repair.approvalStatus === "approved" ? estimateApprovedMessage : issuedPdf ? estimateChangedMessage : estimatePendingMessage}{issuedPdf && <div className="mt-3"><PdfLinkButton href={publicPdfHref} /></div>}</section>}
+
+                  {publishedEstimate && explanationText && (
                     <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <h2 className="text-lg font-bold text-slate-900">お客様への説明</h2>
@@ -638,7 +673,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                   <CustomerRepairActions
                     token={repairActionToken}
                     isBusiness={isBusiness}
-                    showApproval={!activeOptions}
+                    showApproval={publishedEstimate && !activeOptions && needsCustomerApproval(repair)}
                     isApproved={repair.approvalStatus === "approved"}
                     inquiryNumber={repair.inquiryNumber}
                     repairStatus={repair.status}
@@ -648,7 +683,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                     customerName={customerName || "取引先"}
                   />
 
-                  <CustomerGuideAmountInput amountKey={amountKey} baseAmount={subtotal} />
+                  {publishedEstimate && <CustomerGuideAmountInput amountKey={amountKey} baseAmount={subtotal} />}
 
                   <PartnerPrivateMemo token={privateMemoToken} inquiryNumber={repair.inquiryNumber} />
                 </CustomerRepairAccordionItem>
@@ -656,7 +691,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
             })}
           </CustomerRepairAccordionRoot>
 
-          <CustomerExportTools repairs={exportRepairs} />
+          {repairs.every(hasCurrentPublishedEstimate) && <CustomerExportTools repairs={exportRepairs} />}
         </div>
       </main>
     );
@@ -664,142 +699,4 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
 
   const prepaymentReturn = (await searchParams).prepayment;
   return <CustomerRepairB2CPage token={token} repairs={repairs} documentMeta={documentMeta} prepaymentReturn={typeof prepaymentReturn === "string" ? prepaymentReturn : undefined} documentTokenAccess={Boolean(documentTokenRow)} shippingDecision={shippingDecision} groupDelivery={groupDelivery} />;
-
-  return (
-    <main className="min-h-screen bg-slate-100 px-3 py-4 text-slate-900 sm:px-4 sm:py-8">
-      <div className="mx-auto max-w-2xl space-y-4">
-        <header className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-          <p className="text-xs font-bold text-blue-600">Estimate Confirmation</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">お見積確認ページ</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            内容をご確認いただき、ご不明点があれば承認前にコメントでご相談ください。
-          </p>
-        </header>
-
-        <section className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <div className="text-xs font-bold text-slate-500">お客様</div>
-              <div className="text-lg font-bold">{customerName || "お客様"}</div>
-              {documentMeta && (
-                <p className="mt-1 text-xs text-slate-500">
-                  {documentMeta?.estimateNumber} / {documentMeta?.issuedDate.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
-                </p>
-              )}
-            </div>
-            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-right">
-              <div className="text-xs font-bold text-blue-700">税込合計</div>
-              <div className="font-mono text-3xl font-bold text-blue-700">¥{pageTotal.toLocaleString()}</div>
-            </div>
-          </div>
-        </section>
-
-        {repairs.map((repair, index) => {
-          const estimateItems = getEstimateItems(repair);
-          const total = getEstimateTotal(repair);
-          const watchName = [repair.watch?.brand?.name, repair.watch?.model?.name].filter(Boolean).join(" ");
-          const explanationText = displayEstimateOptionContactNote(repair.customerNote);
-          const repairActionToken = repair.publicToken || token;
-
-          return (
-            <section key={repair.id} className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm">
-              <div className="border-b border-slate-100 bg-gradient-to-r from-blue-50 to-white p-4">
-                <div className="flex items-start gap-3">
-                  {repairs.length > 1 && (
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                      {index + 1}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="text-xs font-bold text-slate-500">お問合番号</div>
-                        <div className="font-mono text-xl font-bold text-slate-950">{repair.inquiryNumber}</div>
-                      </div>
-                      <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
-                        {repair.status}
-                      </span>
-                    </div>
-                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-xs font-bold text-slate-500">時計情報</div>
-                      <div className="mt-1 text-base font-bold">{watchName || "-"}</div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        Ref: {repair.watch?.reference?.name || "-"} / Serial: {repair.watch?.serialNumber || "-"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4 p-4">
-                <div>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <h2 className="text-base font-bold">見積内容</h2>
-                    {repair.estimateDocument && (
-                      <Link
-                        href={`/documents/estimate/${repair.estimateDocument.id}`}
-                        className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white hover:bg-slate-700"
-                      >
-                        PDFを見る
-                      </Link>
-                    )}
-                  </div>
-
-                  <div className="divide-y overflow-hidden rounded-lg border border-slate-200">
-                    {estimateItems.length === 0 ? (
-                      <div className="p-4 text-sm text-slate-500">見積明細はまだありません。</div>
-                    ) : (
-                      estimateItems.map((item: any) => (
-                        <div key={item.id} className="flex items-start justify-between gap-3 p-3 text-sm">
-                          <div className="min-w-0">
-                            <div className="font-medium">
-                              {item.type === "part"
-                                ? formatPartDisplay({
-                                    name: item.itemName,
-                                    grade: item.partsMaster?.grade,
-                                    note2: item.partsMaster?.notes2,
-                                  })
-                                : item.itemName}
-                            </div>
-                             <div className="text-xs text-slate-500">数量 {item.quantity || 1}{item.quantityUnit ?? ""} × 単価 ¥{item.unitPrice.toLocaleString()}</div>
-                          </div>
-                          <div className="shrink-0 whitespace-nowrap font-mono font-bold">
-                            ¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-right">
-                  <div className="text-xs font-bold text-blue-700">このお見積の税込合計</div>
-                  <div className="font-mono text-3xl font-bold text-blue-700">¥{total.toLocaleString()}</div>
-                </div>
-
-                {explanationText && (
-                  <section className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <h2 className="text-base font-bold">お客様への説明文</h2>
-                      <CopyExplanationButton text={explanationText} />
-                    </div>
-                    <div className="mt-3 whitespace-pre-wrap rounded-lg border border-indigo-100 bg-white p-3 text-sm leading-relaxed text-slate-800">
-                      {explanationText}
-                    </div>
-                  </section>
-                )}
-
-                <CustomerRepairActions
-                  token={repairActionToken}
-                  isBusiness={isBusiness}
-                  inquiryNumber={repair.inquiryNumber}
-                  photoPostingOptOut={repair.photoPostingOptOut}
-                />
-              </div>
-            </section>
-          );
-        })}
-      </div>
-    </main>
-  );
 }

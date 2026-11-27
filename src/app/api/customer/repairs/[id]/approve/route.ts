@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertApprovalReturnAddress } from "@/lib/return-address";
 import { reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
-import { assertNoUnansweredAlternatives, lockEstimateOptions, UnansweredEstimateOptionsError } from "@/lib/estimate-options";
+import { assertNoUnansweredAlternatives, isIssuedOptionPdfCurrent, issuedOptionSourceHash, lockEstimateOptions, UnansweredEstimateOptionsError } from "@/lib/estimate-options";
 import { findRepairIdByPublicToken } from "../_workflow";
 import { assertFreshReopenEstimate, isEstimateDocumentArchived, ReopenApprovalError } from "@/lib/repair-reopen-approval";
 
@@ -29,7 +29,13 @@ export async function POST(
       where: { id: repairId },
       include: {
         customer: { select: { type: true } },
-        estimate: { include: { items: true } },
+        watch: { include: { brand: true, model: true, reference: true, caseReference: true } },
+        estimate: { include: { items: { include: { partsMaster: { select: { grade: true, notes2: true } } } } } },
+        estimateOptionSet: { include: { choices: { include: { lines: true } } } },
+        estimateDocument: { include: {
+          customer: { select: { type: true, name: true, companyName: true, address: true } },
+          currentPdfFile: true,
+        } },
         orderRequests: {
           where: { status: { in: ["pending", "ordered", "received"] } },
           select: { status: true },
@@ -52,6 +58,12 @@ export async function POST(
     }
     if (repair.approvalStatus === "approved") {
       throw new Error("この案件はすでに承認済みです。");
+    }
+    const document = repair.estimateDocument;
+    const pdf = document?.currentPdfFile;
+    if (!repair.estimate || !document || !pdf || repair.customerId !== document.customerId ||
+      !isIssuedOptionPdfCurrent(pdf, document.id, repair.id, pdf.id, issuedOptionSourceHash(document, repair))) {
+      throw new Error("発行済みの現在の見積書を確認できません。工房へお問い合わせください。");
     }
     await assertFreshReopenEstimate(tx, repairId, repair);
 
@@ -87,7 +99,8 @@ export async function POST(
     if (error instanceof ReopenApprovalError) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof UnansweredEstimateOptionsError) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof Error && ["この案件はすでに承認済みです。", "キャンセル済みの案件は承認できません。", "返却処理済みの案件は承認できません。",
-      "返送先を確認・入力してから承認してください。", "承認状態が変更されました。"].includes(error.message)) {
+      "返送先を確認・入力してから承認してください。", "承認状態が変更されました。",
+      "発行済みの現在の見積書を確認できません。工房へお問い合わせください。"].includes(error.message)) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028") {
