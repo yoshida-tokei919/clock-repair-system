@@ -15,7 +15,7 @@ import { renderEstimatePdfBuffer } from "@/lib/estimate-pdf-render";
 import { prisma } from "@/lib/prisma";
 import { displayIssuedDate, parseIssuedDate } from "@/lib/document-issued-date";
 import { sumCustomerLines } from "@/lib/pricing-tax";
-import { issuedOptionSourceHash, optionTotals, parseOptionSet } from "@/lib/estimate-options";
+import { issuedOptionSourceHash, optionTotals, parseOptionSet, realCommonLineCount } from "@/lib/estimate-options";
 import { estimatePdfSourceFingerprint } from "@/lib/estimate-pdf-source";
 import { manualOnlyEstimateContactNote } from "@/lib/estimate-option-contact-text";
 import { assertEstimateDocumentNotArchived, HistoricalEstimateDocumentError } from "@/lib/repair-reopen-approval";
@@ -96,9 +96,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const set = repair.estimateOptionSet;
       if (!set?.isActive) continue;
       if (repair.approvalStatus !== "pending" || repair.estimateOptionApproval) throw new Error("承認済みの選択肢付き見積は再発行できません。改訂手続きが必要です。");
-      if (estimateDocument.customer.type !== "business" || !repair.estimate || repair.estimate.pricingTaxMode !== estimateDocument.pricingTaxMode ||
+      if (!repair.estimate || repair.customerId !== estimateDocument.customerId || repair.estimate.pricingTaxMode !== estimateDocument.pricingTaxMode ||
           estimateDocument.customer.pricingTaxMode !== estimateDocument.pricingTaxMode) throw new Error("選択肢付き見積の取引先・税表示方式を確認してください。");
-      parseOptionSet(set);
+      parseOptionSet(set, realCommonLineCount(repair.estimate.items));
     }
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "選択肢が不正です。" }, { status: 409 });

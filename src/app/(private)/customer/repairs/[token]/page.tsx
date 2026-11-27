@@ -23,7 +23,7 @@ import { RepairPrepaymentCheckoutButton } from "@/components/customer/RepairPrep
 import { PREPAYMENT_STATUS_LABELS } from "@/lib/repair-prepayment-display";
 import { publicShipmentViews } from "@/lib/customer-shipment-status";
 import { visibleCustomerCommentTarget } from "@/lib/b2b-repair-comment-notice";
-import { isIssuedOptionPdfCurrent, issuedOptionSourceHash } from "@/lib/estimate-options";
+import { isIssuedOptionPdfCurrent, issuedOptionSourceHash, visibleCustomerOptionSet } from "@/lib/estimate-options";
 import { CustomerEstimateOptions } from "./CustomerEstimateOptions";
 import { displayEstimateOptionContactNote, sharedEstimateExplanation } from "@/lib/estimate-option-contact-text";
 
@@ -253,6 +253,14 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
             const receptionPhotos = receptionPhotosForWatchCard(repair);
             const customerPhotos = photosForCustomerProgress(repair);
             const repairToken = typeof repair.publicToken === "string" && repair.publicToken.trim() ? repair.publicToken : null;
+            const activeOptions = visibleCustomerOptionSet(repair.estimateOptionSet, repair.customer.type);
+            const optionHash = activeOptions && repair.estimateDocument && repair.estimate
+              ? issuedOptionSourceHash(repair.estimateDocument, repair) : "";
+            const optionPdf = repair.estimateDocument?.currentPdfFile;
+            const optionAvailable = Boolean(repairToken && activeOptions && !repair.partsAllocationLegacy &&
+              repair.customerId === repair.estimateDocument?.customerId && repair.approvalStatus === "pending" &&
+              repair.status === "承認待ち" && repair.estimateDocument &&
+              isIssuedOptionPdfCurrent(optionPdf, repair.estimateDocument.id, repair.id, optionPdf?.id ?? -1, optionHash));
             const readToken = repairToken ?? (documentTokenAccess ? token : null);
             const prepaymentToken = repairToken ?? (documentTokenAccess ? token : null);
             const primaryPhotoUrl = getRepairPhotoUrl(receptionPhotos[0], readToken ?? undefined);
@@ -281,10 +289,24 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
                 }
               >
                 <section className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">{isDedicatedReturnStatus(repair.status) ? "返却・最終精算内容" : "見積内容"}</h2>{repair.estimateDocument && readToken && <PdfLinkButton href={`/customer/repairs/${readToken}/estimate.pdf`} />}</div>
-                   <div className="mt-3 divide-y divide-slate-100">{estimateItems.length === 0 ? <p className="py-3 text-sm text-slate-500">見積明細はまだありません。</p> : estimateItems.map((item: any) => <div key={item.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div className="min-w-0 font-medium">{item.type === "part" ? formatPartDisplay({ name: item.itemName, grade: item.partsMaster?.grade, note2: item.partsMaster?.notes2 }) : item.itemName}<div className="text-xs font-normal text-slate-500">数量 {item.quantity || 1}{item.quantityUnit ?? ""} × 単価 ¥{item.unitPrice.toLocaleString()}</div></div><span className="shrink-0 font-mono font-bold">¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}</span></div>)}</div>
-                  <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm"><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "課税対象額（税込）" : "税抜小計"}</span><span className="font-mono">¥{(repair.estimate?.pricingTaxMode === "INCLUSIVE" ? total : subtotal).toLocaleString()}</span></div><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "内消費税（10%）" : "消費税（10%）"}</span><span className="font-mono">¥{taxAmount.toLocaleString()}</span></div><div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2"><span className="font-bold">税込合計</span><span className="font-mono text-xl font-bold text-blue-700">¥{total.toLocaleString()}</span></div></div>
+                  <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">{isDedicatedReturnStatus(repair.status) ? "返却・最終精算内容" : activeOptions && repair.approvalStatus === "pending" ? "共通見積内容（選択前）" : "見積内容"}</h2>{repair.estimateDocument && readToken && <PdfLinkButton href={`/customer/repairs/${readToken}/estimate.pdf`} />}</div>
+                   <div className="mt-3 divide-y divide-slate-100">{estimateItems.length === 0 ? <p className="py-3 text-sm text-slate-500">{activeOptions ? "共通明細はありません。各プランの内容をご確認ください。" : "見積明細はまだありません。"}</p> : estimateItems.map((item: any) => <div key={item.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div className="min-w-0 font-medium">{item.type === "part" ? formatPartDisplay({ name: item.itemName, grade: item.partsMaster?.grade, note2: item.partsMaster?.notes2 }) : item.itemName}<div className="text-xs font-normal text-slate-500">数量 {item.quantity || 1}{item.quantityUnit ?? ""} × 単価 ¥{item.unitPrice.toLocaleString()}</div></div><span className="shrink-0 font-mono font-bold">¥{(item.unitPrice * (item.quantity || 1)).toLocaleString()}</span></div>)}</div>
+                  <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm"><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "課税対象額（税込）" : "税抜小計"}</span><span className="font-mono">¥{(repair.estimate?.pricingTaxMode === "INCLUSIVE" ? total : subtotal).toLocaleString()}</span></div><div className="flex justify-between text-slate-600"><span>{repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "内消費税（10%）" : "消費税（10%）"}</span><span className="font-mono">¥{taxAmount.toLocaleString()}</span></div><div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2"><span className="font-bold">{activeOptions && repair.approvalStatus === "pending" ? "共通見積の税込額（選択前）" : "税込合計"}</span><span className="font-mono text-xl font-bold text-blue-700">¥{total.toLocaleString()}</span></div></div>
                 </section>
+
+                {activeOptions && repairToken && <CustomerEstimateOptions token={repairToken} repairId={repair.id} inquiryNumber={repair.inquiryNumber}
+                  title={activeOptions.title} notes={activeOptions.notes}
+                  commonLines={((repair.estimateOptionApproval?.lineSnapshot as { commonLines?: { quantity: number; unitPrice: number }[] } | null)?.commonLines ?? repair.estimate?.items ?? []).map((line: { quantity: number; unitPrice: number }) => ({ quantity: line.quantity, unitPrice: line.unitPrice }))}
+                  choices={activeOptions.choices.map((choice: any) => ({ id: choice.id, kind: choice.kind, name: choice.name, notes: choice.notes,
+                    recommended: choice.recommended, lines: choice.lines.map((line: any) => ({ id: line.id, itemNameSnapshot: line.itemNameSnapshot,
+                      displayNameSnapshot: line.displayNameSnapshot, quantity: line.quantity, quantityUnit: line.quantityUnit, unitPrice: line.unitPrice })) }))}
+                  mode={repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE"}
+                  pdfFileId={optionPdf?.id ?? null} optionSourceHash={optionHash} available={optionAvailable}
+                  approved={Boolean(repair.estimateOptionApproval)} approvedPlanId={repair.estimateOptionApproval?.planChoiceId}
+                  approvedAddOnIds={Array.isArray(repair.estimateOptionApproval?.addOnChoiceIds) ? repair.estimateOptionApproval.addOnChoiceIds as number[] : []}
+                  returnAddress={{ recipientName: repair.returnRecipientName || "", postalCode: repair.returnPostalCode || "",
+                    prefecture: repair.returnPrefecture || "", city: repair.returnCity || "", street: repair.returnStreet || "",
+                    building: repair.returnBuilding || "", phone: repair.returnPhone || "" }} />}
 
                 {repair.prepayments.length > 0 && (
                   <section className="rounded-xl border border-blue-200 bg-white p-4">
@@ -309,7 +331,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
 
                 {customerPhotos.length > 0 && readToken && <section className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-bold">写真</h2><div className="mt-3 grid grid-cols-2 gap-2">{customerPhotos.map((photo: any) => { const photoUrl = getRepairPhotoUrl(photo, readToken); return photoUrl ? <a key={photo.id} href={photoUrl} target="_blank" rel="noopener noreferrer"><img src={photoUrl} alt={photo.fileName || "時計の写真"} className="aspect-square w-full rounded-lg border border-slate-200 object-cover" /></a> : null; })}</div></section>}
 
-                {repairToken && <CustomerB2CApprovalPanel token={repairToken} isApproved={repair.approvalStatus === "approved"} showApproval={needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} photoPostingOptOut={repair.photoPostingOptOut} address={{ recipientName: repair.returnRecipientName || "", postalCode: repair.returnPostalCode || "", prefecture: repair.returnPrefecture || "", city: repair.returnCity || "", street: repair.returnStreet || "", building: repair.returnBuilding || "", phone: repair.returnPhone || "" }} />}
+                {repairToken && <CustomerB2CApprovalPanel token={repairToken} isApproved={repair.approvalStatus === "approved"} showApproval={!activeOptions && needsCustomerApproval(repair)} lineUrl={CUSTOMER_LINE_URL} inquiryNumber={repair.inquiryNumber} photoPostingOptOut={repair.photoPostingOptOut} address={{ recipientName: repair.returnRecipientName || "", postalCode: repair.returnPostalCode || "", prefecture: repair.returnPrefecture || "", city: repair.returnCity || "", street: repair.returnStreet || "", building: repair.returnBuilding || "", phone: repair.returnPhone || "" }} />}
               </CustomerRepairAccordionItem>
             );
           })}
@@ -478,7 +500,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                 readAt: message.readAt ? message.readAt.toISOString() : null,
                 senderType: message.senderType || "partner",
               }));
-              const activeOptions = repair.customer.type === "business" && repair.estimateOptionSet?.isActive ? repair.estimateOptionSet : null;
+              const activeOptions = visibleCustomerOptionSet(repair.estimateOptionSet, repair.customer.type);
               const optionHash = activeOptions && repair.estimateDocument && repair.estimate
                 ? issuedOptionSourceHash(repair.estimateDocument, repair) : "";
               const optionPdf = repair.estimateDocument?.currentPdfFile;
@@ -530,7 +552,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                     <div className="space-y-2">
                       {estimateItems.length === 0 ? (
                         <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-base text-slate-500">
-                          見積明細はまだありません。
+                          {activeOptions ? "共通明細はありません。各プランの内容をご確認ください。" : "見積明細はまだありません。"}
                         </div>
                       ) : (
                         estimateItems.map((item: any) => (
@@ -578,7 +600,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                     choices={activeOptions.choices.map((choice: any) => ({ id: choice.id, kind: choice.kind, name: choice.name,
                       notes: choice.notes, recommended: choice.recommended, lines: choice.lines.map((line: any) => ({
                         id: line.id, itemNameSnapshot: line.itemNameSnapshot, displayNameSnapshot: line.displayNameSnapshot,
-                        quantity: line.quantity, unitPrice: line.unitPrice,
+                        quantity: line.quantity, quantityUnit: line.quantityUnit, unitPrice: line.unitPrice,
                       })) }))} mode={repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE"}
                     pdfFileId={optionPdf?.id ?? null} optionSourceHash={optionHash}
                     available={optionAvailable} approved={Boolean(repair.estimateOptionApproval)}

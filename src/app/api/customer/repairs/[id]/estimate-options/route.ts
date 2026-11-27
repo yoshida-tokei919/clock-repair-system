@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { commonEstimateAmountMatches, documentTokenIncludesRepair, isIssuedOptionPdfCurrent, isSameOptionApproval, issuedOptionSourceHash, lockEstimateOptions, parseOptionSet, selectedOptionTotal, validateOptionSelection } from "@/lib/estimate-options";
+import { approvedOptionLines, commonEstimateAmountMatches, isIssuedOptionPdfCurrent, isSameOptionApproval, issuedOptionSourceHash, lockEstimateOptions, optionApprovalTokenMatches, parseOptionSet, realCommonLineCount, selectedOptionTotal, validateOptionSelection } from "@/lib/estimate-options";
 import { assertYen, sumCustomerLines } from "@/lib/pricing-tax";
 import { reconcileRepairPartAllocations } from "@/lib/repair-part-allocation";
 import { addStatusLogIfMissing } from "../_workflow";
 import { assertFreshReopenEstimate, isEstimateDocumentArchived, ReopenApprovalError } from "@/lib/repair-reopen-approval";
+import { assertApprovalReturnAddress } from "@/lib/return-address";
 
 export const runtime = "nodejs";
 
@@ -33,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // A repair token identifies exactly one repair. A document token may name a
     // repair only after membership and the document's B2B owner are verified.
     const tokenRepair = await prisma.repair.findUnique({ where: { publicToken: token }, select: { id: true } });
-    const tokenDocument = tokenRepair ? null : await prisma.estimateDocument.findUnique({ where: { publicToken: token }, select: { id: true, customerId: true, repairs: { select: { id: true } } } });
+    const tokenDocument = tokenRepair ? null : await prisma.estimateDocument.findUnique({ where: { publicToken: token }, select: { id: true, publicToken: true, customerId: true, repairs: { select: { id: true } } } });
     if (!tokenRepair && !tokenDocument) return NextResponse.json({ error: "共有URLが見つかりません。" }, { status: 404 });
     const repairId = tokenRepair?.id ?? body.repairId;
     if (!Number.isSafeInteger(repairId) || (repairId as number) < 1 ||
@@ -58,9 +59,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const document = await tx.estimateDocument.findUnique({ where: { id: documentId }, include: {
         currentPdfFile: true, customer: { select: { type: true, name: true, companyName: true, address: true } },
       } });
-      if (!repair || !document || repair.estimateDocumentId !== documentId || repair.customerId !== document.customerId || repair.customer.type !== "business" ||
-          (tokenRepair && repair.publicToken !== token) ||
-          (tokenDocument && (document.publicToken !== token || !documentTokenIncludesRepair(tokenDocument, { id: repair.id, customerId: repair.customerId, customerType: repair.customer.type })))) {
+      if (!repair || !document || repair.estimateDocumentId !== documentId || repair.customerId !== document.customerId ||
+          !optionApprovalTokenMatches(token, tokenRepair, tokenDocument, { id: repair.id, publicToken: repair.publicToken,
+            customerId: repair.customerId, customerType: repair.customer.type, estimateDocumentId: repair.estimateDocumentId })) {
         throw new OptionApprovalConflict("共有URLの対象案件が一致しません。");
       }
       if (await isEstimateDocumentArchived(tx, documentId)) {
@@ -87,8 +88,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         throw new OptionApprovalConflict("この見積は選択承認できません。");
       }
       if (repair.partsAllocationLegacy) throw new OptionApprovalConflict("旧形式の部品引当案件は選択承認できません。工房へご連絡ください。");
+      try { assertApprovalReturnAddress(repair.customer.type, repair); }
+      catch { throw new OptionApprovalConflict("返送先を確認・入力してから承認してください。"); }
       const set = repair.estimateOptionSet;
-      parseOptionSet(set);
+      parseOptionSet(set, realCommonLineCount(repair.estimate.items));
       const sourceHash = issuedOptionSourceHash(document, repair);
       if (!isIssuedOptionPdfCurrent(pdf, document.id, repair.id, body.pdfFileId as number, sourceHash) || body.optionSourceHash !== sourceHash) {
         throw new OptionApprovalConflict("発行時の見積内容が変わりました。PDFの再発行が必要です。");
@@ -97,18 +100,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const commonLines = repair.estimate.items;
       if (!commonEstimateAmountMatches(commonLines, repair.estimate, document.pricingTaxMode as "INCLUSIVE" | "EXCLUSIVE")) throw new OptionApprovalConflict("共通明細の金額が一致しません。");
       const totals = selectedOptionTotal(commonLines, plan, addOns, document.pricingTaxMode as "INCLUSIVE" | "EXCLUSIVE");
-      const selectedLines = [...(plan?.lines ?? []), ...addOns.flatMap(choice => choice.lines)];
-      if (commonLines.length === 0 && selectedLines.length === 0) throw new OptionApprovalConflict("見積明細がありません。見積を確認してください。");
+      const selectedLines = approvedOptionLines(realCommonLineCount(commonLines), plan, addOns);
       const existingLines = await tx.repairLineItem.findMany({ where: { repairId: repair.id }, select: { sortOrder: true } });
       const firstSortOrder = Math.max(-1, ...existingLines.map(line => line.sortOrder)) + 1;
-      await tx.estimateItem.createMany({ data: selectedLines.map(line => ({
+      if (selectedLines.length > 0) await tx.estimateItem.createMany({ data: selectedLines.map(line => ({
         estimateId: repair.estimate!.id, itemName: line.itemNameSnapshot, quantity: line.quantity, quantityUnit: line.quantityUnit, unitPrice: line.unitPrice,
         type: line.lineType === "PART" ? "part" : "labor", partsMasterId: line.partsMasterId,
         sourceAreaSnapshot: line.workTypeSnapshot?.toLowerCase() ?? null, categoryNameSnapshot: line.categoryNameSnapshot,
         targetPartNameSnapshot: line.targetPartNameSnapshot, actionNameSnapshot: line.actionNameSnapshot,
         detailLabelSnapshot: line.detailLabelSnapshot, b2cDisplayNameSnapshot: line.displayNameSnapshot,
       })) });
-      await tx.repairLineItem.createMany({ data: selectedLines.map((line, index) => ({
+      if (selectedLines.length > 0) await tx.repairLineItem.createMany({ data: selectedLines.map((line, index) => ({
         repairId: repair.id, lineType: line.lineType, partsMasterId: line.partsMasterId, pricingRuleId: line.pricingRuleId,
         repairWorkCategoryId: line.repairWorkCategoryId, repairWorkActionId: line.repairWorkActionId, targetPartNameId: line.targetPartNameId,
         itemNameSnapshot: line.itemNameSnapshot, estimateDisplayNameSnapshot: line.displayNameSnapshot ?? line.itemNameSnapshot,

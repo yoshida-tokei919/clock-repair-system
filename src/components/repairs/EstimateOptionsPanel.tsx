@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { displayEstimateOptionContactNote } from "@/lib/estimate-option-contact-text";
 import { selectedOptionTotal } from "@/lib/estimate-option-totals";
 import { QUANTITY_UNITS } from "@/lib/quantity-unit";
+import { OptionLineMasters, type MasterContext } from "./OptionLineMasters";
 
 type Line = {
   lineType: "LABOR" | "PART"; itemNameSnapshot: string; displayNameSnapshot: string;
@@ -20,7 +21,7 @@ type CommonLine = { itemName: string; quantity: number; quantityUnit?: string | 
 const newLine = (lineType: Line["lineType"] = "PART"): Line => ({ lineType, itemNameSnapshot: "", displayNameSnapshot: "", notesForCustomerSnapshot: "", workTypeSnapshot: null,
   categoryNameSnapshot: "", actionNameSnapshot: "", targetPartNameSnapshot: "", detailLabelSnapshot: "", quantity: 1, quantityUnit: "", unitPrice: 0,
   partsMasterId: null, pricingRuleId: null, repairWorkCategoryId: null, repairWorkActionId: null, targetPartNameId: null });
-const newChoice = (kind: Choice["kind"], name = ""): Choice => ({ kind, name, notes: "", recommended: false, lines: [newLine()] });
+const newChoice = (kind: Choice["kind"], name = "", commonOnly = false): Choice => ({ kind, name, notes: "", recommended: false, lines: commonOnly ? [] : [newLine()] });
 const yen = (value: number) => `${value.toLocaleString("ja-JP")}円`;
 const lineAmount = (line: { quantity: number; unitPrice: number }) => line.quantity * line.unitPrice;
 
@@ -30,6 +31,7 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
   const [editable, setEditable] = useState(false);
   const [mode, setMode] = useState<"EXCLUSIVE" | "INCLUSIVE">("EXCLUSIVE");
   const [commonLines, setCommonLines] = useState<CommonLine[]>([]);
+  const [masterContext, setMasterContext] = useState<MasterContext | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -53,7 +55,7 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
         })) })) } : { title: "", notes: "", isActive: false, choices: [] };
       setDraft(nextDraft); setSavedDraft(JSON.stringify(nextDraft));
       setContactText(typeof data.contactText === "string" ? data.contactText : null);
-      setEditable(data.editable); setMode(data.pricingTaxMode); setCommonLines(data.commonLines ?? []); setLoaded(true);
+      setEditable(data.editable); setMode(data.pricingTaxMode); setCommonLines(data.commonLines ?? []); setMasterContext(data.masterContext ?? null); setLoaded(true);
     }).catch((cause) => { if (live) setError(cause.message); });
     return () => { live = false; };
   }, [repairId]);
@@ -62,11 +64,13 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
     ...choice, lines: choice.lines.map((line, at) => at === lineIndex ? { ...line, ...patch } : line),
   }));
   const commonTotal = commonLines.reduce((sum, line) => sum + lineAmount(line), 0);
+  const commonCount = commonLines.filter(line => line.itemName.trim() && Number.isSafeInteger(line.quantity) && line.quantity > 0 &&
+    Number.isSafeInteger(line.unitPrice) && line.unitPrice >= 0).length;
   const planCount = draft.choices.filter((choice) => choice.kind === "PLAN").length;
   const validation = draft.choices.length > 30 ? "選択肢は30件までです。"
     : draft.isActive && (draft.choices.length === 0 || planCount === 1) ? "有効な選択肢には2案以上のプラン、または1件以上の追加作業が必要です。"
     : draft.choices.some((choice) => !choice.name.trim()) ? "各選択肢の名前を入力してください。"
-    : draft.choices.some((choice) => choice.lines.length === 0 || choice.lines.length > 50 || choice.lines.some((line) => !line.itemNameSnapshot.trim() || !Number.isSafeInteger(line.quantity) || line.quantity < 1 || line.quantity > 10000 || !Number.isSafeInteger(line.unitPrice) || line.unitPrice < 0)) ? "明細名、数量（1～10000）、単価（0円以上）を確認してください。"
+    : draft.choices.some((choice) => (choice.lines.length === 0 && (choice.kind !== "PLAN" || commonCount === 0)) || choice.lines.length > 50 || choice.lines.some((line) => !line.itemNameSnapshot.trim() || !Number.isSafeInteger(line.quantity) || line.quantity < 1 || line.quantity > 10000 || !Number.isSafeInteger(line.unitPrice) || line.unitPrice < 0)) ? "明細名、数量（1～10000）、単価（0円以上）を確認してください。共通明細があるプランだけ追加行を0件にできます。"
     : draft.choices.filter((choice) => choice.kind === "PLAN" && choice.recommended).length > 1 ? "推奨プランは1つだけ指定できます。" : "";
   const save = async () => {
     if (validation || !editable || saving) return;
@@ -99,7 +103,7 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
   const inputClass = "w-full min-w-0 rounded border border-zinc-300 bg-white px-2 py-2 text-sm";
   return <section className="m-3 space-y-4 rounded border bg-white p-4" aria-label="見積選択肢">
     <datalist id={`${formId}-quantity-units`}>{QUANTITY_UNITS.map(unit => <option key={unit} value={unit} />)}</datalist>
-    <div><h2 className="text-lg font-bold">見積の選択肢</h2><p className="text-sm text-zinc-600">共通作業は全プランに含まれます。変更はメインの修理見積で行い、各プランへ再入力しないでください。</p></div>
+    <div><h2 className="text-lg font-bold">見積の選択肢</h2><p className="text-sm text-zinc-600">メイン見積の明細は全プラン共通です。共通作業だけの案は追加明細0件にします。共通作業がない場合は各プランへ別々の作業を入力します。</p></div>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {loaded && <>
       <div className="rounded-lg border bg-zinc-50 p-4">
@@ -112,7 +116,7 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
         {!editable && <p className="text-sm text-amber-800">承認済みまたは見積書発行済みのため編集できません。</p>}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-medium">状態: {draft.isActive ? "有効" : "無効"} · プラン {planCount}案</p>
-          {draft.choices.length === 0 && <button type="button" className="rounded bg-blue-700 px-4 py-3 font-semibold text-white" onClick={() => setDraft((current) => ({ ...current, isActive: true, choices: [newChoice("PLAN", "A案"), newChoice("PLAN", "B案")] }))}>2案を作成</button>}
+          {draft.choices.length === 0 && <button type="button" className="rounded bg-blue-700 px-4 py-3 font-semibold text-white" onClick={() => setDraft((current) => ({ ...current, isActive: true, choices: [newChoice("PLAN", "A案", commonCount > 0), newChoice("PLAN", "B案")] }))}>2案を作成</button>}
         </div>
         <details className="rounded border p-3">
           <summary className="cursor-pointer font-medium">全体設定（タイトル・条件・有効化）</summary>
@@ -137,9 +141,10 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
                 <input id={`${formId}-choice-${index}`} className={inputClass} value={choice.name} placeholder={isPlan ? "例：A案・FIT可能" : "追加作業"} onChange={(event) => changeChoice(index, (old) => ({ ...old, name: event.target.value }))} /></div>
               <button type="button" className="text-sm text-red-700 underline" onClick={() => setDraft((current) => ({ ...current, choices: current.choices.filter((_, at) => at !== index) }))}>この選択肢を削除</button>
             </div>
+            {isPlan && choice.lines.length === 0 && <p className="mt-3 rounded bg-white p-2 text-sm">共通見積のみ・追加料金なし</p>}
             <div className="mt-3 space-y-3">{choice.lines.map((line, lineIndex) => <div key={lineIndex} className="rounded border bg-white p-3">
               <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_5rem_5rem_8rem_auto]">
-                <label className="text-xs">内容<input className={inputClass} value={line.itemNameSnapshot} placeholder="部品・作業名" onChange={(event) => changeLine(index, lineIndex, { itemNameSnapshot: event.target.value })} /></label>
+                <label className="text-xs">内容<input className={inputClass} value={line.itemNameSnapshot} placeholder="部品・作業名" onChange={(event) => changeLine(index, lineIndex, { itemNameSnapshot: event.target.value, pricingRuleId: null })} /></label>
                 <label className="text-xs">数量<input className={inputClass} type="number" min="1" max="10000" value={line.quantity} onChange={(event) => changeLine(index, lineIndex, { quantity: Number(event.target.value) })} /></label>
                 <label className="text-xs">単位<input className={inputClass} list={`${formId}-quantity-units`} maxLength={20} value={line.quantityUnit} onChange={(event) => changeLine(index, lineIndex, { quantityUnit: event.target.value })} /></label>
                 <label className="text-xs">単価（{mode === "INCLUSIVE" ? "税込" : "税抜"}）<input className={inputClass} type="number" min="0" value={line.unitPrice} onChange={(event) => changeLine(index, lineIndex, { unitPrice: Number(event.target.value) })} /></label>
@@ -149,16 +154,17 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
                 <label>種別 <select className="rounded border bg-white p-1" value={line.lineType} onChange={(event) => {
                   const lineType = event.target.value as Line["lineType"];
                   changeLine(index, lineIndex, lineType === "PART"
-                    ? { lineType, pricingRuleId: null, repairWorkCategoryId: null, repairWorkActionId: null, workTypeSnapshot: null }
-                    : { lineType, partsMasterId: null });
+                    ? { lineType, pricingRuleId: null, repairWorkCategoryId: null, repairWorkActionId: null,
+                        categoryNameSnapshot: "", actionNameSnapshot: "", targetPartNameId: null, targetPartNameSnapshot: "", partsMasterId: null }
+                    : { lineType, partsMasterId: null, targetPartNameId: null, targetPartNameSnapshot: "" });
                 }}><option value="PART">部品</option><option value="LABOR">作業</option></select></label>
                 <button type="button" className="text-red-700 underline" onClick={() => changeChoice(index, (old) => ({ ...old, lines: old.lines.filter((_, at) => at !== lineIndex) }))}>行を削除</button>
               </div>
               <details className="mt-2 text-sm"><summary className="cursor-pointer text-blue-800">この行の詳細設定</summary>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  {line.lineType === "LABOR" && <label>内装・外装区分<select className={inputClass} value={line.workTypeSnapshot ?? ""} onChange={(event) => changeLine(index, lineIndex, { workTypeSnapshot: (event.target.value || null) as Line["workTypeSnapshot"], repairWorkCategoryId: null })}><option value="">区分なし</option><option value="INTERNAL">内装</option><option value="EXTERNAL">外装</option></select></label>}
-                  {(["displayNameSnapshot", "notesForCustomerSnapshot", "categoryNameSnapshot", "actionNameSnapshot", "targetPartNameSnapshot", "detailLabelSnapshot"] as const).map((field) =>
-                    <label key={field}>{({ displayNameSnapshot: "表示名", notesForCustomerSnapshot: "明細条件", categoryNameSnapshot: "カテゴリ名", actionNameSnapshot: "処置名", targetPartNameSnapshot: "対象部品名", detailLabelSnapshot: "詳細" })[field]}<input className={inputClass} value={line[field]} onChange={(event) => changeLine(index, lineIndex, { [field]: event.target.value })} /></label>)}
+                  {masterContext && <OptionLineMasters line={line} context={masterContext} mode={mode} onChange={patch => changeLine(index, lineIndex, patch)} inputClass={inputClass} />}
+                  {(["displayNameSnapshot", "notesForCustomerSnapshot", "detailLabelSnapshot"] as const).map((field) =>
+                    <label key={field}>{({ displayNameSnapshot: "表示名", notesForCustomerSnapshot: "明細条件", detailLabelSnapshot: "詳細" })[field]}<input className={inputClass} value={line[field]} onChange={(event) => changeLine(index, lineIndex, { [field]: event.target.value, ...(field === "detailLabelSnapshot" ? { pricingRuleId: null } : {}) })} /></label>)}
                 </div>
               </details>
             </div>)}</div>
@@ -172,6 +178,7 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
           </article>;
         })}
         <div className="flex flex-wrap gap-4 text-sm"><button type="button" className="text-blue-700 underline" onClick={() => setDraft((current) => ({ ...current, choices: [...current.choices, newChoice("PLAN")] }))}>プランを追加</button>
+          {commonCount > 0 && <button type="button" className="text-blue-700 underline" onClick={() => setDraft((current) => ({ ...current, choices: [...current.choices, newChoice("PLAN", "共通見積のみ", true)] }))}>共通見積のみのプランを追加</button>}
           <button type="button" className="text-blue-700 underline" onClick={() => setDraft((current) => ({ ...current, choices: [...current.choices, newChoice("ADD_ON")] }))}>任意の追加作業を追加</button></div>
       </fieldset>
       <div className="space-y-2 border-t pt-4">

@@ -210,7 +210,7 @@ export function createEstimateServerDocumentElement(
                   fontWeight: "bold",
                 },
               },
-              "金額(税込)"
+              data.jobs.some(job => job.options) && !inclusive ? "金額(税抜)" : "金額(税込)"
             )
           : null,
         data.jobs.map((job, index) => {
@@ -248,7 +248,7 @@ export function createEstimateServerDocumentElement(
               el(
                 Text,
                 { style: { width: columns.total, textAlign: "right" } },
-                job.options ? `共通 ¥${jobTotal.toLocaleString()}` : `¥${jobTotal.toLocaleString()}`
+                job.options ? `共通 ¥${job.items.reduce((sum, item) => sum + item.price * (item.quantity ?? 1), 0).toLocaleString()}` : `¥${jobTotal.toLocaleString()}`
               )
             ),
             job.options ? el(View, { style: { marginTop: 5, paddingLeft: 5, fontSize: 8 } },
@@ -258,6 +258,7 @@ export function createEstimateServerDocumentElement(
                 el(Text, { style: { fontWeight: "bold" } },
                   `${choice.kind === "PLAN" ? "プラン" : "追加作業"}: ${choice.name}${choice.recommended ? "【推奨】" : ""}`),
                 choice.notes ? el(Text, null, `条件: ${choice.notes}`) : null,
+                choice.kind === "PLAN" && choice.lines.length === 0 ? el(Text, null, "共通見積のみ（追加料金なし）") : null,
                 choice.lines.map((line, lineIndex) => el(View, { key: lineIndex, style: styles.itemRow },
                   el(Text, { style: { flexGrow: 1, flexShrink: 1, paddingRight: 4 } },
                     `・${line.name}${line.notes ? ` (${line.notes})` : ""}`),

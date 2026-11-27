@@ -43,7 +43,7 @@ const optionalId = (value: unknown): number | null => {
   return value as number;
 };
 
-export function parseOptionSet(value: unknown): OptionSetInput {
+export function parseOptionSet(value: unknown, commonLineCount = 0): OptionSetInput {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("選択肢データが不正です。");
   const raw = value as Record<string, unknown>;
   if (typeof raw.isActive !== "boolean" || !Array.isArray(raw.choices) || raw.choices.length > 30) throw new Error("選択肢データが不正です。");
@@ -51,7 +51,8 @@ export function parseOptionSet(value: unknown): OptionSetInput {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error("選択肢が不正です。");
     const choice = entry as Record<string, unknown>;
     if (choice.kind !== "PLAN" && choice.kind !== "ADD_ON") throw new Error("選択肢の種別が不正です。");
-    if (typeof choice.recommended !== "boolean" || !Array.isArray(choice.lines) || choice.lines.length < 1 || choice.lines.length > 50) throw new Error("選択肢の明細が不正です。");
+    if (typeof choice.recommended !== "boolean" || !Array.isArray(choice.lines) || choice.lines.length > 50 ||
+        (choice.lines.length === 0 && (choice.kind !== "PLAN" || commonLineCount < 1))) throw new Error("選択肢の明細が不正です。");
     return {
       kind: choice.kind, name: shortText(choice.name, "選択肢名", true)!, notes: shortText(choice.notes, "条件"), recommended: choice.recommended,
       lines: choice.lines.map((entry): OptionLineInput => {
@@ -80,6 +81,7 @@ export function parseOptionSet(value: unknown): OptionSetInput {
   });
   const plans = choices.filter((choice) => choice.kind === "PLAN");
   if (raw.isActive && (choices.length === 0 || plans.length === 1)) throw new Error("有効な選択肢には2案以上のプラン、または1件以上の追加作業が必要です。");
+  if (raw.isActive && commonLineCount === 0 && choices.every(choice => choice.lines.length === 0)) throw new Error("見積明細がありません。");
   if (plans.filter((choice) => choice.recommended).length > 1) throw new Error("推奨プランは1つだけ指定できます。");
   return { title: shortText(raw.title, "見積案タイトル") ?? "", notes: shortText(raw.notes, "全体条件"), isActive: raw.isActive, choices };
 }
@@ -92,6 +94,15 @@ export function optionTotals(commonLines: readonly { unitPrice: number; quantity
 
 export function commonEstimateAmountMatches(items: readonly { unitPrice: number; quantity: number }[], estimate: { totalAmount: number; taxAmount: number }, mode: PricingTaxMode): boolean {
   return sumCustomerLines(items) === estimate.totalAmount + (mode === "INCLUSIVE" ? estimate.taxAmount : 0);
+}
+
+export function realCommonLineCount(items: readonly { itemName: string; quantity: number; unitPrice: number }[]): number {
+  return items.filter(item => item.itemName.trim() && Number.isSafeInteger(item.quantity) && item.quantity > 0 &&
+    Number.isSafeInteger(item.unitPrice) && item.unitPrice >= 0).length;
+}
+
+export function visibleCustomerOptionSet<T extends { isActive: boolean }>(set: T | null, customerType: string): T | null {
+  return (customerType === "individual" || customerType === "business") && set?.isActive ? set : null;
 }
 
 type IssuedOptionRepair = {
@@ -156,6 +167,12 @@ export function validateOptionSelection<T extends { id: number; kind: string; li
   return { plan: plans.find(choice => choice.id === planChoiceId) ?? null, addOns };
 }
 
+export function approvedOptionLines<L>(commonLineCount: number, plan: { lines: L[] } | null, addOns: { lines: L[] }[]): L[] {
+  const selected = [...(plan?.lines ?? []), ...addOns.flatMap(choice => choice.lines)];
+  if (commonLineCount === 0 && selected.length === 0) throw new Error("見積明細がありません。見積を確認してください。");
+  return selected;
+}
+
 export function isIssuedOptionPdfCurrent(pdf: { id: number; estimateDocumentId: number; status: string; storageKey: string; hash: string | null; fileSize: number | null; optionSourceHashes: unknown } | null,
   documentId: number, repairId: number, expectedPdfId: number, sourceHash: string): boolean {
   return Boolean(pdf && pdf.id === expectedPdfId && pdf.estimateDocumentId === documentId && pdf.status === "current" &&
@@ -167,6 +184,14 @@ export function documentTokenIncludesRepair(document: { customerId: number; repa
   repair: { id: number; customerId: number; customerType: string }): boolean {
   return Boolean(document && repair.customerType === "business" && document.customerId === repair.customerId &&
     document.repairs.some(member => member.id === repair.id));
+}
+
+export function optionApprovalTokenMatches(token: string, tokenRepair: { id: number } | null,
+  tokenDocument: ({ publicToken: string | null; id: number; customerId: number; repairs: readonly { id: number }[] }) | null,
+  repair: { id: number; publicToken: string | null; customerId: number; customerType: string; estimateDocumentId: number | null }): boolean {
+  if (tokenRepair) return tokenRepair.id === repair.id && repair.publicToken === token;
+  return Boolean(tokenDocument && tokenDocument.publicToken === token && repair.estimateDocumentId === tokenDocument.id &&
+    documentTokenIncludesRepair(tokenDocument, repair));
 }
 
 export function isSameOptionApproval(previous: { pdfFileId: number; planChoiceId: number | null; addOnChoiceIds: unknown; approverName: string; optionSourceHash: string } | null,

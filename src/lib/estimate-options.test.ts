@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertNoUnansweredAlternatives, canEditEstimateOptions, commonEstimateAmountMatches, documentTokenIncludesRepair, isIssuedOptionPdfCurrent, isSameOptionApproval, issuedOptionSourceHash, optionTotals, parseOptionSet, selectedOptionTotal, validateOptionSelection } from "./estimate-options";
+import { approvedOptionLines, assertNoUnansweredAlternatives, canEditEstimateOptions, commonEstimateAmountMatches, documentTokenIncludesRepair, isIssuedOptionPdfCurrent, isSameOptionApproval, issuedOptionSourceHash, optionApprovalTokenMatches, optionTotals, parseOptionSet, realCommonLineCount, selectedOptionTotal, validateOptionSelection, visibleCustomerOptionSet } from "./estimate-options";
 
 const line = { lineType: "LABOR", itemNameSnapshot: "追加調整", quantity: 1, unitPrice: 1000 };
 const plan = (name: string) => ({ kind: "PLAN", name, recommended: false, lines: [line] });
@@ -12,6 +12,33 @@ test("active set allows add-on only or two plans, and rejects one plan or empty 
   const set = parseOptionSet({ title: "見積", isActive: true, choices: [plan("A"), plan("B"), { kind: "ADD_ON", name: "任意", recommended: false, lines: [line] }] });
   assert.equal(set.choices.length, 3);
   assert.equal(set.choices[2].kind, "ADD_ON");
+});
+
+test("common-only plan needs real common lines, while alternate plans can have no common lines", () => {
+  assert.equal(realCommonLineCount([{ itemName: "", quantity: 1, unitPrice: 0 }, { itemName: "修理", quantity: 1, unitPrice: 20000 }]), 1);
+  const commonOnly = { kind: "PLAN", name: "A", recommended: false, lines: [] };
+  const extra = { ...plan("B"), lines: [{ ...line, unitPrice: 11000 }] };
+  assert.equal(parseOptionSet({ title: "", isActive: true, choices: [commonOnly, extra] }, 3).choices[0].lines.length, 0);
+  assert.throws(() => parseOptionSet({ title: "", isActive: true, choices: [commonOnly, extra] }, 0), /明細/);
+  assert.throws(() => parseOptionSet({ title: "", isActive: true, choices: [plan("A"),
+    { kind: "ADD_ON", name: "空の追加", recommended: false, lines: [] }] }, 1), /明細/);
+  const alternatives = parseOptionSet({ title: "", isActive: true, choices: [plan("修理"), extra] }, 0);
+  assert.equal(alternatives.choices.length, 2);
+  assert.deepEqual(selectedOptionTotal([{ unitPrice: 20000, quantity: 1 }], commonOnly, [], "INCLUSIVE"),
+    { commonAmount: 20000, planAmount: 0, addOnAmount: 0, totalAmount: 18182, taxAmount: 1818, grossAmount: 20000 });
+  assert.equal(selectedOptionTotal([], alternatives.choices[1], [], "EXCLUSIVE").grossAmount, 12100);
+  assert.throws(() => parseOptionSet({ title: "", isActive: true, choices: [commonOnly, { ...commonOnly, name: "B" }] }, 0), /明細/);
+});
+
+test("inclusive three-plan estimate keeps common 22,000 and adds only selected work", () => {
+  const common = [{ unitPrice: 10000, quantity: 1 }, { unitPrice: 7000, quantity: 1 }, { unitPrice: 5000, quantity: 1 }];
+  const choices = parseOptionSet({ title: "", isActive: true, choices: [
+    { kind: "PLAN", name: "A", recommended: false, lines: [] },
+    { kind: "PLAN", name: "B", recommended: false, lines: [{ ...line, unitPrice: 12100 }] },
+    { kind: "PLAN", name: "C", recommended: false, lines: [{ ...line, unitPrice: 17600 }] },
+  ] }, 3).choices;
+  assert.deepEqual(optionTotals(common, choices, "INCLUSIVE").map(total => total.grossAmount), [22000, 34100, 39600]);
+  assert.equal(approvedOptionLines(common.length, choices[0], []).length, 0);
 });
 
 test("choice totals include common work with the existing inclusive or exclusive tax rule", () => {
@@ -72,12 +99,40 @@ test("selection accepts exactly one plan and independent add-ons, rejecting tamp
   assert.equal(validateOptionSelection({ choices: [set.choices[2]] }, null, []).plan, null);
 });
 
+test("approval adds no lines for common-only plan and requires lines without common work", () => {
+  const emptyPlan = { id: 1, kind: "PLAN", lines: [] as typeof line[] };
+  const filledPlan = { id: 2, kind: "PLAN", lines: [line] };
+  assert.deepEqual(approvedOptionLines(3, emptyPlan, []), []);
+  assert.deepEqual(approvedOptionLines(0, filledPlan, []), [line]);
+  assert.throws(() => approvedOptionLines(0, null, []), /見積明細/);
+});
+
 test("document token scope rejects another customer and non-B2B repair", () => {
   const doc = { customerId: 8, repairs: [{ id: 10 }, { id: 11 }] };
   assert.equal(documentTokenIncludesRepair(doc, { id: 11, customerId: 8, customerType: "business" }), true);
   assert.equal(documentTokenIncludesRepair(doc, { id: 12, customerId: 8, customerType: "business" }), false);
   assert.equal(documentTokenIncludesRepair(doc, { id: 11, customerId: 9, customerType: "business" }), false);
   assert.equal(documentTokenIncludesRepair(doc, { id: 11, customerId: 8, customerType: "individual" }), false);
+});
+
+test("B2C option approval needs its own bound repair token; B2B document membership stays scoped", () => {
+  const own = { id: 10, publicToken: "own", customerId: 8, customerType: "individual", estimateDocumentId: 4 };
+  const doc = { id: 4, publicToken: "doc", customerId: 8, repairs: [{ id: 10 }] };
+  assert.equal(optionApprovalTokenMatches("own", { id: 10 }, null, own), true);
+  assert.equal(optionApprovalTokenMatches("own", { id: 11 }, null, own), false);
+  assert.equal(optionApprovalTokenMatches("other", { id: 10 }, null, own), false);
+  assert.equal(optionApprovalTokenMatches("doc", null, doc, own), false);
+  assert.equal(optionApprovalTokenMatches("doc", null, doc, { ...own, customerType: "business" }), true);
+  assert.equal(optionApprovalTokenMatches("doc", null, doc, { ...own, customerType: "business", customerId: 9 }), false);
+  assert.equal(optionApprovalTokenMatches("doc", null, doc, { ...own, customerType: "business", estimateDocumentId: 5 }), false);
+});
+
+test("customer page exposes active options for both customer types", () => {
+  const set = { isActive: true, title: "選択肢" };
+  assert.equal(visibleCustomerOptionSet(set, "individual"), set);
+  assert.equal(visibleCustomerOptionSet(set, "business"), set);
+  assert.equal(visibleCustomerOptionSet({ ...set, isActive: false }, "individual"), null);
+  assert.equal(visibleCustomerOptionSet(set, "unknown"), null);
 });
 
 test("issued PDF check rejects old version, superseded file, missing source and changed hash", () => {

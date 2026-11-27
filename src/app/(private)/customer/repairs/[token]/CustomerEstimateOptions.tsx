@@ -6,6 +6,7 @@ import { selectedOptionTotal } from "@/lib/estimate-option-totals";
 import type { PricingTaxMode } from "@/lib/pricing-tax";
 import { isTerminalApprovalRepairStatus, matchesApprovedOptionSelection } from "@/lib/customer-approval-recovery";
 import { createApprovalSubmitLatch } from "@/lib/customer-approval-submit-latch";
+import { CustomerReturnAddress, type ReturnAddress } from "./CustomerReturnAddress";
 
 type Line = { id: number; itemNameSnapshot: string; displayNameSnapshot: string | null; quantity: number; quantityUnit?: string | null; unitPrice: number };
 type Choice = { id: number; kind: string; name: string; notes: string | null; recommended: boolean; lines: Line[] };
@@ -15,6 +16,7 @@ export function CustomerEstimateOptions(props: {
   commonLines: { quantity: number; unitPrice: number }[]; choices: Choice[]; mode: PricingTaxMode;
   pdfFileId: number | null; optionSourceHash: string; available: boolean; approved: boolean;
   unavailableMessage?: string;
+  returnAddress?: ReturnAddress;
   approvedPlanId?: number | null; approvedAddOnIds?: number[];
 }) {
   const router = useRouter();
@@ -31,11 +33,14 @@ export function CustomerEstimateOptions(props: {
   const [uncertain, setUncertain] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [address, setAddress] = useState(props.returnAddress);
+  const [addressOpen, setAddressOpen] = useState(false);
   const plan = plans.find(choice => choice.id === planId) ?? null;
   const selectedAddOns = addOns.filter(choice => addOnIds.includes(choice.id));
   const totals = selectedOptionTotal(props.commonLines, plan, selectedAddOns, props.mode);
   const money = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
-  const canReview = props.available && !props.approved && !resolved && !uncertain && (!plans.length || !!plan) && !!approverName.trim();
+  const canReview = props.available && !props.approved && !resolved && !uncertain && (!plans.length || !!plan) &&
+    (props.commonLines.length > 0 || Boolean(plan?.lines.length) || selectedAddOns.some(choice => choice.lines.length > 0)) && !!approverName.trim();
   const submit = async () => {
     if (submitBlocked.current || !confirming || !canReview || !props.pdfFileId || submitting || !submitLatch.current.tryStart()) return;
     setSubmitting(true); setError("");
@@ -83,6 +88,8 @@ export function CustomerEstimateOptions(props: {
     finally { submitLatch.current.finish(); setSubmitting(false); }
   };
   return <section className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm" aria-label={`${props.inquiryNumber} の見積選択`}>
+    {address && <CustomerReturnAddress token={props.token} address={address} open={addressOpen} disabled={props.approved || resolved}
+      onOpenChange={setAddressOpen} onAddressSaved={next => { setAddress(next); setAddressOpen(false); }} />}
     <h2 className="text-lg font-bold">{props.title || "見積プラン・追加作業"}</h2>
     {props.notes && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{props.notes}</p>}
     {!props.available && !props.approved && <p className="mt-3 rounded bg-amber-50 p-3 text-sm text-amber-900">{props.unavailableMessage || "発行済みPDFと現在の見積内容を確認できません。工房へ再発行を依頼してください。"}</p>}
@@ -92,6 +99,7 @@ export function CustomerEstimateOptions(props: {
         <span className="flex items-center gap-2"><input type="radio" name={`plan-${props.repairId}`} checked={planId === choice.id} onChange={() => { setPlanId(choice.id); setConfirming(false); }} />
           <span className="font-bold">{choice.name}</span>{choice.recommended && <span className="text-xs text-blue-700">推奨</span>}</span>
         {choice.notes && <span className="ml-6 block text-sm text-slate-600">{choice.notes}</span>}
+        {choice.lines.length === 0 && <span className="ml-6 block text-sm text-slate-600">共通見積のみ（追加料金なし）</span>}
         {choice.lines.map(line => <span key={line.id} className="ml-6 flex justify-between gap-3 text-sm"><span>{line.displayNameSnapshot || line.itemNameSnapshot} × {line.quantity}{line.quantityUnit ?? ""}</span><span>{money(line.unitPrice * line.quantity)}</span></span>)}
       </label>)}
     </fieldset>}
@@ -105,6 +113,7 @@ export function CustomerEstimateOptions(props: {
       </label>)}
     </fieldset>}
     <div className="mt-4 rounded-lg bg-blue-50 p-3 text-sm">
+      <p className="mb-2 text-xs text-slate-600">明細の単価・各欄の金額は{props.mode === "INCLUSIVE" ? "税込" : "税抜"}です。</p>
       <div className="flex justify-between"><span>共通見積</span><span>{money(totals.commonAmount)}</span></div>
       <div className="flex justify-between"><span>選択プラン</span><span>{money(totals.planAmount)}</span></div>
       <div className="flex justify-between"><span>追加作業</span><span>{money(totals.addOnAmount)}</span></div>
@@ -113,7 +122,8 @@ export function CustomerEstimateOptions(props: {
     </div>
     {props.approved || resolved ? <p className="mt-4 font-bold text-green-700">この選択内容は承認済みです。改訂・再承認は工房へご相談ください。</p> : <>
       <p className="mt-4 text-sm text-slate-600">見積内容の変更が必要な場合はコメントで工房へご相談ください。発行後のプラン改訂はこの画面では対応していません。</p>
-      <label className="mt-4 block text-sm font-bold">承認者のお名前（取引先ご担当者）<input className="mt-1 w-full rounded border border-slate-300 p-2" value={approverName} maxLength={100} disabled={!props.available || submitting || uncertain} onChange={event => { setApproverName(event.target.value); setConfirming(false); }} /></label>
+      {address && <button type="button" className="mt-4 block text-sm text-blue-700 underline" onClick={() => setAddressOpen(true)}>返送先を確認・編集する</button>}
+      <label className="mt-4 block text-sm font-bold">承認者のお名前{address ? "" : "（取引先ご担当者）"}<input className="mt-1 w-full rounded border border-slate-300 p-2" value={approverName} maxLength={100} disabled={!props.available || submitting || uncertain} onChange={event => { setApproverName(event.target.value); setConfirming(false); }} /></label>
       {!confirming ? <button type="button" className="mt-4 rounded bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50" disabled={!canReview} onClick={() => setConfirming(true)}>選択内容を確認する</button>
         : <div className="mt-4 rounded border border-blue-300 p-3"><p className="font-bold">承認内容の最終確認</p><p>プラン: {plan?.name ?? "なし"}</p><p>追加作業: {selectedAddOns.map(choice => choice.name).join("、") || "なし"}</p><p>承認者: {approverName.trim()}</p><p className="font-bold">税込合計: {money(totals.grossAmount)}</p><button type="button" className="mt-3 rounded bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50" disabled={submitting || uncertain} onClick={submit}>{submitting ? "承認を確認中…" : "この内容で承認を確定する"}</button><button type="button" className="ml-3 text-sm underline" disabled={submitting || uncertain} onClick={() => setConfirming(false)}>選択に戻る</button></div>}
     </>}

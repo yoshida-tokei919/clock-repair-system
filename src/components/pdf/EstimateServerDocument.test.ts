@@ -95,3 +95,20 @@ test("single multi-quantity line keeps its extended total in the watch column", 
   assert.ok(rendered.includes("¥500 × 2"));
   assert.ok(rendered.includes("¥1,000"));
 });
+
+test("B2C PDF shows common-only plan without a zero-yen row and tax-mode-consistent amounts", () => {
+  const data: EstimateServerDocumentProps["data"] = { ...base, customer: { name: "個人", type: "individual" },
+    pricingTaxMode: "EXCLUSIVE", jobs: [{ ...base.jobs[0], totalAmount: 22000,
+      items: [{ name: "共通作業", price: 20000, quantity: 1 }],
+      options: { title: "修理案", notes: null, choices: [
+        { kind: "PLAN", name: "A", notes: null, recommended: true, lines: [], deltaAmount: 0, totalAmount: 20000 },
+        { kind: "PLAN", name: "B", notes: null, recommended: false,
+          lines: [{ name: "ムーブメント交換", price: 11000, quantity: 1, notes: null }], deltaAmount: 11000, totalAmount: 31000 },
+      ] } }] };
+  const output = texts(createEstimateServerDocumentElement(runtime, renderer, data)).join(" ");
+  assert.match(output, /共通 ¥20,000/);
+  assert.match(output, /共通見積のみ（追加料金なし）/);
+  assert.match(output, /共通＋このプラン ¥20,000\(税抜\)/);
+  assert.match(output, /金額\(税抜\)/);
+  assert.doesNotMatch(output, /・[^¥]*¥0(?!\d)/);
+});

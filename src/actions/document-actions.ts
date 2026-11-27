@@ -16,7 +16,7 @@ import { b2bPaymentDueDate, billingMonthBounds, billingMonthFromDate, isB2BBilli
 import { getAdminApiIdentity } from "@/lib/admin-api-auth";
 import { resolveIssuedDate } from "@/lib/document-issued-date";
 import { calculateTaxableAmounts, commonEstimateMode, sumCustomerLines } from "@/lib/pricing-tax";
-import { lockEstimateOptions, parseOptionSet } from "@/lib/estimate-options";
+import { lockEstimateOptions, parseOptionSet, realCommonLineCount } from "@/lib/estimate-options";
 import { invoiceAmountsWithDiscount, resolveDiscountBps } from "@/lib/b2b-invoice-discount";
 import { allocateHistoricalRefunds } from "@/lib/b2b-historical-refund-allocation";
 
@@ -76,9 +76,6 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
         });
 
         if (repairs.length === 0) return { success: false, error: "Repairs not found" };
-        if (type === "estimate" && repairs.some(repair => repair.estimateOptionSet?.isActive && repair.customer.type !== "business")) {
-            return { success: false, error: "選択肢が未回答の案件を通常見積書として発行できません。" };
-        }
         if (type === "delivery") {
             assertNoDuplicateReturnShipping(repairs, shipping!.shippingFee);
             if (repairs.length !== uniqueRepairIds.length) return { success: false, error: "納品書の対象案件を再確認してください" };
@@ -262,9 +259,9 @@ export async function generateBulkDocument(repairIds: number[], type: 'delivery'
                     throw new Error("見積内容が変更されました。再読み込みしてください");
                   }
                   for (const repair of fresh) if (repair.estimateOptionSet?.isActive) {
-                    if (repair.customer.type !== "business" || !repair.estimate || repair.estimate.pricingTaxMode !== pricingTaxMode ||
+                    if (!repair.estimate || repair.estimate.pricingTaxMode !== pricingTaxMode ||
                         repair.customer.pricingTaxMode !== pricingTaxMode) throw new Error("選択肢付き見積の取引先・税表示方式を確認してください");
-                    parseOptionSet(repair.estimateOptionSet);
+                    parseOptionSet(repair.estimateOptionSet, realCommonLineCount(repair.estimate.items));
                   }
                   const created = await tx.estimateDocument.create({
                     data: {
