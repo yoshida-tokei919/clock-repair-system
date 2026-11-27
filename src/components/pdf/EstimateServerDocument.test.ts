@@ -40,12 +40,14 @@ for (const mode of ["EXCLUSIVE", "INCLUSIVE"] as const) test(`${mode} B2B option
   const output = texts(tree).join(" ");
   assert.match(output, /K-001/);
   assert.match(output, /K-002/);
-  assert.match(output, /共通 ¥10,000/);
-  assert.match(output, /差額 ¥4,000 \/ 共通＋このプラン ¥14,000/);
-  assert.match(output, /差額 ¥8,000 \/ 共通＋このプラン ¥18,000/);
+  assert.match(output, /A案：案1/);
+  assert.match(output, /B案：案2/);
+  assert.equal(output.match(/共通点検/g)?.length, 2);
+  assert.match(output, new RegExp(`この案の税込合計 ¥${totals[0].grossAmount.toLocaleString()}`));
+  assert.match(output, new RegExp(`この案の税込合計 ¥${totals[1].grossAmount.toLocaleString()}`));
   assert.match(output, /追加額 ¥1,500/);
   assert.doesNotMatch(output, /¥22,000/);
-  assert.match(output, /【推奨】/);
+  assert.match(output, /【おすすめ】/);
   assert.match(output, /納期は要相談/);
   assert.match(output, /部品在庫次第/);
   assert.match(output, /ご確認ください/);
@@ -106,9 +108,26 @@ test("B2C PDF shows common-only plan without a zero-yen row and tax-mode-consist
           lines: [{ name: "ムーブメント交換", price: 11000, quantity: 1, notes: null }], deltaAmount: 11000, totalAmount: 31000 },
       ] } }] };
   const output = texts(createEstimateServerDocumentElement(runtime, renderer, data)).join(" ");
-  assert.match(output, /共通 ¥20,000/);
-  assert.match(output, /共通見積のみ（追加料金なし）/);
-  assert.match(output, /共通＋このプラン ¥20,000\(税抜\)/);
+  assert.equal(output.match(/共通作業/g)?.length, 2);
+  assert.match(output, /A案/);
+  assert.match(output, /この案の税込合計 ¥22,000/);
+  assert.match(output, /この案の税込合計 ¥34,100/);
   assert.match(output, /金額\(税抜\)/);
+  assert.doesNotMatch(output, /税込合計 ¥22,000 税抜小計/);
   assert.doesNotMatch(output, /・[^¥]*¥0(?!\d)/);
+});
+
+test("PDF plans with no common work each show only their own complete work", () => {
+  const data: EstimateServerDocumentProps["data"] = { ...base, jobs: [{ ...base.jobs[0], items: [], options: {
+    title: "修理案", choices: [
+      { kind: "PLAN", name: "A案", recommended: true, lines: [{ name: "竜頭修理", price: 20000, quantity: 1 }], deltaAmount: 20000, totalAmount: 20000 },
+      { kind: "PLAN", name: "共通見積のみ", recommended: false, lines: [{ name: "機械交換", price: 31000, quantity: 1 }], deltaAmount: 31000, totalAmount: 31000 },
+    ],
+  } }] };
+  const output = texts(createEstimateServerDocumentElement(runtime, renderer, data)).join(" ");
+  assert.match(output, /A案【おすすめ】 ・竜頭修理/);
+  assert.match(output, /B案 ・機械交換/);
+  assert.match(output, /この案の税込合計 ¥22,000/);
+  assert.match(output, /この案の税込合計 ¥34,100/);
+  assert.doesNotMatch(output, /共通見積のみ|¥0/);
 });

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { displayEstimateOptionContactNote } from "@/lib/estimate-option-contact-text";
-import { selectedOptionTotal } from "@/lib/estimate-option-totals";
+import { customerPlanName, selectedOptionTotal } from "@/lib/estimate-option-totals";
 import { QUANTITY_UNITS } from "@/lib/quantity-unit";
 import { OptionLineMasters, type MasterContext } from "./OptionLineMasters";
 
@@ -141,7 +141,7 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
                 <input id={`${formId}-choice-${index}`} className={inputClass} value={choice.name} placeholder={isPlan ? "例：A案・FIT可能" : "追加作業"} onChange={(event) => changeChoice(index, (old) => ({ ...old, name: event.target.value }))} /></div>
               <button type="button" className="text-sm text-red-700 underline" onClick={() => setDraft((current) => ({ ...current, choices: current.choices.filter((_, at) => at !== index) }))}>この選択肢を削除</button>
             </div>
-            {isPlan && choice.lines.length === 0 && <p className="mt-3 rounded bg-white p-2 text-sm">共通見積のみ・追加料金なし</p>}
+            {isPlan && choice.lines.length === 0 && <p className="mt-3 rounded bg-white p-2 text-sm">上記の作業がこの案に含まれます</p>}
             <div className="mt-3 space-y-3">{choice.lines.map((line, lineIndex) => <div key={lineIndex} className="rounded border bg-white p-3">
               <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_5rem_5rem_8rem_auto]">
                 <label className="text-xs">内容<input className={inputClass} value={line.itemNameSnapshot} placeholder="部品・作業名" onChange={(event) => changeLine(index, lineIndex, { itemNameSnapshot: event.target.value, pricingRuleId: null })} /></label>
@@ -178,7 +178,7 @@ export function EstimateOptionsPanel({ repairId }: { repairId: number }) {
           </article>;
         })}
         <div className="flex flex-wrap gap-4 text-sm"><button type="button" className="text-blue-700 underline" onClick={() => setDraft((current) => ({ ...current, choices: [...current.choices, newChoice("PLAN")] }))}>プランを追加</button>
-          {commonCount > 0 && <button type="button" className="text-blue-700 underline" onClick={() => setDraft((current) => ({ ...current, choices: [...current.choices, newChoice("PLAN", "共通見積のみ", true)] }))}>共通見積のみのプランを追加</button>}
+          {commonCount > 0 && <button type="button" className="text-blue-700 underline" onClick={() => setDraft((current) => ({ ...current, choices: [...current.choices, newChoice("PLAN", customerPlanName("", current.choices.filter((choice) => choice.kind === "PLAN").length), true)] }))}>上記の作業を含む案を追加</button>}
           <button type="button" className="text-blue-700 underline" onClick={() => setDraft((current) => ({ ...current, choices: [...current.choices, newChoice("ADD_ON")] }))}>任意の追加作業を追加</button></div>
       </fieldset>
       <div className="space-y-2 border-t pt-4">

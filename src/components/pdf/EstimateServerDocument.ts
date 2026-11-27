@@ -1,6 +1,7 @@
 import { formatWatchInformation } from '@/lib/timepiece-type';
 import type { TimepieceType } from '@prisma/client';
 import { formatEstimateLinePrice } from './estimate-line-price';
+import { customerPlanName, selectedOptionTotal } from '@/lib/estimate-option-totals';
 
 export interface EstimateServerDocumentProps {
   data: {
@@ -68,6 +69,7 @@ export function createEstimateServerDocumentElement(
     customerType === "business" ? withOnchu(value) : withSama(value);
   const isB2C = data.customer.type === "individual" && data.pricingTaxMode !== "INCLUSIVE";
   const inclusive = !isB2C && data.pricingTaxMode === "INCLUSIVE";
+  const mode = data.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE";
   const columns = {
     no: "3%",
     inquiry: "9%",
@@ -222,7 +224,7 @@ export function createEstimateServerDocumentElement(
           return el(
             View,
             { key: job.id || index, wrap: job.options &&
-                job.items.length + job.options.choices.reduce((count, choice) => count + choice.lines.length + 3, 2) <= 25
+                job.options.choices.reduce((count, choice) => count + choice.lines.length + (choice.kind === "PLAN" ? job.items.length : 0) + 3, 2) <= 25
                 ? false : undefined, style: [styles.row, { minHeight: 30 }] },
             el(
               View,
@@ -235,7 +237,7 @@ export function createEstimateServerDocumentElement(
               el(
                 View,
                 { style: { width: columns.items, paddingLeft: 4, borderLeftWidth: 1, borderColor: "#eee" } },
-                job.items.map((item, itemIndex) =>
+                (job.options ? [] : job.items).map((item, itemIndex) =>
                   el(
                     View,
                     { key: itemIndex, style: styles.itemRow },
@@ -248,25 +250,29 @@ export function createEstimateServerDocumentElement(
               el(
                 Text,
                 { style: { width: columns.total, textAlign: "right" } },
-                job.options ? `共通 ¥${job.items.reduce((sum, item) => sum + item.price * (item.quantity ?? 1), 0).toLocaleString()}` : `¥${jobTotal.toLocaleString()}`
+                job.options ? "各案をご確認ください" : `¥${jobTotal.toLocaleString()}`
               )
             ),
             job.options ? el(View, { style: { marginTop: 5, paddingLeft: 5, fontSize: 8 } },
               el(Text, { style: { fontWeight: "bold" } }, job.options.title || "選択肢"),
+              el(Text, null, `明細金額は${mode === "INCLUSIVE" ? "税込" : "税抜"}、各案の合計は税込です。`),
               job.options.notes ? el(Text, null, `全体条件: ${job.options.notes}`) : null,
               job.options.choices.map((choice, choiceIndex) => el(View, { key: choiceIndex, style: { marginTop: 4 } },
                 el(Text, { style: { fontWeight: "bold" } },
-                  `${choice.kind === "PLAN" ? "プラン" : "追加作業"}: ${choice.name}${choice.recommended ? "【推奨】" : ""}`),
+                  `${choice.kind === "PLAN" ? customerPlanName(choice.name, job.options!.choices.slice(0, choiceIndex).filter(item => item.kind === "PLAN").length) : `追加作業: ${choice.name}`}${choice.recommended ? "【おすすめ】" : ""}`),
                 choice.notes ? el(Text, null, `条件: ${choice.notes}`) : null,
-                choice.kind === "PLAN" && choice.lines.length === 0 ? el(Text, null, "共通見積のみ（追加料金なし）") : null,
-                choice.lines.map((line, lineIndex) => el(View, { key: lineIndex, style: styles.itemRow },
+                (choice.kind === "PLAN" ? [
+                  ...job.items.map(item => ({ name: item.displayName || item.name, price: item.price, quantity: item.quantity ?? 1, quantityUnit: item.quantityUnit, notes: null })),
+                  ...choice.lines,
+                ] : choice.lines).map((line, lineIndex) => el(View, { key: lineIndex, style: styles.itemRow },
                   el(Text, { style: { flexGrow: 1, flexShrink: 1, paddingRight: 4 } },
                     `・${line.name}${line.notes ? ` (${line.notes})` : ""}`),
                   el(Text, { wrap: false, style: { textAlign: "right", flexShrink: 0 } },
-                    formatEstimateLinePrice(line.price, line.quantity)))),
+                    `${formatEstimateLinePrice(line.price, line.quantity)}${line.quantity > 1 ? line.quantityUnit ?? "" : ""}`))),
                 el(Text, { style: { textAlign: "right", fontWeight: "bold" } },
                   choice.kind === "PLAN"
-                    ? `差額 ¥${choice.deltaAmount.toLocaleString()} / 共通＋このプラン ¥${choice.totalAmount.toLocaleString()}${inclusive ? "(税込)" : "(税抜)"}`
+                    ? `この案の税込合計 ¥${selectedOptionTotal(job.items.map(item => ({ unitPrice: item.price, quantity: item.quantity ?? 1 })),
+                        { lines: choice.lines.map(line => ({ unitPrice: line.price, quantity: line.quantity })) }, [], mode).grossAmount.toLocaleString()}`
                     : `追加額 ¥${choice.deltaAmount.toLocaleString()}${inclusive ? "(税込)" : "(税抜)"}`)
               ))) : null,
             job.customerNote
@@ -275,7 +281,7 @@ export function createEstimateServerDocumentElement(
           );
         })
       ),
-      isB2C
+      isB2C && !data.jobs.some(job => job.options)
         ? el(
             View,
             { style: { alignSelf: "flex-end", width: "32%", marginTop: 12 } },
