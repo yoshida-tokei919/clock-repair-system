@@ -141,8 +141,7 @@ export function B2bBatchIntakeForm({ partners, brands, movementMakers, movementC
       const data = new FormData();
       data.append("file", photo.file);
       data.append("repairId", String(repairId));
-      data.append("category", "FRONT");
-      data.append("stage", "RECEPTION");
+      data.append("category", photo.category);
       const response = await fetch("/api/upload", { method: "POST", body: data });
       const body: unknown = await response.json().catch(() => null);
       const status = uploadOutcome(response.status, body, repairId);

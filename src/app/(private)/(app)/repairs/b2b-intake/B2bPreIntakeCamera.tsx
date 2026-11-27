@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CameraAlignmentGuide } from "@/components/repairs/CameraAlignmentGuide";
+import { repairPhotoCategories, repairPhotoCategoryLabels, type RepairPhotoCategory } from "@/lib/repair-photo-sharing";
 
 export type CapturedPhoto = {
-  key: string; rowKey: number; file: File; url: string;
+  key: string; rowKey: number; file: File; url: string; category: RepairPhotoCategory;
   status: "pending" | "uploading" | "success" | "failed" | "unknown";
   error?: string;
 };
@@ -14,6 +15,7 @@ export function B2bPreIntakeCamera({ rowKey, watchNumber, photos, disabled, onAd
   onAdd: (photo: CapturedPhoto) => void; onDelete: (key: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState<RepairPhotoCategory>("FRONT");
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState<{ file: File; url: string } | null>(null);
   const [resolution, setResolution] = useState("");
@@ -104,13 +106,16 @@ export function B2bPreIntakeCamera({ rowKey, watchNumber, photos, disabled, onAd
     const saved = draftRef.current;
     draftRef.current = null;
     setDraft(null);
-    onAdd({ key: crypto.randomUUID(), rowKey, ...saved, status: "pending" });
+    onAdd({ key: crypto.randomUUID(), rowKey, ...saved, category, status: "pending" });
     setOpen(false);
   }
 
   function close() { stop(); clearDraft(); setOpen(false); }
 
   return <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm">
+    <label className="mb-2 block">撮影箇所 <select className="rounded border p-1" value={category} onChange={event => setCategory(event.target.value as RepairPhotoCategory)}>
+      {repairPhotoCategories.map(value => <option key={value} value={value}>{repairPhotoCategoryLabels[value]}</option>)}
+    </select></label>
     <div className="flex flex-wrap items-center gap-3">
       <button type="button" className="rounded bg-slate-900 px-3 py-2 text-white disabled:opacity-40" disabled={disabled} onClick={() => void start()}>Webカメラで外観を撮影</button>
       <span>時計 {watchNumber}：{photos.length}枚（撮影なしでも登録可）</span>

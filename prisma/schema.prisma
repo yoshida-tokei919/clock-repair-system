@@ -1331,6 +1331,8 @@ enum RepairPhotoCategory {
   BACK
   BRACELET
   MOVEMENT_OPEN
+  MOVEMENT_DISASSEMBLED
+  FAULT_DETAIL
   REPAIR_DETAIL
   OTHER
 }
@@ -1340,7 +1342,7 @@ model RepairPhoto {
   repairId           Int
   stage              RepairPhotoStage?
   category           RepairPhotoCategory @default(OTHER)
-  customerVisible    Boolean             @default(true)
+  customerVisible    Boolean             @default(false)
   publicCaseVisible  Boolean             @default(false)
   snsVisible         Boolean             @default(false)
   storageKey         String

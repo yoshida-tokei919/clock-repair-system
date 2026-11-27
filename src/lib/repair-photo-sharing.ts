@@ -4,6 +4,8 @@ export type RepairPhotoCategory =
   | "BACK"
   | "BRACELET"
   | "MOVEMENT_OPEN"
+  | "MOVEMENT_DISASSEMBLED"
+  | "FAULT_DETAIL"
   | "REPAIR_DETAIL"
   | "OTHER";
 
@@ -15,6 +17,8 @@ export const repairPhotoCategories = [
   "BACK",
   "BRACELET",
   "MOVEMENT_OPEN",
+  "MOVEMENT_DISASSEMBLED",
+  "FAULT_DETAIL",
   "REPAIR_DETAIL",
   "OTHER",
 ] as const satisfies readonly RepairPhotoCategory[];
@@ -27,6 +31,8 @@ export const repairPhotoCategoryLabels: Record<RepairPhotoCategory, string> = {
   BACK: "裏面",
   BRACELET: "バンド / ブレス",
   MOVEMENT_OPEN: "ムーブメント",
+  MOVEMENT_DISASSEMBLED: "ムーブメント（分解時）",
+  FAULT_DETAIL: "不具合箇所",
   REPAIR_DETAIL: "修理箇所",
   OTHER: "その他",
 };
@@ -45,11 +51,13 @@ export type PhotoSharingValues = {
 
 export const photoSharingFallbacks: Record<RepairPhotoCategory, PhotoSharingValues> = {
   FRONT: { customerVisible: true, publicCaseVisible: true, snsVisible: true },
-  BACK: { customerVisible: true, publicCaseVisible: true, snsVisible: false },
+  BACK: { customerVisible: false, publicCaseVisible: true, snsVisible: false },
   CROWN_SIDE: { customerVisible: false, publicCaseVisible: false, snsVisible: false },
   BRACELET: { customerVisible: false, publicCaseVisible: false, snsVisible: false },
-  MOVEMENT_OPEN: { customerVisible: true, publicCaseVisible: true, snsVisible: true },
-  REPAIR_DETAIL: { customerVisible: true, publicCaseVisible: true, snsVisible: true },
+  MOVEMENT_OPEN: { customerVisible: false, publicCaseVisible: true, snsVisible: true },
+  MOVEMENT_DISASSEMBLED: { customerVisible: false, publicCaseVisible: false, snsVisible: false },
+  FAULT_DETAIL: { customerVisible: false, publicCaseVisible: false, snsVisible: false },
+  REPAIR_DETAIL: { customerVisible: false, publicCaseVisible: true, snsVisible: true },
   OTHER: { customerVisible: false, publicCaseVisible: false, snsVisible: false },
 };
 
@@ -71,4 +79,21 @@ export function normalizePhotoSharing(values: Partial<PhotoSharingValues>): Phot
     publicCaseVisible: values.publicCaseVisible === true,
     snsVisible: values.snsVisible === true,
   };
+}
+
+export function repairPhotoStageFromStatus(status: string): RepairPhotoStage | null {
+  if (status === "作業中") return "WORK";
+  if (status === "作業完了" || status === "納品済み") return "COMPLETION";
+  if (["受付", "見積中", "承認待ち", "部品待ち(未注文)", "部品待ち(注文済み)", "部品入荷済み", "作業待ち"].includes(status)) return "RECEPTION";
+  return null;
+}
+
+export function newPhotoSharing(stage: RepairPhotoStage | null, category: RepairPhotoCategory, preset?: Partial<PhotoSharingValues> | null): PhotoSharingValues {
+  const sharing = normalizePhotoSharing(preset ?? photoSharingFallbacks[category]);
+  // A category-wide preset can enable another category, but FRONT is only
+  // automatic for reception. A missing preset always uses safe fallbacks.
+  sharing.customerVisible = category === "FRONT"
+    ? stage === "RECEPTION" && sharing.customerVisible
+    : sharing.customerVisible;
+  return sharing;
 }

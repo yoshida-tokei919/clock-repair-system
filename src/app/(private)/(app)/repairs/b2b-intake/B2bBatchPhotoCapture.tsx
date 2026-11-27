@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectDialog } from "@/components/repairs/MobileConnectDialog";
 import { CameraAlignmentGuide } from "@/components/repairs/CameraAlignmentGuide";
+import { repairPhotoCategories, repairPhotoCategoryLabels, type RepairPhotoCategory } from "@/lib/repair-photo-sharing";
 
 type Repair = { id: number; inquiryNumber: string };
 
 export function B2bBatchPhotoCapture({ repairs }: { repairs: Repair[] }) {
   const [selected, setSelected] = useState<Repair | null>(null);
+  const [category, setCategory] = useState<RepairPhotoCategory>("FRONT");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [ready, setReady] = useState(false);
@@ -120,8 +122,7 @@ export function B2bBatchPhotoCapture({ repairs }: { repairs: Repair[] }) {
       const data = new FormData();
       data.append("file", new File([blob], `b2b-${repairId}-${Date.now()}.jpg`, { type: "image/jpeg" }));
       data.append("repairId", String(repairId));
-      data.append("category", "FRONT");
-      data.append("stage", "RECEPTION");
+      data.append("category", category);
       const response = await fetch("/api/upload", { method: "POST", body: data });
       const body = await response.json();
       if (!response.ok || !body.success || body.photo?.repairId !== repairId) throw new Error(body.error || "保存結果を確認できません。案件画面で確認してください。");
@@ -137,6 +138,9 @@ export function B2bBatchPhotoCapture({ repairs }: { repairs: Repair[] }) {
 
   return <section className="mt-5 rounded-md border border-green-300 bg-white p-4 text-sm">
     <h3 className="font-semibold">受付写真</h3>
+    <label className="mt-2 block">PC撮影箇所 <select className="rounded border p-1" value={category} onChange={event => setCategory(event.target.value as RepairPhotoCategory)}>
+      {repairPhotoCategories.map(value => <option key={value} value={value}>{repairPhotoCategoryLabels[value]}</option>)}
+    </select></label>
     <p className="mt-1">案件IDは一括登録後に確定します。登録済みの案件ごとにPCカメラまたはスマホQRで撮影してください。</p>
     <ul className="mt-3 space-y-2">{repairs.map(repair => <li key={repair.id} className="flex flex-wrap items-center gap-2">
       <span className="min-w-36">{repair.inquiryNumber}（ID: {repair.id}）：{photoCounts[repair.id] ?? "—"}枚</span>

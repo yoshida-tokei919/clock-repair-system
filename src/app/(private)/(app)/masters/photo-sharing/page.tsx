@@ -48,7 +48,7 @@ export default function PhotoSharingDefaultsPage() {
   };
 
   return <main className="mx-auto max-w-3xl space-y-5 p-6">
-    <div><h1 className="text-2xl font-bold">写真共有デフォルト設定</h1><p className="mt-1 text-sm text-zinc-600">撮影箇所ごとの初期共有先です。既存の案件写真は変更しません。</p></div>
+    <div><h1 className="text-2xl font-bold">写真共有デフォルト設定</h1><p className="mt-1 text-sm text-zinc-600">撮影箇所ごとの初期共有先です。正面写真の顧客共有は受付時だけ自動でONになります。既存の案件写真は変更しません。</p></div>
     <div className="overflow-hidden rounded-lg border bg-white">
       <div className="grid grid-cols-[1fr_repeat(3,5rem)] border-b bg-zinc-50 px-4 py-3 text-xs font-bold text-zinc-600"><span>撮影箇所</span><span>共有</span><span>事例</span><span>SNS</span></div>
       {repairPhotoCategories.map((category) => <div key={category} className="grid grid-cols-[1fr_repeat(3,5rem)] items-center border-b px-4 py-3 text-sm last:border-b-0"><span>{repairPhotoCategoryLabels[category]}</span>{(["customerVisible", "publicCaseVisible", "snsVisible"] as const).map((key) => <label key={key}><Checkbox checked={defaults[category][key]} onCheckedChange={(checked) => update(category, key, checked === true)} /></label>)}</div>)}

@@ -3,6 +3,7 @@ import type { PaymentStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { resolveCustomerRepairShareScope } from "@/lib/customer-repair-share";
+import { selectCustomerRepairPhotos } from "@/lib/customer-repair-photos";
 import { getPublicIntakeShippingDecision, IntakeShippingDecisionError } from "@/lib/intake-shipping-decision";
 import { getPublicIntakeDeliveryPreference, IntakeDeliveryPreferenceError } from "@/lib/intake-delivery-preference";
 import { YUPURI_DELIVERY_TIME_OPTIONS } from "@/lib/yupuri-v3";
@@ -155,32 +156,6 @@ function getRepairPhotoUrl(photo?: { id?: number; storageKey?: string | null } |
   return null;
 }
 
-function receptionPhotosForWatchCard(repair: { photos?: any[] }) {
-  const photos = repair.photos ?? [];
-  return photos.filter(
-    (photo) => photo.stage === "RECEPTION" && ["FRONT", "BACK"].includes(photo.category),
-  );
-}
-
-function photosForCustomerProgress(repair: { status?: string | null; photos?: any[] }) {
-  const photos = repair.photos ?? [];
-  const status = repair.status ?? "";
-  const byStage = (stage: string, categories: string[]) => photos.filter(
-    (photo) => photo.stage === stage && categories.includes(photo.category),
-  );
-
-  if (status.includes("作業中")) {
-    const movementPhotos = byStage("WORK", ["MOVEMENT_OPEN"]);
-    return movementPhotos.length ? movementPhotos : byStage("WORK", ["REPAIR_DETAIL"]);
-  }
-  if (status.includes("作業完了") || status.includes("納品")) {
-    return byStage("COMPLETION", ["FRONT", "BACK"]);
-  }
-  // Reception photos belong to the watch card only. They must never be used
-  // as a progress-photo fallback below the estimate total.
-  return [];
-}
-
 function getCustomerStatus(status: string) {
   if (status === "修理不可返却") return { label: "修理不可・返却", className: "border-amber-200 bg-amber-50 text-amber-800" };
   if (status === "キャンセル返却") return { label: "キャンセル・返却", className: "border-amber-200 bg-amber-50 text-amber-800" };
@@ -285,8 +260,8 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
           {repairs.map((repair, index) => {
             const estimateItems = getEstimateItems(repair);
             const { subtotal, taxAmount, total } = getEstimateAmounts(repair);
-            const receptionPhotos = receptionPhotosForWatchCard(repair);
-            const customerPhotos = photosForCustomerProgress(repair);
+            const selectedPhotos = selectCustomerRepairPhotos(repair.status, repair.photos);
+            const customerPhotos = selectedPhotos.progress;
             const repairToken = typeof repair.publicToken === "string" && repair.publicToken.trim() ? repair.publicToken : null;
             const activeOptions = visibleCustomerOptionSet(repair.estimateOptionSet, repair.customer.type);
             const optionHash = activeOptions && repair.estimateDocument && repair.estimate
@@ -301,7 +276,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
               publishedEstimate);
             const readToken = repairToken ?? (documentTokenAccess ? token : null);
             const prepaymentToken = repairToken ?? (documentTokenAccess ? token : null);
-            const primaryPhotoUrl = getRepairPhotoUrl(receptionPhotos[0], readToken ?? undefined);
+            const primaryPhotoUrl = getRepairPhotoUrl(selectedPhotos.thumbnail, readToken ?? undefined);
             const status = repair.status === "承認待ち" && !publishedEstimate ? getCustomerStatus("見積中") : getCustomerStatus(repair.status);
             const watchName = getWatchBrandModelLine(repair);
             const identifiers = [

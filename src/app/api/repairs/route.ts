@@ -18,9 +18,10 @@ import {
     replaceRepairLineItems,
 } from "@/lib/repair-line-items";
 import {
-    photoSharingFallbacks,
+    newPhotoSharing,
     repairPhotoCategory,
     repairPhotoStage,
+    repairPhotoStageFromStatus,
 } from "@/lib/repair-photo-sharing";
 
 function extractInquirySequence(inquiryNumber: string | null, prefix: string) {
@@ -418,11 +419,12 @@ export async function POST(req: Request) {
                 await Promise.all(photoList.map(async (p: any) => {
                     const category = repairPhotoCategory(p.category);
                     const preset = await tx.photoSharingDefault.findUnique({ where: { category } });
-                    const sharing = preset ?? photoSharingFallbacks[category];
+                    const stage = repairPhotoStage(p.stage) ?? repairPhotoStageFromStatus(repair.status);
+                    const sharing = newPhotoSharing(stage, category, preset);
                     return tx.repairPhoto.create({
                         data: {
                             repairId: repair.id,
-                            stage: repairPhotoStage(p.stage),
+                            stage,
                             category,
                             customerVisible: sharing.customerVisible,
                             publicCaseVisible: sharing.publicCaseVisible,

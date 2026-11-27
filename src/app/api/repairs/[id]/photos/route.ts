@@ -4,9 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
     normalizePhotoSharing,
-    photoSharingFallbacks,
+    newPhotoSharing,
     repairPhotoCategory,
     repairPhotoStage,
+    repairPhotoStageFromStatus,
 } from "@/lib/repair-photo-sharing";
 import { deleteRepairPhotoObject, isR2RepairPhotoKey } from "@/lib/r2-repair-photos";
 
@@ -55,12 +56,13 @@ export async function POST(
         const category = repairPhotoCategory(body.category);
 
         // Verify Repair exists
-        const repair = await prisma.repair.findUnique({ where: { id: repairId }, select: { id: true, photoPostingOptOut: true } });
+        const repair = await prisma.repair.findUnique({ where: { id: repairId }, select: { id: true, status: true, photoPostingOptOut: true } });
         if (!repair) return NextResponse.json({ error: "Repair not found" }, { status: 404 });
 
         // Create Photo Record
         const preset = await prisma.photoSharingDefault.findUnique({ where: { category } });
-        const sharing = normalizePhotoSharing(preset ?? photoSharingFallbacks[category]);
+        const stage = repairPhotoStage(body.stage) ?? repairPhotoStageFromStatus(repair.status);
+        const sharing = newPhotoSharing(stage, category, preset);
         if (repair.photoPostingOptOut) {
             sharing.publicCaseVisible = false;
             sharing.snsVisible = false;
@@ -68,7 +70,7 @@ export async function POST(
         const photo = await prisma.repairPhoto.create({
             data: {
                 repairId: repair.id,
-                stage: repairPhotoStage(body.stage),
+                stage,
                 category,
                 ...sharing,
                 storageKey: url, // In real world, this is the R2 key. In mock, it's the URL.
@@ -111,10 +113,14 @@ export async function PATCH(
             select: { photoPostingOptOut: true },
         });
         if (!repair) return NextResponse.json({ error: "Repair not found" }, { status: 404 });
+        const existing = await prisma.repairPhoto.findFirst({ where: { id: photoId, repairId }, select: {
+            stage: true, category: true, customerVisible: true, publicCaseVisible: true, snsVisible: true,
+        } });
+        if (!existing) return NextResponse.json({ error: "Photo not found" }, { status: 404 });
         const sharing = normalizePhotoSharing({
-            customerVisible: body.customerVisible,
-            publicCaseVisible: body.publicCaseVisible,
-            snsVisible: body.snsVisible,
+            customerVisible: body.customerVisible ?? existing.customerVisible,
+            publicCaseVisible: body.publicCaseVisible ?? existing.publicCaseVisible,
+            snsVisible: body.snsVisible ?? existing.snsVisible,
         });
         if (repair.photoPostingOptOut) {
             sharing.publicCaseVisible = false;
@@ -122,7 +128,7 @@ export async function PATCH(
         }
         const photo = await prisma.repairPhoto.updateMany({
             where: { id: photoId, repairId },
-            data: { stage: repairPhotoStage(body.stage), category, ...sharing },
+            data: { stage: body.stage === undefined ? existing.stage : repairPhotoStage(body.stage), category: body.category === undefined ? existing.category : category, ...sharing },
         });
         if (photo.count !== 1) {
             return NextResponse.json({ error: "Photo not found" }, { status: 404 });

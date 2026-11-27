@@ -64,7 +64,10 @@ import { RepairLineConversation } from "./RepairLineConversation";
 import { RepairComments } from "./RepairComments";
 import {
     photoSharingFallbacks,
+    newPhotoSharing,
     repairPhotoCategories,
+    repairPhotoCategory,
+    repairPhotoStageFromStatus,
     repairPhotoCategoryLabels,
     repairPhotoStageLabels,
     repairPhotoStages,
@@ -145,15 +148,6 @@ const STATUS_STEPS: { id: string; label: string }[] = [
 // ステータスバーに横並び表示するメインフロー（保留・キャンセルは除外）
 const MAIN_STATUS_STEPS = STATUS_STEPS.filter(s => s.id !== 'キャンセル' && s.id !== '保留');
 const PART_SEARCH_SITES_STORAGE_KEY = "repair-part-search-sites:v1";
-
-const repairPhotoStageFromStatus = (repairStatus: string) => {
-    if (repairStatus === "作業中") return "WORK" as const;
-    if (repairStatus === "作業完了" || repairStatus === "納品済み") return "COMPLETION" as const;
-    if (["受付", "見積中", "承認待ち", "部品待ち(未注文)", "部品待ち(注文済み)", "部品入荷済み", "作業待ち"].includes(repairStatus)) {
-        return "RECEPTION" as const;
-    }
-    return null;
-};
 
 function getRepairPhotoSrc(photo?: { id?: number; storageKey?: string | null } | null): string | null {
     const storageKey = photo?.storageKey?.trim();
@@ -2390,7 +2384,7 @@ export function RepairEntryForm({ initialData, mode = 'create', initialTab = 'ma
                 mimeType: data.mimeType,
                 stage: captureStage,
                 category: newPhotoCategory,
-                ...(photoSharingDefaults[newPhotoCategory] ?? photoSharingFallbacks.OTHER),
+                ...newPhotoSharing(captureStage, repairPhotoCategory(newPhotoCategory), photoSharingDefaults[newPhotoCategory]),
             };
             setPhotos(prev => [...prev, savedPhoto]);
             return savedPhoto;

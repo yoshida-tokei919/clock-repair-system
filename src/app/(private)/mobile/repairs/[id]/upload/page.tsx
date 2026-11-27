@@ -7,12 +7,14 @@ import { Card } from "@/components/ui/card";
 import imageCompression from "browser-image-compression";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { repairPhotoCategories, repairPhotoCategoryLabels, type RepairPhotoCategory } from "@/lib/repair-photo-sharing";
 
 export default function MobileUploadPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = React.use(params);
     const repairId = resolvedParams.id;
     const [isUploading, setIsUploading] = useState(false);
     const [uploadedCount, setUploadedCount] = useState(0);
+    const [category, setCategory] = useState<RepairPhotoCategory>("FRONT");
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,6 +44,7 @@ export default function MobileUploadPage({ params }: { params: Promise<{ id: str
                 const fileName = `mobile-${Date.now()}.webp`;
                 formData.append("file", compressedBlob, fileName);
                 formData.append("repairId", repairId);
+                formData.append("category", category);
                 formData.append("source", "mobile"); // Mark as mobile upload
 
                 const res = await fetch("/api/upload", {
@@ -81,6 +84,11 @@ export default function MobileUploadPage({ params }: { params: Promise<{ id: str
                 </div>
 
                 <Card className="bg-zinc-900/50 border-zinc-800 p-6 flex flex-col items-center gap-6">
+                    <label className="w-full text-sm">撮影箇所
+                        <select className="mt-2 w-full rounded border border-zinc-600 bg-zinc-800 p-2" value={category} onChange={event => setCategory(event.target.value as RepairPhotoCategory)}>
+                            {repairPhotoCategories.map(value => <option key={value} value={value}>{repairPhotoCategoryLabels[value]}</option>)}
+                        </select>
+                    </label>
                     <input
                         type="file"
                         accept="image/*"

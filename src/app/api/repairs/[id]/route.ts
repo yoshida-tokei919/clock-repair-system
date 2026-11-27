@@ -20,8 +20,10 @@ import {
 } from "@/lib/repair-line-items";
 import {
     normalizePhotoSharing,
+    newPhotoSharing,
     repairPhotoCategory,
     repairPhotoStage,
+    repairPhotoStageFromStatus,
 } from "@/lib/repair-photo-sharing";
 import { enforceRepairPhotoPostingOptOut } from "@/lib/repair-photo-posting-opt-out";
 import { getRepairStatusTransition } from "@/lib/repair-status-transition";
@@ -498,25 +500,35 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                     select: { id: true },
                 })).map((photo) => photo.id));
 
-                await Promise.all(body.photos.map((rawPhoto: any) => {
-                    const category = repairPhotoCategory(rawPhoto.category);
-                    const sharing = normalizePhotoSharing({
-                        customerVisible: rawPhoto.customerVisible,
-                        publicCaseVisible: rawPhoto.publicCaseVisible,
-                        snsVisible: rawPhoto.snsVisible,
-                    });
+                await Promise.all(body.photos.map(async (rawPhoto: any) => {
+                    const photoId = Number(rawPhoto.id);
+                    const existing = Number.isInteger(photoId) && existingPhotoIds.has(photoId)
+                        ? await tx.repairPhoto.findUnique({ where: { id: photoId } }) : null;
+                    const category = rawPhoto.category === undefined && existing ? existing.category : repairPhotoCategory(rawPhoto.category);
+                    const stage = repairPhotoStage(rawPhoto.stage) ?? (!existing ? repairPhotoStageFromStatus(dbStatus) : null);
+                    const preset = existing ? null : await tx.photoSharingDefault.findUnique({ where: { category } });
+                    const sharing = existing
+                        ? normalizePhotoSharing({
+                            customerVisible: rawPhoto.customerVisible ?? existing.customerVisible,
+                            publicCaseVisible: rawPhoto.publicCaseVisible ?? existing.publicCaseVisible,
+                            snsVisible: rawPhoto.snsVisible ?? existing.snsVisible,
+                        })
+                        : { ...newPhotoSharing(stage, category, preset),
+                            ...(typeof rawPhoto.customerVisible === "boolean" ? { customerVisible: rawPhoto.customerVisible } : {}),
+                            ...(typeof rawPhoto.publicCaseVisible === "boolean" ? { publicCaseVisible: rawPhoto.publicCaseVisible } : {}),
+                            ...(typeof rawPhoto.snsVisible === "boolean" ? { snsVisible: rawPhoto.snsVisible } : {}),
+                        };
                     if (photoPostingOptOut) {
                         sharing.publicCaseVisible = false;
                         sharing.snsVisible = false;
                     }
                     const data = {
-                        stage: repairPhotoStage(rawPhoto.stage),
+                        stage: existing && rawPhoto.stage === undefined ? existing.stage : stage,
                         category,
                         ...sharing,
-                        fileName: rawPhoto.fileName || null,
-                        mimeType: rawPhoto.mimeType || null,
+                        fileName: rawPhoto.fileName === undefined && existing ? existing.fileName : rawPhoto.fileName || null,
+                        mimeType: rawPhoto.mimeType === undefined && existing ? existing.mimeType : rawPhoto.mimeType || null,
                     };
-                    const photoId = Number(rawPhoto.id);
                     if (Number.isInteger(photoId) && existingPhotoIds.has(photoId)) {
                         return tx.repairPhoto.update({ where: { id: photoId }, data });
                     }

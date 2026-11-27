@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Camera, RefreshCw, Check, X, CameraOff, Loader2, RotateCcw } from "lucide-react";
 import { CameraAlignmentGuide } from "@/components/repairs/CameraAlignmentGuide";
+import { repairPhotoCategories, repairPhotoCategoryLabels, repairPhotoCategory } from "@/lib/repair-photo-sharing";
 
 // 入力映像の解像度を維持してWebP品質92%で保存する。
 const WEBP_QUALITY = 0.92;
@@ -32,6 +33,7 @@ export function CameraCaptureDialog({
     const canvasRef  = useRef<HTMLCanvasElement>(null);
 
     const [phase, setPhase]               = useState<DialogPhase>('preview');
+    const [selectedCategory, setSelectedCategory] = useState(repairPhotoCategory(category));
     const [stream, setStream]             = useState<MediaStream | null>(null);
     const [devices, setDevices]           = useState<MediaDeviceInfo[]>([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
@@ -164,7 +166,7 @@ export function CameraCaptureDialog({
             const formData = new FormData();
             formData.append('file', new File([capturedBlob], `camera-${Date.now()}.webp`, { type: 'image/webp' }));
             formData.append('repairId', String(repairId));
-            formData.append('category', category);
+            formData.append('category', selectedCategory);
             const response = await fetch('/api/upload', { method: 'POST', body: formData });
             const result = await response.json().catch(() => ({}));
             if (!response.ok || !result.success) throw new Error(result.error ?? '保存に失敗しました');
@@ -184,6 +186,9 @@ export function CameraCaptureDialog({
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
             <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-zinc-800">
+                <select aria-label="撮影箇所" className="m-3 rounded border bg-zinc-900 p-2 text-white" value={selectedCategory} onChange={event => setSelectedCategory(repairPhotoCategory(event.target.value))}>
+                    {repairPhotoCategories.map(value => <option key={value} value={value}>{repairPhotoCategoryLabels[value]}</option>)}
+                </select>
                 {/* ヘッダー */}
                 <DialogHeader className="p-3 bg-zinc-900 border-b border-zinc-800 flex flex-row items-center justify-between">
                     <DialogTitle className="text-white flex items-center gap-2 text-sm">
