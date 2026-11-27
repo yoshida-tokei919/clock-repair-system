@@ -131,3 +131,23 @@ test("PDF plans with no common work each show only their own complete work", () 
   assert.match(output, /この案の税込合計 ¥34,100/);
   assert.doesNotMatch(output, /共通見積のみ|¥0/);
 });
+
+test("PDF option rows qualify known types and keep quantity on the amount side", () => {
+  const data: EstimateServerDocumentProps["data"] = { ...base, jobs: [{ ...base.jobs[0], items: [
+    { name: "リューズ 修理", type: "labor", price: 8000, quantity: 1 },
+  ], options: { title: "修理案", choices: [
+    { kind: "PLAN", name: "標準", recommended: false, lines: [
+      { name: "リューズ", lineType: "PART", price: 1000, quantity: 2, quantityUnit: "本" },
+    ], deltaAmount: 2000, totalAmount: 10000 },
+    { kind: "ADD_ON", name: "追加", recommended: false, lines: [
+      { name: "追加調整", lineType: "LABOR", price: 500, quantity: 1 },
+      { name: "名称不明", price: 300, quantity: 1 },
+    ], deltaAmount: 800, totalAmount: 800 },
+  ] } }] };
+  const output = texts(createEstimateServerDocumentElement(runtime, renderer, data)).join(" ");
+  assert.match(output, /・リューズ修理（技術料）/);
+  assert.match(output, /・リューズ（部品代） ¥1,000 × 2本/);
+  assert.match(output, /・追加調整（技術料） ¥500/);
+  assert.match(output, /・名称不明 ¥300/);
+  assert.doesNotMatch(output, /・リューズ修理（技術料） × 1|・追加調整（技術料） × 1/);
+});

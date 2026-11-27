@@ -3,12 +3,13 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { customerPlanName, selectedOptionTotal } from "@/lib/estimate-option-totals";
+import { customerOptionLineLabel, customerOptionLineQuantity } from "@/lib/customer-option-line-label";
 import type { PricingTaxMode } from "@/lib/pricing-tax";
 import { isTerminalApprovalRepairStatus, matchesApprovedOptionSelection } from "@/lib/customer-approval-recovery";
 import { createApprovalSubmitLatch } from "@/lib/customer-approval-submit-latch";
 import { CustomerReturnAddress, type ReturnAddress } from "./CustomerReturnAddress";
 
-type Line = { id: number; itemNameSnapshot: string; displayNameSnapshot: string | null; quantity: number; quantityUnit?: string | null; unitPrice: number };
+type Line = { id: number; itemNameSnapshot: string; displayNameSnapshot: string | null; lineType?: string | null; quantity: number; quantityUnit?: string | null; unitPrice: number };
 type Choice = { id: number; kind: string; name: string; notes: string | null; recommended: boolean; lines: Line[] };
 
 export function CustomerEstimateOptions(props: {
@@ -40,7 +41,7 @@ export function CustomerEstimateOptions(props: {
   const selectedAddOns = addOns.filter(choice => addOnIds.includes(choice.id));
   const totals = selectedOptionTotal(props.commonLines, plan, selectedAddOns, props.mode);
   const money = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
-  const lineLabel = (line: Line) => line.displayNameSnapshot || line.itemNameSnapshot;
+  const lineLabel = (line: Line) => customerOptionLineLabel(line.displayNameSnapshot || line.itemNameSnapshot, line.lineType);
   const planName = (choice: Choice) => customerPlanName(choice.name, plans.indexOf(choice));
   const canReview = props.available && !props.approved && !resolved && !uncertain && (!plans.length || !!plan) &&
     (props.commonLines.length > 0 || Boolean(plan?.lines.length) || selectedAddOns.some(choice => choice.lines.length > 0)) && !!approverName.trim();
@@ -103,7 +104,7 @@ export function CustomerEstimateOptions(props: {
         <span className="flex items-center gap-2"><input type="radio" name={`plan-${props.repairId}`} checked={planId === choice.id} onChange={() => { setPlanId(choice.id); setConfirming(false); }} />
           <span className="font-bold">{planName(choice)}</span>{choice.recommended && <span className="text-xs text-blue-700">おすすめ</span>}</span>
         {choice.notes && <span className="ml-6 block text-sm text-slate-600">{choice.notes}</span>}
-        {[...props.commonLines, ...choice.lines].map((line, index) => <span key={`${index}-${line.id}`} className="ml-6 flex flex-wrap justify-between gap-x-3 text-sm"><span>{lineLabel(line)} × {line.quantity}{line.quantityUnit ?? ""}</span><span>{money(line.unitPrice * line.quantity)}</span></span>)}
+        {[...props.commonLines, ...choice.lines].map((line, index) => <span key={`${index}-${line.id}`} className="ml-6 flex flex-wrap justify-between gap-x-3 text-sm"><span>{lineLabel(line)}{customerOptionLineQuantity(line.quantity, line.quantityUnit)}</span><span>{money(line.unitPrice * line.quantity)}</span></span>)}
         <span className="ml-6 mt-2 flex flex-wrap justify-between gap-x-2 border-t border-slate-200 pt-2 font-bold"><span>この案の税込合計</span><span>{money(selectedOptionTotal(props.commonLines, choice, [], props.mode).grossAmount)}</span></span>
       </label>)}
     </fieldset>}
@@ -113,7 +114,7 @@ export function CustomerEstimateOptions(props: {
         <span className="flex items-center gap-2"><input type="checkbox" checked={addOnIds.includes(choice.id)} onChange={event => { setAddOnIds(current => event.target.checked ? [...current, choice.id] : current.filter(id => id !== choice.id)); setConfirming(false); }} />
           <span className="font-bold">{choice.name}</span></span>
         {choice.notes && <span className="ml-6 block text-sm text-slate-600">{choice.notes}</span>}
-        {choice.lines.map(line => <span key={line.id} className="ml-6 flex justify-between gap-3 text-sm"><span>{line.displayNameSnapshot || line.itemNameSnapshot} × {line.quantity}{line.quantityUnit ?? ""}</span><span>{money(line.unitPrice * line.quantity)}</span></span>)}
+        {choice.lines.map(line => <span key={line.id} className="ml-6 flex justify-between gap-3 text-sm"><span>{lineLabel(line)}{customerOptionLineQuantity(line.quantity, line.quantityUnit)}</span><span>{money(line.unitPrice * line.quantity)}</span></span>)}
       </label>)}
     </fieldset>}
     {(plan || plans.length === 0) && <div className="mt-4 rounded-lg bg-blue-50 p-3 text-sm">

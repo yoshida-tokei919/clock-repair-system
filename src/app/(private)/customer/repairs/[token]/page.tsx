@@ -110,6 +110,7 @@ function getOptionCommonLines(repair: any) {
     id: line.id ?? index,
     itemNameSnapshot: line.itemNameSnapshot ?? line.itemName,
     displayNameSnapshot: line.displayNameSnapshot ?? (repair.customer.type === "individual" ? line.b2cDisplayNameSnapshot : null) ?? null,
+    lineType: line.lineType ?? (line.type === "part" ? "PART" : line.type === "labor" ? "LABOR" : null),
     quantity: line.quantity, quantityUnit: line.quantityUnit ?? null, unitPrice: line.unitPrice,
   }));
 }
@@ -309,7 +310,7 @@ function CustomerRepairB2CPage({ token, repairs, documentMeta, prepaymentReturn,
                   commonLines={getOptionCommonLines(repair)}
                   choices={activeOptions.choices.map((choice: any) => ({ id: choice.id, kind: choice.kind, name: choice.name, notes: choice.notes,
                     recommended: choice.recommended, lines: choice.lines.map((line: any) => ({ id: line.id, itemNameSnapshot: line.itemNameSnapshot,
-                      displayNameSnapshot: line.displayNameSnapshot, quantity: line.quantity, quantityUnit: line.quantityUnit, unitPrice: line.unitPrice })) }))}
+                      displayNameSnapshot: line.displayNameSnapshot, lineType: line.lineType, quantity: line.quantity, quantityUnit: line.quantityUnit, unitPrice: line.unitPrice })) }))}
                   mode={repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE"}
                   pdfHref={repair.estimateDocument && readToken ? `/customer/repairs/${readToken}/estimate.pdf` : undefined}
                   pdfFileId={optionPdf?.id ?? null} optionSourceHash={optionHash} available={optionAvailable}
@@ -609,7 +610,7 @@ export default async function CustomerRepairPage({ params, searchParams }: PageP
                     commonLines={getOptionCommonLines(repair)}
                     choices={activeOptions.choices.map((choice: any) => ({ id: choice.id, kind: choice.kind, name: choice.name,
                       notes: choice.notes, recommended: choice.recommended, lines: choice.lines.map((line: any) => ({
-                        id: line.id, itemNameSnapshot: line.itemNameSnapshot, displayNameSnapshot: line.displayNameSnapshot,
+                        id: line.id, itemNameSnapshot: line.itemNameSnapshot, displayNameSnapshot: line.displayNameSnapshot, lineType: line.lineType,
                         quantity: line.quantity, quantityUnit: line.quantityUnit, unitPrice: line.unitPrice,
                       })) }))} mode={repair.estimate?.pricingTaxMode === "INCLUSIVE" ? "INCLUSIVE" : "EXCLUSIVE"}
                     pdfFileId={optionPdf?.id ?? null} optionSourceHash={optionHash}

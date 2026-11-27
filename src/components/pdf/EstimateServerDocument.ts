@@ -2,6 +2,7 @@ import { formatWatchInformation } from '@/lib/timepiece-type';
 import type { TimepieceType } from '@prisma/client';
 import { formatEstimateLinePrice } from './estimate-line-price';
 import { customerPlanName, selectedOptionTotal } from '@/lib/estimate-option-totals';
+import { customerOptionLineLabel } from '@/lib/customer-option-line-label';
 
 export interface EstimateServerDocumentProps {
   data: {
@@ -40,7 +41,7 @@ export interface EstimateServerDocumentProps {
           name: string;
           notes?: string | null;
           recommended: boolean;
-          lines: { name: string; price: number; quantity: number; quantityUnit?: string | null; notes?: string | null }[];
+          lines: { name: string; lineType?: string | null; price: number; quantity: number; quantityUnit?: string | null; notes?: string | null }[];
           deltaAmount: number;
           totalAmount: number;
         }[];
@@ -262,11 +263,11 @@ export function createEstimateServerDocumentElement(
                   `${choice.kind === "PLAN" ? customerPlanName(choice.name, job.options!.choices.slice(0, choiceIndex).filter(item => item.kind === "PLAN").length) : `追加作業: ${choice.name}`}${choice.recommended ? "【おすすめ】" : ""}`),
                 choice.notes ? el(Text, null, `条件: ${choice.notes}`) : null,
                 (choice.kind === "PLAN" ? [
-                  ...job.items.map(item => ({ name: item.displayName || item.name, price: item.price, quantity: item.quantity ?? 1, quantityUnit: item.quantityUnit, notes: null })),
+                  ...job.items.map(item => ({ name: item.displayName || item.name, lineType: item.type === 'part' ? 'PART' : item.type === 'labor' ? 'LABOR' : null, price: item.price, quantity: item.quantity ?? 1, quantityUnit: item.quantityUnit, notes: null })),
                   ...choice.lines,
                 ] : choice.lines).map((line, lineIndex) => el(View, { key: lineIndex, style: styles.itemRow },
                   el(Text, { style: { flexGrow: 1, flexShrink: 1, paddingRight: 4 } },
-                    `・${line.name}${line.notes ? ` (${line.notes})` : ""}`),
+                    `・${customerOptionLineLabel(line.name, line.lineType)}${line.notes ? ` (${line.notes})` : ""}`),
                   el(Text, { wrap: false, style: { textAlign: "right", flexShrink: 0 } },
                     `${formatEstimateLinePrice(line.price, line.quantity)}${line.quantity > 1 ? line.quantityUnit ?? "" : ""}`))),
                 el(Text, { style: { textAlign: "right", fontWeight: "bold" } },

@@ -166,6 +166,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           recommended: choice.recommended,
           lines: choice.lines.map(line => ({
             name: line.displayNameSnapshot || line.itemNameSnapshot,
+            lineType: line.lineType,
             price: line.unitPrice,
             quantity: line.quantity,
             quantityUnit: line.quantityUnit,
