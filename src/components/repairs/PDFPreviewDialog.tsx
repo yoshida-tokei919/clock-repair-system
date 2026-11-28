@@ -54,7 +54,7 @@ export default function PDFPreviewDialog({ isOpen, onClose, repairData }: PDFPre
     const commonCustomer = {
         name: repairData.customer?.name || "顧客名なし",
         address: repairData.customer?.address || "",
-        type: repairData.customer?.type || 'individual'
+        type: repairData.customer?.type === 'business' ? 'business' as const : 'individual' as const
     };
 
     // Construct "Jobs" array (even if single repair, we treat as list of 1)

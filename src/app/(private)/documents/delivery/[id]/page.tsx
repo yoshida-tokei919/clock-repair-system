@@ -78,6 +78,7 @@ export default async function DeliveryDocumentPage({ params }: { params: Promise
         date: displayIssuedDate(note.issuedDate),
         customer: {
             name: note.customer.name,
+            type: note.customer.type as "business" | "individual",
             address: note.customer.address || undefined
         },
         jobs: jobs,

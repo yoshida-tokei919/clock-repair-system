@@ -42,7 +42,7 @@ export interface DeliveryDocumentProps {
     data: {
         deliveryNumber: string;
         date: string;
-        customer: { name: string; address?: string; };
+        customer: { name: string; type: 'business' | 'individual'; address?: string; };
         jobs: {
             inquiryNumber: string;
             endUserName?: string;
@@ -60,6 +60,8 @@ export interface DeliveryDocumentProps {
 }
 
 export function DeliveryDocument({ data }: DeliveryDocumentProps) {
+    const isB2C = data.customer.type === 'individual';
+    const recipientName = data.customer.name.trim().replace(/(?:\s*(?:御中|様))+$/, '').trim();
     // Calc Totals
     const inclusive = data.pricingTaxMode === "INCLUSIVE";
     const subTotal = data.subtotalAmount ?? data.jobs.reduce((sum, job) => sum + job.items.reduce((s, i) => s + i.price * (i.quantity ?? 1), 0), 0);
@@ -83,14 +85,14 @@ export function DeliveryDocument({ data }: DeliveryDocumentProps) {
                 {/* INFO */}
                 <View style={styles.infoArea}>
                     <View style={{ width: '55%' }}>
-                        <Text style={styles.recipient}>{data.customer.name} 御中</Text>
+                        <Text style={styles.recipient}>{recipientName} {isB2C ? '様' : '御中'}</Text>
                         <Text style={{ fontSize: 9, color: '#555', marginTop: 4 }}>{data.customer.address || ""}</Text>
                         <Text style={{ fontSize: 9, marginTop: 10 }}>下記の通り納品申し上げます。</Text>
                     </View>
                     <View style={{ width: '40%' }}>
                         <Text style={styles.sender}>ヨシダ時計修理工房</Text>
                         <Text style={styles.sender}>〒651-1213 神戸市北区広陵町1-162-1-401</Text>
-                        <Text style={styles.sender}>TEL: 090-2041-8275</Text>
+                        {!isB2C && <Text style={styles.sender}>TEL: 090-2041-8275</Text>}
                     </View>
                 </View>
 
